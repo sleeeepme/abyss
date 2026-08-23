@@ -1,4 +1,5 @@
 # 依存は入れない（プロトタイプは外部依存ゼロ、テストだけ playwright を使う）
+node_modules
 node_modules/
 package-lock.json
 

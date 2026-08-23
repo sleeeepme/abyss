@@ -12,12 +12,40 @@
 # 各テストは {errs, R} を JSON で吐く。R の中の真偽値は
 # すべて「true = 期待どおり」に揃えてあるので、false が1つでも出れば失敗。
 # 既知の期待 false は KNOWN に書いてある（理由もそこに書く）。
+#
+# 使い方:
+#   ./sweep.sh                 全部回す（約3分）
+#   ./sweep.sh --since         未コミットの変更に関係するスイートだけ
+#   ./sweep.sh --since HEAD~1  指定した地点からの変更ぶん
+#   ./sweep.sh --list          選ばれるスイートを表示するだけ（回さない）
+#
+# 絞り込みの中身は pick.py。対応表は人が書かず、テスト自身の語彙から毎回作る。
+# 判断がつかないときは黙って全部回す（そう作ってある）。
 cd "$(dirname "$0")"
+
 # proto/_*.mjs は掃引に入れない（_h.mjs = 共通部品 / _intrperf.mjs = 単発の計測）
-SUITES="verify touchtest scrolltest bagtest gravetest hubtest gearttest rangedtest
-        elemtest afftest bosstest pacetest partytest fxtest bossaoe zonetest kitetest
-        adtest basetest looptest forgetest movetest ulttest allytest cursetest
-        scaletest intrtest mournrest boontest allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest"
+ALL="$(ls proto/*.mjs | sed 's|proto/||;s|\.mjs$||' | grep -v '^_' | tr '\n' ' ')"
+
+MODE=all; BASE=''; LIST_ONLY=0
+case "$1" in
+  --since) MODE=since; BASE="$2" ;;
+  --list)  MODE=since; BASE="$2"; LIST_ONLY=1 ;;
+  '')      ;;
+  *)       echo "知らない引数: $1"; exit 2 ;;
+esac
+
+if [ "$MODE" = since ]; then
+  SUITES="$(python3 pick.py "$BASE" 2>/tmp/pick.why)"
+  echo "--- 絞り込み ---"
+  cat /tmp/pick.why
+  if [ -z "$SUITES" ]; then echo "回すものが無い。"; exit 0; fi
+  echo "対象: $(echo $SUITES | wc -w) 本 — $SUITES"
+  echo
+  [ "$LIST_ONLY" = 1 ] && exit 0
+else
+  SUITES="$ALL"
+fi
+
 for f in $SUITES; do
   timeout 180 node "proto/$f.mjs" 2>&1 | SUITE="$f" python3 -c '
 import json,os,sys
