@@ -14,11 +14,11 @@
 
 | パス | 内容 |
 |---|---|
-| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約568KB / 10,858行）。外部依存なし |
-| `proto/*.mjs` | 回帰テスト42スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
+| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約572KB / 10,918行）。外部依存なし |
+| `proto/*.mjs` | 回帰テスト41スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
 | `sweep.sh` | 全スイートを回して、false になった項目だけを並べる。`--since` で絞り込み |
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
-| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約184KB） |
+| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約192KB） |
 | `docs/abyss-引継書-収益設計監査.md` | 収益設計の監査・引継書（第3版／広告のみ前提） |
 | `docs/handoff.html` | 同上のHTML版 |
 | `unity/` | **凍結中。** C# は「引き撃ちの抑制」時点まで。再開時は差分を追わずプロトタイプから書き直す |
@@ -40,7 +40,7 @@ npm i -g playwright && npx playwright install chromium   # 初回のみ
 node proto/verify.mjs        # 個別に実行
 ```
 
-42スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
+41スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
 
 ```bash
 ./sweep.sh                   # 全部回して false になった項目だけ並べる（約4分30秒）
@@ -53,7 +53,7 @@ for f in verify touchtest scrolltest bagtest gravetest hubtest gearttest \
          rangedtest elemtest afftest bosstest pacetest partytest fxtest \
          bossaoe zonetest kitetest adtest basetest looptest forgetest movetest \
          ulttest allytest cursetest scaletest intrtest mournrest boontest \
-         allyuptest allyidtest arttest artpreviewtest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest; do
+         allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest; do
   echo "=== $f ==="; node proto/$f.mjs
 done
 ```

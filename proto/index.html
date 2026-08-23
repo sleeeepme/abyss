@@ -3632,11 +3632,45 @@ function resistOf(target, type){
 function buildupNeed(target){
   return target.isPlayer ? 34 + target.lv*4 : 20 + target.lv*5;
 }
+/* 継続ダメージは「毎秒 最大HPの何%まで」で頭を打つ。
+
+   これが無いと、傷の重さが**受けた側の体力と無関係**になる。
+   dps は掛けた側のレベルで決まり、maxHp は受けた側のレベルで決まるので、
+   釣り合っているうちは丁度よくても、離れた瞬間に一方的になる。
+   実測: 第6階層の苔に立ち続けたとき、Lv.1 の仲間は 4.2秒で落ちていた
+   （最大HP 66 に対して毎秒 16——1秒で4分の1）。
+
+   割合で頭を打てば、掛けた側が誰であろうと「満タンから何秒か」が揃う。 */
+const DOT_MAX_PCT   = 0.035;  // 毎秒 最大HPの 3.5% まで
+/* 浅い階はさらに半分にする。
+   序盤は回復手段も解毒も揃っていないうえ、最大HPそのものが小さいので、
+   同じ「割合」でも取り返しがつかない。踏んだことを学ぶ余地を残す。 */
+const DOT_EARLY_PCT   = 0.018;
+const DOT_EARLY_DEPTH = 10;
+function dotPct(){
+  return (S.run && S.run.depth < DOT_EARLY_DEPTH) ? DOT_EARLY_PCT : DOT_MAX_PCT;
+}
+function ourMaxHp(target){
+  if(!target) return 0;
+  if(target.maxHp) return target.maxHp;                           // 判定用の器が持ってきた値
+  if(target.isPlayer) return S.hero ? stats(S.hero).maxHp : 0;
+  if(target.ally && target.job) return allyStats(target).maxHp;   // 仲間の実体
+  return 0;
+}
+/* 味方に効く分だけ弱める。敵に与えるぶんは触らない。 */
+function dotCap(target, dps){
+  const mx=ourMaxHp(target);
+  return mx ? Math.min(dps, mx*dotPct()) : dps;
+}
 function addStatus(target, id, srcLevel){
   const def=STATUS[id]; if(!def) return;
   target.st = target.st || {};
-  const dps = target.isPlayer ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
-  target.st[id] = {t:def.dur, dps};
+  /* **仲間はこちら側。** 以前は isPlayer だけを見ていたので、
+     仲間には敵と同じ式（毎秒 6+lv*2.2）が当たっていた——プレイヤーの丁度2倍。
+     加入したての仲間が溶けていたのは、ほぼこれ（利用者からの報告）。 */
+  const ours = !!(target.isPlayer || target.ally);
+  const dps = ours ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
+  target.st[id] = {t:def.dur, dps: ours ? dotCap(target, dps) : dps};
   if(target.isPlayer) log(def.nm+'！');
 }
 function hasStatus(target, id){ return !!(target.st && target.st[id] && target.st[id].t>0); }
@@ -4854,7 +4888,9 @@ function tickHazards(dt){
   // プレイヤー
   const ph = hazardAt(P.x, P.y);
   if(ph && S.hero && (P.invuln||0)<=0){
-    const dmg = Math.max(1, Math.round(ph.dps*step*(1+lv*0.06)));
+    // 踏み続けている間の削れも、割合で頭を打つ（出血と同じ理由）
+    const cap = stats(S.hero).maxHp*dotPct()*step;
+    const dmg = Math.max(1, Math.round(Math.min(ph.dps*step*(1+lv*0.06), cap)));
     S.hero.hpNow -= dmg;
     pop(P.x, P.y-0.4, dmg, ph.edge);
     if(ph.st && rnd()<0.35 && !statusSuppressed({isPlayer:true}, ph.st))
@@ -4867,9 +4903,11 @@ function tickHazards(dt){
   // 仲間
   livingParty().forEach(a=>{
     const h=hazardAt(a.x,a.y); if(!h) return;
-    const dmg=Math.max(1, Math.round(h.dps*step*(1+lv*0.05)*0.8));
+    const cap = allyStats(a).maxHp*dotPct()*step;
+    const dmg=Math.max(1, Math.round(Math.min(h.dps*step*(1+lv*0.05)*0.8, cap)));
     a.hpNow-=dmg; pop(a.x,a.y-0.4,dmg,h.edge);
-    if(h.st && rnd()<0.30) addStatus(a, h.st, lv);
+    // 浅い階の出血よけは仲間にも掛ける（ここだけ通していなかった）
+    if(h.st && rnd()<0.30 && !statusSuppressed(a, h.st)) addStatus(a, h.st, lv);
     if(a.hpNow<=0) downAlly(a);
   });
 
@@ -5558,8 +5596,9 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
   const st = allyStats(a);
   const lv = e ? e.lv : (boltLv || (S.run?S.run.depth:1));
   const type = (e ? e.dt : dmgType) || 'blunt';
-  // ally:true を渡す。浅い階の出血よけ（statusSuppressed）がこの印を見る
-  const target = {ally:true, lv:a.lv, def:st.def, res:st.res, st:a.st, bu:a.bu};
+  // ally:true を渡す。浅い階の出血よけ（statusSuppressed）がこの印を見る。
+  // maxHp も渡す——継続ダメージの上限（DOT_MAX_PCT）が受けた側の体力を要る
+  const target = {ally:true, lv:a.lv, def:st.def, res:st.res, st:a.st, bu:a.bu, maxHp:st.maxHp};
   const r = resolveDamage(target, [{type, amount: boltDmg ?? e.atkV}], lv);
   a.st=target.st; a.bu=target.bu;
   let dm = r.total;
@@ -6390,6 +6429,31 @@ function bindTap(node, fn){
   node.addEventListener('click', run, false);
   node.addEventListener('touchend', run, {passive:false});
 }
+/* 一覧の「行」をタップで拾う。委譲なので、中身を描き直しても付け直さなくてよい。
+
+   **click だけを見てはいけない。**
+   実機のタップでは touchend のあとに click が来ないことがあり
+   （こちらが touchend を preventDefault していれば必ず来ない）、
+   click だけのハンドラは一度も呼ばれない。
+   実際に慰霊碑と「誰に着せるか」がこれで完全に無反応だった（利用者からの報告）。
+   押しても何も起きないので、原因が「秘石が足りない」に見えてしまう。
+
+   同じ物を各画面に書き写すと必ず1ヶ所抜けるので、ここに集める。
+   実際、抜けていたのは5ヶ所——報告が来たのはそのうち2ヶ所だけだった。 */
+function bindRowTap(node, sel, fn){
+  if(!node){ console.warn('bindRowTap: element not found'); return; }
+  const run=e=>{
+    const t = (e.target && e.target.closest) ? e.target.closest(sel) : null;
+    if(!t) return;                       // 背景や閉じるボタンは素通りさせる
+    if(!tapAccepted(e)) return;
+    if(e.cancelable) e.preventDefault();
+    e.stopPropagation();                 // 下の townTap / bagTap に二重で拾わせない
+    fn(t, e);
+  };
+  node.addEventListener('click', run, false);
+  node.addEventListener('touchend', run, {passive:false});
+  node.__rowTap = true;                // 「両方に付けた」の印。検査で数える
+}
 
 /* ---------- 入力 ---------- */
 const keys={};
@@ -6408,49 +6472,6 @@ let stickId=null, stickOx=0, stickOy=0, stickDx=0, stickDy=0;
 const stickEl=el('stick'), knobEl=el('knob');
 function el(id){return document.getElementById(id)}
 const cv=el('cv'), ctx=cv.getContext('2d');
-
-/* `art-preview.html` からだけ有効になる、実アセット差し替え前の見た目検証。
-   通常のプレイURLには一切影響させない。 */
-const artPreviewEnabled = new URLSearchParams(location.search).has('artPreview');
-let artPreviewPlayerSprite = null;
-if(artPreviewEnabled){
-  const src = new Image();
-  src.addEventListener('load', ()=>{
-    // ゲーム用に 18×29px へ整理済みの透過PNG。読み込みに失敗したときは
-    // artPreview でも従来の丸マーカーへ戻る。
-    artPreviewPlayerSprite=src;
-  });
-  src.src='assets/player-sprite-v1.png';
-}
-
-/* 上下揺れは描画だけの演出。P の座標・当たり判定・カメラには触れない。 */
-function artPreviewBobAt(ms,idle){
-  return idle ? Math.round(Math.sin(ms/400)) : 0;
-}
-/* 検証URLだけで使う小さな確認口。通常URLには出さない。 */
-if(artPreviewEnabled) window.__ART_PREVIEW__={
-  ready:()=>!!artPreviewPlayerSprite,
-  spriteSize:()=>artPreviewPlayerSprite
-    ? [artPreviewPlayerSprite.naturalWidth,artPreviewPlayerSprite.naturalHeight] : null,
-  bobAt:artPreviewBobAt
-};
-function drawArtPreviewPlayer(x,y,angle,ms=performance.now()){
-  if(!artPreviewPlayerSprite) return false;
-  // ネイティブの18px級をそのまま描く。90度単位だけ向きを変えるので、
-  // 斜め回転や非整数倍率によるドットの滲みを避けられる。
-  const w=artPreviewPlayerSprite.naturalWidth, h=artPreviewPlayerSprite.naturalHeight;
-  const idle=!P.moving && !P.target && !P.guard && !W.mine && P.swing<=0;
-  const bob=artPreviewBobAt(ms,idle);
-  const facing=Math.round((angle-Math.PI/2)/(Math.PI/2))*Math.PI/2;
-  ctx.save();
-  ctx.imageSmoothingEnabled=false;
-  ctx.translate(Math.round(x),Math.round(y)+bob);
-  // 元絵は画面下向き。ランタンも含めて四方向へ向ける。
-  ctx.rotate(facing);
-  ctx.drawImage(artPreviewPlayerSprite,-Math.round(w/2),-Math.round(h*0.56),w,h);
-  ctx.restore();
-  return true;
-}
 
 /* ---------- 指の役割分担 ----------
    以前は **画面の左右**で決めていた（左半分＝スティック／右半分＝ガード）。
@@ -7820,22 +7841,19 @@ function draw(){
     ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
+  ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
+  ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
+  // 向き矢印
   const ang=Math.atan2(P.diry,P.dirx);
-  const artPlayerDrawn=artPreviewEnabled && drawArtPreviewPlayer(px,py,ang);
-  if(!artPlayerDrawn){
-    ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
-    ctx.fillStyle='#ffffff';
-    ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
-    ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
-    // 向き矢印
-    ctx.fillStyle='#7fe0c0';
-    ctx.beginPath();
-    ctx.moveTo(px+Math.cos(ang)*TS*0.62, py+Math.sin(ang)*TS*0.62);
-    ctx.lineTo(px+Math.cos(ang+2.5)*TS*0.34, py+Math.sin(ang+2.5)*TS*0.34);
-    ctx.lineTo(px+Math.cos(ang-2.5)*TS*0.34, py+Math.sin(ang-2.5)*TS*0.34);
-    ctx.closePath(); ctx.fill();
-  }
+  ctx.fillStyle='#7fe0c0';
+  ctx.beginPath();
+  ctx.moveTo(px+Math.cos(ang)*TS*0.62, py+Math.sin(ang)*TS*0.62);
+  ctx.lineTo(px+Math.cos(ang+2.5)*TS*0.34, py+Math.sin(ang+2.5)*TS*0.34);
+  ctx.lineTo(px+Math.cos(ang-2.5)*TS*0.34, py+Math.sin(ang-2.5)*TS*0.34);
+  ctx.closePath(); ctx.fill();
   ctx.globalAlpha=1;
   label('自分', px, py-TS*0.72, '#7fe0c0');
   // 攻撃エフェクト（属性ごとに形が変わる）
@@ -8824,11 +8842,12 @@ function renderMem(){
       }).join('');
 }
 function boodName(id){ const d=boonDef(id); return d?d.nm:id; }
-el('scr-mem').addEventListener('click', e=>{
-  const t=e.target.closest('[data-mem]');
-  if(!t) return;
+bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   const r=memRevive(+t.dataset.mem);
+  /* 呼び戻せなかったら**理由を言う。**
+     黙って何も起きないと、押し方が悪いのか秘石が足りないのか分からない。 */
   if(r.ok) log(r.ally.name+'が戻ってきた');
+  else showBanner('呼び戻せない', r.why||'', '#e0705a', 2.0);
   renderMem(); renderTown();
 });
 function shopHTML(it){
@@ -9130,7 +9149,7 @@ function allyEquipTakeOff(uid){
   a.hpNow=Math.min(a.hpNow, allyStats(a).maxHp);
   renderAllyEquip();
 }
-el('m-allyeq').addEventListener('click', e=>{
+bindRowTap(el('m-allyeq'), '[data-aeon],[data-aeoff],[data-aecharm]', (n,e)=>{
   const on=e.target.closest('[data-aeon]');
   if(on){ allyEquipGive(+on.dataset.aeon); return; }
   const off=e.target.closest('[data-aeoff]');
@@ -9299,9 +9318,7 @@ function renderForgeFix(mid){
     : `修理には鉱石 ×${c.need}（所持 ${oreAnyTotal(mid)}）`;
   btn.className = c.ok ? (anyBroken?'primary':'') : 'ghost';
 }
-el('fg-who').addEventListener('click', e=>{
-  const t=e.target.closest('[data-fgwho]');
-  if(!t) return;
+bindRowTap(el('fg-who'), '[data-fgwho]', t=>{
   _forgeWho = t.dataset.fgwho==='me' ? null : +t.dataset.fgwho;
   renderForge();
 });
@@ -9342,9 +9359,7 @@ bindTap(el('fg-do'), ()=>{
 });
 bindTap(el('fg-close'), closeForge);
 bindTap(el('ms-close'), closeMerchant);
-el('m-mshop').addEventListener('click', e=>{
-  const t=e.target.closest('[data-mbuy]');
-  if(!t) return;
+bindRowTap(el('m-mshop'), '[data-mbuy]', t=>{
   const r=buyFromMerchant(+t.dataset.mbuy);
   if(r.ok) log('🎒 '+itemName(r.item)+' を買った');
   else if(r.why) log(r.why);
@@ -9754,9 +9769,8 @@ function openWearPick(it){
   el('m-wear').classList.add('on');
 }
 function closeWearPick(){ el('m-wear').classList.remove('on'); _wearItem=null; }
-el('m-wear').addEventListener('click', e=>{
-  const n=e.target.closest('[data-wear]');
-  if(!n || !_wearItem) return;
+bindRowTap(el('m-wear'), '[data-wear]', n=>{
+  if(!_wearItem) return;
   const who=n.dataset.wear;
   if(who==='hero') wearOnHero(_wearItem);
   else{

@@ -466,4 +466,201 @@ R.playerCanStillBleedEnemies = await pg.evaluate(()=>{
   return {bleeding: !!e.st.bleed, ok: !!e.st.bleed};
 });
 
+/* ================= 8. 一覧の行が、実機のタップで反応する =================
+
+   ここは **合成 MouseEvent('click') では絶対に落ちない**。
+   実際 towntest.givesToAlly は click を直に投げていたので通り続けていた。
+   本物のタップでは touchend のあとに click が来ないことがあり、
+   click だけを見ているハンドラは一度も呼ばれない。
+   慰霊碑と「誰に着せるか」がこれで完全に無反応だった（利用者からの報告）。
+   だからここだけは pg.tap() を使う。 */
+
+const tap = async (sel)=>{
+  const l=pg.locator(sel).first();
+  await l.scrollIntoViewIfNeeded().catch(()=>{});
+  try{ await l.tap({timeout:2500}); return null; }
+  catch(e){ return e.message.split('\n')[0]; }
+};
+
+// 8-a. 慰霊碑：秘石が足りていれば、行をタップして呼び戻せる
+await pg.evaluate(()=>{
+  S.hero=newHero(); S.run=null; S.hero.party=[]; S.shards=99999; S.fallen=[];
+  const v=TH.ally(10,'warrior',10); uniqueAllyName(v,[]); memInter(v);
+  setScreen('mem');
+});
+R.memRowTapRevives = {err: await tap('#memlist [data-mem]')};
+Object.assign(R.memRowTapRevives, await pg.evaluate(()=>({
+  party:party().length, fallen:(S.fallen||[]).length,
+  ok: party().length===1 && (S.fallen||[]).length===0
+})));
+
+/* 8-b. 呼び戻せないときは**理由を出す。**
+       黙って何も起きないと、押し方が悪いのか秘石が足りないのか分からない。 */
+await pg.evaluate(()=>{
+  S.hero=newHero(); S.run=null; S.shards=99999; S.fallen=[];
+  S.hero.party=[];
+  for(let i=0;i<PARTY_MAX;i++){                      // 満員にする
+    const a=TH.ally(10,'warrior',10); a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a);
+  }
+  const v=TH.ally(10,'mage',10); uniqueAllyName(v,[]); memInter(v);
+  setScreen('mem');
+  _banner=null;
+});
+R.memBlockedSaysWhy = {err: await tap('#memlist [data-mem]')};
+Object.assign(R.memBlockedSaysWhy, await pg.evaluate(()=>({
+  banner: _banner ? _banner.title+'/'+_banner.sub : null,
+  ok: !!(_banner && _banner.sub)
+})));
+
+// 8-c. 倉庫：装備をタップ → 相手を選ぶ → 本当に着る
+await pg.evaluate(()=>{
+  S.hero=newHero(); S.run=null;
+  const a=TH.ally(10,'priest',10); a.slot=0; uniqueAllyName(a,party()); S.hero.party=[a];
+  const it=genBaseItem(jobDef('priest').weapon,16,1); it.ident=true;
+  S.stash=[it]; S.hero.equip.weapon=null;
+  setScreen('stash');
+});
+R.stashRowOpensPicker = {err: await tap('#stash .item')};
+R.stashRowOpensPicker.ok = await pg.evaluate(()=>el('m-wear').classList.contains('on'));
+
+R.wearRowTapEquips = {err: await tap('#wear-list [data-wear="hero"]')};
+Object.assign(R.wearRowTapEquips, await pg.evaluate(()=>({
+  closed: !el('m-wear').classList.contains('on'),
+  heroGot: !!S.hero.equip.weapon,
+  stashEmpty: S.stash.length===0,
+  ok: !el('m-wear').classList.contains('on') && !!S.hero.equip.weapon && S.stash.length===0
+})));
+
+// 8-d. 炉の対象選択も同じ経路（報告は来ていないが、同じ書き方で壊れていた）
+await pg.evaluate(()=>{
+  S.hero=newHero(); S.run=null; S.gold=999999; S.ore={raw:999,fine:999,deep:999};
+  S.hero.equip.weapon=genBaseItem('sword',20,1);
+  S.hero.party=[];
+  const a=TH.ally(20,'warrior',20); a.slot=0;
+  a.equip.weapon=genBaseItem(jobDef('warrior').weapon,20,1);
+  uniqueAllyName(a,party()); S.hero.party=[a];
+  openForge(false);
+});
+R.forgeWhoTap = {err: await tap('#fg-who [data-fgwho]:not([data-fgwho="me"])')};
+Object.assign(R.forgeWhoTap, await pg.evaluate(()=>{
+  const picked=_forgeWho!==null;
+  el('m-forge').classList.remove('on');
+  return {who:_forgeWho, ok: picked};
+}));
+
+/* 8-e. click だけを見ている委譲ハンドラが残っていないこと。
+       ここは「いま直した2ヶ所」ではなく**書き方そのもの**を見る検査。
+       抜けていたのは5ヶ所で、報告が来たのはそのうち2ヶ所だけだった——
+       報告を待っていると残りは見つからない。 */
+R.noClickOnlyLists = await pg.evaluate(()=>{
+  const ids=['scr-mem','m-wear','m-allyeq','fg-who','m-mshop'];
+  const missing=ids.filter(id=>{
+    const n=document.getElementById(id);
+    return !n || !n.__rowTap;      // bindRowTap を通った印
+  });
+  return {ids, missing, ok: missing.length===0};
+});
+
+/* ================= 9. 継続ダメージ ================= */
+
+/* 9-a. 仲間はこちら側の式で計算される。
+       以前は isPlayer だけを見ていたので、仲間には敵と同じ式が当たっていた
+       （プレイヤーの丁度2倍）。加入したての仲間が溶けていたのは、ほぼこれ。 */
+R.allyDotIsOurs = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(12);
+  const lv=8;
+  const p={isPlayer:true, st:{}, maxHp:1e9};
+  const a={ally:true, lv:3, st:{}, maxHp:1e9};      // 上限を効かせないため巨大HP
+  addStatus(p,'bleed',lv); addStatus(a,'bleed',lv);
+  return {player:+p.st.bleed.dps.toFixed(2), ally:+a.st.bleed.dps.toFixed(2),
+          enemyWouldBe:+(6+lv*2.2).toFixed(2),
+          ok: Math.abs(p.st.bleed.dps-a.st.bleed.dps)<0.01};
+});
+
+/* 9-b. 継続ダメージは最大HPの割合で頭を打つ。
+       dps は掛けた側のレベル、maxHp は受けた側のレベルで決まるので、
+       これが無いと釣り合いが崩れた瞬間に一方的になる。 */
+R.dotCappedByMaxHp = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(30);           // 深い＝掛ける側が強い
+  const small={ally:true, lv:1, st:{}, maxHp:60};
+  const big  ={ally:true, lv:1, st:{}, maxHp:600};
+  addStatus(small,'bleed',30); addStatus(big,'bleed',30);
+  const cap=60*DOT_MAX_PCT;
+  return {small:+small.st.bleed.dps.toFixed(2), big:+big.st.bleed.dps.toFixed(2),
+          cap:+cap.toFixed(2), raw:+(3+30*1.1).toFixed(2),
+          ok: Math.abs(small.st.bleed.dps-cap)<0.01 && big.st.bleed.dps>small.st.bleed.dps};
+});
+
+// 9-c. 浅い階はさらに緩い
+R.dotEasierEarly = await pg.evaluate(()=>{
+  const probe=(depth)=>{
+    TH.run(1,{seed:4}); TH.floor(depth);
+    const t={ally:true, lv:1, st:{}, maxHp:200};
+    addStatus(t,'bleed',30);
+    return +t.st.bleed.dps.toFixed(2);
+  };
+  const shallow=probe(3), deep=probe(20);
+  return {shallow, deep, earlyDepth:DOT_EARLY_DEPTH,
+          ok: shallow < deep && Math.abs(shallow - 200*DOT_EARLY_PCT) < 0.01};
+});
+
+/* 9-d. 苔に立ち続けても、序盤なら生きて出られる。
+       実測（直す前）: 第6階層で Lv.1 の仲間は **4.2秒** で落ちていた。 */
+R.standingInMossSurvivable = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); TH.floor(6);
+  S.hero.lv=5; S.hero.str=10;S.hero.dex=10;S.hero.vit=10;S.hero.int=10;
+  S.hero.hpNow=stats(S.hero).maxHp;
+  S.hero.party=[];
+  const a=TH.ally(1,'warrior',1); a.slot=0; uniqueAllyName(a,party());
+  S.hero.party=[a]; a.hpNow=allyStats(a).maxHp;
+  const f=W.fl;
+  W.haz={kind:'spore', g:[]};
+  for(let y=0;y<f.H;y++) W.haz.g[y]=new Array(f.W).fill(0);
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+    const gy=Math.floor(P.y)+dy, gx=Math.floor(P.x)+dx;
+    if(W.haz.g[gy]) W.haz.g[gy][gx]=1;
+  }
+  W.enemies.length=0;                       // 継続ダメージだけを見る
+  a.x=P.x; a.y=P.y;
+  const mx=allyStats(a).maxHp;
+  stepSim(10, {each:()=>{ a.x=P.x; a.y=P.y; }});
+  const left = a.dead ? 0 : a.hpNow;
+  return {maxHp:Math.round(mx), left:Math.round(left),
+          lostPct:+((1-left/mx)*100).toFixed(0),
+          alive: !a.dead,
+          ok: !a.dead && left > mx*0.4};      // 10秒で6割以上は削らない
+});
+
+// 9-e. 深い階では危険なまま（緩めたのは序盤だけ）
+R.deepStillHurts = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(25);
+  const t={ally:true, lv:1, st:{}, maxHp:200};
+  addStatus(t,'bleed',25);
+  return {dps:+t.st.bleed.dps.toFixed(2), pct:DOT_MAX_PCT,
+          ok: Math.abs(t.st.bleed.dps - 200*DOT_MAX_PCT) < 0.01};
+});
+
+/* 9-f. 浅い階の出血よけは、ハザード経由の仲間にも掛かる。
+       ここだけ statusSuppressed を通していなかった。 */
+R.allyHazardNoEarlyBleed = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); TH.floor(3);            // BLEED_MIN_DEPTH より浅い
+  S.hero.party=[];
+  const a=TH.ally(5,'warrior',5); a.slot=0; uniqueAllyName(a,party());
+  S.hero.party=[a]; a.hpNow=1e9; a.st={};
+  const f=W.fl;
+  W.haz={kind:'spore', g:[]};
+  for(let y=0;y<f.H;y++) W.haz.g[y]=new Array(f.W).fill(0);
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+    const gy=Math.floor(P.y)+dy, gx=Math.floor(P.x)+dx;
+    if(W.haz.g[gy]) W.haz.g[gy][gx]=1;
+  }
+  W.enemies.length=0;
+  a.x=P.x; a.y=P.y;
+  stepSim(12, {each:()=>{ a.x=P.x; a.y=P.y; a.hpNow=1e9; }});
+  // 否定側は肯定形で書く（false は掃引では失敗として並ぶ）
+  return {depth:S.run.depth, min:BLEED_MIN_DEPTH,
+          clean: !(a.st && a.st.bleed),
+          ok: !(a.st && a.st.bleed)};
+});
+
 await done(b, errs, R);
