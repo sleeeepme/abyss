@@ -6409,6 +6409,50 @@ const stickEl=el('stick'), knobEl=el('knob');
 function el(id){return document.getElementById(id)}
 const cv=el('cv'), ctx=cv.getContext('2d');
 
+/* `art-preview.html` からだけ有効になる、実アセット差し替え前の見た目検証。
+   通常のプレイURLには一切影響させない。 */
+const artPreviewEnabled = new URLSearchParams(location.search).has('artPreview');
+let artPreviewPlayerSprite = null;
+if(artPreviewEnabled){
+  const src = new Image();
+  src.addEventListener('load', ()=>{
+    /* スタイルテストの中から、ランタンを持つ冒険者だけを 18×20px の
+       ネイティブスプライトへ落とす。背景の藍だけを透過して、床の上に置けるようにする。 */
+    const crop=document.createElement('canvas'), cc=crop.getContext('2d');
+    crop.width=104; crop.height=120;
+    cc.imageSmoothingEnabled=false;
+    cc.drawImage(src,446,326,104,120,0,0,104,120);
+    const sprite=document.createElement('canvas'), sc=sprite.getContext('2d');
+    sprite.width=18; sprite.height=20;
+    sc.imageSmoothingEnabled=false;
+    sc.drawImage(crop,0,0,crop.width,crop.height,0,0,sprite.width,sprite.height);
+    const px=sc.getImageData(0,0,sprite.width,sprite.height);
+    for(let i=0;i<px.data.length;i+=4){
+      const r=px.data[i], g=px.data[i+1], b=px.data[i+2];
+      // 深い藍の背景だけ消す。黒いアウトラインは残して輪郭を守る。
+      if(r<25 && g<28 && b>r+12 && b>g+12) px.data[i+3]=0;
+    }
+    sc.putImageData(px,0,0);
+    artPreviewPlayerSprite=sprite;
+  });
+  src.src='assets/player-art-preview-source.png';
+}
+
+function drawArtPreviewPlayer(x,y,angle){
+  if(!artPreviewPlayerSprite) return false;
+  // 元の試作絵は余白込みで切り出しているため、表示時は一段大きくして
+  // 8〜12px級の輪郭が実プレイ中にも読める大きさにする。
+  const w=TS*1.55, h=TS*1.78;
+  ctx.save();
+  ctx.imageSmoothingEnabled=false;
+  ctx.translate(x,y+TS*0.05);
+  // 元絵は画面下向き。移動・攻撃方向に合わせてだけ回す。
+  ctx.rotate(angle-Math.PI/2);
+  ctx.drawImage(artPreviewPlayerSprite,-w/2,-h*0.58,w,h);
+  ctx.restore();
+  return true;
+}
+
 /* ---------- 指の役割分担 ----------
    以前は **画面の左右**で決めていた（左半分＝スティック／右半分＝ガード）。
    左利きや、右手で持って右親指で動かしたい人が動かせない。
@@ -7777,19 +7821,22 @@ function draw(){
     ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
-  ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
-  ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
-  // 向き矢印
   const ang=Math.atan2(P.diry,P.dirx);
-  ctx.fillStyle='#7fe0c0';
-  ctx.beginPath();
-  ctx.moveTo(px+Math.cos(ang)*TS*0.62, py+Math.sin(ang)*TS*0.62);
-  ctx.lineTo(px+Math.cos(ang+2.5)*TS*0.34, py+Math.sin(ang+2.5)*TS*0.34);
-  ctx.lineTo(px+Math.cos(ang-2.5)*TS*0.34, py+Math.sin(ang-2.5)*TS*0.34);
-  ctx.closePath(); ctx.fill();
+  const artPlayerDrawn=artPreviewEnabled && drawArtPreviewPlayer(px,py,ang);
+  if(!artPlayerDrawn){
+    ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
+    ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
+    // 向き矢印
+    ctx.fillStyle='#7fe0c0';
+    ctx.beginPath();
+    ctx.moveTo(px+Math.cos(ang)*TS*0.62, py+Math.sin(ang)*TS*0.62);
+    ctx.lineTo(px+Math.cos(ang+2.5)*TS*0.34, py+Math.sin(ang+2.5)*TS*0.34);
+    ctx.lineTo(px+Math.cos(ang-2.5)*TS*0.34, py+Math.sin(ang-2.5)*TS*0.34);
+    ctx.closePath(); ctx.fill();
+  }
   ctx.globalAlpha=1;
   label('自分', px, py-TS*0.72, '#7fe0c0');
   // 攻撃エフェクト（属性ごとに形が変わる）
