@@ -247,7 +247,12 @@
   /* 広告は必ず最前面。他のモーダルと同じ z-index だと DOM 順で下に潜り、
      視聴完了ボタンが押せなくなる（重ねない運用にしているが、保険として明示する） */
   #m-ad{z-index:40}
-  .modal .box{width:100%;max-width:380px}
+  /* 中身が画面より高くなり得るモーダルは全部ある。
+     実際に踏んだ: 炉のメニューが伸びて「閉じる」が画面外へ出て、
+     **開いたら二度と閉じられない**状態になった。
+     個別に付けて回ると必ず付け忘れが出るので、箱そのものに持たせる。 */
+  .modal .box{width:100%;max-width:380px;max-height:88vh;overflow-y:auto;
+    -webkit-overflow-scrolling:touch}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
 
   /* 拠点のメニュー（画面を分けて 1 画面あたりの情報量を減らす） */
@@ -2994,7 +2999,13 @@ function knownFloor(depth){ return depth <= (S.deepest - KNOWN_MARGIN); }
    無名の内部倍率だと、遅くなったことが不具合に見える。 */
 function windGrace(){
   if(!S.run) return false;
-  return S.run.depth <= (S.run.startDeepest||0);
+  /* **等号を入れない。** S.deepest は「到達した階」であって「抜けた階」ではない。
+     `<=` にしていたせいで、初回の第1階層（deepest=1）にも加護が掛かっていた——
+     一度も歩いたことのない道が、最初から「知っている道」になっていた。
+
+     死んだ階も同じで、そこで倒れた以上まだ抜けていない。
+     加護が掛かるのは「一度その先へ降りた階」だけ。 */
+  return S.run.depth < (S.run.startDeepest||0);
 }
 
 /* ---------- 未踏の階層では階段を隠す ----------
@@ -3420,8 +3431,26 @@ function heroName(){
   if(gen<=1) return base;
   return base+'　'+(GEN_KANJI[gen]||gen)+'代目';
 }
+/* ---------- 生まれ直しの下駄 ----------
+   死ぬたびに Lv.1 からやり直すのは、深く潜るほど再走が長くなるということ。
+   第40階層で死んだ人が、また第1階層を Lv.1 で歩くのは罰でしかない。
+
+   **大ボスを1体倒すごとに、次のキャラの初期レベルが 2 上がる。**
+   大ボスは口座側の記録（S.greatKills）なので、死んでも消えない。
+   「どこまで行けたか」が、そのまま次のキャラの出発点になる。
+
+   上限を置いてあるのは、周回を重ねた人が初期レベルだけで
+   序盤を無に帰さないため——道中の目盛り（武器熟練）と喧嘩させたくない。 */
+const REBIRTH_PER_GREAT = 2;    // 大ボス1体につき初期レベル +2
+const REBIRTH_MAX_LV    = 21;   // 初期レベルの上限（大ボス10体ぶん）
+function rebirthLevel(){
+  return Math.min(REBIRTH_MAX_LV, 1 + greatKills()*REBIRTH_PER_GREAT);
+}
 function newHero(){
-  return {name:heroName(), lv:1, xp:0, str:5,dex:5,vit:5,int:5,
+  /* レベルアップは str/dex/vit を 1 ずつ上げるので、
+     初期レベルぶんの能力値もその式のまま与える（別勘定にしない）。 */
+  const lv = rebirthLevel(), up = lv-1;
+  return {name:heroName(), lv, xp:0, str:5+up, dex:5+up, vit:5+up, int:5+up,
           equip:{weapon:null,shield:null,armor:null,accessory:null}, hpNow:0,
           // 潜在は死ぬまで残る（拠点に戻っても消えない）。
           // 祭壇があれば、前のキャラの潜在をいくつか引き継いで生まれる。
@@ -4188,7 +4217,17 @@ function spawnNpc(fl, depth){
    その場から動かないのも意図。追わせると1人で群れに突っ込んで必ず死ぬので、
    「その場で耐えている」形にして、間に合わせるかどうかをプレイヤーの足に預ける。 */
 const NPC_WAKE_DIST = 8.5;    // ここまで近づき、かつ見通せたら気づく
-const NPC_ENGAGE    = 5.0;    // 気づいたあと、この距離までの敵を相手にする
+/* 相手にする距離。**索敵の広い遠距離敵に合わせて広く取る。**
+   5.0 にしていたせいで、射程 5.0 の「守り手」に一方的に撃たれて、
+   本人はそれを相手だとすら思っていない、という形になっていた。 */
+const NPC_ENGAGE    = 8.0;
+/* 間合いが足りないときだけ詰める。上限は**元いた場所からの距離**で持つ。
+   仲間のように「相手を追う」形にすると、1体倒すたびに次の敵へ引っ張られて
+   1人で群れの中に立つ。動ける範囲そのものを縛れば、それは起きない。
+
+   5.0 なのは、相手にする距離（8.0）の内側を実際に殴りに行ける値だから。
+   3.2 では、射程 5.0 の相手に近接が届かず、結局一方的に撃たれるだけだった。 */
+const NPC_LEASH     = 5.0;
 function npcAwake(){ return !!(W.npc && W.npc.awake); }
 function updateNpc(dt){
   const a=W.npc; if(!a) return;
@@ -4201,10 +4240,12 @@ function updateNpc(dt){
     const d=Math.hypot(a.x-P.x, a.y-P.y);
     if(d<=NPC_WAKE_DIST && losClear(P.x,P.y,a.x,a.y)){
       a.awake=true;
+      a.homeX=a.x; a.homeY=a.y;      // 詰めてよい範囲の基準
       if(nearestEnemyTo(a.x,a.y,NPC_ENGAGE)) log('◆ '+allyLabel(a)+'が敵と交戦している');
     }
     return;
   }
+  if(a.homeX===undefined){ a.homeX=a.x; a.homeY=a.y; }
 
   const st=allyStats(a);
   tickStatus(a, dt, (d,col)=>{ a.hpNow-=d; pop(a.x,a.y-0.4,d,col); });
@@ -4212,11 +4253,27 @@ function updateNpc(dt){
 
   const tgt=nearestEnemyTo(a.x, a.y, NPC_ENGAGE);
   a.tgt=tgt||null;
-  a.mvx=0; a.mvy=0; a.moving=false;     // その場を動かない（追わせると孤立して死ぬ）
+  a.mvx=0; a.mvy=0; a.moving=false;
   if(!tgt) return;
   const dx=tgt.x-a.x, dy=tgt.y-a.y, d=Math.hypot(dx,dy)||1e-6;
   a.dirx=dx/d; a.diry=dy/d;
-  if(a.atkCd<=0 && d <= st.range+tgt.r) allyAttack(a, st, tgt);
+
+  /* 届かないなら詰める。
+     以前は「その場を動かない」だけだったので、射程の長い相手に対しては
+     **殴られ続けるだけで一度も殴り返せなかった**（近接ジョブなら必ずそうなる）。
+     ただし追いかけ回させない——元いた場所から NPC_LEASH までしか出ない。
+     間合いに入っていれば動かないので、張り付いたあとの見え方は今までと同じ。 */
+  const reach = st.range + tgt.r;
+  if(d > reach*0.92){
+    const homeD = Math.hypot(a.x-a.homeX, a.y-a.homeY);
+    if(homeD < NPC_LEASH){
+      const step = st.ms * 0.85 * dt;
+      const bx=a.x, by=a.y;
+      moveEnt(a, dx/d*step, dy/d*step);
+      a.mvx=dx/d; a.mvy=dy/d; a.moving = Math.hypot(a.x-bx, a.y-by) > step*0.2;
+    }
+  }
+  if(a.atkCd<=0 && Math.hypot(tgt.x-a.x, tgt.y-a.y) <= reach) allyAttack(a, st, tgt);
 }
 /* 敵の弱点・耐性を短く並べる（UI 用） */
 function resLine(res){
@@ -6113,6 +6170,14 @@ function die(){
       + '鉱石は持ち帰らないと自分の物にならない</span></div>';
   }
   html += '<div style="color:var(--dim);font-size:11px;margin-top:14px">（倉庫の装備と所持金は無事）</div>';
+  /* 次のキャラの出発点をここで言う。
+     「また Lv.1 からか」と思わせないことが、この下駄の仕事の半分なので、
+     数字が乗る場所ではなく、**心が折れる場所**に書く。 */
+  if(greatKills()>0){
+    html += '<div style="color:#7fe0c0;margin-top:10px;line-height:1.8">'
+      + '倒した大ボス <b>'+greatKills()+'</b> 体ぶん、次の代は <b>Lv.'+rebirthLevel()+'</b> から始まる'
+      + '<br><span style="color:var(--dim);font-size:11px">武器の熟練と遺物もそのまま残っている</span></div>';
+  }
   /* 祭壇（拠点開発）。積み上げた潜在が完全には消えなくなる。
      全部残すと死のコストが無くなるので、価値の高い順に数個だけ。 */
   /* 引き継ぎの元手。レア度の高い順に並べておき、
