@@ -28,6 +28,14 @@
   /* 拠点まわりの画面だけに出る下部バナー枠。
      探索中は絶対に出さない（画面が狭く、視界が塞がると被弾に直結する）。
      実際の広告SDKに差し替える前提のダミー枠。高さは標準的なバナー（50px）に合わせてある。 */
+  /* 潜るボタンの固定バー。バナーの真上に置く。
+     拠点で一番よく押すボタンが、スクロールしないと出てこないのはおかしかった。 */
+  #divebar{position:fixed;left:0;right:0;bottom:0;z-index:13;display:none;
+    padding:8px 16px calc(8px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--bg) 68%, rgba(11,13,18,0));}
+  #divebar.on{display:block}
+  #divebar.banner{bottom:calc(50px + env(safe-area-inset-bottom));
+    padding-bottom:8px;background:linear-gradient(to top, var(--bg) 78%, rgba(11,13,18,0))}
   #adbar{position:fixed;left:0;right:0;bottom:0;height:calc(50px + env(safe-area-inset-bottom));
     padding-bottom:env(safe-area-inset-bottom);
     display:none;align-items:center;justify-content:center;
@@ -45,7 +53,7 @@
     /* #hud は pointer-events:none なので、押せるものは自分で auto に戻す。
        これが抜けていて、大技ボタンは**見えているのに押せなかった**
        （クリックが下のキャンバスへ抜けていた）。
-       同じ HUD の中でも prompt / helpbtn / bagbtn は auto を持っていて、
+       同じ HUD の中でも prompt / bagbtn / statbtn は auto を持っていて、
        このボタンだけが漏れていた。 */
     pointer-events:auto;
     user-select:none;z-index:6}
@@ -59,6 +67,9 @@
     border:1px solid var(--line);padding:1px 5px;margin-right:8px}
   /* バナーに隠れないよう、対象画面の下だけ余白を足す */
   .screen.banner{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+  /* 拠点はさらに「潜る」バーのぶんを足す（重なると押せないボタンができる） */
+  #scr-town.banner{padding-bottom:calc(128px + env(safe-area-inset-bottom))}
+  #scr-town{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
   h1{font-size:20px;margin:0 0 4px;letter-spacing:.06em}
   h2{font-size:13px;margin:18px 0 8px;color:var(--dim);font-weight:600;letter-spacing:.08em}
   .sub{font-size:12px;color:var(--dim);margin:0 0 14px;line-height:1.6}
@@ -80,6 +91,26 @@
   .item .af{color:var(--dim);font-size:11px}
   .item.eq{outline:1px solid #3d7a5c}
   .empty{color:var(--dim);font-size:12px;padding:10px 0}
+
+  /* ---------- タイトル画面 ----------
+     起動していきなり拠点に立たされると、**遊びが始まった瞬間が無い**。
+     何のゲームなのかも、自分が誰なのかも決めないまま操作を求められる。
+     ここは情報を置く場所ではなく、息を整える場所なので、
+     置くものは「題名」と「始める」と「遊び方」の3つだけにしてある。 */
+  #scr-title{justify-content:center;align-items:center;text-align:center;
+    background:radial-gradient(120% 90% at 50% 8%, #16202e 0%, var(--bg) 62%)}
+  #scr-title .logo{font-size:38px;font-weight:800;letter-spacing:.14em;line-height:1.1;
+    margin:0 0 6px;color:#e8e2d8;
+    text-shadow:0 0 28px rgba(150,190,255,.18)}
+  #scr-title .tagline{font-size:12px;color:var(--dim);letter-spacing:.18em;margin:0 0 4px}
+  #scr-title .ver{font-size:10px;color:#5c6479;letter-spacing:.1em;margin-bottom:34px}
+  #scr-title .tbtns{width:100%;max-width:300px;display:flex;flex-direction:column;gap:10px}
+  #scr-title .foot{margin-top:30px;font-size:10px;color:#5c6479;line-height:1.8}
+  /* 名前の入力。text-size-adjust を切らないと iOS が勝手に拡大する */
+  #nm-input{width:100%;font-family:inherit;font-size:17px;font-weight:700;text-align:center;
+    color:var(--txt);background:#171c26;border:1px solid #2a3040;border-radius:10px;
+    padding:14px 12px;margin:6px 0 10px;-webkit-text-size-adjust:100%}
+  #nm-input:focus{outline:none;border-color:#3d7a5c}
 
   /* HUD */
   #hud{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;display:none;z-index:5;
@@ -103,6 +134,14 @@
   #bossbar .bl>i{display:block;height:100%;background:linear-gradient(90deg,#c4433f,#e0803f);
     width:100%;transition:width .12s linear}
   #bossbar span{font-size:11px;font-weight:700;color:#e0a090;letter-spacing:.06em}
+  /* 試練の残り時間。ボスのバーと同じ形にしてあるのは、
+     どちらも「これが終わるまで戦い続ける」という同じ意味だから。 */
+  #trialbar{position:absolute;left:50%;transform:translateX(-50%);
+    top:calc(max(10px,env(safe-area-inset-top)) + 58px);width:66%;display:none;text-align:center}
+  #trialbar .bl{height:9px;background:#1b2029;border:1px solid #4a3a5a;border-radius:5px;overflow:hidden}
+  #trialbar .bl>i{display:block;height:100%;background:linear-gradient(90deg,#c98adf,#8fd8ff);
+    width:100%;transition:width .12s linear}
+  #trialbar span{font-size:11px;font-weight:700;color:#d0aee0;letter-spacing:.06em}
   /* パーティ表示。左端に縦に並べる（右はミニマップが占めている） */
   #partybar{position:absolute;left:max(10px,env(safe-area-inset-left));
     top:calc(max(10px,env(safe-area-inset-top)) + 96px);display:none;
@@ -154,8 +193,9 @@
     border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);display:none}
   #knob{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.16);
     left:38px;top:38px}
-  #autotag{position:absolute;right:14px;bottom:calc(16px + env(safe-area-inset-bottom));
-    font-size:11px;color:#4a5468;border:1px solid #262d3b;border-radius:20px;padding:5px 11px}
+  /* 「攻撃は自動」の常設タグと探索中の「？」は畳んだ。
+     遊び始めの1〜2分で分かることを、以後ずっと画面の隅に置いておく理由が無い
+     （説明はタイトルの「遊び方」に集約した）。 */
   /* 飛び道具の「足の状態」。なぜ削れないのかが見えないと理不尽になるので常時出す */
   #foottag{position:absolute;right:14px;bottom:calc(50px + env(safe-area-inset-bottom));
     font-size:11px;font-weight:700;border-radius:20px;padding:5px 11px;display:none;
@@ -177,25 +217,17 @@
     pointer-events:auto;display:none;background:#232a38;border:1px solid var(--line);border-radius:9px;
     padding:10px 18px;font-size:13px;font-weight:600}
   #kb{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));font-size:10px;color:#414a5e;line-height:1.6}
-  #helpbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 66px);
-    width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.85);
-    color:var(--dim);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;
-    pointer-events:auto}
-  #helpbtn:active{background:#2e3648}
-  /* タイトル（拠点）の「？」。潜る前に説明を割り込ませる代わりに、
-     いつでも自分から開ける入口をここに常設する。 */
-  #titlehelp{position:absolute;right:16px;top:calc(max(12px,env(safe-area-inset-top)) + 8px);
-    width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);
-    background:var(--panel);color:var(--txt);font-size:18px;font-weight:700;
-    display:flex;align-items:center;justify-content:center;z-index:5;padding:0}
-  #titlehelp:active{background:#2e3648}
-  /* ラベルは円の左に置く。下に出すと直下のカードと重なる */
-  #titlehelp s{position:absolute;right:46px;top:50%;transform:translateY(-50%);
-    font-size:10px;color:var(--dim);text-decoration:none;white-space:nowrap;letter-spacing:.04em}
+  /* 右上は「開く物」の列。上に詰めすぎると、階層・所持金の行に
+     🎒 の個数バッジが重なる（実際に重なった）ので、その下から始める。 */
   #bagbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 106px);
     width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
     color:var(--txt);font-size:19px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
+  #statbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 156px);
+    width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
+    color:var(--txt);font-size:19px;display:flex;align-items:center;justify-content:center;
+    pointer-events:auto}
+  #statbtn:active{background:#2e3648}
   #bagbtn:active{background:#2e3648}
   #bagcount{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;border-radius:9px;
     background:#4a9d6e;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;padding:0 4px}
@@ -253,10 +285,57 @@
 
 <div id="wrap"><canvas id="cv"></canvas></div>
 
-<!-- ============ 拠点（ハブ） ============ -->
-<div class="screen on" id="scr-town">
-  <button id="titlehelp">？<s>あそびかた</s></button>
-  <h1>ABYSS RELIC <span style="font-size:11px;color:var(--dim);font-weight:400">proto v0.2</span></h1>
+<!-- ============ タイトル ============ -->
+<div class="screen on" id="scr-title">
+  <div class="logo">ABYSS<br>RELIC</div>
+  <p class="tagline">深く潜り、生きて帰る</p>
+  <div class="ver">proto v0.3</div>
+  <div class="tbtns">
+    <button class="primary" id="t-start">冒険に出る</button>
+    <button class="ghost" id="t-help">遊び方</button>
+  </div>
+  <div class="foot" id="t-foot"></div>
+</div>
+
+<!-- ============ 拠点（ハブ） ============
+     ここは「次にどこへ行くか」を選ぶ場所であって、読む場所ではない。
+     以前は能力値・装備・潜在・仲間・呪いを全部この1画面に積んでいたので、
+     潜るまでに5回スクロールしていた。**見る物は別画面へ、決める物だけ残す。**
+     残したのは「どこから潜るか」と「潜る」ボタン、そして各施設への入口。 -->
+<div class="screen" id="scr-town">
+  <h1>ABYSS RELIC <span style="font-size:11px;color:var(--dim);font-weight:400">proto v0.3</span></h1>
+  <p class="sub" id="town-line"></p>
+
+  <h2>開始階層</h2>
+  <div id="startdepth" class="btnrow" style="flex-wrap:wrap"></div>
+
+  <h2>拠点</h2>
+  <div class="menu">
+    <button class="menubtn" id="btn-go-char"><i>🧍</i><b>ステータス</b><s id="m-char-sub"></s></button>
+    <button class="menubtn" id="btn-go-gacha"><i>🎁</i><b>ガチャ</b><s id="m-gacha-sub"></s></button>
+    <button class="menubtn" id="btn-go-shop"><i>🛒</i><b>道具屋</b><s id="m-shop-sub"></s></button>
+    <button class="menubtn" id="btn-go-stash"><i>📦</i><b>倉庫</b><s id="m-stash-sub"></s></button>
+    <button class="menubtn" id="btn-go-forge"><i>⚒️</i><b>鍛造所</b><s id="m-forge-sub"></s></button>
+    <button class="menubtn" id="btn-go-upg"><i>⬆️</i><b>永続強化</b><s id="m-upg-sub"></s></button>
+    <button class="menubtn" id="btn-go-bld"><i>🏛️</i><b>拠点開発</b><s id="m-bld-sub"></s></button>
+    <button class="menubtn" id="btn-go-mem"><i>🕯️</i><b>慰霊碑</b><s id="m-mem-sub"></s></button>
+  </div>
+
+  <div style="height:10px"></div>
+  <button class="ghost" id="btn-reset">データ全消去</button>
+  <div style="height:24px"></div>
+</div>
+
+<!-- 潜るボタンはバナーと同じく画面に固定する。
+     拠点で一番よく押すボタンが、スクロールしないと出てこないのはおかしい。 -->
+<div id="divebar"><button class="primary" id="btn-dive">ダンジョンへ潜る</button></div>
+
+<!-- ============ ステータス ============
+     拠点から追い出した「見る物」の行き先。
+     能力値・装備・潜在・仲間・呪いはここに集める。 -->
+<div class="screen" id="scr-char">
+  <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
+    <h1>ステータス</h1><span class="gold" id="char-gold"></span></div>
 
   <div class="card" id="charcard"></div>
 
@@ -272,26 +351,6 @@
   <h2>今週の呪い <span style="color:var(--dim);font-weight:400;font-size:11px">任意・重ねがけ可・毎週入れ替わる</span></h2>
   <p class="sub" id="curse-hint"></p>
   <div class="grid" id="town-curses"></div>
-
-  <h2>開始階層</h2>
-  <div id="startdepth" class="btnrow" style="flex-wrap:wrap"></div>
-
-  <div style="height:16px"></div>
-  <button class="primary" id="btn-dive">ダンジョンへ潜る</button>
-
-  <h2>拠点</h2>
-  <div class="menu">
-    <button class="menubtn" id="btn-go-gacha"><i>🎁</i><b>ガチャ</b><s id="m-gacha-sub"></s></button>
-    <button class="menubtn" id="btn-go-shop"><i>🛒</i><b>道具屋</b><s id="m-shop-sub"></s></button>
-    <button class="menubtn" id="btn-go-stash"><i>📦</i><b>倉庫</b><s id="m-stash-sub"></s></button>
-    <button class="menubtn" id="btn-go-forge"><i>⚒️</i><b>鍛造所</b><s id="m-forge-sub"></s></button>
-    <button class="menubtn" id="btn-go-upg"><i>⬆️</i><b>永続強化</b><s id="m-upg-sub"></s></button>
-    <button class="menubtn" id="btn-go-bld"><i>🏛️</i><b>拠点開発</b><s id="m-bld-sub"></s></button>
-    <button class="menubtn" id="btn-go-mem"><i>🕯️</i><b>慰霊碑</b><s id="m-mem-sub"></s></button>
-  </div>
-
-  <div style="height:10px"></div>
-  <button class="ghost" id="btn-reset">データ全消去</button>
   <div style="height:24px"></div>
 </div>
 
@@ -334,6 +393,10 @@
     <b style="color:#7fe0c0">死んでも失いません</b>。<br>
     どんな探索も、必ずここに変わります。</p>
   <div class="grid" id="upgrades"></div>
+
+  <h2 id="relic-head">遺物 <span style="color:var(--dim);font-weight:400;font-size:11px">試練で得る・死んでも失わない</span></h2>
+  <p class="sub" id="relic-hint"></p>
+  <div class="grid" id="relics"></div>
 
   <h2 id="ult-head">大技 <span style="color:var(--dim);font-weight:400;font-size:11px">大ボスを倒すと増える・1つだけセットできる</span></h2>
   <p class="sub" id="ult-hint"></p>
@@ -412,6 +475,7 @@
     <div id="depth"><b id="dnum">1</b><span id="dsub">階層</span></div>
   </div>
   <div id="bossbar"><div class="bl"><i id="bossfill"></i></div><span id="bossname"></span></div>
+  <div id="trialbar"><div class="bl"><i id="trialfill"></i></div><span id="trialname"></span></div>
   <div id="partybar"></div>
   <div id="gravehint"></div>
   <div id="intruder"></div>
@@ -420,21 +484,21 @@
   <div id="log"></div>
   <div id="kb">WASD/矢印 移動<br>Shift ガード<br>I 持ち物 / E 階段</div>
   <div id="stick"><div id="knob"></div></div>
-  <div id="autotag">攻撃は自動</div>
   <div id="foottag"></div>
   <div id="durtag"></div>
   <div id="ultbtn"><i id="ult-icon">✹</i><b id="ult-nm"></b><s id="ult-cd"></s></div>
   <div id="prompt"></div>
-  <div id="helpbtn">?</div>
   <div id="bagbtn">🎒<span id="bagcount">0</span></div>
+  <div id="statbtn">🧍</div>
 </div>
 
 <!-- ============ 探索中の持ち物・ステータス ============ -->
-<div class="modal" id="m-bag"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
-  <h1 style="text-align:center">持ち物とステータス</h1>
+<!-- 探索中のステータス。持ち物と同居させると、
+     「装備を替えたい」ときにも能力値の壁を毎回スクロールする羽目になる。 -->
+<div class="modal" id="m-stat"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
+  <h1 style="text-align:center">ステータス</h1>
   <p class="sub" style="text-align:center">開いている間はゲームが止まります</p>
 
-  <h2>ステータス</h2>
   <div class="card" id="bag-stats"></div>
 
   <h2>潜在 <span style="color:var(--dim);font-weight:400;font-size:11px">ボス撃破で得た・死ぬまで有効</span></h2>
@@ -442,6 +506,15 @@
 
   <h2>仲間 <span style="color:var(--dim);font-weight:400;font-size:11px">最大3名・あなたが死ぬと一緒に失われる</span></h2>
   <div class="grid" id="bag-party"></div>
+
+  <div style="height:14px"></div>
+  <button class="primary" id="stat-ok">探索に戻る</button>
+  <div style="height:20px"></div>
+</div></div>
+
+<div class="modal" id="m-bag"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
+  <h1 style="text-align:center">持ち物</h1>
+  <p class="sub" style="text-align:center">開いている間はゲームが止まります</p>
 
   <h2>装備・護符 <span style="color:var(--dim);font-weight:400;font-size:11px">装備はタップで外す</span></h2>
   <div class="grid" id="bag-equip"></div>
@@ -486,6 +559,17 @@
 </div></div>
 
 <!-- ============ 道中のイベント ============ -->
+<!-- 試練。始める前に、枷も報酬も全部見せてから聞く -->
+<div class="modal" id="m-trial"><div class="box" style="text-align:left">
+  <h1 id="tr-title" style="text-align:center">🗿 試練の石碑</h1>
+  <p class="sub" id="tr-sub" style="text-align:center"></p>
+  <div class="card" id="tr-body"></div>
+  <div style="height:12px"></div>
+  <button class="primary" id="tr-yes">試練を受ける</button>
+  <div style="height:8px"></div>
+  <button class="ghost" id="tr-no">立ち去る</button>
+</div></div>
+
 <div class="modal" id="m-event"><div class="box">
   <h1 id="ev-title">？</h1>
   <p class="sub" id="ev-sub"></p>
@@ -568,6 +652,28 @@
 </div></div>
 
 <!-- ============ 操作説明 / 凡例 ============ -->
+<!-- 倉庫の装備を誰に着せるか。仲間がいないときは出さない（1択の選択肢は選択ではない） -->
+<div class="modal" id="m-wear"><div class="box" style="text-align:left">
+  <h1 id="wear-title" style="text-align:center">誰に装備させる</h1>
+  <p class="sub" id="wear-sub" style="text-align:center"></p>
+  <div class="grid" id="wear-list"></div>
+  <div style="height:12px"></div>
+  <button class="ghost" id="wear-cancel">やめる</button>
+</div></div>
+
+<!-- 冒険者の名前。愛着の入口なので、決めるのはここ1回だけにする -->
+<div class="modal" id="m-name"><div class="box">
+  <h1>あなたの名は</h1>
+  <p class="sub">この名は、あなたが倒れたあとも受け継がれる。</p>
+  <input id="nm-input" maxlength="10" placeholder="冒険者" autocomplete="off" spellcheck="false">
+  <div class="btnrow">
+    <button class="ghost" id="nm-roll">おまかせ</button>
+    <button class="primary" id="nm-ok">これでいく</button>
+  </div>
+  <div style="height:8px"></div>
+  <button class="ghost" id="nm-back">やめる</button>
+</div></div>
+
 <div class="modal" id="m-help"><div class="box" style="text-align:left;max-height:88vh;overflow-y:auto">
   <h1 style="text-align:center">操作と記号</h1>
 
@@ -685,7 +791,7 @@
     どれも<b>「やるか、やめるか」の一択</b>で、得だけの物はありません。<b>無視して降りるのも常に正解です。</b><br>
     📦 <b style="color:#d6b34a">忘れられた荷</b>：装備3点。開けると敵が湧く<br>
     ⛲ <b style="color:#7fe0c0">癒しの泉</b>：全員全快。ただしこの階層の敵が速くなる<br>
-    🕯️ <b style="color:#c98adf">古びた祭壇</b>：最大HPの20%を永久に払い、3つの潜在から1つを選ぶ<br>
+    🕯️ <b style="color:#c98adf">古びた祭壇</b>：最大HPの10%を永久に払い、3つの潜在から1つを選ぶ<br>
     🏺 <b style="color:#e0705a">賭博の壺</b>：未鑑定品を賭けて55%でレア度が1段階上がる
   </div>
 
@@ -1145,6 +1251,29 @@ const BASES=[
   {id:'ring',   nm:'指輪',     slot:SLOT.C, dur:25, ilvl:1},
   {id:'amulet', nm:'護符',     slot:SLOT.C, dur:25, ilvl:3},
 ];
+/* ---------- 杖の弾の形 ----------
+   杖は「球を1つ飛ばす」だけで、弓との違いが射程と貫通しか無かった。
+   撃つたびに形が変わるようにして、**同じ武器で毎回ちがう絵**が出るようにする。
+
+   弾数と威力は交換になっている（撃つ数が増えるほど1発は軽い）。
+   総火力をおおよそ揃えてあるのは、当たりの形を引いたときだけ強い、を避けるため——
+   それをやると、良い形が出るまで撃たない待ちの遊びになる。 */
+const STAFF_SHAPES=[
+  //  弾数 × 威力 の総和を 1.00 〜 1.35 に収めてある。
+  //  多弾のほうが少しだけ上なのは、散らばるぶん単体には当たり切らないから。
+  {id:'bolt',   nm:'魔弾',   w:46, mult:1.00, offs:[0]},                        // 1.00
+  {id:'twin',   nm:'双撃',   w:22, mult:0.58, offs:[-0.10, 0.10]},              // 1.16
+  {id:'fan',    nm:'扇撃',   w:20, mult:0.42, offs:[-0.30, 0, 0.30]},           // 1.26
+  {id:'spread', nm:'散撃',   w:12, mult:0.27, offs:[-0.62,-0.31, 0, 0.31, 0.62]},// 1.35
+];
+function rollStaffShape(){
+  const tot=STAFF_SHAPES.reduce((a,x)=>a+x.w,0);
+  let r=rnd()*tot;
+  for(const sh of STAFF_SHAPES){ r-=sh.w; if(r<=0) return sh; }
+  return STAFF_SHAPES[0];
+}
+function staffShapeDef(id){ return STAFF_SHAPES.find(x=>x.id===id) || STAFF_SHAPES[0]; }
+
 /* 素手 / 盾なしのときの既定値 */
 const FIST={atk:2, spd:1.05, reach:1.45, arc:75, hands:1, proj:null, dt:'blunt'};
 
@@ -1164,8 +1293,12 @@ const PREFIX=[
   {id:'fury',  nm:'猛る',     stat:'aspdPct', r:[5,12]},
   {id:'stout', nm:'頑健な',   stat:'hp',      r:[10,24]},
   /* 「疾風の」から改名。語順を 接頭辞→接尾辞→種別 にしたので、
-     の で終わる接頭辞だけ「疾風の生還の剣」と の が二重になって読みにくかった。 */
-  {id:'swift', nm:'疾き',     stat:'msPct',   r:[4,9]},
+     の で終わる接頭辞だけ「疾風の生還の剣」と の が二重になって読みにくかった。
+
+     移動速度だけの接頭辞は、装備としては地味すぎて誰も選ばなかった。
+     このゲームで移動＝回避なので、**速さと回避は同じ物の裏表**でいい。
+     stat2 を持つ唯一の接頭辞。「速いから当たらない」を数字にする。 */
+  {id:'swift', nm:'疾き',     stat:'msPct',   r:[4,9], stat2:'evade', r2:[3,7]},
   {id:'vamp',  nm:'貪る',     stat:'leech',   r:[2,5]},
   {id:'keen',  nm:'冴えた',   stat:'critPct', r:[3,8]},
 ];
@@ -1193,7 +1326,7 @@ const STATNM={dmgPct:'物理ダメージ +%v%',aspdPct:'攻撃速度 +%v%',hp:'�
   fire:'追加 炎ダメージ %v', shock:'追加 雷ダメージ %v', frost:'追加 冷気ダメージ %v',
   mf:'発見力 +%v',thorns:'ダメージ反射 %v%',lowDR:'瀕死時 被ダメージ -%v%',def:'防御 +%v',
   resFire:'炎耐性 +%v%', resShock:'雷耐性 +%v%', resFrost:'冷気耐性 +%v%',
-  ultCdr:'大技のリキャスト -%v%'};
+  ultCdr:'大技のリキャスト -%v%', evade:'回避率 +%v%'};
 const RARITY=[
   {id:0,nm:'Common',col:'--c-common',w:60, aff:[0,0], val:6},
   {id:1,nm:'Magic', col:'--c-magic', w:28, aff:[1,2], val:26},
@@ -1225,6 +1358,14 @@ function rollRarity(ilvl, mf){
    先にスロットを抽選してからその中のベースを選ぶ。 */
 const SLOT_WEIGHT = [[SLOT.W,28],[SLOT.S,14],[SLOT.A,34],[SLOT.C,24]];
 function pickBase(ilvl){
+  /* 遺物「求道」。いま握っている武器種が出やすくなる。
+     熟練（武器種ごとに育つ）と噛み合わせてある——
+     使い続けるほど出やすくなり、出るほど使い続けられる。
+     確率は 3 回に 1 回ほど。ここを高くすると他の種が一切見えなくなる。 */
+  if(relicOn('hoard') && S.hero && S.hero.equip.weapon && rnd()<0.34){
+    const want=BASES.find(b=>b.id===S.hero.equip.weapon.base);
+    if(want && want.ilvl<=Math.max(1,ilvl)) return want;
+  }
   const avail = BASES.filter(b=>b.ilvl<=Math.max(1,ilvl));
   const slots = SLOT_WEIGHT.filter(([s])=>avail.some(b=>b.slot===s));
   const tot = slots.reduce((a,[,w])=>a+w,0);
@@ -1256,7 +1397,12 @@ function buildItem(base, rar, ilvl){
   const pp=[...PREFIX], ss=[...SUFFIX];
   for(let i=0;i<pn && pp.length;i++){
     const a=pp.splice(Math.floor(rnd()*pp.length),1)[0];
-    it.aff.push({t:'p',id:a.id,nm:a.nm,stat:a.stat,v:Math.max(1,Math.round(rf(a.r[0],a.r[1])*(1+ (s-1)*0.6)))});
+    const af={t:'p',id:a.id,nm:a.nm,stat:a.stat,
+              v:Math.max(1,Math.round(rf(a.r[0],a.r[1])*(1+ (s-1)*0.6)))};
+    // 2つめの効果を持つ接頭辞（今は「疾き」だけ）。ilvl の伸びは控えめにする。
+    if(a.stat2){ af.stat2=a.stat2;
+                 af.v2=Math.max(1,Math.round(rf(a.r2[0],a.r2[1])*(1+ (s-1)*0.35))); }
+    it.aff.push(af);
   }
   for(let i=0;i<sn && ss.length;i++){
     const a=ss.splice(Math.floor(rnd()*ss.length),1)[0];
@@ -1435,7 +1581,11 @@ function affLines(it){
   }
   if(it.block) L.push('ガード軽減 '+it.block+'%　パリイ受付 '+(b.parry||0.2).toFixed(2)+'秒');
   if(it.def) L.push('防御力 '+it.def);
-  it.aff.forEach(a=>L.push(STATNM[a.stat].replace('%v',a.v)));
+  it.aff.forEach(a=>{
+    L.push(STATNM[a.stat].replace('%v',a.v));
+    // 2つめの効果を持つ接頭辞（疾き）。書かないと、付いていることが伝わらない。
+    if(a.stat2 && STATNM[a.stat2]) L.push(STATNM[a.stat2].replace('%v',a.v2));
+  });
   upSkills(it).forEach(k=>L.push(`<span style="color:${k.col}">⚒ ${k.nm} — ${k.desc(it)}</span>`));
   if(it.durMax) L.push(durLine(it));
   return L;
@@ -1466,7 +1616,80 @@ const UPGRADES=[
      ここで上がるのはあくまで**そこへ届く速さ**で、上限そのものではない。 */
   {id:'ally',  nm:'仲間の練度', max:6, shard:14,
    step:'仲間の全能力 +6%',  desc:'HP・攻撃・防御・攻速・移動・射程'},
+  /* 遺物の枠。**最初の遺物を手に入れるまで一覧に出さない。**
+     持っていない物のための枠を先に見せても、何のことか分からないうえ、
+     「開いているのに入れる物が無い枠」を眺めることになる。 */
+  {id:'relic', nm:'遺物の枠', max:3, shard:26, hidden:()=>!(S.relics||[]).length,
+   step:'遺物をもう1つ装備できる', desc:'試練で得た遺物を着ける枠'},
 ];
+/* ---------- レリック（遺物） ----------
+   ここまでの成長は、どれも「死ぬと消える」か「数字が増える」かのどちらかだった。
+   潜在はキャラが死ねば消え、永続強化は全部が能力値の底上げで、
+   **遊び方そのものを変える物が1つも無かった。**
+
+   レリックは死んでもロストしない。そして能力を伸ばすのではなく、
+   **その人の戦い方に寄り添う**——剣ばかり使う人には剣が出やすくなり、
+   大技で戦う人には大技が重くなる。潜在に近いが、口座側に永久に残る。
+
+   枠は最初 0。試練を1つ越えて初めて1枠目が開く（永続強化に項目が現れる）。
+   最大3枠にしてあるのは、全部載せを選べる数にすると
+   「どれを付けるか」が消えて、ただの常時効果になるから。 */
+const RELIC_MAX_SLOTS = 3;
+const RELICS=[
+  {id:'hoard', nm:'求道の遺物', icon:'🜚', col:'#d6b34a',
+   desc:'いま使っている武器種が出やすくなる',
+   note:'熟練を伸ばしたい種を使い続けるほど噛み合う'},
+  {id:'greed', nm:'貪婪の遺物', icon:'🜛', col:'#c98adf',
+   desc:'発見力 +45（良いレア度が出やすい）', mf:45},
+  {id:'ruin',  nm:'破断の遺物', icon:'🜠', col:'#e0705a',
+   desc:'大技の威力 +35%', ultPow:35},
+  {id:'pulse', nm:'脈動の遺物', icon:'🜄', col:'#7fe0c0',
+   desc:'12秒ごとに最大HPの 8% を回復', regenEvery:12, regenPct:8},
+  {id:'wisp',  nm:'伴影の遺物', icon:'🜁', col:'#8fd8ff',
+   desc:'攻撃してくれる影がひとつ付き従う', wisp:1},
+  {id:'ember', nm:'不滅の遺物', icon:'🜂', col:'#ff9a5a',
+   desc:'倒れたとき、1回の探索につき一度だけHP全快で立ち上がる', revive:true},
+  {id:'quake', nm:'震撼の遺物', icon:'🜃', col:'#a97fe0',
+   desc:'近接が当たると衝撃波が広がる', shock:1},
+  {id:'swift', nm:'韋駄天の遺物', icon:'🜍', col:'#7fc3e0',
+   desc:'移動速度 +12%　回避 +6%', ms:12, evade:6},
+];
+function relicDef(id){ return RELICS.find(r=>r.id===id); }
+function relicSlots(){ return Math.min(RELIC_MAX_SLOTS, upgLv('relic')); }
+function relicsOwned(){ return (S.relics||[]).map(relicDef).filter(Boolean); }
+/* 装備しているレリック。枠が減っても壊れないよう、読むたびに枠数で切る。 */
+function relicsOn(){
+  return (S.relicEq||[]).slice(0, relicSlots()).map(relicDef).filter(Boolean);
+}
+function relicHas(id){ return (S.relics||[]).includes(id); }
+function relicOn(id){ return relicsOn().some(r=>r.id===id); }
+/* 装備しているレリックの合計。数値の効果はここを通す。 */
+function relicSum(key){ return relicsOn().reduce((n,r)=>n+(r[key]||0), 0); }
+/* まだ持っていないレリックを1つ。同じ物は落ちない。 */
+function rollNewRelic(){
+  const pool=RELICS.filter(r=>!relicHas(r.id));
+  return pool.length ? pick(pool) : null;
+}
+function grantRelic(id){
+  S.relics = S.relics || [];
+  if(S.relics.includes(id)) return false;
+  S.relics.push(id);
+  /* 最初の1つで枠が開く。先に枠だけ配ると、
+     開いているのに入れる物が無い枠を眺めることになる。 */
+  if(!upgLv('relic')) S.upg.relic = 1;
+  S.relicEq = S.relicEq || [];
+  if(S.relicEq.length < relicSlots()) S.relicEq.push(id);   // 空きがあれば即座に着ける
+  return true;
+}
+function relicToggle(id){
+  if(!relicHas(id)) return;
+  S.relicEq = S.relicEq || [];
+  const i=S.relicEq.indexOf(id);
+  if(i>=0){ S.relicEq.splice(i,1); return; }
+  if(S.relicEq.length >= relicSlots()){ log('遺物の枠が足りない'); return; }
+  S.relicEq.push(id);
+}
+
 /* ---------- 秘石 ----------
    永続強化の対価を「金」から「敵が落とす石」に変えるためのもの。
 
@@ -1688,6 +1911,62 @@ function spawnForge(fl, depth, ores){
   return null;                                // 離せないなら置かない
 }
 
+/* ---------- 試練の石碑 ----------
+   遺物の入手口はここ1つだけにしてある。
+   拾い物として落とすと「運が良ければ手に入る物」になり、
+   遺物のように**遊び方を決める物**が運任せになるのは据わりが悪い。
+
+   試練は、始めるかどうかを自分で決める短い籠城戦。
+   ・一定時間、敵が湧き続ける
+   ・そのあいだ、ランダムな枷（デバフ）が1つ掛かる
+   ・生き延びれば、まだ持っていない遺物が1つ
+
+   難度は高めにしてある。逃げ道は用意していない——
+   始めた時点で「引き返す」の選択肢が消えるからこそ、
+   石碑の前で一度考えることになる。 */
+const TRIAL_CHANCE    = 0.16;   // 1階層に石碑がある確率
+const TRIAL_MIN_DEPTH = 5;      // 序盤には出さない
+const TRIAL_SEC       = 45;     // 耐える時間
+const TRIAL_WAVE      = 3.2;    // 何秒ごとに湧くか
+const TRIAL_PER_WAVE  = 2;      // 1回に湧く数
+const TRIAL_SPAWN_MIN = 5.5;    // 湧く距離（近すぎると理不尽になる）
+const TRIAL_SPAWN_MAX = 9.0;
+/* 枷は5種。どれも「戦い方を変えさせる」物にしてある——
+   ただ弱くするだけの枷は、耐える時間が延びるだけで判断が増えない。 */
+const TRIAL_BANES=[
+  {id:'heavy',  nm:'重圧',   desc:'移動速度 -30%',        ms:-30},
+  {id:'dull',   nm:'鈍化',   desc:'攻撃速度 -30%',        aspd:-30},
+  {id:'frail',  nm:'脆弱',   desc:'被ダメージ +35%',      dmgTaken:35},
+  {id:'blind',  nm:'暗幕',   desc:'視界が狭まる',         sight:0.55},
+  {id:'silent', nm:'封技',   desc:'大技が使えない',       silence:true},
+];
+function trialBaneDef(id){ return TRIAL_BANES.find(b=>b.id===id); }
+function spawnTrial(fl, depth, avoid){
+  if(depth < TRIAL_MIN_DEPTH) return null;
+  if(bossTierAt(depth)) return null;          // ボス階の主役は1つでいい
+  if(rnd() >= TRIAL_CHANCE) return null;
+  if(!rollNewRelic()) return null;            // 出す遺物が無いなら石碑も出さない
+  for(let i=0;i<12;i++){
+    const s=pickSpot(fl);
+    if(!s) return null;
+    if((avoid||[]).some(o=>o && Math.hypot(o.x-s.x, o.y-s.y) < 5.0)) continue;
+    return {x:s.x, y:s.y, seed:rnd()*6.28, used:false};
+  }
+  return null;
+}
+function nearTrial(){
+  return (W.trial && !W.trial.used
+          && Math.hypot(W.trial.x-P.x, W.trial.y-P.y) < 1.6) ? W.trial : null;
+}
+function trialActive(){ return !!(S.run && S.run.trial && S.run.trial.t>0); }
+function trialBane(){ return trialActive() ? trialBaneDef(S.run.trial.bane) : null; }
+/* 枷の効き目を1箇所から引く。掛かっていなければ既定値を返す。 */
+function baneMul(key, dflt){
+  const b=trialBane();
+  if(!b || b[key]===undefined) return dflt;
+  return b[key];
+}
+
 /* ---------- 強化レベルと、節目で付く技 ----------
    レベルは +10 まで。3・6・9 の3回だけ、武器に「技」がランダムで1つ付く。
 
@@ -1827,6 +2106,10 @@ function shopSlotBonus(){  return bldLv('market'); }
 const GRAVE_ITEMS_MIN = 4;   // 回収できる道具の数（装備していなかった物から抽選）
 const GRAVE_ITEMS_MAX = 6;
 const GRAVE_GOLD_RATE = 0.5; // 持っていた金の何割が残るか
+/* 累計経験値の何割が遺体に残るか。3割にしてあるのは、
+   「取りに行けばレベルが戻る」ではなく「取りに行けば少し楽になる」にしたいから。
+   全部返すと死が無料になり、返さないと再走が苦行になる。その間を狙っている。 */
+const GRAVE_XP_RATE   = 0.30;
 /* ---------- 遺体の風化 ----------
    「明日また開く理由」を、贈り物ではなく圧力の側から作る。
    デイリー報酬は「得だけの物を置かない」という原則と正面衝突するが、
@@ -2536,6 +2819,7 @@ function fireAllyArt(a, st, id, tgt, def){
 /* 仲間の技のダメージ。通常の一振りと同じ経路（属性・状態異常・撃破処理）を通す。 */
 function hitEnemyByAlly(a, st, e, mult){
   if(!e || e.dead) return;
+  if(eliteEvades(e)) return;           // 精鋭の性質「影の」
   const dmg = Math.max(1, Math.round(st.atk*mult));
   e.hp -= dmg; e.hit = Math.max(e.hit, 0.12);
   pop(e.x, e.y-0.3, dmg, jobDef(a.job).col);
@@ -2692,9 +2976,26 @@ function party(){ return (S.hero && S.hero.party) || []; }
    「もう分かっている場所」は速く走り抜けられるべき。
    これをやらないと、死ぬたびに同じ道のりを最初から歩かされて再走が苦行になる。
    最深の少し手前までを「踏破済み」とし、そこは足を速くする。 */
-const KNOWN_MARGIN = 4;          // 最深からこれだけ手前までが踏破済み
-const KNOWN_SPEED  = 1.45;       // 踏破済み階層での移動速度倍率
+const KNOWN_MARGIN = 4;          // 最深からこれだけ手前までが踏破済み（階段の公開に使う）
+const KNOWN_SPEED  = 1.45;       // 「疾風の加護」の移動速度倍率
 function knownFloor(depth){ return depth <= (S.deepest - KNOWN_MARGIN); }
+
+/* ---------- 疾風の加護 ----------
+   足を速くする条件が「最深-4より手前」だった。つまり**記録の直前4階だけ
+   急に遅くなる**。再走で一番だれるのはまさにその4階で、
+   もう知っている道なのに、そこだけ歩かされていた。
+
+   条件を「この探索を始めた時点の最深より浅いあいだ」に変える。
+   死んで潜り直したなら、**未踏の階に着くまでずっと速い。**
+   踏み込んだ瞬間に切れるので、「ここから先は知らない道だ」が
+   足の重さとして伝わる（＝速度そのものが道標になる）。
+
+   名前を付けたのは、切れたことに気づけるようにするため。
+   無名の内部倍率だと、遅くなったことが不具合に見える。 */
+function windGrace(){
+  if(!S.run) return false;
+  return S.run.depth <= (S.run.startDeepest||0);
+}
 
 /* ---------- 未踏の階層では階段を隠す ----------
    最深を更新している最中の階層は「探索する場所」であってほしい。
@@ -2891,12 +3192,71 @@ const BOSS_MOVES={
   burst: {nm:'散弾',     tele:0.50, mult:0.70, cd:[4.0,5.4], min:0, max:99},
   // 広がる輪。外へ逃げると必ず当たる。ボスに近づくのが正解になる反転技。
   wave:  {nm:'波動',     tele:0.95, rad:9.0, mult:1.15, cd:[6.5,8.5], min:0, max:99},
+
+  /* ---- ここから下は、ボスを1体ずつ別物にするために足した技 ----
+     同じ4つを配り直すだけでは、名前が違う同じボスが10体並ぶだけになる。
+     どれも「立ち位置を奪う」という原則は同じだが、奪い方が違う。 */
+
+  // 突進。線の上を走り抜ける。横に避けるしかない＝**下がって避ける癖を否定する**。
+  charge:{nm:'突進',     tele:0.80, len:9.0, wide:1.0, mult:1.35, cd:[4.4,6.0], min:2.6, max:99},
+  // 石柱・落石。足元ではなく**離れた数ヶ所**が同時に爆ぜる。逃げ先を先に潰す技。
+  pillars:{nm:'落石',    tele:1.05, rad:1.7, n:4, spread:5.2, mult:1.05, cd:[5.0,6.8], min:0, max:99},
+  // 貫き。細くて長い線。射線から外れれば当たらない＝角度で避ける技。
+  beam:  {nm:'貫き',     tele:0.72, len:12.0, wide:0.62, mult:1.25, cd:[4.0,5.6], min:1.5, max:99},
+  // 招来。取り巻きを呼ぶ。数で押される前に本体を削る、という判断を作る。
+  summon:{nm:'招来',     tele:0.70, n:3, cd:[9.0,12.0], min:0, max:99},
 };
+/* 既定のセット。UNIQUE_BOSSES に載っていない階（周回した61階以降）で使う。 */
 const BOSS_MOVESET={
   mid:   ['slam','cleave'],
   great: ['slam','cleave','burst'],
   final: ['slam','cleave','burst','wave'],
 };
+
+/* ---------- 名前つきのボス ----------
+   以前は「〈系統名〉+ 長／王」で、第5階層の長と第45階層の長が
+   名前も技も同じだった。**倒した相手を覚えていられない。**
+
+   50階までの節目を1体ずつ別物にする。決め方は3つ。
+     1. 属性は階層のテーマに合わせる（灼熱の窯の主は炎、凍える回廊の主は氷）
+     2. 技の組み合わせを全部変える。**同じセットは1つも無い**
+     3. 激昂で開く技も個別に持たせる（第2段階が「速くなるだけ」にならないように）
+
+   系統（fam）はその階のテーマから引くので、色と耐性も自然に揃う。 */
+const UNIQUE_BOSSES={
+  5:  {nm:'坑道の主 グラウ',  fam:'beast',  dt:'blunt',
+       moves:['slam','pillars'],            rage:['cleave'],
+       line:'掘り進んだ先で、岩が動いた。'},
+  10: {nm:'鉄喰らい ヴォル',  fam:'armor',  dt:'pierce',
+       moves:['charge','cleave','slam'],    rage:['burst'],
+       line:'鉱石を喰って育ったものがいる。'},
+  15: {nm:'苔喰み ミルダ',    fam:'slime',  dt:'blunt',
+       moves:['wave','burst','summon'],     rage:['slam'],
+       line:'水路の苔が、ひとつの塊になっている。'},
+  20: {nm:'水底の詠み手 ネレイ', fam:'undead', dt:'frost',
+       moves:['beam','wave','summon','cleave'], rage:['pillars'],
+       line:'水の底から、聞いたことのない声がする。'},
+  25: {nm:'灰の番人 カルド',  fam:'flame',  dt:'fire',
+       moves:['pillars','slam','cleave'],   rage:['wave'],
+       line:'炉の灰が、人の形に積み上がっている。'},
+  30: {nm:'窯の女王 イグナ',  fam:'flame',  dt:'fire',
+       moves:['charge','burst','pillars','wave'], rage:['beam'],
+       line:'窯そのものが、こちらを見ている。'},
+  35: {nm:'凍て牙 フリム',    fam:'frost',  dt:'frost',
+       moves:['charge','cleave','beam'],    rage:['wave'],
+       line:'吐く息が、当たった先から凍っていく。'},
+  40: {nm:'氷冠の王 ヴェルグ', fam:'frost',  dt:'frost',
+       moves:['beam','wave','pillars','summon'], rage:['charge'],
+       line:'氷の冠をかぶった影が、玉座から立ち上がる。'},
+  45: {nm:'骨積みの司 オス',  fam:'undead', dt:'pierce',
+       moves:['summon','burst','slam'],     rage:['beam'],
+       line:'骨の山が、内側から組み上がっていく。'},
+  50: {nm:'深淵の主 アビス',  fam:'arcane', dt:'arcane',
+       moves:['slam','cleave','burst','wave','beam','pillars','charge','summon'],
+       rage:['charge'],
+       line:'ここから先は無い。それが、そこにいる。'},
+};
+function uniqueBossAt(depth){ return UNIQUE_BOSSES[depth] || null; }
 /* 激昂で解禁される技。第2段階が「速くなるだけ」にならないようにする。
    必ず「そのティアがまだ持っていない技」を割り当てること
    （持っている技を書いても何も起きず、激昂の意味が薄れる）。 */
@@ -2950,8 +3310,61 @@ const S={
   deathAdBonus:0,        // 死亡時に広告を見て増やした引き継ぎ枠（その死の間だけ）
   fallen:[],             // 慰霊碑。失った仲間（アカウント単位・キャラが死んでも残る）
   beacons:[],            // 大ボスを倒して開いた中継地点（倒した階の番号）
-  hero:null, run:null, screen:'town', prevScreen:'town'
+  mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
+  relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
+  name:'',               // 冒険者の名前。代を重ねても受け継がれる
+  hero:null, run:null, screen:'title', prevScreen:'town'
 };
+
+/* ---------- 武器熟練度 ----------
+   死ぬたびに、また第1階層から同じ道を歩き直す。
+   永続強化と潜在はあるが、どちらも「潜る前に選ぶ物」で、
+   **歩いている最中に伸びる物が1つも無かった。**
+   だから再走の道中は、ただの移動時間になっていた。
+
+   使い続けた武器種が育つ。10段階。死んでも消えない。
+   狙いは数値そのものより、**道中に目盛りを置くこと**にある。
+   「この階であと少しで剣が7になる」という理由で、あと1体倒す気になる。
+
+   武器種ごとに別々なのが肝で、
+   拾った物に持ち替えるか、育てた種を使い続けるかという判断が生まれる。 */
+const MASTERY_MAX   = 10;
+const MASTERY_ATK   = 2.5;   // 1段階あたりの攻撃力(%)
+const MASTERY_ASPD  = 1.5;   // 1段階あたりの攻撃速度(%)
+const MASTERY_RANGE = 1.0;   // 1段階あたりの射程(%)
+/* 次の段階までに要る「当てた回数」。
+   後半を重くしすぎると、そこで目盛りが止まって元の木阿弥になるので、
+   指数は 1.55（Lv.10 到達までおよそ 2,900 発）に留める。 */
+function masteryNeed(lv){ return Math.round(30*Math.pow(lv,1.55)); }
+function masteryOf(baseId){
+  const m=(S.mastery||{})[baseId];
+  return m ? m.lv : 0;
+}
+function masteryXp(baseId){
+  const m=(S.mastery||{})[baseId];
+  return m ? m.xp : 0;
+}
+/* 熟練度の倍率。素手には乗らない（種として育てる対象ではない）。 */
+function masteryMul(baseId){
+  const lv=masteryOf(baseId);
+  return {atk:1+lv*MASTERY_ATK/100, aspd:1+lv*MASTERY_ASPD/100, range:1+lv*MASTERY_RANGE/100};
+}
+function gainMastery(baseId, n){
+  if(!baseId) return;
+  S.mastery = S.mastery || {};
+  const m = S.mastery[baseId] || (S.mastery[baseId]={lv:0, xp:0});
+  if(m.lv>=MASTERY_MAX) return;
+  m.xp += (n||1);
+  while(m.lv<MASTERY_MAX && m.xp>=masteryNeed(m.lv+1)){
+    m.xp -= masteryNeed(m.lv+1);
+    m.lv++;
+    const b=BASES.find(x=>x.id===baseId);
+    const nm=(b?BASE_IC[b.id]+' '+b.nm:baseId);
+    log('⚔ '+nm+'の熟練 '+m.lv);
+    if(m.lv===MASTERY_MAX){ m.xp=0; showBanner(nm+'　熟練 極み', '攻撃力 +'+(MASTERY_ATK*MASTERY_MAX)+'%　攻速 +'+(MASTERY_ASPD*MASTERY_MAX)+'%', '#d6b34a', 2.6); }
+    else showBanner(nm+'　熟練 '+m.lv, '攻撃力 +'+(MASTERY_ATK*m.lv).toFixed(1)+'%　攻速 +'+(MASTERY_ASPD*m.lv).toFixed(1)+'%', '#d6b34a', 1.8);
+  }
+}
 function stashCap(){ return 20 + upgLv('stash')*6; }
 /* ---------- 中継地点 ----------
    以前は「最深 14 到達で第10階層から」という到達度の条件だった。
@@ -2995,8 +3408,20 @@ function outfitForBeacon(h, depth){
   h.hpNow = stats(h).maxHp;
   return (given.lv || given.gear.length) ? given : null;
 }
+/* ---------- 名前と、その先の代 ----------
+   名前を1回だけ聞くのは、そこが愛着の入口だから。
+   死んだら別人になるが、**名前は受け継がれる**（二代目・三代目…）。
+   祭壇で潜在を次のキャラへ渡す仕掛けと辻褄が合うし、
+   「何代目で第何階層まで行けたか」が、そのまま記録の読み方になる。 */
+const GEN_KANJI=['','','二','三','四','五','六','七','八','九','十'];
+function heroName(){
+  const base=(S.name||'').trim() || '冒険者';
+  const gen=(S.deaths||0)+1;
+  if(gen<=1) return base;
+  return base+'　'+(GEN_KANJI[gen]||gen)+'代目';
+}
 function newHero(){
-  return {name:'冒険者 #'+(S.deaths+1), lv:1, xp:0, str:5,dex:5,vit:5,int:5,
+  return {name:heroName(), lv:1, xp:0, str:5,dex:5,vit:5,int:5,
           equip:{weapon:null,shield:null,armor:null,accessory:null}, hpNow:0,
           // 潜在は死ぬまで残る（拠点に戻っても消えない）。
           // 祭壇があれば、前のキャラの潜在をいくつか引き継いで生まれる。
@@ -3004,6 +3429,14 @@ function newHero(){
           party:[]};   // 仲間も同じ。プレイヤーが死ねば一緒に失われる
 }
 function xpNeed(lv){ return Math.round(18*Math.pow(lv,1.55)); }
+/* そのキャラが Lv.1 から今までに積んだ累計経験値。
+   遺体に残す量を「持っている経験値」ではなく**積んだ総量**で測るために要る
+   （現在値だけだと、レベルが上がった直後に死ぬと何も残らない）。 */
+function totalXpOf(h){
+  let t=h.xp||0;
+  for(let l=1;l<h.lv;l++) t+=xpNeed(l);
+  return t;
+}
 
 /* 派生ステータス */
 function stats(h){
@@ -3012,29 +3445,37 @@ function stats(h){
   const eq=Object.values(h.equip).filter(it=>it && !isBroken(it));
   let a={dmgPct:0,aspdPct:0,hp:0,msPct:0,leech:0,critPct:0,allStat:0,
          fire:0,shock:0,frost:0,mf:0,thorns:0,lowDR:0,def:0,
-         resFire:0,resShock:0,resFrost:0,ultCdr:0,
+         resFire:0,resShock:0,resFrost:0,ultCdr:0,evade:0,
          // 鍛造で付く技の受け皿
          rangePct:0, multi:0, arcAdd:0, pierceAdd:0, durSave:0};
   let wAtk=FIST.atk, wSpd=FIST.spd, bDef=0;
   let wReach=FIST.reach, wArc=FIST.arc, wHands=FIST.hands, wProj=FIST.proj, wDt=FIST.dt;
-  let wUp=0, wItem=null;
+  let wUp=0, wItem=null, wBase=null;
   let block=0, parryWin=0, hasShield=false;
   eq.forEach(it=>{
     const b=baseOf(it);
     if(it.slot===SLOT.W){
       // 鍛造レベルは武器の素の攻撃力に乗る。接頭辞の %増加より先に掛かるので、
       // 「良い武器を鍛える」ほど伸びる（育て甲斐を接頭辞と喧嘩させない）。
-      wUp=it.up||0; wItem=it;
+      wUp=it.up||0; wItem=it; wBase=it.base;
       wAtk=it.atk*(1+wUp*UP_ATK_PER); wSpd=it.spd;
       wReach=b.reach||FIST.reach; wArc=b.arc||FIST.arc;
       wHands=b.hands||1; wProj=b.proj||null; wDt=b.dt||FIST.dt;
     }
     if(it.slot===SLOT.S){ hasShield=true; block=it.block||0; parryWin=b.parry||0.2; }
     if(it.def){ bDef+=it.def; }
-    it.aff.forEach(f=>{ a[f.stat]=(a[f.stat]||0)+f.v; });
+    it.aff.forEach(f=>{ a[f.stat]=(a[f.stat]||0)+f.v;
+                        if(f.stat2) a[f.stat2]=(a[f.stat2]||0)+(f.v2||0); });
   });
   // 節目で付いた技。武器に紐づくので、武器を持ち替えれば当然消える。
   if(wItem) upSkills(wItem).forEach(sk=>sk.ap(a, wItem));
+  /* 武器熟練度。**素の武器性能に掛ける**ので、接頭辞の %増加より先に乗る。
+     仲間には掛けない（熟練はプレイヤーの手癖であって、渡した装備の性能ではない）。 */
+  const MM = (h===S.hero && wBase) ? masteryMul(wBase) : {atk:1, aspd:1, range:1};
+  wAtk  *= MM.atk;
+  wSpd  *= MM.aspd;
+  wReach*= MM.range;
+
   const as=a.allStat;
   const str=h.str+as, dex=h.dex+as, vit=h.vit+as, int=h.int+as;
   // 永続強化を最後に乗算で適用する。装備の伸びを殺さず、底上げだけを担わせる。
@@ -3061,11 +3502,16 @@ function stats(h){
     maxHp,
     atk:   (wAtk + str*1.1) * (1 + a.dmgPct/100) * (1 + U('atk')*0.09) * (1 + B('atk')/100) * AV * PR * SA,
     aspd:  wSpd * (1 + (dex*0.9 + a.aspdPct)/100) * (1 + U('aspd')*0.07)
-           * (1 + C('aspd')/100) * (1 + B('aspd')/100) * AV * SA,
+           * (1 + C('aspd')/100) * (1 + B('aspd')/100) * AV * SA
+           * (1 + (h===S.hero ? baneMul('aspd',0) : 0)/100),
     def:   (bDef + a.def + vit*0.6) * (1 + B('def')/100) * SA,
     crit:  clamp(4 + dex*0.5 + a.critPct + U('crit')*4 + B('crit'), 0, 75),
+    // 遺物はプレイヤー本人にだけ乗る（口座に残る物なので、渡す概念が無い）
     ms:    BASE_MOVE_SPEED * (1 + a.msPct/100) * (1 + U('ms')*0.05)
-           * (1 + C('ms')/100) * (1 + B('ms')/100) * SA,
+           * (1 + C('ms')/100) * (1 + B('ms')/100)
+           * (1 + (h===S.hero ? relicSum('ms') : 0)/100) * SA
+           // 試練の枷。プレイヤーだけに掛かる（仲間まで縛ると難度が跳ね上がりすぎる）
+           * (1 + (h===S.hero ? baneMul('ms',0) : 0)/100),
     // 射程は武器の素の射程から。強化・護符・潜在はそこに乗る
     range: wReach * (1 + a.rangePct/100) * (1 + U('range')*0.10)
            * (1 + C('range')/100) * (1 + B('range')/100),
@@ -3078,8 +3524,12 @@ function stats(h){
     res:  {fire:a.resFire, shock:a.resShock, frost:a.resFrost, arcane:0,
            slash:0, pierce:0, blunt:0},
     hasShield, block, parryWin,
+    /* 回避率。上限を置いてあるのは、装備を積むだけで無敵になる道を潰すため。
+       「たまに当たらない」は気持ちよく、「ほとんど当たらない」は緊張を殺す。 */
+    evade: clamp(a.evade + (h===S.hero ? relicSum('evade') : 0), 0, 40),
     leech: a.leech + B('leech'),
-    mf:a.mf + U('mf')*12 + C('mf') + B('mf') + (h===S.hero ? curseBonus().mf : 0),
+    mf:a.mf + U('mf')*12 + C('mf') + B('mf')
+       + (h===S.hero ? curseBonus().mf + relicSum('mf') : 0),
     thorns:a.thorns + B('thorns'), lowDR:a.lowDR, charmDR:C('dr') + B('dr'),
     ailPct: B('ail'), regenPct: B('regen'),
     // 大技のリキャスト短縮（装備＋潜在）。仲間ぶんは ultCooldown 側で足す。
@@ -3271,33 +3721,67 @@ const ARCH=[
   {id:'turret',nm:'守り手', col:'#4a7f9a', hp:1.6, atk:1.2, ms:0,   range:5.0,  tele:0.75, aggro:6},
 ];
 /* エリート接頭辞。系統とは別軸で、耐性ではなく挙動を歪ませる役割に絞る。 */
+/* ---------- 精鋭・ユニークの性質 ----------
+   4つしか無かったので、階を跨ぐと同じ組み合わせがすぐ戻ってきた。
+   数を増やすだけでなく、**戦い方を変えさせる物**を混ぜてある——
+   数字が上がるだけの性質は、硬い雑魚が増えるのと変わらない。 */
 const ELITE_AFF=[
-  {nm:'俊敏な', ms:1.35},{nm:'頑健な', hp:2.0},
-  {nm:'反射する',thorns:0.25},{nm:'狂った', atk:1.35, tele:0.7}
+  {nm:'俊敏な',   ms:1.35},
+  {nm:'頑健な',   hp:2.0},
+  {nm:'反射する', thorns:0.25},
+  {nm:'狂った',   atk:1.35, tele:0.7},
+  {nm:'鈍重な',   hp:2.8, ms:0.7},                 // 硬いが遅い。捨てて逃げてもよい相手
+  {nm:'影の',     ms:1.15, evasive:0.22},          // たまに攻撃をすり抜ける
+  {nm:'毒々しい', atk:1.1, proc:'bleed'},          // 当たると出血
+  {nm:'燻る',     atk:1.1, proc:'burn'},           // 当たると火傷
+  {nm:'帯電した', atk:1.05, proc:'shock'},         // 当たると感電（被ダメージが増える）
+  {nm:'凍てつく', atk:1.05, proc:'chill'},         // 当たると鈍る
+  {nm:'貪る',     atk:1.2, leech:0.25},            // 与えたぶん自分が回復する
+  {nm:'裂ける',   hp:1.4, split:true},             // 倒すと小さいのが2体に分かれる
 ];
+/* ユニークは性質を2つ持つ。1つだと「速いだけ」「硬いだけ」で終わってしまい、
+   固有名を付けるほどの相手にならない。 */
+function rollEliteAffixes(n){
+  const pool=[...ELITE_AFF], out=[];
+  for(let i=0;i<n && pool.length;i++) out.push(pool.splice(Math.floor(rnd()*pool.length),1)[0]);
+  return out;
+}
+/* 性質のうち、当たったときに効く物をまとめて引く（hitPlayer / hitAlly から見る）。 */
+function affOf(e, key){
+  return (e && e.aff) ? e.aff.reduce((v,f)=>f[key]!==undefined?f[key]:v, undefined) : undefined;
+}
 
 /* ボスを 1 体作る。通常敵と同じ枠組みに乗せ、係数と挙動だけを盛る。 */
 function makeBoss(fl, depth, tier){
   const cfg=BOSS_STATS[tier];
   const lv = depth + Math.floor(depth/8) + (tier==='great'?3:1);
   const fams = FAMILY.filter(f=>f.minDepth<=depth);
-  const fam = pick(fams.length?fams:[FAMILY[0]]);
-  const a = pick(ARCH.filter(x=>x.id!=='swarm'));   // 群れ型はボスに向かない
+  /* 名前つきのボスなら、系統・属性・技を丸ごとそちらから引く。
+     載っていない階（周回した61階以降）は今までどおり系統をランダムに引く。 */
+  const U = uniqueBossAt(depth);
+  const fam = (U && FAMILY.find(f=>f.id===U.fam)) || pick(fams.length?fams:[FAMILY[0]]);
+  /* 群れ型はボスに向かない。据え置き型（守り手）も外す——
+     ms:0 のアーキタイプは AI が追跡状態に入らないので、
+     ボス側で速度を上書きしても**一歩も動かない**。
+     予兆つきの技を8つ持った動かない的は、緊張ではなくただの作業になる
+     （「ボスは必ず動く」と書いてあったが、この2種だけ嘘になっていた）。 */
+  const a = pick(ARCH.filter(x=>x.id!=='swarm' && x.id!=='turret'));
   const e={
     x:fl.stair.x, y:fl.stair.y,
     arch:a, fam, lv, elite:false, aff:[], boss:true, tier,
     maxHp: Math.round((26+lv*11)*a.hp*cfg.hp),
     atkV:  (5+lv*2.6)*a.atk*cfg.atk,
     def:   lv*1.6*cfg.def,
-    res:   fam.res, dt: fam.atk,
+    res:   fam.res, dt: (U ? U.dt : fam.atk),
     st:{}, bu:{},
     state:'idle', t:0, cd:1.2, vx:0, vy:0, hit:0, tele:0, dead:false,
     // ボスは必ず動く。据え置き型でも最低限の圧はかけたい。
     r:cfg.r, cr:Math.min(cfg.r, BOSS_COLLIDE_MAX),
     ms:Math.max(a.ms,1.25)*0.85, teleMul:1, rage:false,
     // 範囲攻撃
-    moves:[...BOSS_MOVESET[tier]], cast:null, moveCd:rf(2.0,3.5),
-    col:fam.col, name: fam.nm+cfg.nm,
+    moves:[...(U ? U.moves : BOSS_MOVESET[tier])], cast:null, moveCd:rf(2.0,3.5),
+    uniqueBoss: U ? depth : 0,
+    col:fam.col, name: U ? U.nm : (fam.nm+cfg.nm),
     // 名前と HP ゲージは「一撃入れて初めて」出る。
     // 部屋に入った瞬間に正体と残量が分かると、遭遇の緊張が全部前借りされてしまう。
     revealed:false
@@ -3368,7 +3852,7 @@ function makeUnique(fl, depth, fams){
   const r = pick(fl.rooms.filter(r=>r!==fl.start)) || fl.rooms[0];
   const e={
     x:r.cx+rf(-0.6,0.6), y:r.cy+rf(-0.6,0.6),
-    arch:a, fam, lv, elite:true, aff:[pick(ELITE_AFF)], uniq:true,
+    arch:a, fam, lv, elite:true, aff:rollEliteAffixes(2), uniq:true,
     maxHp: Math.round((26+lv*11)*a.hp*4.2),
     atkV:  (5+lv*2.6)*a.atk*1.5,
     def:   lv*1.6*1.5,
@@ -3380,8 +3864,17 @@ function makeUnique(fl, depth, fams){
     // 正体が分からないと選択そのものが成立しない。
     name: pick(UNIQUE_NAMES)
   };
-  e.aff.forEach(f=>{ if(f.hp) e.maxHp=Math.round(e.maxHp*f.hp); if(f.atk) e.atkV*=f.atk; });
+  e.aff.forEach(f=>{ if(f.hp) e.maxHp=Math.round(e.maxHp*f.hp); if(f.atk) e.atkV*=f.atk;
+                     if(f.ms) e.ms*=f.ms; });
+  /* 性質を2つにしたので、HPを増やす物が2つ重なることがある（頑健＋鈍重で 5.6 倍）。
+     そのままだと**ユニークが中ボスより硬くなる**。
+     ユニークは「避けるか挑むか」を選ばせる相手であって、
+     ボスより上の壁ではないので、中ボスの手前で頭打ちにする。 */
+  const midCap = Math.round((26+lv*11)*a.hp*BOSS_STATS.mid.hp*0.75);
+  e.maxHp = Math.min(e.maxHp, midCap);
   e.hp=e.maxHp;
+  // 二つの性質を名前に出す。見て分かるからこそ「挑むか避けるか」を選べる。
+  e.name = e.aff.map(f=>f.nm).join('') + e.name;
   return e;
 }
 
@@ -3621,6 +4114,9 @@ function tickIntruder(){
    だから全部「やるか、やめるか」の一択にしてある。
    得だけの物は置かない（それは判断ではなく作業）。
    無視して階段へ向かうのも常に正解になりうる、という状態を保つ。 */
+/* 祭壇に捧げる最大HPの割合。説明文・見積り・実処理がここ1つを見る
+   （数字を散らすと、必ずどれかが古いまま残る——実際に一度やっている）。 */
+const ALTAR_HP_COST = 0.10;
 const EVENTS=[
   {id:'cache', nm:'忘れられた荷', icon:'📦', col:'#d6b34a',
    sub:'誰かが担いだまま置いていったらしい。',
@@ -3633,7 +4129,11 @@ const EVENTS=[
    yes:'飲む（敵が速くなる）', no:'飲まない'},
   {id:'altar', nm:'古びた祭壇', icon:'🕯️', col:'#c98adf',
    sub:'何かを求めている。',
-   body:'<b>最大HPの20%</b>を永久に捧げると、<br>'
+   /* 以前は 20%。1回で最大HPの2割は、潜在1つの見返りとしては重すぎた——
+      「強くなるために弱くなる」の弱くなるほうが勝ってしまい、
+      祭壇そのものを避けるのが最適解になっていた。10% にして、
+      「もう1つ積むか」を毎回考えられる値幅にする。 */
+   body:'<b>最大HPの'+Math.round(ALTAR_HP_COST*100)+'%</b>を永久に捧げると、<br>'
        +'<b>3つの潜在</b>が示され、そこから<b>1つを選べる</b>。<br>'
        +'<span style="color:var(--dim);font-size:11px">HPの減少はこのキャラが死ぬまで戻らない</span>',
    yes:'捧げる', no:'立ち去る'},
@@ -3667,7 +4167,56 @@ function spawnNpc(fl, depth){
   if(!s) return null;
   const a = makeAlly(depth, S.hero);
   a.x = s.x; a.y = s.y;
+  a.npc = true;          // 加入前。倒れても「倒れた仲間」ではなく消滅する
+  a.awake = false;       // まだ気づいていない（見られるまで戦わない）
+  a.hpNow = allyStats(a).maxHp;
   return a;
+}
+
+/* ---------- 加入前の仲間（NPC）の戦闘 ----------
+   以前は棒立ちで、周りで戦闘が起きても何もしなかった。
+   隣で敵に囲まれている人が微動だにしないのは、人ではなく拾い物に見える。
+
+   ただし「最初から戦わせる」は成立しない。NPC は階層に入った時点で
+   プレイヤーから遠い場所にいるので、**見えないところで交戦して、会う前に死ぬ。**
+   それは事件ですらなく、ただ仲間が出ない階が増えるだけになる。
+
+   だから **姿が見えたら戦い始める**。視界に入った瞬間に気づき、
+   そこからは本物の戦闘になる——負ければ死に、その仲間は永久に失われる。
+   「助けに行くか、見捨てるか」を、出会った瞬間に決めさせたい。
+
+   その場から動かないのも意図。追わせると1人で群れに突っ込んで必ず死ぬので、
+   「その場で耐えている」形にして、間に合わせるかどうかをプレイヤーの足に預ける。 */
+const NPC_WAKE_DIST = 8.5;    // ここまで近づき、かつ見通せたら気づく
+const NPC_ENGAGE    = 5.0;    // 気づいたあと、この距離までの敵を相手にする
+function npcAwake(){ return !!(W.npc && W.npc.awake); }
+function updateNpc(dt){
+  const a=W.npc; if(!a) return;
+  a.atkCd=Math.max(0,(a.atkCd||0)-dt);
+  a.swing=Math.max(0,(a.swing||0)-dt);
+  a.hit  =Math.max(0,(a.hit  ||0)-dt);
+
+  if(!a.awake){
+    // 気づくまでは戦わない。**enemyTarget からも外れている**ので狙われもしない。
+    const d=Math.hypot(a.x-P.x, a.y-P.y);
+    if(d<=NPC_WAKE_DIST && losClear(P.x,P.y,a.x,a.y)){
+      a.awake=true;
+      if(nearestEnemyTo(a.x,a.y,NPC_ENGAGE)) log('◆ '+allyLabel(a)+'が敵と交戦している');
+    }
+    return;
+  }
+
+  const st=allyStats(a);
+  tickStatus(a, dt, (d,col)=>{ a.hpNow-=d; pop(a.x,a.y-0.4,d,col); });
+  if(a.hpNow<=0){ downAlly(a); return; }
+
+  const tgt=nearestEnemyTo(a.x, a.y, NPC_ENGAGE);
+  a.tgt=tgt||null;
+  a.mvx=0; a.mvy=0; a.moving=false;     // その場を動かない（追わせると孤立して死ぬ）
+  if(!tgt) return;
+  const dx=tgt.x-a.x, dy=tgt.y-a.y, d=Math.hypot(dx,dy)||1e-6;
+  a.dirx=dx/d; a.diry=dy/d;
+  if(a.atkCd<=0 && d <= st.range+tgt.r) allyAttack(a, st, tgt);
 }
 /* 敵の弱点・耐性を短く並べる（UI 用） */
 function resLine(res){
@@ -3691,7 +4240,12 @@ function startRun(depth){
            // 巡回者。潜り全体の時計で動くので、**ここが唯一のリセット点**。
            // 帰還は S.run を捨てて次にここを通るので、帰ることだけが解除になる。
            intruder:null, intrNext:INTRUDER_AFTER, intrWarned:false, intrSeen:false,
-           healAds:HEAL_ADS_PER_RUN};   // 階段での全体回復（広告）。探索ごとに戻る
+           healAds:HEAL_ADS_PER_RUN,    // 階段での全体回復（広告）。探索ごとに戻る
+           // 仲間の蘇生。5階ごとの帯で、パーティ共通の回数を持つ
+           revBand:reviveBand(d), revLeft:REVIVE_PER_BAND,
+           /* 疾風の加護の境目。潜り始めに固定するのが肝で、S.deepest を
+              直接見ると、記録を更新した瞬間に境目ごと動いて永久に切れない。 */
+           startDeepest:S.deepest};
   S.shardsRun=0;
 
   // ガチャの持ち込み枠をここで渡す。武器は持ち物へ、護符はその探索の常時効果へ。
@@ -3756,8 +4310,12 @@ function enterFloor(depth){
   W.ores = spawnOres(fl, depth);      // 鉱脈。掘ると鉱石になるが、その場では鍛えられない
   W.forge = spawnForge(fl, depth, W.ores);   // 炉は別の場所。鉱石を運ぶ距離をつくる
   W.shop  = spawnMerchant(fl, depth, [W.forge, ...(W.ores||[])]);   // 道中の商人
+  W.trial = spawnTrial(fl, depth, [W.forge, W.shop, W.ev, ...(W.ores||[])]);  // 試練の石碑
   W.mine = null;
   W.arts = [];                        // 置き型の効果は階をまたがない
+  /* 試練は階をまたげない。持ち越せると「湧いた敵から逃げて階段へ」が正解になり、
+     籠城戦という形そのものが崩れる。 */
+  if(S.run) S.run.trial = null;
   S.run.sanct = null;
   livingParty().forEach(a=>{ a.artCd=undefined; a.iframe=0; a.graceT=0; });
   [S.hero, ...party()].forEach(h=>{ if(h) h.barrier=0; });
@@ -3813,15 +4371,24 @@ function enterFloor(depth){
   }
 
   log('第'+depth+'階層');
-  if(S.run.bossTier) log(S.run.bossTier==='final' ? '深淵の主の気配'
-                       : S.run.bossTier==='great' ? '大ボスの気配' : '中ボスの気配');
+  if(S.run.bossTier){
+    /* 名前つきのボスなら、その階だけの一行を出す。
+       正体（名前）はまだ伏せる——一撃入れて初めて名乗る仕掛けは残したい。
+       ここで渡すのは「何かがいる」ではなく「**何がいそうか**」の手触りだけ。 */
+    const U=uniqueBossAt(S.run.depth);
+    log(U ? U.line
+          : S.run.bossTier==='final' ? '深淵の主の気配'
+          : S.run.bossTier==='great' ? '大ボスの気配' : '中ボスの気配');
+  }
   if(W.enemies.some(e=>e.uniq && !e.dead)) log('見慣れぬ気配がひとつ');
   if(W.ev) log(eventDef(W.ev.id).icon+' '+eventDef(W.ev.id).nm+'がある');
   if(W.ores.length) log('⛏ 鉱脈 '+W.ores.length+'ヶ所');
   if(W.forge) log('🔥 どこかで炉が焚かれている');
   if(W.shop)  log('🎒 商人がいるらしい');
+  if(W.trial) log('🗿 試練の石碑がある');
   if(W.haz) log('⚠ '+hazardDef(W.haz.kind).nm+'がある');
-  if(knownFloor(depth)) log('踏破済みの階層 — 足が速い');
+  if(windGrace()) log('🌀 疾風の加護 — 未踏の階まで足が速い');
+  else if(S.run.startDeepest>0 && depth===S.run.startDeepest+1) log('🌀 疾風の加護が切れた — ここから先は未踏');
   if(W.npc) log('この階層に人の気配がある');
   if(W.grave) log('この階層に遺体がある');
 }
@@ -3848,6 +4415,7 @@ const W={fl:null,enemies:[],drops:[],fx:[],pops:[],seen:null,grave:null,npc:null
          ores:[],     // 鉱脈。掘ると露天の炉になる
          mine:null,   // 採掘中（掘っているあいだは動けない）
          arts:[],     // 仲間の大技が置いた効果（焦土・聖域）
+         trial:null,  // 試練の石碑（遺物の唯一の入手口）
          trail:[]};   // プレイヤーの足跡。仲間の追従に使う
 
 function solid(x,y){
@@ -3977,6 +4545,12 @@ function enemyTarget(e){
     const d=Math.hypot(a.x-e.x, a.y-e.y);
     if(d<bd){ bd=d; best={x:a.x, y:a.y, ent:a}; }
   }
+  /* 加入前の仲間も、**気づいたあとだけ**狙われる。
+     気づく前から狙わせると、プレイヤーが着く前に死んでいる。 */
+  if(npcAwake()){
+    const a=W.npc, d=Math.hypot(a.x-e.x, a.y-e.y);
+    if(d<bd){ bd=d; best={x:a.x, y:a.y, ent:a}; }
+  }
   return best;
 }
 
@@ -4038,6 +4612,7 @@ function playerParts(st, mult){
    opt.forceCrit = 狩人の「狙撃」用。 */
 function hitEnemy(e, st, mult, opt){
   opt = opt||{};
+  if(eliteEvades(e)) return;           // 精鋭の性質「影の」
   const src = opt.src || S.hero;
   const crit = opt.forceCrit || rnd()*100 < st.crit;
   const r = resolveDamage(e, playerParts(st,(crit?1.5:1.0)*(mult||1)), src.lv,
@@ -4077,6 +4652,7 @@ function meleeSwing(st, ang, mult){
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da>halfArc) return;
     hitEnemy(e,st,mult);
+    relicShockwave(st, e);          // 遺物「震撼」
   });
 }
 const MULTI_MULT = 0.85;        // 追撃の威力。等倍にすると「連撃」だけが正解になる
@@ -4088,6 +4664,12 @@ function playerAttack(){
   P.swing = 0.18;
   const ang=Math.atan2(P.diry,P.dirx);
   const twin = rnd()*100 < (st.multi||0);      // 鍛造の技「連撃」
+
+  /* 熟練は「戦っているあいだ」だけ積む。
+     相手のいない場所で振り続けて上がると、道中に目盛りを置いた意味が反対になる
+     （安全な場所で素振りするのが最適解になってしまう）。 */
+  const wb = S.hero.equip.weapon && S.hero.equip.weapon.base;
+  if(wb && P.target && !P.target.dead) gainMastery(wb, 1);
 
   // 攻撃するたびに武器が擦り減る（技「堅牢」があると半分）
   if(rnd()<DUR.weaponHitChance*(1-(st.durSave||0)/100)) damageGear('weapon',1);
@@ -4107,6 +4689,19 @@ function playerAttack(){
                life: st.range/spd+0.05,
                pierce: (isBow?1:2)+(st.projPierce||0),
                hitIds:new Set(), mult:foot.mul*mult, foot:foot.k});
+
+    /* 杖だけ、撃つたびに弾の形が変わる。
+       弓は「1本を当てる」武器なので形を変えない——変えると弓と杖の差が消える。
+       杖は術者の武器なので、**何が出るか分からない**ほうがそれらしい。
+       形ごとに弾の数と1発の威力を交換にしてあるので、
+       どれが出ても総火力はおおよそ釣り合う（速射が一方的な当たりにならない）。 */
+    if(st.proj==='bolt'){
+      const sh=rollStaffShape();
+      P.staffShape=sh.id;                            // 表示用
+      sh.offs.forEach(o=>shot(o, sh.mult));
+      if(twin) shot(rf(-0.1,0.1)||0.08, sh.mult*MULTI_MULT);
+      return;
+    }
     shot(0, 1);
     if(twin) shot(rf(-0.1,0.1)||0.08, MULTI_MULT);   // 追加の1射。わずかに散る
     return;
@@ -4199,10 +4794,19 @@ function ultReady(){
   const u=ultEquipped();
   return !!u && S.screen==='game' && S.run && (P.ultCd||0)<=0;
 }
+/* 大技の威力に掛かる倍率。遺物「破断」のぶん。
+   ここを1箇所にしておかないと、大技を1つ足すたびに掛け忘れが出る。 */
+function ultPowerMul(){ return 1 + relicSum('ultPow')/100; }
 function fireUlt(){
   const u=ultEquipped();
   if(!ultReady() || !S.hero) return false;
-  const lv=ultLv(u.id), st=stats(S.hero);
+  // 試練の枷「封技」。押しても出ない理由をその場で言う（無反応にはしない）
+  if(baneMul('silence',false)){ log('封技 — 大技が出せない'); return false; }
+  const lv=ultLv(u.id), base=stats(S.hero);
+  /* 威力の倍率は「攻撃力を積んだ状態」として渡す。
+     各技の mult に個別に掛けると、技を足すたびに掛け忘れが出る。 */
+  const UP=ultPowerMul();
+  const st = UP===1 ? base : Object.assign({}, base, {atk: base.atk*UP});
   P.ultCd = ultCooldown(u);
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && Math.hypot(e.x-P.x, e.y-P.y) <= r + e.r);
@@ -4471,7 +5075,7 @@ function allyUpdate(a, dt){
 
   // --- 移動と、詰まりからの脱出 ---
   if(mvx||mvy){
-    const known = (S.run && knownFloor(S.run.depth)) ? KNOWN_SPEED : 1;
+    const known = windGrace() ? KNOWN_SPEED : 1;         // 疾風の加護
     const bx=a.x, by=a.y, step=st.ms*(a.msJit||1)*known*catchUp(a)*slow*hazardSlowAt(a.x,a.y)*dt;
     moveEnt(a, mvx*step, mvy*step);
     const moved = Math.hypot(a.x-bx, a.y-by);
@@ -4720,6 +5324,63 @@ function tickFamiliars(a, st, dt){
   });
 }
 
+/* ---------- 遺物の毎フレーム処理 ----------
+   「脈動（定期回復）」と「伴影（付き従う影）」。
+   どちらも押す物ではないので、update から静かに回す。 */
+function tickRelics(dt){
+  if(!S.run || !S.hero) return;
+  // 脈動：一定間隔で最大HPの数%を戻す
+  const every=relicSum('regenEvery');
+  if(every>0){
+    S.run.relicRegen = (S.run.relicRegen||0) + dt;
+    if(S.run.relicRegen >= every){
+      S.run.relicRegen = 0;
+      const st=stats(S.hero);
+      const amt=Math.max(1, Math.round(st.maxHp*relicSum('regenPct')/100));
+      if(S.hero.hpNow < st.maxHp){
+        S.hero.hpNow = Math.min(st.maxHp, S.hero.hpNow+amt);
+        pop(P.x, P.y-0.5, amt, '#7fe0c0', '+');
+        W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:1.1, life:0.4, maxLife:0.4, col:'#7fe0c0'});
+      }
+    }
+  }
+  // 伴影：プレイヤーの周りを回り、近くの敵を撃つ
+  const n=relicSum('wisp');
+  P.wisps = P.wisps || [];
+  while(P.wisps.length < n) P.wisps.push({ang:rnd()*6.28, cd:rf(0,RELIC_WISP_CD)});
+  P.wisps.length = n;
+  if(!n) return;
+  const st=stats(S.hero);
+  P.wisps.forEach((w,i)=>{
+    w.ang += dt*1.7;
+    w.x = P.x + Math.cos(w.ang + i*Math.PI)*1.05;
+    w.y = P.y + Math.sin(w.ang + i*Math.PI)*1.05 - 0.25;
+    w.cd -= dt;
+    if(w.cd>0) return;
+    const tgt = nearestEnemyTo(w.x, w.y, RELIC_WISP_RANGE);
+    if(!tgt) return;
+    w.cd = RELIC_WISP_CD;
+    const ang = Math.atan2(tgt.y-w.y, tgt.x-w.x);
+    W.fx.push({t:'pshot', kind:'bolt', x:w.x, y:w.y,
+               vx:Math.cos(ang)*8, vy:Math.sin(ang)*8,
+               life: RELIC_WISP_RANGE/8+0.05, pierce:1, hitIds:new Set(),
+               mult:RELIC_WISP_MULT, foot:'still', wisp:true});
+  });
+}
+const RELIC_WISP_CD=1.9, RELIC_WISP_RANGE=5.0, RELIC_WISP_MULT=0.5;
+/* 遺物「震撼」。近接が当たった場所から衝撃波が広がる。
+   本体より軽く、当たった相手には二重に入らない（1発が2回分にならないように）。 */
+const RELIC_SHOCK_R=1.9, RELIC_SHOCK_MULT=0.45;
+function relicShockwave(st, e){
+  if(!relicOn('quake')) return;
+  W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:RELIC_SHOCK_R, life:0.26, maxLife:0.26, col:'#a97fe0'});
+  nearEnemies(e.x, e.y, RELIC_SHOCK_R+1).forEach(o=>{
+    if(o.dead || o===e) return;
+    if(Math.hypot(o.x-e.x, o.y-e.y) > RELIC_SHOCK_R+o.r) return;
+    hitEnemy(o, st, RELIC_SHOCK_MULT);
+  });
+}
+
 /* 仲間が敵に当てたときの追加効果。近接も飛び道具もここを通す。 */
 function applyAllyOnHit(a, e, st){
   if(!a || !e || e.dead) return;
@@ -4817,6 +5478,13 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
     pop(e.x, e.y-0.3, back, j.col);
     if(e.hp<=0) killEnemy(e, a);
   }
+  // 精鋭・ユニークの性質。プレイヤーと同じ物が仲間にも効く。
+  if(e && !e.dead){
+    const pr=affOf(e,'proc'); if(pr) addStatus(a, pr, e.lv);
+    const lc=affOf(e,'leech');
+    if(lc){ e.hp=Math.min(e.maxHp, e.hp + Math.max(1, Math.round(dm*lc)));
+            pop(e.x, e.y-0.4, Math.round(dm*lc), '#7fe0c0', '+'); }
+  }
   a.hpNow -= dm;
   a.hit = 0.12;
   pop(a.x, a.y-0.4, dm, DTYPE[type]?DTYPE[type].col:'#ff8a80');
@@ -4833,6 +5501,18 @@ function damageAllyGear(a, slot, amount){
 /* 仲間が倒れた。ここでロストが確定し、広告での蘇生を 1 度だけ提案する。 */
 function downAlly(a){
   if(a.dead) return;
+  /* 加入前の仲間は、蘇生の対象にならない。
+     「1人につき1回だけ」の広告蘇生は**連れ歩いた相手**への救済であって、
+     まだ名前しか知らない相手に使えると、あらゆる階で保険が効いてしまう。
+     ここで消えるからこそ、間に合わなかったことに意味が出る。 */
+  if(a.npc){
+    a.dead=true; a.hpNow=0;
+    W.fx.push({t:'grave',x:a.x,y:a.y,life:0.9,max:0.9});
+    log('✕ '+allyLabel(a)+'は倒れてしまった');
+    showBanner('間に合わなかった', a.name+'を仲間にできなかった', '#e0705a', 2.2);
+    W.npc=null;
+    return;
+  }
   if(tryPhoenix(a, false)) return;      // 不死鳥の潜在
   a.dead=true; a.hpNow=0;
   W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
@@ -4885,8 +5565,35 @@ function onLevelUp(h, isPlayer){
 }
 let _lvFlash=0;
 
+/* 精鋭の性質「影の」。こちらの攻撃をたまにすり抜ける。
+   当てても通らないことがある相手は、手数で押す戦い方を否定する。 */
+function eliteEvades(e){
+  const v=affOf(e,'evasive');
+  if(!v) return false;
+  if(rnd()>=v) return false;
+  W.pops.push({x:e.x, y:e.y-0.4, txt:'かわした', c:'#8b93a7', life:0.6});
+  return true;
+}
+
 function killEnemy(e, byAlly){
   if(e.dead) return;
+  /* 精鋭の性質「裂ける」。倒すと小さいのが2体に分かれる。
+     倒した瞬間に盤面が終わらないので、片付ける順番を考えさせられる。 */
+  if(affOf(e,'split') && !e.wasSplit && S.run){
+    for(let i=0;i<2;i++){
+      const ang=rnd()*Math.PI*2;
+      const x=e.x+Math.cos(ang)*0.9, y=e.y+Math.sin(ang)*0.9;
+      if(solid(x,y)) continue;
+      const c=Object.assign({}, e, {
+        x, y, dead:false, wasSplit:true, uniq:false, elite:false, aff:[],
+        maxHp:Math.max(1,Math.round(e.maxHp*0.28)), r:0.32,
+        atkV:e.atkV*0.7, st:{}, bu:{}, cast:null, fade:undefined,
+        name:'裂けた'+e.name});
+      c.hp=c.maxHp;
+      W.enemies.push(c);
+      W.fx.push({t:'grave', x, y, life:0.35, max:0.35});
+    }
+  }
   e.dead=true; S.run.kills++;
   const st=stats(S.hero);
   const cfg = e.boss ? BOSS_STATS[e.tier] : null;
@@ -5039,7 +5746,10 @@ function bossRage(e){
   if(!e.rage && e.hp <= e.maxHp*0.5){
     e.rage=true; e.teleMul=0.65; e.ms*=1.3;
     // 激昂で新しい技が解禁される。「速くなるだけ」の第2段階にしない。
-    (BOSS_RAGE_MOVES[e.tier]||[]).forEach(m=>{ if(!e.moves.includes(m)) e.moves.push(m); });
+    /* 激昂で開く技。名前つきのボスは個別に持っている
+       （持たせないと、10体が同じ第2段階になって作り分けた意味が消える）。 */
+    const U = e.uniqueBoss ? uniqueBossAt(e.uniqueBoss) : null;
+    ((U ? U.rage : BOSS_RAGE_MOVES[e.tier])||[]).forEach(m=>{ if(!e.moves.includes(m)) e.moves.push(m); });
     e.moveCd = Math.min(e.moveCd, 1.2);
     if(e.revealed) log(e.name+'が激昂した');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.5,max:0.5});
@@ -5078,6 +5788,18 @@ function bossCast(e, dt, slow, tg){
   e.lastMove = id;
   e.cast = {id, t:m.tele*(e.teleMul||1), max:m.tele*(e.teleMul||1),
             dir:Math.atan2(tg.y-e.y, tg.x-e.x)};
+  /* 落石は**溜めの時点で落ちる場所を決める**。着弾時に決めると、
+     予兆で見せた場所と当たる場所がずれて、避けたのに当たる形になる。
+     1つは必ず相手の足元、残りはその周り——逃げ先を潰す形にする。 */
+  if(id==='pillars'){
+    const spots=[{x:tg.x, y:tg.y}];
+    for(let i=1;i<m.n;i++){
+      const ang=rnd()*Math.PI*2, r=rf(m.rad*1.4, m.spread);
+      const x=tg.x+Math.cos(ang)*r, y=tg.y+Math.sin(ang)*r;
+      spots.push({x, y});
+    }
+    e.cast.spots=spots;
+  }
   e.tele = 0;                        // 通常攻撃の予兆は打ち消す（二重に出さない）
   if(e.revealed) log(e.name+'の'+m.nm);
   return true;
@@ -5130,6 +5852,66 @@ function resolveBossMove(e){
     W.fx.push({t:'wave',x:e.x,y:e.y,r:e.r*0.9,max:m.rad,speed:5.2,
                dmg:e.atkV*m.mult, src:e, hit:[],
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80', life:99});
+
+  }else if(e.cast.id==='charge' || e.cast.id==='beam'){
+    /* 線の攻撃。突進は本体がその線を走り抜け、貫きは撃つだけ。
+       どちらも**横に避ける**しか無い形なので、下がって避ける癖を否定する。
+       線の当たり判定は「始点から len までの帯」で、予兆の絵とまったく同じ。 */
+    const len=m.len, wide=m.wide;
+    const cx=Math.cos(dir), cy=Math.sin(dir);
+    W.fx.push({t:'ultbeam', x:e.x, y:e.y, a:dir, len, wide, life:0.42, maxLife:0.42,
+               col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    aoeTargets().forEach(t=>{
+      const dx=t.x-e.x, dy=t.y-e.y;
+      const along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
+      if(along>=-0.4 && along<=len && side<=wide+t.r) aoeHit(e, t, m.mult);
+    });
+    if(e.cast.id==='charge'){
+      // 走り抜ける。壁は抜けない（抜けると部屋の外へ消えてしまう）
+      let gx=e.x, gy=e.y;
+      for(let d=0; d<len; d+=0.3){
+        const nx=gx+cx*0.3, ny=gy+cy*0.3;
+        if(solid(nx,ny)) break;
+        gx=nx; gy=ny;
+      }
+      W.fx.push({t:'ultline', x:e.x, y:e.y, x2:gx, y2:gy, life:0.3, maxLife:0.3,
+                 col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+      e.x=gx; e.y=gy;
+    }
+
+  }else if(e.cast.id==='pillars'){
+    /* 離れた数ヶ所が同時に爆ぜる。足元ではなく**逃げ先**を潰す技なので、
+       中心はキャスト開始時に決めて、予兆でその場所を見せてある。 */
+    (e.cast.spots||[]).forEach(sp=>{
+      W.fx.push({t:'shock',x:sp.x,y:sp.y,r:m.rad,life:0.34,max:0.34,
+                 col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+      aoeTargets().forEach(t=>{
+        if(Math.hypot(t.x-sp.x, t.y-sp.y) - t.r < m.rad) aoeHit(e, t, m.mult);
+      });
+    });
+
+  }else if(e.cast.id==='summon'){
+    /* 取り巻きを呼ぶ。ダメージは無い代わりに、盤面そのものを変える。
+       「数で押される前に本体を削る」という判断を作るための技。 */
+    const n=(e.rage? m.n+1 : m.n);
+    const lv=Math.max(1, e.lv-2);
+    const fams=floorFamilies(S.run?S.run.depth:1);
+    for(let i=0;i<n;i++){
+      const ang=i/n*Math.PI*2+rnd()*0.5, r=1.6+rnd()*1.2;
+      const x=e.x+Math.cos(ang)*r, y=e.y+Math.sin(ang)*r;
+      if(solid(x,y)) continue;
+      const a2=pick(ARCH), fam2=pick(fams.length?fams:[FAMILY[0]]);
+      const c={x, y, arch:a2, fam:fam2, lv, elite:false, aff:[],
+        maxHp:Math.round((26+lv*11)*a2.hp*0.7), atkV:(5+lv*2.6)*a2.atk*0.8, def:lv*1.6,
+        res:fam2.res, dt:fam2.atk, st:{}, bu:{},
+        state:'chase', t:0, cd:rf(0,0.6), vx:0, vy:0, hit:0, tele:0, dead:false, r:0.34,
+        ms:a2.ms, teleMul:1, col:fam2.col, name:fam2.nm+'の'+a2.nm, summoned:true};
+      c.hp=c.maxHp;
+      W.enemies.push(c);
+      W.fx.push({t:'grave', x, y, life:0.4, max:0.4});
+    }
+    W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:3.2, life:0.5, maxLife:0.5,
+               col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
   }
   const cd=m.cd;
   e.moveCd = rf(cd[0],cd[1]) * (e.rage?0.65:1);
@@ -5155,9 +5937,28 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
       P.parryFx = 0.35;
       log('パリイ！');
       W.fx.push({t:'parry',x:P.x,y:P.y,life:0.35,max:0.35});
-      if(e && !e.dead){ e.tele=0; e.cd=Math.max(e.cd,1.4); e.hit=0.15; }  // よろめかせる
+      /* 近接を弾いたら本当に**よろめき状態**を入れる。
+         以前は「次の攻撃までを遅らせる」だけで、見た目に何も起きなかった。
+         パリイは受付 0.15〜0.28 秒しかない賭けなので、
+         成功したことが盤面に残らないと、狙う理由が育たない。
+         弾（飛び道具）は撃った本人が離れているので、これは近接だけ。 */
+      if(e && !e.dead){
+        e.tele=0; e.cd=Math.max(e.cd,1.4); e.hit=0.15;
+        if(!boltDmg) addStatus(e, 'stagger', S.hero.lv);
+      }
       return true;                       // 攻撃は消滅（弾も消える）
     }
+  }
+
+  /* 回避。「疾き」装備で積む。仲間の回避（hitAlly）と同じ形で、
+     成立したらダメージも状態異常も一切通らない。
+
+     **パリイより後ろに置く。** 先に回避を引くと、狙って合わせたパリイが
+     「たまたま避けた」に食われて、よろめきも光も出ない。
+     結果は同じ無傷でも、プレイヤーから見れば操作が無かったことになる。 */
+  if(st.evade>0 && rnd()*100 < st.evade){
+    W.pops.push({x:P.x, y:P.y-0.4, txt:'回避', c:'#8fc7ff', life:0.7});
+    return true;
   }
 
   const lv = e ? e.lv : (boltLv||S.run.depth);
@@ -5172,6 +5973,18 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
   if(st.charmDR) dm=Math.round(dm*(1-st.charmDR/100));      // 加護の護符
   if(S.run.ward) dm=Math.max(1, Math.round(dm*(1-S.run.ward.cut/100)));   // 大技「守護」
   if(hasCurse('thin')) dm=Math.round(dm*1.4);                              // 呪い「薄氷」
+  /* 精鋭・ユニークの性質。当たった瞬間に効く物はここでまとめて見る。
+     状態異常を配るのが本体で、数字の上乗せは控えめにしてある——
+     「硬くて痛い」だけの相手は、緊張ではなくただの作業になる。 */
+  if(e && !e.dead){
+    const pr=affOf(e,'proc');
+    if(pr) addStatus({isPlayer:true, st:S.run.pst}, pr, e.lv), S.run.pst=S.run.pst;
+    const lc=affOf(e,'leech');
+    if(lc){ e.hp=Math.min(e.maxHp, e.hp + Math.max(1, Math.round(dm*lc)));
+            pop(e.x, e.y-0.4, Math.round(dm*lc), '#7fe0c0', '+'); }
+  }
+  const baneDmg=baneMul('dmgTaken',0);                                     // 試練の枷「脆弱」
+  if(baneDmg) dm=Math.max(1, Math.round(dm*(1+baneDmg/100)));
 
   let guarded=false;
   if(P.guard && st.hasShield && st.block>0){
@@ -5240,8 +6053,17 @@ function die(){
   // 前の遺体は、回収されないまま死んだので消える
   const prevGrave = S.grave;
 
-  S.grave = (kept.length || keptGold>0 || keptOreN>0)
-    ? {depth:S.run.depth, x:P.x, y:P.y, items:kept, gold:keptGold, ore:keptOre,
+  /* ---------- 遺体に残る経験値 ----------
+     道具と金は戻るのに、**積み上げたレベルだけは丸ごと消えていた**。
+     再走で一番つらいのは持ち物ではなくレベル差なので、
+     戻ってこないものが一番痛い、という形になっていた。
+
+     死んだ時点までに稼いだ累計経験値の一部を遺体に置く。
+     全部は返さない（死んだ意味が消える）。風化にも同じだけ効く。 */
+  const keptXp = Math.floor(totalXpOf(S.hero) * GRAVE_XP_RATE);
+
+  S.grave = (kept.length || keptGold>0 || keptOreN>0 || keptXp>0)
+    ? {depth:S.run.depth, x:P.x, y:P.y, items:kept, gold:keptGold, ore:keptOre, xp:keptXp,
        heroName:S.hero.name, lv:S.hero.lv, t:nowMs()}
     : null;
 
@@ -5348,9 +6170,17 @@ function collectGrave(){
   const g=Math.floor(S.grave.gold*k);
   S.run.loot.push(...items);
   S.run.gold += g;
+  // 経験値も風化する。放置した時間ぶんは戻ってこない。
+  const xp=Math.floor((S.grave.xp||0)*k);
   let oreN=0;
   ORES.forEach(o=>{ const n=Math.floor(((S.grave.ore&&S.grave.ore[o.id])||0)*k);
                     if(n>0){ gainOre(o.id, n); oreN+=n; } });
+  if(xp>0){
+    const before=S.hero.lv;
+    addXp(S.hero, xp, true);
+    const gained=S.hero.lv-before;
+    log(`◈ 遺した経験を取り戻した（+${xp}`+(gained>0?` / Lv.${S.hero.lv}`:'')+'）');
+  }
   log(`遺体を回収：道具 ${items.length} 点 / ${g} G`+(oreN?` / 鉱石 ${oreN}`:''));
   if(k<1) log(`風化で失われた：道具 ${lostItems} 点（${Math.round((1-k)*100)}% 朽ちていた）`);
   items.slice(0,4).forEach(it=>log('　'+itemName(it)));
@@ -5470,10 +6300,18 @@ const stickEl=el('stick'), knobEl=el('knob');
 function el(id){return document.getElementById(id)}
 const cv=el('cv'), ctx=cv.getContext('2d');
 
-/* 指の役割分担:
-     左半分に最初に触れた指 → 移動スティック
-     それ以外の指（右半分 or 2本目）→ ガード
-   これで「移動しながら盾を構える」が片手ずつで成立する。 */
+/* ---------- 指の役割分担 ----------
+   以前は **画面の左右**で決めていた（左半分＝スティック／右半分＝ガード）。
+   左利きや、右手で持って右親指で動かしたい人が動かせない。
+   逆にガードは画面の右側でしか構えられなかった。
+
+   場所ではなく **順番** で決める。
+
+     1本目の指 → 移動スティック（触れた場所にスティックが出る）
+     2本目の指 → ガード
+
+   これで「どこに触れても動ける」「どこに触れても構えられる」が両立する。
+   片手ずつでも、片手の2本指でも同じように成立する。 */
 let guardId=null;
 function beginGuard(){
   if(P.guard) return;
@@ -5494,9 +6332,9 @@ function tapHitsNpc(cx, cy){
 function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
-    if(t.target && t.target.closest && t.target.closest('#prompt,#helpbtn,#bagbtn')) continue;
+    if(t.target && t.target.closest && t.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
-    if(t.clientX < innerWidth*0.55 && stickId===null){
+    if(stickId===null){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
       stickEl.style.left=(t.clientX-65)+'px'; stickEl.style.top=(t.clientY-65)+'px';
@@ -5522,6 +6360,19 @@ function touchEnd(ev){
   for(const t of ev.changedTouches){
     if(t.identifier===stickId){ stickId=null; stickDx=stickDy=0; stickEl.style.display='none'; }
     if(t.identifier===guardId){ guardId=null; endGuard(); }
+  }
+  /* スティックの指だけ離してガードの指が残っている、という持ち替えが起きる。
+     そのまま放置すると「触れているのに動けない」になるので、
+     残っている指をスティックに引き継ぐ（構えは解ける）。 */
+  if(stickId===null && guardId!==null){
+    const t=[...(ev.touches||[])].find(x=>x.identifier===guardId);
+    if(t){
+      guardId=null; endGuard();
+      stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
+      stickEl.style.display='block';
+      stickEl.style.left=(t.clientX-65)+'px'; stickEl.style.top=(t.clientY-65)+'px';
+      knobEl.style.left='38px'; knobEl.style.top='38px';
+    }
   }
 }
 addEventListener('touchstart',e=>{if(S.screen==='game'){touchStart(e);}},{passive:true});
@@ -5663,9 +6514,94 @@ function interact(){
   if(nearEvent()){ openEvent(); return; }
   if(nearMerchant()){ openMerchant(); return; }
   if(nearForge()){ openForge(true); return; }
+  if(nearTrial()){ openTrial(); return; }
   const ore=nearOre();
   if(ore){ startMine(ore); return; }
 }
+/* ---------- 試練 ----------
+   始める前に、何が起きるかを全部見せる。
+   「やってみないと分からない」で高難度に放り込むのは、挑戦ではなく事故なので。 */
+function openTrial(){
+  const t=W.trial; if(!t || t.used) return;
+  const prize=rollNewRelic();
+  if(!prize){ log('この石碑はもう応えない'); t.used=true; return; }
+  // 枷はここで決めて見せる。始めてから知らせるのでは、覚悟の決めようがない。
+  t.bane = t.bane || pick(TRIAL_BANES).id;
+  const b=trialBaneDef(t.bane);
+  S.screen='trial';
+  el('hud').classList.remove('on');
+  el('tr-title').textContent='🗿 試練の石碑';
+  el('tr-sub').textContent='何かが試そうとしている。';
+  el('tr-body').innerHTML =
+    `<div class="row"><span class="k">耐える</span><span><b>${TRIAL_SEC}</b> 秒<br>
+       <span style="color:var(--dim);font-size:11px">そのあいだ敵が湧き続ける</span></span></div>
+     <div class="row"><span class="k">枷</span><span style="color:#e0705a">
+       <b>${b.nm}</b><br><span style="font-size:11px">${b.desc}</span></span></div>
+     <div class="row"><span class="k">報酬</span><span style="color:#d6b34a">
+       <b>遺物がひとつ</b><br><span style="color:var(--dim);font-size:11px">中身は触れるまで分からない</span></span></div>
+     <div class="row"><span class="k">やめられない</span><span style="color:var(--dim);font-size:11px">
+       始めたら、終わるまで湧き続ける<br>階段を降りれば中断できるが、報酬は無い</span></div>`;
+  el('m-trial').classList.add('on');
+}
+function closeTrial(){ el('m-trial').classList.remove('on'); setScreen('game'); last=performance.now(); }
+function startTrial(){
+  const t=W.trial; if(!t || t.used) return;
+  t.used=true;                       // 1階につき1回
+  S.run.trial={t:TRIAL_SEC, max:TRIAL_SEC, bane:t.bane, wave:0.8, kills:0, x:t.x, y:t.y};
+  closeTrial();
+  log('🗿 試練が始まった — '+trialBaneDef(t.bane).nm);
+  showBanner('試練', trialBaneDef(t.bane).nm+'　'+TRIAL_SEC+'秒 耐えろ', '#c98adf', 2.4);
+  W.fx.push({t:'ultring', x:t.x, y:t.y, r:0, max:6, life:0.7, maxLife:0.7, col:'#c98adf'});
+}
+/* 毎フレーム。湧かせて、時間を削って、終わったら渡す。 */
+function tickTrial(dt){
+  const tr=S.run && S.run.trial;
+  if(!tr || tr.t<=0) return;
+  tr.t -= dt;
+  tr.wave -= dt;
+  if(tr.wave<=0){
+    tr.wave = TRIAL_WAVE;
+    for(let i=0;i<TRIAL_PER_WAVE;i++) spawnTrialEnemy();
+  }
+  if(tr.t<=0){
+    tr.t=0;
+    const prize=rollNewRelic();
+    if(prize && grantRelic(prize.id)){
+      log('🗿 '+prize.icon+' '+prize.nm+' を得た');
+      showBanner(prize.icon+' '+prize.nm, prize.desc, prize.col, 3.2);
+      W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:5, life:0.9, maxLife:0.9, col:prize.col});
+    }else{
+      log('試練を越えた（もう得られる遺物は無い）');
+    }
+    S.run.trial=null;
+  }
+}
+/* 湧く場所はプレイヤーから一定の距離を空ける。
+   足元に出すと避けようが無く、それは難度ではなく事故になる。 */
+function spawnTrialEnemy(){
+  if(!W.fl || !S.run) return;
+  const depth=S.run.depth;
+  const fams=floorFamilies(depth);
+  const lv=depth+Math.floor(depth/6)+1;
+  for(let i=0;i<24;i++){
+    const ang=rnd()*Math.PI*2, r=rf(TRIAL_SPAWN_MIN, TRIAL_SPAWN_MAX);
+    const x=P.x+Math.cos(ang)*r, y=P.y+Math.sin(ang)*r;
+    if(solid(x,y)) continue;
+    const a=pick(ARCH), fam=pick(fams.length?fams:[FAMILY[0]]);
+    const e={
+      x, y, arch:a, fam, lv, elite:rnd()<0.18, aff:[],
+      maxHp:Math.round((26+lv*11)*a.hp), atkV:(5+lv*2.6)*a.atk, def:lv*1.6,
+      res:fam.res, dt:fam.atk, st:{}, bu:{},
+      state:'chase', t:0, cd:rf(0,0.6), vx:0, vy:0, hit:0, tele:0, dead:false, r:0.34,
+      ms:a.ms, teleMul:1, col:fam.col, name:fam.nm+'の'+a.nm, trial:true};
+    e.hp=e.maxHp;
+    if(e.elite){ e.maxHp=Math.round(e.maxHp*1.5); e.hp=e.maxHp; e.atkV*=1.25; e.name='精鋭の'+e.name; }
+    W.enemies.push(e);
+    W.fx.push({t:'grave', x, y, life:0.35, max:0.35});
+    return;
+  }
+}
+
 function openStairs(){
   const safe = S.run.depth%5===0;
   el('st-title').textContent = safe?'帰還ポータル':'下り階段';
@@ -5763,7 +6699,20 @@ let last=performance.now();
 let _tickCount=0;      // ループが生きているかの検証用（フリーズ回帰を捕まえる）
 let _drawDt=0;         // 描画だけで使う delta（漂う粒と層バナーのアニメ用）
 function tick(now){
-  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  /* dt は **必ず 0 以上**。上限しか見ていなかったせいで、負の dt が通っていた。
+
+     rAF が渡す now は「そのフレームの開始時刻」で、
+     画面を閉じる処理などが last=performance.now() を呼ぶのは
+     フレームの途中——つまり now より後の時刻になる。
+     次のフレームの now がそれより手前だと (now-last) が負になり、
+     Math.min(0.05, 負) は負をそのまま通してしまう。
+
+     負の dt はタイマーを**巻き戻す**。実際に踏んだのはパリイの閃光で、
+     0.35 秒の残り時間が 0.6 まで伸び、描画の半径が負になって
+     arc() が例外を投げていた（tick の try が拾うのでフリーズはしないが、
+     そのフレームの描画は丸ごと落ちる）。
+     時間が戻る前提の処理はどこにも無いので、入口で潰す。 */
+  const dt=clamp((now-last)/1000, 0, 0.05); last=now;
   _tickCount++; _drawDt=dt;
   // 例外でループが止まると「ゲームオーバー後にフリーズ」になる。必ず次フレームを予約する。
   try{
@@ -5858,7 +6807,7 @@ function update(dt){
 
   if(m>0.15 && !W.mine){
     // ガード中は動きが鈍る。この game では移動＝回避なので、これがガードの代償になる。
-    const known = knownFloor(S.run.depth) ? KNOWN_SPEED : 1;   // 踏破済みは速い
+    const known = windGrace() ? KNOWN_SPEED : 1;               // 疾風の加護
     const sp=st.ms*known*Math.min(1,m)*(P.guard && st.hasShield ? GUARD_MOVE_MUL : 1)*pChill
              *hazardSlowAt(P.x,P.y);
     moveEnt(P, ix/m*sp*dt, iy/m*sp*dt);
@@ -5887,9 +6836,12 @@ function update(dt){
   }
 
   pushTrail();        // 仲間が辿る足跡を残す
+  tickRelics(dt);     // 遺物の定期効果（脈動・伴影）
+  tickTrial(dt);      // 試練の籠城戦
   autoPickup();
   if(W.grave && Math.hypot(W.grave.x-P.x, W.grave.y-P.y) < 0.9) collectGrave();
   livingParty().forEach(a=>allyUpdate(a,dt));
+  updateNpc(dt);                 // 加入前の仲間。見られてから戦い始める
   resolveAllyOverlap();          // 全員動かしたあとに、めり込みだけ直す
   if(!S.hero || !S.run) return;
   W.enemies.forEach(e=>enemyUpdate(e,dt));
@@ -5901,6 +6853,9 @@ function update(dt){
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
       // 敵の弾は当たった者に入る。仲間が前に出ていれば仲間が受ける。
+      if(npcAwake() && Math.hypot(f.x-W.npc.x,f.y-W.npc.y)<0.45){
+        hitAlly(W.npc,null,f.dmg,f.dt,f.lv); return false;
+      }
       for(const a of livingParty()){
         if(Math.hypot(f.x-a.x,f.y-a.y)<0.45){ hitAlly(a,null,f.dmg,f.dt,f.lv); return false; }
       }
@@ -5975,8 +6930,8 @@ function update(dt){
   W.enemies=W.enemies.filter(e=>!e.dead || (e.fade=(e.fade??0.3)-dt)>0);
   if(!S.hero || !S.run) return;
 
-  // 探索済み記録
-  const gx=Math.floor(P.x), gy=Math.floor(P.y), R=9;
+  // 探索済み記録。試練の枷「暗幕」のあいだは見える範囲そのものが狭まる
+  const gx=Math.floor(P.x), gy=Math.floor(P.y), R=Math.round(9*baneMul('sight',1));
   for(let y=gy-R;y<=gy+R;y++) for(let x=gx-R;x<=gx+R;x++)
     if(y>=0&&x>=0&&y<W.fl.H&&x<W.fl.W && (x-gx)**2+(y-gy)**2<R*R) W.seen[y][x]=1;
 
@@ -6275,10 +7230,24 @@ function draw(){
     ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.arc(sx,sy,R+3,0,7); ctx.stroke();
     if(isNpc){
-      // 未加入は「？」を浮かせて、話しかけられることを見せる
-      ctx.globalAlpha=0.55+0.35*Math.sin(performance.now()/320);
-      label('？', sx, sy-R-TS*0.42, '#ffd06a', 1);
-      ctx.globalAlpha=1;
+      /* 未加入は「？」を浮かせて、話しかけられることを見せる。
+         ただし戦いが始まったら「？」ではなく **HPバー**を出す。
+         このバーが減っていくのを見せないと、
+         「急げ」という状況そのものが伝わらない（気づかないうちに消えて終わる）。 */
+      if(a.awake){
+        const mx=allyStats(a).maxHp;
+        ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
+        ctx.fillStyle=j.col; ctx.fillRect(sx-R,sy-R-9,R*2*clamp(a.hpNow/mx,0,1),3.5);
+        if(a.tgt){
+          ctx.globalAlpha=0.55+0.35*Math.sin(performance.now()/180);
+          label('⚔', sx, sy-R-TS*0.46, '#e0705a', 1);
+          ctx.globalAlpha=1;
+        }
+      }else{
+        ctx.globalAlpha=0.55+0.35*Math.sin(performance.now()/320);
+        label('？', sx, sy-R-TS*0.42, '#ffd06a', 1);
+        ctx.globalAlpha=1;
+      }
       label(allyLabel(a), sx, sy+R+TS*0.40, j.col, 1);
     }else{
       const mx=allyStats(a).maxHp;
@@ -6301,6 +7270,18 @@ function draw(){
       ctx.restore();
     });
     drawMate(a,false);
+  });
+  // 遺物「伴影」。使い魔と同じ描き方だが、色を変えて出どころを分かるようにする。
+  (P.wisps||[]).forEach(w=>{
+    if(w.x===undefined) return;
+    const fx=w.x*TS-camX, fy=w.y*TS-camY;
+    const pl=0.6+0.4*Math.sin(performance.now()/200+w.ang);
+    ctx.save();
+    ctx.globalAlpha=0.28*pl; ctx.fillStyle='#8fd8ff';
+    ctx.beginPath(); ctx.arc(fx,fy,TS*0.32,0,7); ctx.fill();
+    ctx.globalAlpha=0.95; ctx.fillStyle='#dff0ff';
+    ctx.beginPath(); ctx.arc(fx,fy,TS*0.14,0,7); ctx.fill();
+    ctx.restore();
   });
   if(W.npc) drawMate(W.npc,true);
 
@@ -6411,6 +7392,32 @@ function draw(){
     }
   }
 
+  /* 試練の石碑。触れる前は静かに脈打ち、始まったあとは色が濃くなる。
+     済んだ石碑も残す——消すと「さっきここで何かした」が盤面から消えてしまう。 */
+  if(W.trial){
+    const sx=W.trial.x*TS-camX, sy=W.trial.y*TS-camY;
+    if(sx>-80 && sy>-80 && sx<innerWidth+80 && sy<innerHeight+80){
+      ctx.save();
+      const live=trialActive();
+      const pl=0.5+0.35*Math.sin(performance.now()/(live?150:320)+W.trial.seed);
+      const col=W.trial.used ? (live?'#c98adf':'#5b6072') : '#c98adf';
+      ctx.globalAlpha=(W.trial.used&&!live?0.10:0.24)*pl; ctx.fillStyle=col;
+      ctx.beginPath(); ctx.arc(sx, sy, TS*(live?1.3:0.9), 0, 7); ctx.fill();
+      ctx.globalAlpha=1;
+      // 石碑そのもの。縦長の板に見えるよう、角を落とした矩形にする。
+      ctx.fillStyle = W.trial.used&&!live ? '#3a4152' : '#4a4360';
+      ctx.fillRect(sx-TS*0.22, sy-TS*0.46, TS*0.44, TS*0.86);
+      ctx.fillStyle = W.trial.used&&!live ? '#5b6072' : shade(col,1.1);
+      ctx.fillRect(sx-TS*0.13, sy-TS*0.34, TS*0.26, TS*0.10);
+      ctx.fillRect(sx-TS*0.13, sy-TS*0.16, TS*0.26, TS*0.10);
+      ctx.fillRect(sx-TS*0.13, sy+TS*0.02, TS*0.26, TS*0.10);
+      if(Math.hypot(W.trial.x-P.x, W.trial.y-P.y)<8)
+        label(W.trial.used?(live?'試練 進行中':'試練 済み'):'試練の石碑',
+              sx, sy+TS*0.86, W.trial.used&&!live?'#5b6072':'#c98adf', 1);
+      ctx.restore();
+    }
+  }
+
   /* 仲間の大技が置いた効果。キャラより下に敷く（上に描くと足元が見えない）。 */
   (W.arts||[]).forEach(f=>{
     const sx=f.x*TS-camX, sy=f.y*TS-camY;
@@ -6509,8 +7516,12 @@ function draw(){
       ctx.restore();
     }
     if(f.t==='ultring'){       // 震撼・守護：広がる輪
-      const k=1-f.life/f.maxLife;
-      const rr=f.max*k;
+      /* life は「減らしてから、同じフレームで描いて、最後に捨てる」順で回るので、
+         描く瞬間だけ負になっていることがある。そのまま半径にすると
+         arc() が負の半径で例外を投げ、**ループごと止まる**（実際に踏んだ）。
+         描画側で必ず 0〜1 に丸める。 */
+      const k=clamp(1-f.life/f.maxLife, 0, 1);
+      const rr=Math.max(0, f.max*k);
       ctx.save();
       ctx.globalAlpha=(1-k)*0.9;
       ctx.strokeStyle=f.col; ctx.lineWidth=4;
@@ -6623,9 +7634,10 @@ function draw(){
   }
   // パリイ成功の閃光
   if(P.parryFx>0){
-    const p=1-P.parryFx/0.35;
+    // 半径が負になり得る式は、描画側でも丸めておく（例外1つで1フレーム落ちるので）
+    const p=clamp(1-P.parryFx/0.35, 0, 1);
     ctx.strokeStyle='rgba(255,224,138,'+(1-p)+')'; ctx.lineWidth=4;
-    ctx.beginPath(); ctx.arc(px,py,TS*(0.5+p*1.9),0,7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
   ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
@@ -7050,9 +8062,15 @@ function shade(hex,k){
   const r=Math.round(((n>>16)&255)*k), g=Math.round(((n>>8)&255)*k), b=Math.round((n&255)*k);
   return 'rgb('+r+','+g+','+b+')';
 }
+/* ミニマップは右下。以前は右上（?と🎒の下）に置いていたが、
+   上の帯には敵の情報・侵入者の警告・パーティ・ログが集まっていて、
+   **一番よく見る地図が、一番混んでいる場所**にあった。
+   下は大技ボタンしか居ないので、そこの上に逃がす。 */
+const MM_BOTTOM = 186;      // 画面下端からの余白（大技ボタンの上に出す）
 function drawMinimap(){
   const f=W.fl, s=Math.min(110/f.W, 110/f.H);
-  const mw=f.W*s, mh=f.H*s, ox=innerWidth-mw-14, oy=172;   // ?ボタンと🎒の下
+  const mw=f.W*s, mh=f.H*s;
+  const ox=innerWidth-mw-14, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
   ctx.globalAlpha=0.28; ctx.fillStyle='#000'; ctx.fillRect(ox-3,oy-3,mw+6,mh+6); ctx.globalAlpha=1;
   ctx.globalAlpha=0.5; ctx.strokeStyle='#39415a'; ctx.lineWidth=1;
   ctx.strokeRect(ox-3.5,oy-3.5,mw+7,mh+7); ctx.globalAlpha=1;
@@ -7119,7 +8137,10 @@ function updateHUD(){
   // 「この時間で何をするか」という一番おいしい判断ができない。
   const av = (S.hero.avengeT||0) > 0
     ? `<span style="color:#ff6a5a">弔い ${S.hero.avengeT.toFixed(1)}</span>` : '';
-  el('statusbar').innerHTML = av + act.map(k=>
+  // 疾風の加護。切れたことに気づけるよう、効いているあいだは出しっぱなしにする
+  const wg = windGrace()
+    ? `<span style="color:#7fe0c0">🌀 疾風の加護</span>` : '';
+  el('statusbar').innerHTML = wg + av + act.map(k=>
     `<span style="color:${STATUS[k].col}">${STATUS[k].nm} ${pst[k].t.toFixed(1)}</span>`).join('');
 
   // 狙っている敵の弱点・耐性。属性を選ぶ意味は、これが見えて初めて伝わる。
@@ -7188,6 +8209,13 @@ function updateHUD(){
     el('bossfill').style.width = clamp(boss.hp/boss.maxHp*100,0,100)+'%';
     el('bossname').textContent = boss.name + (boss.rage?'（激昂）':'');
   }else bb.style.display='none';
+  // 試練の残り時間。枷の名前も一緒に出す（何が掛かっているか忘れさせない）
+  const tb=el('trialbar'), tr=S.run && S.run.trial;
+  if(tr && tr.t>0){
+    tb.style.display='block';
+    el('trialfill').style.width = clamp(tr.t/tr.max*100,0,100)+'%';
+    el('trialname').textContent = '🗿 試練　'+trialBaneDef(tr.bane).nm+'　あと '+Math.ceil(tr.t)+'秒';
+  }else tb.style.display='none';
   /* 耐久の警告。壊れると性能を完全に失うのに、ログは流れて消えてしまう。
      壊れそう／壊れているあいだは出しっぱなしにして、見落としようがなくする。 */
   const alerts=gearAlerts(), dtag=el('durtag');
@@ -7283,7 +8311,9 @@ function updateHUD(){
   }
   else if(nearNpc()){
     pr.style.display='block';
-    pr.textContent = '◆ '+W.npc.name+'に話しかける';
+    pr.textContent = (W.npc.awake && W.npc.tgt)
+      ? '◆ '+W.npc.name+'を助けて仲間にする'
+      : '◆ '+W.npc.name+'に話しかける';
   }
   else if(nearEvent()){
     const d=eventDef(W.ev.id);
@@ -7297,6 +8327,10 @@ function updateHUD(){
   else if(nearForge()){
     pr.style.display='block';
     pr.textContent = '⚒ 炉で鍛える／直す';
+  }
+  else if(nearTrial()){
+    pr.style.display='block';
+    pr.textContent = '🗿 試練の石碑に触れる';
   }
   else if(nearOre()){
     pr.style.display='block';
@@ -7319,16 +8353,17 @@ function updateHUD(){
 
    なので座標を決め打ちせず、**上に居る物の一番下を測って、その下に置く**。
    毎フレーム測ると reflow を強制するので、見た目が変わったときだけ測り直す。 */
-const HUD_STACK = ['partybar','targetinfo','intruder','statusbar','gravehint','bossbar'];
-let _hudSig='';
-function hudSig(){
-  let sig=logs.length+'/';
-  for(const id of HUD_STACK){
-    const n=el(id);
-    sig += (n && n.style.display!=='none' ? (n.textContent||'').length : -1) + ',';
-  }
-  return sig;
-}
+const HUD_STACK = ['partybar','targetinfo','intruder','statusbar','gravehint','bossbar','trialbar'];
+/* 測り直しは **1フレームに1回**。
+   以前は表示状態と文字数から署名を作って、変わったときだけ測っていた。
+   だが署名は衝突する——文字数がたまたま前と同じ組み合わせになると、
+   見た目が変わっているのに測り直しを飛ばして、ログが前の位置に残った
+   （実際に踏んだ: 仲間2人を出し直したのにログが上に残る）。
+
+   updateHUD はどのみち毎フレーム innerHTML を書き換えていて、
+   その時点でレイアウトは無効化されている。まとめて1回測るだけなら
+   reflow は1回で済むので、素直にフレーム単位で測り直す。 */
+let _hudLaidTick=-1;
 /* 敵の情報パネルは中央寄せ、パーティ表示は左寄せ。
    横に重なるときだけ下へ落とす（重なっていないのに落とすと、無駄に下がる）。 */
 function layoutTargetInfo(base){
@@ -7346,11 +8381,10 @@ function layoutTargetInfo(base){
   }
   if(top > r0.top-base) ti.style.top=Math.round(top)+'px';
 }
-function layoutHud(){
+function layoutHud(force){
   const lg=el('log'); if(!lg) return;
-  const sig=hudSig();
-  if(sig===_hudSig) return;
-  _hudSig=sig;
+  if(!force && _hudLaidTick===_tickCount) return;
+  _hudLaidTick=_tickCount;
 
   const base = el('hud').getBoundingClientRect().top;
   layoutTargetInfo(base);                   // ログより先に、こちらの位置を決める
@@ -7368,23 +8402,28 @@ let logs=[];
 function log(t){
   logs.unshift(t); logs=logs.slice(0,5);
   el('log').innerHTML=logs.map((l,i)=>'<div style="opacity:'+(1-i*0.18)+'">'+l+'</div>').join('');
-  layoutHud();
+  layoutHud(true);      // 行が増えた直後は、同じフレームでも測り直す
 }
 
 /* ---------- 画面遷移 ----------
    1画面あたりの情報量を抑えるため、拠点をハブにして道具屋・倉庫・強化・ガチャを
    それぞれ独立した画面に分けている。 */
-const SCREENS={town:'scr-town', shop:'scr-shop', stash:'scr-stash', upg:'scr-upg',
-               bld:'scr-bld', gacha:'scr-gacha', mem:'scr-mem'};
-const RENDERERS={town:renderTown, shop:renderShop, stash:renderStash, upg:renderUpg,
-                 bld:renderBld, gacha:renderGacha, mem:renderMem};
+const SCREENS={title:'scr-title', town:'scr-town', char:'scr-char', shop:'scr-shop',
+               stash:'scr-stash', upg:'scr-upg', bld:'scr-bld', gacha:'scr-gacha', mem:'scr-mem'};
+const RENDERERS={title:renderTitle, town:renderTown, char:renderChar, shop:renderShop,
+                 stash:renderStash, upg:renderUpg, bld:renderBld, gacha:renderGacha, mem:renderMem};
 function isMenu(s){ return !!SCREENS[s]; }
 
 /* 拠点系の画面にだけバナーを出す。ゲーム中とモーダル専有中は出さない。 */
 function syncAdBar(){
-  const show = isMenu(S.screen);          // 説明モーダルやゲーム中には出さない
+  // タイトルにも出さない。起動して最初に見る画面を広告で始めたくない。
+  const show = isMenu(S.screen) && S.screen!=='title';
   el('adbar').classList.toggle('on', show);
   for(const k in SCREENS) el(SCREENS[k]).classList.toggle('banner', show);
+  // 「潜る」バーは拠点にだけ。バナーが出ているならその上へずらす。
+  const dive=el('divebar');
+  dive.classList.toggle('on', S.screen==='town');
+  dive.classList.toggle('banner', show);
 }
 function setScreen(s){
   if(isMenu(S.screen) && S.screen!==s) S.prevScreen=S.screen;
@@ -7396,6 +8435,40 @@ function setScreen(s){
   if(RENDERERS[s]) RENDERERS[s]();
   syncAdBar();
 }
+/* 熟練の1行。今の武器のぶんだけ出す（全部並べると表になってしまう）。 */
+function masteryRow(){
+  const w=S.hero && S.hero.equip.weapon;
+  if(!w) return '<div class="row"><span class="k">武器熟練</span>'
+    +'<span style="color:var(--dim)">素手には熟練が付かない</span></div>';
+  const b=baseOf(w), lv=masteryOf(w.base), mm=masteryMul(w.base);
+  const need=lv>=MASTERY_MAX ? 0 : masteryNeed(lv+1);
+  const xp=masteryXp(w.base);
+  const bar = need
+    ? `<span style="display:inline-block;width:60px;height:5px;background:#1b2029;border-radius:3px;
+         margin-left:8px;vertical-align:middle;overflow:hidden">
+         <i style="display:block;height:100%;width:${Math.round(xp/need*100)}%;background:#d6b34a"></i></span>`
+    : '';
+  return '<div class="row"><span class="k">武器熟練</span><span>'
+    + `<b style="color:#d6b34a">${BASE_IC[w.base]||''} ${b.nm} ${lv}</b> / ${MASTERY_MAX}${bar}`
+    + `<br><span style="color:var(--dim);font-size:11px">攻撃 +${((mm.atk-1)*100).toFixed(1)}%　`
+    + `攻速 +${((mm.aspd-1)*100).toFixed(1)}%　射程 +${((mm.range-1)*100).toFixed(1)}%`
+    + (need?`　（次まで ${Math.max(0,need-xp)}）`:'　極み')
+    + '</span></span></div>';
+}
+
+/* 装備中の遺物を1行で。持っていないうちは何も出さない
+   （まだ手に入らない物の空欄は、説明にならない）。 */
+function relicRow(){
+  if(!(S.relics||[]).length) return '';
+  const on=relicsOn();
+  return '<div class="row"><span class="k">遺物</span><span>'
+    + (on.length
+        ? on.map(r=>`<span style="color:${r.col}">${r.icon} ${r.nm}</span>`).join('　')
+        : '<span style="color:var(--dim)">装備していない</span>')
+    + `<br><span style="color:var(--dim);font-size:11px">${on.length} / ${relicSlots()} 枠`
+    + `　所持 ${(S.relics||[]).length} / ${RELICS.length}</span></span></div>`;
+}
+
 function itemHTML(it, showEq, opt){
   opt = opt || {};
   const col = isConsum(it) ? ((consumDef(it.consum)||{}).col || '#7fe0c0') : RARCOL[it.rar];
@@ -7578,11 +8651,13 @@ function shopHTML(it){
     <div class="af" style="color:${afford?'#d6b34a':'#5c6479'};font-weight:700">${it.price} G</div>
   </div>`;
 }
-function renderTown(){
+
+/* ---------- ステータス画面 ----------
+   拠点から追い出した「見る物」の行き先。読む物はここに全部ある、という形にして、
+   拠点側からは1つのボタンで入れるようにした。 */
+function renderChar(){
   if(!S.hero) S.hero=newHero();
-  refreshGacha();
-  if(pruneGrave()) log('遺体は完全に朽ちた');
-  if(!S.shop.length) rerollShop();
+  el('char-gold').innerHTML = '<span style="color:#d6b34a">'+S.gold+' G</span>';
   const st=stats(S.hero);
   el('charcard').innerHTML =
     '<div class="row"><span>'+S.hero.name+'</span><span>Lv.'+S.hero.lv+'</span></div>'+
@@ -7592,6 +8667,7 @@ function renderTown(){
     '<div class="row"><span class="k">所持金</span><span style="color:#d6b34a;font-weight:700">'+S.gold+' G</span></div>'+
     '<div class="row"><span class="k">秘石</span><span style="color:#8fd8ff;font-weight:700">◆ '+(S.shards||0)+'</span></div>'+
     '<div class="row"><span class="k">鉱石</span><span style="text-align:right">'+oreLine(false)+'</span></div>'+
+    masteryRow()+ relicRow()+
     '<div class="row"><span class="k">最深到達 / ロスト回数</span><span>'+S.deepest+'階層 / '+S.deaths+'</span></div>'+
     (S.grave
       ? (()=>{ const k=graveDecay(S.grave), hl=graveHoursLeft(S.grave);
@@ -7621,8 +8697,29 @@ function renderTown(){
         ${nx?`<span style="color:var(--dim)">　次は Lv.${nx.lv}</span>`:''}</div>
     </div>`;
   }).join('') : '<div class="empty">まだ誰もいない。潜って仲間を見つけよう</div>';
+}
 
-  const uds=unlockedDepths();
+/* 拠点は「次にどこへ行くか」を決める画面。
+   能力値・装備・潜在・仲間・呪いは renderChar（ステータス画面）が持つ。
+   ここに全部を並べていたときは、潜るまでに5回スクロールが要った。 */
+function renderTown(){
+  if(!S.hero) S.hero=newHero();
+  refreshGacha();
+  if(pruneGrave()) log('遺体は完全に朽ちた');
+  if(!S.shop.length) rerollShop();
+
+  /* 1行だけの現況。ここで出すのは**次の判断に効く数字**に絞る
+     （細かい能力値はステータス画面で見ればよい）。 */
+  const need=repairables().length;
+  el('town-line').innerHTML =
+    `<b>${S.hero.name}</b>　Lv.${S.hero.lv}`
+    + `　<span style="color:#d6b34a">${S.gold} G</span>`
+    + `　<span style="color:#8fd8ff">◆ ${S.shards||0}</span>`
+    + (livingParty().length ? `　仲間 ${livingParty().length}` : '')
+    + (need ? `<br><span style="color:#ffb08a">⚠ 壊れかけの装備が ${need} 点ある</span>` : '')
+    + (S.grave ? `<br><span style="color:#7fe0c0">遺体は第${S.grave.depth}階層に残っている</span>` : '');
+
+const uds=unlockedDepths();
   el('startdepth').innerHTML = uds.map(d=>
     `<button class="${S.startDepth===d?'primary':'ghost'}" data-depth="${d}" style="flex:0 0 auto;width:auto;padding:9px 15px">第${d}階層</button>`
   ).join('')
@@ -7642,11 +8739,15 @@ function renderTown(){
     ? `持ち込み ${S.carry.length}点・今日あと${S.gachaLeft}回`
     : (S.gachaLeft>0 ? `広告で今日あと${S.gachaLeft}回引ける` : '明日また5回引ける');
   // 修理が必要なら、道具屋のボタン自体に出す。奥に隠れていると壊れたまま潜ってしまう。
-  const need=repairables().length;
   const shopSub=el('m-shop-sub');
   shopSub.textContent = need ? `⚠ 要修理 ${need}点` : `${S.shop.length}点 入荷中`;
   shopSub.style.color = need ? '#ffb08a' : '';
   el('m-stash-sub').textContent = `${S.stash.length} / ${stashCap()}`;
+  // ステータスの副題。中を見なくても「今どうなっているか」が分かる一言にする。
+  const bn=(S.hero.boons||[]).length;
+  el('m-char-sub').textContent = `Lv.${S.hero.lv}`
+    + (bn?`・潜在 ${bn}`:'')
+    + (livingParty().length?`・仲間 ${livingParty().length}`:'');
   const buyable = UPGRADES.filter(u=>upgLv(u.id)<u.max && (S.shards||0)>=upgCost(u,upgLv(u.id))).length
                 + unlockedUlts().filter(u=>ultCanUp(u.id)).length;
   el('m-upg-sub').textContent   = buyable ? `${buyable}件 習得可能` : `◆ ${S.shards||0} 秘石`;
@@ -7748,6 +8849,7 @@ function closeAllyEquip(){
   el('m-allyeq').classList.remove('on');
   _aeAlly=null;
   if(_aePrev==='bag'){ S.screen='bag'; el('m-bag').classList.add('on'); renderBag(); }
+  else if(_aePrev==='stat'){ S.screen='stat'; el('m-stat').classList.add('on'); renderBag(); }
   else { setScreen(_aePrev==='allyeq' ? 'town' : _aePrev); }
 }
 function renderAllyEquip(){
@@ -8106,8 +9208,36 @@ function renderStash(){
 }
 function renderUpg(){
   el('upg-gold').innerHTML = '<span style="color:#8fd8ff">◆ '+(S.shards||0)+' 秘石</span>';
-  el('upgrades').innerHTML = UPGRADES.map(upgradeHTML).join('');
+  el('upgrades').innerHTML = UPGRADES.filter(u=>!(u.hidden && u.hidden())).map(upgradeHTML).join('');
+  renderRelics();
   renderUlts();
+}
+/* ---------- 遺物の一覧 ----------
+   持っている物だけを並べ、タップで着け外しする。
+   1つも持っていないうちは見出しごと畳む——
+   「まだ手に入らない物の空欄」を見せても、遊び方の説明にはならない。 */
+function renderRelics(){
+  const owned=relicsOwned();
+  const head=el('relic-head'), hint=el('relic-hint'), list=el('relics');
+  const show = owned.length>0;
+  head.style.display = show?'':'none';
+  hint.style.display = show?'':'none';
+  list.style.display = show?'':'none';
+  if(!show) return;
+  const slots=relicSlots(), on=relicsOn().length;
+  hint.innerHTML = `装備 <b>${on}</b> / ${slots}　`
+    + (slots<RELIC_MAX_SLOTS
+        ? '<span style="color:var(--dim)">枠は上の「遺物の枠」で増やせる</span>'
+        : '<span style="color:#7fe0c0">枠は最大</span>');
+  list.innerHTML = owned.map(r=>{
+    const eq=relicOn(r.id);
+    return `<div class="item${eq?' eq':''}" data-relic="${r.id}" style="border-left-color:${r.col}">
+      <div class="nm" style="color:${r.col}">${r.icon} ${r.nm}
+        <span style="color:${eq?'#7fe0c0':'var(--dim)'};font-size:11px">　${eq?'装備中':'タップで装備'}</span></div>
+      <div class="af">${r.desc}</div>
+      ${r.note?`<div class="af" style="color:var(--dim)">${r.note}</div>`:''}
+    </div>`;
+  }).join('');
 }
 /* 大技の一覧。タップで枠にセット、右の「+」で技レベルを上げる。 */
 function ultHTML(u){
@@ -8298,6 +9428,12 @@ function townTap(e){
   const db=e.target.closest('[data-depth]');
   if(db){ S.startDepth=+db.dataset.depth; redraw(); return; }
 
+  // 遺物の着け外し
+  const rb=e.target.closest('[data-relic]');
+  if(rb){ relicToggle(rb.dataset.relic);
+          if(S.hero) S.hero.hpNow=Math.min(S.hero.hpNow, stats(S.hero).maxHp);
+          redraw(); return; }
+
   // 永続強化の購入
   const ub=e.target.closest('[data-upg]');
   if(ub){
@@ -8377,18 +9513,71 @@ function townTap(e){
   const uid=+n.dataset.uid;
   const inStash=S.stash.find(i=>i.uid===uid);
   if(inStash){
-    const cur=S.hero.equip[inStash.slot];
-    if(cur){ S.stash.push(cur); }
-    S.hero.equip[inStash.slot]=inStash;
-    S.stash.splice(S.stash.indexOf(inStash),1);
-    S.hero.hpNow=stats(S.hero).maxHp;
-    redraw(); return;
+    /* 仲間がいるなら、誰に着せるかを聞く。
+       仲間に装備を渡す道は仲間の画面にしか無かったので、
+       倉庫で良い物を見つけても、そこからは自分にしか着せられなかった。
+       ただし**自分しかいないときは聞かない**——選択肢が1つの問いは、ただの手間。 */
+    if(wearCandidates(inStash).length > 1){ openWearPick(inStash); return; }
+    wearOnHero(inStash); redraw(); return;
   }
   const eqi=Object.values(S.hero.equip).find(i=>i&&i.uid===uid);
   if(eqi){ S.hero.equip[eqi.slot]=null; S.stash.push(eqi); redraw(); }
 }
 document.addEventListener('click', townTap, false);
 document.addEventListener('touchend', townTap, {passive:false});
+
+/* ---------- 倉庫から「誰に着せるか」 ---------- */
+function wearOnHero(it){
+  const cur=S.hero.equip[it.slot];
+  if(cur) S.stash.push(cur);
+  S.hero.equip[it.slot]=it;
+  const i=S.stash.indexOf(it); if(i>=0) S.stash.splice(i,1);
+  S.hero.hpNow=Math.min(stats(S.hero).maxHp, S.hero.hpNow || stats(S.hero).maxHp);
+}
+function wearOnAlly(a, it){
+  if(!allyCanEquip(a,it)) return false;
+  const cur=a.equip[it.slot];
+  a.equip[it.slot]=it;
+  const i=S.stash.indexOf(it); if(i>=0) S.stash.splice(i,1);
+  if(cur) S.stash.push(cur);
+  a.hpNow=Math.min(a.hpNow, allyStats(a).maxHp);
+  return true;
+}
+/* 着せられる相手。自分は常に入る（自分の装備は種を選ばない）。 */
+function wearCandidates(it){
+  return [S.hero, ...livingParty()].filter(h=> h===S.hero || allyCanEquip(h,it));
+}
+let _wearItem=null;
+function openWearPick(it){
+  _wearItem=it;
+  el('wear-sub').innerHTML = itemName(it);
+  el('wear-list').innerHTML = wearCandidates(it).map(h=>{
+    const isHero = h===S.hero;
+    const j = isHero ? null : jobDef(h.job);
+    const col = isHero ? '#e8e2d8' : j.col;
+    const cur = h.equip[it.slot];
+    return `<div class="item" data-wear="${isHero?'hero':h.uidA}" style="border-left-color:${col}">
+      <div class="nm" style="color:${col}">${isHero? S.hero.name : allyLabel(h)}
+        <span style="color:var(--dim);font-size:11px">Lv.${h.lv}</span></div>
+      <div class="af">${cur ? 'いまは '+itemName(cur) : '<span style="color:#7fe0c0">その枠は空いている</span>'}</div>
+    </div>`;
+  }).join('');
+  el('m-wear').classList.add('on');
+}
+function closeWearPick(){ el('m-wear').classList.remove('on'); _wearItem=null; }
+el('m-wear').addEventListener('click', e=>{
+  const n=e.target.closest('[data-wear]');
+  if(!n || !_wearItem) return;
+  const who=n.dataset.wear;
+  if(who==='hero') wearOnHero(_wearItem);
+  else{
+    const a=livingParty().find(x=>String(x.uidA)===who);
+    if(a) wearOnAlly(a, _wearItem);
+  }
+  closeWearPick();
+  if(RENDERERS[S.screen]) RENDERERS[S.screen]();
+});
+bindTap(el('wear-cancel'), closeWearPick);
 
 /* ---------- 操作説明 / 凡例 ---------- */
 /* ---------- ボスの範囲攻撃の予兆 ----------
@@ -8431,6 +9620,40 @@ function drawBossCast(e, sx, sy, R){
       ctx.lineTo(sx+Math.cos(ang)*(R+TS*2.2*p), sy+Math.sin(ang)*(R+TS*2.2*p));
       ctx.stroke();
     }
+
+  }else if(e.cast.id==='charge' || e.cast.id==='beam'){
+    /* 帯。**当たる範囲そのもの**を描く。
+       ここが実際の判定とずれた瞬間に「避けたのに当たった」が生まれ、
+       回避ボタンの無いこのゲームでは即座に理不尽になる。 */
+    const a=e.cast.dir, L=m.len*TS, Wd=m.wide*TS;
+    ctx.save();
+    ctx.translate(sx,sy); ctx.rotate(a);
+    ctx.fillStyle='rgba('+warn+','+(0.09+p*0.22)+')';
+    ctx.fillRect(0, -Wd, L, Wd*2);
+    ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5;
+    ctx.strokeRect(0, -Wd, L, Wd*2);
+    // 内側から満ちる帯で「あと何秒か」を出す（円の予兆と同じ読み方にそろえる）
+    ctx.fillStyle='rgba(255,255,255,'+(0.14+p*0.22)+')';
+    ctx.fillRect(0, -Wd, L*p, Wd*2);
+    ctx.restore();
+
+  }else if(e.cast.id==='pillars'){
+    // 落ちる場所を全部見せる。逃げ先を選ばせるのがこの技の本体なので。
+    (e.cast.spots||[]).forEach(sp=>{
+      const px2=sp.x*TS-(P.x*TS-innerWidth/2), py2=sp.y*TS-(P.y*TS-innerHeight/2);
+      const rad=m.rad*TS;
+      ctx.fillStyle='rgba('+warn+','+(0.10+p*0.24)+')';
+      ctx.beginPath(); ctx.arc(px2,py2,rad,0,7); ctx.fill();
+      ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5;
+      ctx.beginPath(); ctx.arc(px2,py2,rad,0,7); ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(px2,py2,Math.max(0,rad*p),0,7); ctx.stroke();
+    });
+
+  }else if(e.cast.id==='summon'){
+    // 呼び出しは当たり判定が無い。だから輪だけを出して「何か来る」と伝える。
+    ctx.strokeStyle='rgba(200,138,223,'+(0.35+p*0.5)+')'; ctx.lineWidth=2+p*2;
+    ctx.beginPath(); ctx.arc(sx,sy,R+TS*(0.6+p*1.6),0,7); ctx.stroke();
   }
   // 技名。何が来るか読めれば、避け方を選べる。
   if(e.revealed){
@@ -8643,6 +9866,7 @@ function renderBag(){
       ? '<div class="row"><span class="k">ガード軽減 / パリイ受付</span><span style="color:#8fc7ff">'
         +st.block+'% / '+st.parryWin.toFixed(2)+'秒</span></div>'
       : '<div class="row"><span class="k">盾</span><span style="color:var(--dim)">なし</span></div>')+
+    masteryRow()+ relicRow()+
     '<div class="row"><span class="k">発見力 / 次のLvまで</span><span>'+st.mf+' / '+Math.max(0,xpNeed(S.hero.lv)-S.hero.xp)+'</span></div>'+
     '<div class="row"><span class="k">この探索の稼ぎ</span><span>撃破 '+S.run.kills+' / '+S.run.gold+' G</span></div>';
 
@@ -8697,15 +9921,30 @@ function openBag(){
 }
 function closeBag(){ el('m-bag').classList.remove('on'); setScreen('game'); last=performance.now(); }
 
+/* 探索中のステータス。持ち物と分けたのは、用が違うから——
+   装備を替えたいときに能力値の壁を毎回スクロールさせない。 */
+function openStat(){
+  if(!S.run || !S.hero) return;
+  S.screen='stat';
+  el('hud').classList.remove('on');
+  renderBag();                       // 中身の組み立ては持ち物と共通
+  el('m-stat').classList.add('on');
+}
+function closeStat(){ el('m-stat').classList.remove('on'); setScreen('game'); last=performance.now(); }
+
 function bagTap(e){
-  if(S.screen!=='bag') return;
+  if(S.screen!=='bag' && S.screen!=='stat') return;
   if(!e.target || !e.target.closest) return;
   const ally=e.target.closest('.item[data-ally]');
   if(ally){
     if(!tapAccepted(e)) return;
     if(e.type==='touchend' && e.cancelable) e.preventDefault();
     const a=livingParty().find(m=>m.uidA===+ally.dataset.ally);
-    if(a){ el('m-bag').classList.remove('on'); openAllyEquip(a, 'bag'); }
+    if(a){
+      const from=S.screen;
+      el('m-bag').classList.remove('on'); el('m-stat').classList.remove('on');
+      openAllyEquip(a, from);
+    }
     return;
   }
   const n=e.target.closest('.item[data-uid]');
@@ -8856,8 +10095,13 @@ function openAllyInspect(){
   /* 二つ名と持っている潜在は、加入を決める前に見えていなければならない。
      加入してから分かるのでは「誰を連れて行くか」の判断材料にならない。 */
   const ep=allyEpithet(a);
+  const hurt = a.hpNow < st.maxHp;
   el('ally-sub').innerHTML = (ep ? '<b style="color:'+j.col+'">'+ep+'</b><br>' : '')
     + j.nm+'　Lv.'+a.lv+'　仲間 '+livingParty().length+' / '+PARTY_MAX
+    /* 傷ついたまま加入することがある（助けに入るのが遅れた場合）。
+       連れて行くかどうかの判断材料なので、傷は隠さない。 */
+    + (hurt ? '<br><span style="color:#e0705a;font-size:11px">傷ついている　HP '
+              + Math.max(0,Math.ceil(a.hpNow))+' / '+st.maxHp+'</span>' : '')
     + ((a.boons&&a.boons.length)
         ? '<br><span style="font-size:11px">'
           + a.boons.map(b=>'<span style="color:'+boonRarDef(b.rar).col+'">'
@@ -8901,6 +10145,11 @@ function joinAlly(){
   // 空いている隊列スロットを割り当てる（左後ろ・右後ろ・真後ろ…）
   const used=party().map(m=>m.slot);
   a.slot = [0,1,2,3].find(i=>!used.includes(i)) ?? party().length;
+  /* 加入したら「加入前」の印を落とす。残したままだと、
+     以後この仲間が倒れたときに downAlly が NPC の枝を通ってしまい、
+     蘇生の相談も無く黙って消える。 */
+  a.npc=false; a.awake=false; a.tgt=null;
+  a.mode='follow'; a.crumb=Math.max(0, W.trail.length-2);
   S.hero.party.push(a);
   W.npc=null;
   log(allyLabel(a)+'が加わった');
@@ -8961,7 +10210,7 @@ function openEvent(){
   if(ev.id==='altar'){
     const st=stats(S.hero);
     body += '<br><span style="color:var(--dim);font-size:11px">最大HP '
-          + st.maxHp+' → '+Math.round(st.maxHp*0.8)+'</span>';
+          + st.maxHp+' → '+Math.round(st.maxHp*(1-ALTAR_HP_COST))+'</span>';
   }
   el('ev-body').innerHTML = body + (can?'':'<br><span style="color:#e0705a">'+why+'</span>');
   const yes=el('ev-yes');
@@ -9012,7 +10261,7 @@ function resolveEvent(){
 
   }else if(ev.id==='altar'){
     // 最大HPを恒久的に削る。stats() は装備由来なので、専用の負債として持つ。
-    S.hero.hpDebt = (S.hero.hpDebt||0) + 0.20;
+    S.hero.hpDebt = (S.hero.hpDebt||0) + ALTAR_HP_COST;
     const after=stats(S.hero);
     S.hero.hpNow = Math.min(S.hero.hpNow, after.maxHp);
     log('祭壇に捧げた');
@@ -9053,24 +10302,33 @@ bindTap(el('ev-yes'), ()=>{
   resolveEvent();
 });
 bindTap(el('ev-no'), closeEvent);
+bindTap(el('tr-yes'), startTrial);
+bindTap(el('tr-no'),  closeTrial);
 
 /* ---------- 仲間の死亡と広告蘇生 ----------
-   蘇生は「1人につき1回だけ」だったが、深く潜るほど取り返しがつかなくなり、
-   20階を越えたあたりで事故1回＝パーティ解散になっていた。
-   5階進むごとに権利が戻る形にすると、
-   「今使うか、次の階層まで我慢するか」という判断が毎回発生する。 */
-const REVIVE_REFRESH_EVERY = 5;   // この階層数だけ進むごとに蘇生権が戻る
-/* その仲間が今なら蘇生できるか。最後に蘇生した階層から5階進んでいれば可。 */
-function canRevive(a){
-  if(!a) return false;
-  if(a.revivedAt===undefined) return true;
-  const d = (S.run?S.run.depth:0) - a.revivedAt;
-  return d >= REVIVE_REFRESH_EVERY;
+   「1人につき1回だけ」→「5階進むごとに1人1回」と直してきたが、
+   どちらも**人ごとの権利**だったのが問題だった。
+
+   ボス戦では複数人がまとめて落ちる。人ごとの権利だと、
+   同じ戦闘で2人目が倒れた瞬間にもう打つ手がない。
+   逆に、仲間が1人しかいない人は権利が1つしか無く、常に不利になる。
+
+   **5階ごとに、パーティ共通で4回**にする。
+   誰に使ってもいい。仲間が少ないほど1人あたりの猶予が増えるので、
+   「まず1人連れて行く」の敷居も下がる。 */
+const REVIVE_BAND     = 5;   // この階層数ごとに権利が戻る
+const REVIVE_PER_BAND = 4;   // 1帯あたりの回数（全キャラ共通）
+function reviveBand(depth){ return Math.floor(Math.max(0,(depth||1)-1)/REVIVE_BAND); }
+/* 残りの蘇生回数。読むたびに帯を見て、階層が進んでいれば満タンに戻す
+   （進むこと自体が補充なので、補充の処理を別の場所に置かない）。 */
+function revivesLeft(){
+  if(!S.run) return 0;
+  const band=reviveBand(S.run.depth);
+  if(S.run.revBand!==band){ S.run.revBand=band; S.run.revLeft=REVIVE_PER_BAND; }
+  return S.run.revLeft;
 }
-function reviveReadyIn(a){
-  if(!a || a.revivedAt===undefined) return 0;
-  return Math.max(0, REVIVE_REFRESH_EVERY - ((S.run?S.run.depth:0) - a.revivedAt));
-}
+function reviveBandTop(){ return (reviveBand(S.run?S.run.depth:1)+1)*REVIVE_BAND; }
+function canRevive(a){ return !!a && revivesLeft()>0; }
 let _fallen=null, _fallenQueue=[];
 function openFallen(a){
   // 同じフレームで2人倒れることがある。順番に出す。
@@ -9081,17 +10339,21 @@ function openFallen(a){
   el('fal-title').textContent = a.name+'が倒れた';
   el('fal-sub').textContent = jobDef(a.job).nm+'　Lv.'+a.lv+'　第'+(S.run?S.run.depth:'?')+'階層';
   const can = canRevive(a);
+  const left = revivesLeft();
   el('fal-body').innerHTML = can
     ? `<div class="row"><span class="k">見送ると</span><span>この仲間は失われる<br>
          <span style="color:var(--dim);font-size:11px">装備も潜在も護符も一緒に消える</span><br>
          <span style="color:#8fd8ff;font-size:11px">◆ ${allyLossShards(a)} 秘石が残る（死んでも消えない）</span>
          ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:11px">弔いの潜在が発動する</span>':''}</span></div>
        <div class="row"><span class="k">蘇生すると</span><span><b>Lv.1</b> に戻り、装備をランダムに失う<br>
-         <span style="color:var(--dim);font-size:11px">潜在は残る。蘇生は<b>1人につき1回だけ</b></span></span></div>`
-    : `<div class="row"><span class="k">まだ戻らない</span><span>この仲間は第${a.revivedAt}階層で蘇生している。<br>
-         <span style="color:var(--dim);font-size:11px">あと <b>${reviveReadyIn(a)}</b> 階進めば、また蘇生できる</span></span></div>`;
+         <span style="color:var(--dim);font-size:11px">潜在は残る</span></span></div>
+       <div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}
+         <span style="color:var(--dim);font-size:11px">（誰に使ってもよい）</span><br>
+         <span style="color:var(--dim);font-size:11px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
+    : `<div class="row"><span class="k">もう戻せない</span><span>この帯の蘇生を使い切っている。<br>
+         <span style="color:var(--dim);font-size:11px">第${reviveBandTop()+1}階層まで進めば、また ${REVIVE_PER_BAND} 回使える</span></span></div>`;
   const btn=el('fal-revive');
-  btn.textContent = can ? '広告を見て蘇生させる' : '蘇生はもう使えない';
+  btn.textContent = can ? ('広告を見て蘇生させる（残り '+left+'）') : 'この帯の蘇生は使い切った';
   btn.className   = can ? 'primary' : 'ghost';
   el('m-fallen').classList.add('on');
 }
@@ -9213,6 +10475,20 @@ function spendBarrier(h, x, y){
 
 /* 不死鳥。1回の探索につき1度だけ立ち上がる。防げたら true。 */
 function tryPhoenix(h, isPlayer){
+  /* 遺物「不滅」。プレイヤーだけ、1回の探索につき一度だけ全快で立ち上がる。
+     潜在の不死鳥（割合回復）とは別枠にしてある——
+     どちらも同じ枠にすると、両方積んでも1回しか起きないことになり、
+     せっかく2つ揃えた意味が消える。 */
+  if(isPlayer && relicOn('ember') && S.run && !S.run.emberUsed){
+    S.run.emberUsed = true;
+    h.hpNow = stats(h).maxHp;
+    h.dead = false;
+    W.fx.push({t:'parry', x:P.x, y:P.y, life:1.2, max:1.2});
+    P.invuln = Math.max(P.invuln||0, 2.0);
+    log('🜂 不滅の遺物が砕けた — 立ち上がった');
+    showBanner('不滅の遺物', 'HP 全快で立ち上がった', '#ff9a5a', 2.6);
+    return true;
+  }
   const v = boonSum(h,'phoenix');
   if(v<=0 || h.phoenixUsed) return false;
   h.phoenixUsed = true;
@@ -9240,10 +10516,12 @@ function letFallenGo(){
   igniteAvenge();
   closeFallen();
 }
-/* 広告視聴 → Lv1 + 装備ランダムロストで復帰。1人につき1回だけ。 */
+/* 広告視聴 → Lv1 + 装備ランダムロストで復帰。回数はパーティ共通の持ち分から引く。 */
 function reviveFallen(){
   const a=_fallen; if(!a || !canRevive(a)) return;
   openAd(()=>{
+    if(!canRevive(a)){ closeFallen(); return; }   // 視聴中に帯が変わる可能性は無いが、念のため
+    S.run.revLeft = Math.max(0, revivesLeft()-1);
     a.revived=true; a.revivedAt=(S.run?S.run.depth:0); a.dead=false;
     a.lv=1; a.xp=0; a.str=5; a.dex=5; a.vit=5; a.int=5;
     a.st={}; a.bu={};
@@ -9285,19 +10563,20 @@ bindTap(el('clr-ok'), ()=>{
 
 function openHelp(){ _prevScreen=S.screen; buildLegend(); S.screen='help'; el('hud').classList.remove('on'); el('m-help').classList.add('on'); }
 function closeHelp(){ el('m-help').classList.remove('on'); setScreen(_prevScreen==='help'?'game':_prevScreen); last=performance.now(); }
-bindTap(el('helpbtn'), openHelp);
 bindTap(el('help-ok'), closeHelp);
 bindTap(el('bagbtn'), openBag);
 bindTap(el('bag-ok'), closeBag);
+bindTap(el('statbtn'), openStat);
+bindTap(el('stat-ok'), closeStat);
 /* 説明はタイトルの「？」からいつでも開ける。
    潜った直後に自動で割り込ませていたのをやめた理由:
    ・遊びたい瞬間に長文を挟まれるのが一番だるい
    ・自分で開いたときにしか、人は説明を読まない
    入口を常設したので、読みたくなった時点で読める。 */
-bindTap(el('titlehelp'), openHelp);
 
 bindTap(el('btn-dive'), ()=>{ startRun(); });
 /* 拠点のサブ画面へ */
+bindTap(el('btn-go-char'),  ()=>setScreen('char'));
 bindTap(el('btn-go-shop'),  ()=>setScreen('shop'));
 bindTap(el('btn-go-stash'), ()=>setScreen('stash'));
 bindTap(el('btn-go-upg'),   ()=>setScreen('upg'));
@@ -9329,7 +10608,10 @@ bindTap(el('btn-reset'), ()=>{
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
   S.carry=[];S.gachaDay='';refreshGacha();
-  S.hero=newHero(); renderTown();
+  /* 名前も消してタイトルへ戻す。「全消去」と言っておいて名前だけ残るのは、
+     消えたのかどうかが分からない一番よくない形。 */
+  S.name=''; S.mastery={}; S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
+  setScreen('title');
 });
 
 /* ガチャ（ダミー広告 → 抽選 → 持ち込み枠へ） */
@@ -9375,9 +10657,56 @@ bindTap(el('d-ok'), ()=>{
 });
 bindTap(el('r-ok'), ()=>{ el('m-ret').classList.remove('on'); setScreen('town'); last=performance.now(); });
 
+/* ---------- タイトル ----------
+   ここは情報を置く場所ではない。起動して最初に見る画面に読み物を積むと、
+   「まだ何も始まっていないのに読まされる」ことになる。
+   置くのは題名と2つのボタンだけ。記録は、記録がある人にだけ小さく出す。 */
+function renderTitle(){
+  const f=el('t-foot');
+  const played=(S.deepest||1)>1 || (S.deaths||0)>0;
+  f.innerHTML = played
+    ? `最深 <b style="color:#d6b34a">${S.deepest}</b> 階層　／　ロスト ${S.deaths} 回`
+      + (S.name?`<br>${heroName()}`:'')
+    : '攻撃は自動。あなたが決めるのは<b>立ち位置</b>と<b>引き際</b>。';
+  el('t-start').textContent = played ? '冒険を続ける' : '冒険に出る';
+}
+/* 名前を決める。決めるのは1回だけで、以後は代を重ねる（heroName）。 */
+function openNameEntry(){
+  const inp=el('nm-input');
+  inp.value = S.name || '';
+  el('m-name').classList.add('on');
+  // モーダルが開ききってから焦点を当てる（開く前だと iOS がキーボードを出さない）
+  setTimeout(()=>{ try{ inp.focus(); }catch(e){} }, 60);
+}
+function closeNameEntry(){ el('m-name').classList.remove('on'); }
+function confirmName(){
+  const v=(el('nm-input').value||'').trim().slice(0,10);
+  S.name = v || '冒険者';
+  closeNameEntry();
+  startAdventure();
+}
+/* 拠点へ入る。ここで初めて主人公を作る
+   （タイトルにいるあいだは、まだ誰でもない）。 */
+function startAdventure(){
+  if(!S.hero) S.hero=newHero();
+  else if(S.hero.lv===1 && !S.hero.xp) S.hero.name=heroName();   // 名前を変えた直後
+  setScreen('town');
+  last=performance.now();
+}
+bindTap(el('t-start'), ()=>{
+  // 既に冒険が始まっているなら名前は聞き直さない（拠点へ戻るだけ）
+  if(S.hero) startAdventure(); else openNameEntry();
+});
+bindTap(el('t-help'), openHelp);
+bindTap(el('nm-ok'),   confirmName);
+bindTap(el('nm-back'), closeNameEntry);
+bindTap(el('nm-roll'), ()=>{ el('nm-input').value = rollAllyName()+rollAllyName().slice(-1); });
+// Enter でも決定できるようにする（PC で遊ぶときのため）
+el('nm-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); confirmName(); } });
+
 /* 起動。ここまで到達したら JS は動いているので「動いていません」表示を消す */
 const nojs=el('nojs'); if(nojs && nojs.parentNode) nojs.parentNode.removeChild(nojs);
-resize(); setScreen('town'); requestAnimationFrame(tick);
+resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
 </body>
 </html>
