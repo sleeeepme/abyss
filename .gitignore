@@ -1,0 +1,24 @@
+# 依存は入れない（プロトタイプは外部依存ゼロ、テストだけ playwright を使う）
+node_modules/
+package-lock.json
+
+# テストが吐く一時物
+/tmp/
+*.png
+!docs/**/*.png
+test-results/
+playwright-report/
+
+# エディタ・OS
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Unity（凍結中。C# のソースだけ追う）
+unity/**/Library/
+unity/**/Temp/
+unity/**/Obj/
+unity/**/Build/
+unity/**/Logs/
+unity/**/UserSettings/
