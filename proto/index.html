@@ -6416,39 +6416,38 @@ let artPreviewPlayerSprite = null;
 if(artPreviewEnabled){
   const src = new Image();
   src.addEventListener('load', ()=>{
-    /* スタイルテストの中から、ランタンを持つ冒険者だけを 18×20px の
-       ネイティブスプライトへ落とす。背景の藍だけを透過して、床の上に置けるようにする。 */
-    const crop=document.createElement('canvas'), cc=crop.getContext('2d');
-    crop.width=104; crop.height=120;
-    cc.imageSmoothingEnabled=false;
-    cc.drawImage(src,446,326,104,120,0,0,104,120);
-    const sprite=document.createElement('canvas'), sc=sprite.getContext('2d');
-    sprite.width=18; sprite.height=20;
-    sc.imageSmoothingEnabled=false;
-    sc.drawImage(crop,0,0,crop.width,crop.height,0,0,sprite.width,sprite.height);
-    const px=sc.getImageData(0,0,sprite.width,sprite.height);
-    for(let i=0;i<px.data.length;i+=4){
-      const r=px.data[i], g=px.data[i+1], b=px.data[i+2];
-      // 深い藍の背景だけ消す。黒いアウトラインは残して輪郭を守る。
-      if(r<25 && g<28 && b>r+12 && b>g+12) px.data[i+3]=0;
-    }
-    sc.putImageData(px,0,0);
-    artPreviewPlayerSprite=sprite;
+    // ゲーム用に 18×29px へ整理済みの透過PNG。読み込みに失敗したときは
+    // artPreview でも従来の丸マーカーへ戻る。
+    artPreviewPlayerSprite=src;
   });
-  src.src='assets/player-art-preview-source.png';
+  src.src='assets/player-sprite-v1.png';
 }
 
-function drawArtPreviewPlayer(x,y,angle){
+/* 上下揺れは描画だけの演出。P の座標・当たり判定・カメラには触れない。 */
+function artPreviewBobAt(ms,idle){
+  return idle ? Math.round(Math.sin(ms/400)) : 0;
+}
+/* 検証URLだけで使う小さな確認口。通常URLには出さない。 */
+if(artPreviewEnabled) window.__ART_PREVIEW__={
+  ready:()=>!!artPreviewPlayerSprite,
+  spriteSize:()=>artPreviewPlayerSprite
+    ? [artPreviewPlayerSprite.naturalWidth,artPreviewPlayerSprite.naturalHeight] : null,
+  bobAt:artPreviewBobAt
+};
+function drawArtPreviewPlayer(x,y,angle,ms=performance.now()){
   if(!artPreviewPlayerSprite) return false;
-  // 元の試作絵は余白込みで切り出しているため、表示時は一段大きくして
-  // 8〜12px級の輪郭が実プレイ中にも読める大きさにする。
-  const w=TS*1.55, h=TS*1.78;
+  // ネイティブの18px級をそのまま描く。90度単位だけ向きを変えるので、
+  // 斜め回転や非整数倍率によるドットの滲みを避けられる。
+  const w=artPreviewPlayerSprite.naturalWidth, h=artPreviewPlayerSprite.naturalHeight;
+  const idle=!P.moving && !P.target && !P.guard && !W.mine && P.swing<=0;
+  const bob=artPreviewBobAt(ms,idle);
+  const facing=Math.round((angle-Math.PI/2)/(Math.PI/2))*Math.PI/2;
   ctx.save();
   ctx.imageSmoothingEnabled=false;
-  ctx.translate(x,y+TS*0.05);
-  // 元絵は画面下向き。移動・攻撃方向に合わせてだけ回す。
-  ctx.rotate(angle-Math.PI/2);
-  ctx.drawImage(artPreviewPlayerSprite,-w/2,-h*0.58,w,h);
+  ctx.translate(Math.round(x),Math.round(y)+bob);
+  // 元絵は画面下向き。ランタンも含めて四方向へ向ける。
+  ctx.rotate(facing);
+  ctx.drawImage(artPreviewPlayerSprite,-Math.round(w/2),-Math.round(h*0.56),w,h);
   ctx.restore();
   return true;
 }
