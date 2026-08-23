@@ -97,7 +97,8 @@ R.gen = await pg.evaluate(()=>{
           appearsAt10: at(12).avgTiles>0,
           growsWithDepth: at(45).avgTiles>at(12).avgTiles,
           neverOnStair: at(12).onStair===0 && at(35).onStair===0 && at(45).onStair===0,
-          zoneThemed: at(25).kinds[0]==='lava' && at(35).kinds[0]==='ice' && at(45).kinds[0]==='bone'};
+          // 層の並びが 石/水/根/跡/炉/白 になったので、深度ごとの種類も変わる
+          zoneThemed: at(25).kinds[0]==='spore' && at(35).kinds[0]==='slick' && at(45).kinds[0]==='lava'};
 });
 R.hurts = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; S.hero.str=28;S.hero.dex=28;S.hero.vit=28;

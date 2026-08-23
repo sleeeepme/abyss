@@ -71,9 +71,9 @@ done
 cat <<'NOTE'
 
 --- 既知の期待 false（失敗ではない）---
-hubtest  .hub.townHasShopGrid        拠点は縦並び。格子レイアウトを捨てたときの残り
+hubtest  .hub.townHasShopGrid        街は縦並び。格子レイアウトを捨てたときの残り
 pacetest .bossHidden.revealed など    ボスは殴るまで名乗らない＝出た直後は未公開が正しい
-partytest .fallen.deadAfter など      倒れた仲間は「死亡扱いにしない」（広告蘇生の余地）
+partytest .fallen.deadAfter など      倒れた還りは「死亡扱いにしない」（広告蘇生の余地）
 fxtest   .noAutoHelp.helpShown       操作説明は自動で出さない
 zonetest .banner.sameZone            同じ層ではバナーを出し直さない
 kitetest .hud.melee.shown            近接には引き撃ちHUDを出さない

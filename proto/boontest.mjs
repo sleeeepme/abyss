@@ -462,12 +462,12 @@ R.altarPick = await pg.evaluate(()=>{
           threeChoices: rows===3,
           picksTheOneTapped: gotRight,
           // 文言: 「1つ授かる」ではなく「3つから1つ選べる」と書いてある
-          bodySaysChoice: evText.includes('3つの潜在') && evText.includes('1つを選べる'),
+          bodySaysChoice: evText.includes('3つの馴れ') && evText.includes('1つを選べる'),
           // 「祭壇を倒した」になっていない
           notKilled: !sub.includes('倒した'),
           subSaysChoice: sub.includes('3つから1つ選ぶ'),
           ok: boonOpen && rows===3 && gotRight && (S.hero.hpDebt||0)>0
-              && evText.includes('3つの潜在') && evText.includes('1つを選べる')
+              && evText.includes('3つの馴れ') && evText.includes('1つを選べる')
               && !sub.includes('倒した') && sub.includes('3つから1つ選ぶ')};
 });
 

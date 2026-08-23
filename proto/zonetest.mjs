@@ -118,7 +118,7 @@ R.connectivity = await pg.evaluate(()=>{
 
 /* ============ 3. 敵の偏り ============ */
 
-// 3-a. 層の相性で系統が偏る（灼熱の窯は焔鬼が出やすい）
+// 3-a. 層の相性で系統が偏る（炉の層はエンバーが出やすい）
 R.famBias = await pg.evaluate(()=>{
   const sample=(depth, n)=>{
     const c={};
@@ -128,16 +128,18 @@ R.famBias = await pg.evaluate(()=>{
     }
     return c;
   };
-  const kiln=sample(25,300), frost=sample(35,300), abyss=sample(55,300);
+  // 層の並びは 石(1-10) 水(11-20) 根(21-30) 跡(31-40) 炉(41-50) 白(51-60)
+  const ruin=sample(35,300), furnace=sample(45,300), pale=sample(55,300);
   const pct=(c,id)=>{ const t=Object.values(c).reduce((a,b)=>a+b,0);
                       return +(((c[id]||0)/t)*100).toFixed(1); };
   return {
-    kiln:{flame:pct(kiln,'flame'), frost:pct(kiln,'frost')},
-    frost:{frost:pct(frost,'frost'), flame:pct(frost,'flame')},
-    abyss:{arcane:pct(abyss,'arcane')},
-    kilnFavoursFlame: pct(kiln,'flame') > pct(kiln,'frost'),
-    frostFavoursFrost: pct(frost,'frost') > pct(frost,'flame'),
-    abyssFavoursArcane: pct(abyss,'arcane') > 15};
+    zones:{d35:zoneAt(35).nm, d45:zoneAt(45).nm, d55:zoneAt(55).nm},
+    ruin:{armor:pct(ruin,'armor'), flame:pct(ruin,'flame')},
+    furnace:{flame:pct(furnace,'flame'), frost:pct(furnace,'frost')},
+    pale:{frost:pct(pale,'frost'), beast:pct(pale,'beast')},
+    ruinFavoursRuin: pct(ruin,'armor') > pct(ruin,'flame'),
+    furnaceFavoursEmber: pct(furnace,'flame') > pct(furnace,'frost'),
+    paleFavoursPale: pct(pale,'frost') > pct(pale,'beast')};
 });
 
 // 3-b. 偏りは「解禁」を前借りしない（序盤の約束を壊さない）
@@ -193,9 +195,9 @@ R.ui = await pg.evaluate(()=>{
   const st22=document.getElementById('st-body').textContent;
   document.getElementById('m-stairs').classList.remove('on'); S.screen='game';
   return {hudText:hud.replace(/\s+/g,' '),
-          hudHasZone: hud.includes('灼熱の窯'),
+          hudHasZone: hud.includes(zoneAt(23).nm),
           previewText: (st20.match(/この先は\s*\S+/)||[''])[0],
-          // 第20階層で降りると第21階層＝灼熱の窯に入る
+          // 第20階層で降りると第21階層＝根の層に入る
           previewAtBoundary: st20.includes('この先は') && st20.includes(zoneAt(21).nm),
           noPreviewMidZone: !st22.includes('この先は')};
 });

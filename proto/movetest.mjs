@@ -171,22 +171,23 @@ R.follow = await pg.evaluate(async ()=>{
 // 3-b. 視線が切れても足跡から辿り直せる（角を曲がったとき）
 //     ループを止めたままプレイヤーだけを歩かせて、確実に視線が切れる状況を作る。
 R.corner = await pg.evaluate(async ()=>{
-  S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; S.hero.str=29;S.hero.dex=29;S.hero.vit=29;
-  startRun(30); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
-  for(let i=0;i<3;i++){ const a=makeAlly(30,S.hero); a.x=P.x; a.y=P.y;
-    a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
-  stepSim(0.8);
-
-  // ループを止める（仲間を置き去りにしたまま、足跡だけ正しく伸ばす）
-  const keep=S.screen; S.screen='bag';
-  const home={x:P.x, y:P.y};
-  // 開始地点から視線が通らない、遠い部屋を目指す
-  const target = W.fl.rooms
-    .map(r=>({x:r.cx+0.5, y:r.cy+0.5}))
-    .filter(t=>Math.hypot(t.x-home.x,t.y-home.y)>12 && !losClear(home.x,home.y,t.x,t.y))
-    .sort((a,b)=>Math.hypot(a.x-home.x,a.y-home.y)-Math.hypot(b.x-home.x,b.y-home.y))[0];
-  let moved=0, detour=0;
-  if(target){
+  /* 見たいのは「角を曲がって視線が切れても、足跡を辿って戻ってこられるか」。
+     **特定の地図に頼らない。** 層の間取りを触るたびに落ちるのでは検証にならない。
+     視線が切れるところまで歩けた階が見つかるまで、階を引き直す。 */
+  const setup = ()=>{
+    S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; S.hero.str=29;S.hero.dex=29;S.hero.vit=29;
+    startRun(30); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
+    for(let i=0;i<3;i++){ const a=makeAlly(30,S.hero); a.x=P.x; a.y=P.y;
+      a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
+    stepSim(0.8);
+  };
+  const walkAway = ()=>{
+    const target = W.fl.rooms
+      .map(r=>({x:r.cx+0.5, y:r.cy+0.5}))
+      .filter(t=>Math.hypot(t.x-P.x,t.y-P.y)>10 && !losClear(P.x,P.y,t.x,t.y))
+      .sort((a,b)=>Math.hypot(b.x-P.x,b.y-P.y)-Math.hypot(a.x-P.x,a.y-P.y))[0];
+    if(!target) return 0;
+    let moved=0, detour=0;
     for(let i=0;i<4000;i++){
       const dx=target.x-P.x, dy=target.y-P.y, d=Math.hypot(dx,dy);
       if(d<0.6) break;
@@ -200,13 +201,25 @@ R.corner = await pg.evaluate(async ()=>{
       if(!stepped) detour += 0.4;
       pushTrail();
     }
-  }
-  const blocked = party().map(a=>!losClear(a.x,a.y,P.x,P.y));
+    return moved;
+  };
+
+  let tries=0, moved=0, blocked=[false];
+  const keep=S.screen;
+  do{
+    tries++;
+    setup();
+    S.screen='bag';                       // ループを止めて、プレイヤーだけ歩かせる
+    moved = walkAway();
+    blocked = party().map(a=>!losClear(a.x,a.y,P.x,P.y));
+  }while(!blocked.some(Boolean) && tries<15);
+
   const start = party().map(a=>+Math.hypot(a.x-P.x,a.y-P.y).toFixed(1));
   S.screen=keep; last=performance.now();
 
   stepSim(9);
-  return {walked:+moved.toFixed(1), losBlocked:blocked, startGaps:start, trail:W.trail.length,
+  return {tries, walked:+moved.toFixed(1), losBlocked:blocked, startGaps:start,
+          trail:W.trail.length,
           losGotBlocked: blocked.some(Boolean),
           finalGaps:livingParty().map(a=>+Math.hypot(a.x-P.x,a.y-P.y).toFixed(1)),
           crumbs:livingParty().map(a=>a.crumb),

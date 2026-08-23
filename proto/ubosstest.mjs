@@ -38,24 +38,57 @@ R.movesetsDiffer = await pg.evaluate(depths=>{
   return {sets, dupes, allDistinct: dupes.length===0, ok: dupes.length===0};
 }, DEPTHS);
 
-/* 1-c. 属性は階層のテーマに合わせる。
-       灼熱の窯の主が氷を吐いたら、層を作った意味が消える。 */
-R.elementsMatchZone = await pg.evaluate(depths=>{
-  // 層ごとに「ここではこれなら自然」と言える属性
-  const okBy={ mine:['blunt','pierce','slash'],
-               moss:['blunt','frost','pierce','slash'],
-               kiln:['fire'],
-               frost:['frost'],
-               bone:['pierce','blunt','arcane'] };
+/* 1-c. 属性は**その一体の正体**に合う。
+
+   以前は「層のテーマに合わせる」ことを見ていたが、設定が変わった。
+   現象体は「その深さから動けなくなったもの」で、**深度に固定されている**——
+   層のほうが入れ替わるので、深度と層は一致しない（設定書 6章）。
+   だから層ではなく、名前が名乗っている正体と属性が合っているかを見る。 */
+R.elementsMatchSelf = await pg.evaluate(depths=>{
+  // 現象体＝層の語を名乗る。登録名持ち＝生前の職種に合う手
+  const want={
+    5:['blunt','pierce'],      // 灰の大蛙 — 吐く・のしかかる
+    10:['pierce'],             // 空引きのヴェラ — 弓
+    15:['blunt','arcane'],     // 沼の大蛭 — 吸う
+    20:['blunt'],              // 打ち直しのブレヒト — 鎚
+    25:['pierce','slash'],     // 根の大蜘蛛 — 脚
+    30:['arcane'],             // 施しのマレット — 薬
+    35:['fire'],               // 炉の大蛇 — 熱そのもの
+    40:['blunt'],              // 動かぬ盾、オルト — 盾
+    45:['frost','arcane'],     // 白の大眼 — 欠
+    50:['arcane'],             // 初めの供物
+  };
   const bad=[];
   const rows=depths.map(d=>{
-    const z=zoneAt(d), U=uniqueBossAt(d);
-    const fits=(okBy[z.id]||[]).includes(U.dt);
-    if(!fits) bad.push({d, zone:z.nm, dt:U.dt});
-    return {d, zone:z.id, dt:U.dt, fits};
+    const U=uniqueBossAt(d);
+    const fits=(want[d]||[]).includes(U.dt);
+    if(!fits) bad.push({d, nm:U.nm, dt:U.dt});
+    return {d, nm:U.nm, dt:U.dt, fits};
   });
   return {rows, bad, ok: bad.length===0};
 }, DEPTHS);
+
+/* 1-d. 名前の三段ルール。深く潜るほど、名前が人の言葉に近づく。
+       現象体は漢字で名指し、登録名持ちは人名を持つ（＝かつて人だった）。
+       ラスボスだけが番号を持たない。 */
+R.namingTiers = await pg.evaluate(()=>{
+  const manifest=[5,15,25,35,45].map(d=>uniqueBossAt(d));
+  const registered=[10,20,30,40].map(d=>uniqueBossAt(d));
+  const last=uniqueBossAt(50);
+  return {
+    manifest: manifest.map(u=>u.nm),
+    registered: registered.map(u=>u.nm),
+    last: last.nm,
+    manifestAreNamed: manifest.every(u=>/^[^ぁ-ん]*の大/.test(u.nm)),
+    manifestRegistered: manifest.every(u=>u.reg.indexOf('現象体')===0),
+    registeredHaveNumbers: registered.every(u=>u.reg.indexOf('登録：')===0),
+    lastHasNoNumber: last.reg.includes('番号欄ともに空白'),
+    allHaveLine: [...manifest,...registered,last].every(u=>!!u.line),
+    ok: manifest.every(u=>u.reg.indexOf('現象体')===0)
+        && registered.every(u=>u.reg.indexOf('登録：')===0)
+        && last.reg.includes('番号欄ともに空白')
+  };
+});
 
 // 1-d. 系統（色と耐性）も定義どおりに乗る
 R.familyApplied = await pg.evaluate(depths=>{

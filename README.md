@@ -3,6 +3,17 @@
 『カイブツダンジョン（イニシエダンジョン）』に着想を得た、**オリジナルの**モバイル向けローグライク。
 移植でもリメイクでもなく、仕組みだけを継承した別作品として作っている。
 
+## 設定書の在り処
+
+命名の基準は **claude.ai のプロジェクト「abyss」** にある2冊。
+
+- `abyss-世界観設定書.md` — アビス／街／六層／還り損ない／命名指針
+- `abyss-敵とボス設定書.md` — 表記の三段ルール／雑魚32種／規格外12体／ボス10体
+
+**リポジトリには複製を置かない。** 同じ物が2ヶ所にあると必ず片方が古くなる。
+実装への落とし方（どの内部IDがどの名前に対応するか）は
+`docs/GAME_DESIGN.md` 5.5.52 に記録してある。
+
 ## IP に関する取り決め（厳守）
 
 - 仕組み・アイデアの継承は可。
@@ -14,11 +25,11 @@
 
 | パス | 内容 |
 |---|---|
-| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約572KB / 10,918行）。外部依存なし |
-| `proto/*.mjs` | 回帰テスト41スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
+| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約580KB / 11,029行）。外部依存なし |
+| `proto/*.mjs` | 回帰テスト42スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
 | `sweep.sh` | 全スイートを回して、false になった項目だけを並べる。`--since` で絞り込み |
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
-| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約192KB） |
+| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約200KB） |
 | `docs/abyss-引継書-収益設計監査.md` | 収益設計の監査・引継書（第3版／広告のみ前提） |
 | `docs/handoff.html` | 同上のHTML版 |
 | `unity/` | **凍結中。** C# は「引き撃ちの抑制」時点まで。再開時は差分を追わずプロトタイプから書き直す |
@@ -40,10 +51,10 @@ npm i -g playwright && npx playwright install chromium   # 初回のみ
 node proto/verify.mjs        # 個別に実行
 ```
 
-41スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
+42スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
 
 ```bash
-./sweep.sh                   # 全部回して false になった項目だけ並べる（約4分30秒）
+./sweep.sh                   # 全部回して false になった項目だけ並べる（約5分）
 ./sweep.sh --since           # 未コミットの変更に関係するスイートだけ（実測 34秒）
 ./sweep.sh --since HEAD~1    # 指定した地点からの変更ぶん
 ./sweep.sh --list            # 選ばれるスイートを表示するだけ（回さない）
@@ -53,13 +64,13 @@ for f in verify touchtest scrolltest bagtest gravetest hubtest gearttest \
          rangedtest elemtest afftest bosstest pacetest partytest fxtest \
          bossaoe zonetest kitetest adtest basetest looptest forgetest movetest \
          ulttest allytest cursetest scaletest intrtest mournrest boontest \
-         allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest; do
+         allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest loretest; do
   echo "=== $f ==="; node proto/$f.mjs
 done
 ```
 
 各スイートは `{errs, R}` を出力する。`errs` が空で、`R` の中の `false` が下の既知一覧だけなら合格。
-全数1周で **約4分30秒**。
+全数1周で **約5分**。
 
 ### `--since` の絞り込み（pick.py）
 
@@ -82,7 +93,7 @@ done
 
 どのスイートも見ていない語があれば `--list` が名前を挙げる。**黙って落とさない。**
 
-実測: 盾ボタンまわりの1行を触ったとき **8/41本・34秒**（全数は4分30秒）。
+実測: 盾ボタンまわりの1行を触ったとき **8/42本・34秒**（全数は約5分）。
 
 ### テストを書くときの2つの約束
 
