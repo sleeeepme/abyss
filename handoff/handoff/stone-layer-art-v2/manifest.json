@@ -1,0 +1,42 @@
+{
+  "package": "abyss-stone-layer-art-v2",
+  "target": "proto/index.html",
+  "sourceOfTruth": [
+    "proto/index.html",
+    "docs/GAME_DESIGN.md"
+  ],
+  "doNotModifyByDefault": [
+    "unity/"
+  ],
+  "references": {
+    "concept": "reference/concept-art.png",
+    "spriteSheet": "reference/stone-layer-sprite-sheet-v2.png",
+    "mapSample": "reference/stone-layer-map-sample-v2.png"
+  },
+  "spriteSheetStatus": "art-reference-with-opaque-background",
+  "requiredElements": [
+    "irregular_flat_purple_stone_walls",
+    "brazier",
+    "puddles_multiple_shapes",
+    "human_bones",
+    "spider_webs",
+    "grass",
+    "moss"
+  ],
+  "forbiddenElements": [
+    "ore",
+    "gold",
+    "crystals",
+    "mining_tools",
+    "mine_cart",
+    "treasure"
+  ],
+  "paletteGuidance": {
+    "stone": "muted matte purple with dark-violet joints",
+    "floor": "very dark violet",
+    "water": "dark muted teal with sparse cyan reflection pixels",
+    "fire": "restrained amber-orange-yellow",
+    "bonesAndWebs": "warm ivory",
+    "vegetation": "dull olive"
+  }
+}

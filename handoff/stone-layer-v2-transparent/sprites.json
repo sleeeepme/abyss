@@ -1,0 +1,790 @@
+{
+  "source": "source/stone-layer-sprite-sheet-v2.png",
+  "sourceSize": {
+    "w": 1536,
+    "h": 1024
+  },
+  "background": "removed from approved v2 RGB sheet",
+  "sprites": {
+    "wall_single": {
+      "file": "sprites/wall/wall_single.png",
+      "category": "wall",
+      "w": 74,
+      "h": 70,
+      "sourceCrop": {
+        "x": 35,
+        "y": 35,
+        "w": 100,
+        "h": 120
+      }
+    },
+    "wall_run_01": {
+      "file": "sprites/wall/wall_run_01.png",
+      "category": "wall",
+      "w": 220,
+      "h": 101,
+      "sourceCrop": {
+        "x": 145,
+        "y": 35,
+        "w": 255,
+        "h": 120
+      }
+    },
+    "wall_run_02": {
+      "file": "sprites/wall/wall_run_02.png",
+      "category": "wall",
+      "w": 234,
+      "h": 89,
+      "sourceCrop": {
+        "x": 400,
+        "y": 35,
+        "w": 265,
+        "h": 120
+      }
+    },
+    "wall_run_03": {
+      "file": "sprites/wall/wall_run_03.png",
+      "category": "wall",
+      "w": 187,
+      "h": 83,
+      "sourceCrop": {
+        "x": 660,
+        "y": 35,
+        "w": 210,
+        "h": 120
+      }
+    },
+    "wall_run_04": {
+      "file": "sprites/wall/wall_run_04.png",
+      "category": "wall",
+      "w": 262,
+      "h": 84,
+      "sourceCrop": {
+        "x": 865,
+        "y": 35,
+        "w": 280,
+        "h": 120
+      }
+    },
+    "wall_run_05": {
+      "file": "sprites/wall/wall_run_05.png",
+      "category": "wall",
+      "w": 327,
+      "h": 85,
+      "sourceCrop": {
+        "x": 1135,
+        "y": 35,
+        "w": 375,
+        "h": 120
+      }
+    },
+    "wall_corner_01": {
+      "file": "sprites/wall/wall_corner_01.png",
+      "category": "wall",
+      "w": 150,
+      "h": 139,
+      "sourceCrop": {
+        "x": 35,
+        "y": 175,
+        "w": 180,
+        "h": 170
+      }
+    },
+    "wall_corner_02": {
+      "file": "sprites/wall/wall_corner_02.png",
+      "category": "wall",
+      "w": 136,
+      "h": 132,
+      "sourceCrop": {
+        "x": 225,
+        "y": 175,
+        "w": 175,
+        "h": 170
+      }
+    },
+    "wall_corner_03": {
+      "file": "sprites/wall/wall_corner_03.png",
+      "category": "wall",
+      "w": 130,
+      "h": 127,
+      "sourceCrop": {
+        "x": 400,
+        "y": 175,
+        "w": 185,
+        "h": 170
+      }
+    },
+    "wall_corner_04": {
+      "file": "sprites/wall/wall_corner_04.png",
+      "category": "wall",
+      "w": 136,
+      "h": 123,
+      "sourceCrop": {
+        "x": 575,
+        "y": 175,
+        "w": 180,
+        "h": 170
+      }
+    },
+    "wall_corner_05": {
+      "file": "sprites/wall/wall_corner_05.png",
+      "category": "wall",
+      "w": 139,
+      "h": 124,
+      "sourceCrop": {
+        "x": 745,
+        "y": 175,
+        "w": 180,
+        "h": 170
+      }
+    },
+    "wall_arch": {
+      "file": "sprites/wall/wall_arch.png",
+      "category": "wall",
+      "w": 136,
+      "h": 144,
+      "sourceCrop": {
+        "x": 920,
+        "y": 165,
+        "w": 205,
+        "h": 185
+      }
+    },
+    "wall_broken_tall": {
+      "file": "sprites/wall/wall_broken_tall.png",
+      "category": "wall",
+      "w": 146,
+      "h": 119,
+      "sourceCrop": {
+        "x": 1105,
+        "y": 175,
+        "w": 170,
+        "h": 170
+      }
+    },
+    "wall_broken_wide": {
+      "file": "sprites/wall/wall_broken_wide.png",
+      "category": "wall",
+      "w": 208,
+      "h": 98,
+      "sourceCrop": {
+        "x": 1265,
+        "y": 175,
+        "w": 255,
+        "h": 170
+      }
+    },
+    "wall_block_01": {
+      "file": "sprites/wall/wall_block_01.png",
+      "category": "wall",
+      "w": 148,
+      "h": 103,
+      "sourceCrop": {
+        "x": 35,
+        "y": 350,
+        "w": 185,
+        "h": 150
+      }
+    },
+    "wall_block_02": {
+      "file": "sprites/wall/wall_block_02.png",
+      "category": "wall",
+      "w": 118,
+      "h": 101,
+      "sourceCrop": {
+        "x": 225,
+        "y": 350,
+        "w": 170,
+        "h": 150
+      }
+    },
+    "wall_block_03": {
+      "file": "sprites/wall/wall_block_03.png",
+      "category": "wall",
+      "w": 116,
+      "h": 100,
+      "sourceCrop": {
+        "x": 400,
+        "y": 350,
+        "w": 170,
+        "h": 150
+      }
+    },
+    "wall_rubble_01": {
+      "file": "sprites/wall/wall_rubble_01.png",
+      "category": "wall",
+      "w": 141,
+      "h": 101,
+      "sourceCrop": {
+        "x": 585,
+        "y": 350,
+        "w": 195,
+        "h": 155
+      }
+    },
+    "wall_rubble_02": {
+      "file": "sprites/wall/wall_rubble_02.png",
+      "category": "wall",
+      "w": 112,
+      "h": 94,
+      "sourceCrop": {
+        "x": 770,
+        "y": 350,
+        "w": 175,
+        "h": 155
+      }
+    },
+    "wall_rubble_03": {
+      "file": "sprites/wall/wall_rubble_03.png",
+      "category": "wall",
+      "w": 132,
+      "h": 90,
+      "sourceCrop": {
+        "x": 930,
+        "y": 350,
+        "w": 180,
+        "h": 155
+      }
+    },
+    "stone_loose_01": {
+      "file": "sprites/wall/stone_loose_01.png",
+      "category": "wall",
+      "w": 50,
+      "h": 58,
+      "sourceCrop": {
+        "x": 1110,
+        "y": 365,
+        "w": 100,
+        "h": 130
+      }
+    },
+    "stone_loose_02": {
+      "file": "sprites/wall/stone_loose_02.png",
+      "category": "wall",
+      "w": 51,
+      "h": 41,
+      "sourceCrop": {
+        "x": 1205,
+        "y": 370,
+        "w": 120,
+        "h": 125
+      }
+    },
+    "brazier_unlit": {
+      "file": "sprites/brazier/brazier_unlit.png",
+      "category": "brazier",
+      "w": 92,
+      "h": 83,
+      "sourceCrop": {
+        "x": 45,
+        "y": 500,
+        "w": 145,
+        "h": 160
+      }
+    },
+    "brazier_small_flame": {
+      "file": "sprites/brazier/brazier_small_flame.png",
+      "category": "brazier",
+      "w": 89,
+      "h": 115,
+      "sourceCrop": {
+        "x": 205,
+        "y": 490,
+        "w": 165,
+        "h": 170
+      }
+    },
+    "brazier_large_flame": {
+      "file": "sprites/brazier/brazier_large_flame.png",
+      "category": "brazier",
+      "w": 90,
+      "h": 159,
+      "sourceCrop": {
+        "x": 385,
+        "y": 475,
+        "w": 140,
+        "h": 185
+      }
+    },
+    "puddle_01": {
+      "file": "sprites/puddle/puddle_01.png",
+      "category": "puddle",
+      "w": 54,
+      "h": 29,
+      "sourceCrop": {
+        "x": 555,
+        "y": 550,
+        "w": 75,
+        "h": 100
+      }
+    },
+    "puddle_02": {
+      "file": "sprites/puddle/puddle_02.png",
+      "category": "puddle",
+      "w": 112,
+      "h": 47,
+      "sourceCrop": {
+        "x": 635,
+        "y": 535,
+        "w": 140,
+        "h": 115
+      }
+    },
+    "puddle_03": {
+      "file": "sprites/puddle/puddle_03.png",
+      "category": "puddle",
+      "w": 134,
+      "h": 65,
+      "sourceCrop": {
+        "x": 790,
+        "y": 520,
+        "w": 150,
+        "h": 135
+      }
+    },
+    "puddle_04": {
+      "file": "sprites/puddle/puddle_04.png",
+      "category": "puddle",
+      "w": 187,
+      "h": 88,
+      "sourceCrop": {
+        "x": 955,
+        "y": 505,
+        "w": 190,
+        "h": 150
+      }
+    },
+    "puddle_05": {
+      "file": "sprites/puddle/puddle_05.png",
+      "category": "puddle",
+      "w": 295,
+      "h": 117,
+      "sourceCrop": {
+        "x": 1170,
+        "y": 500,
+        "w": 325,
+        "h": 155
+      }
+    },
+    "bone_skull": {
+      "file": "sprites/bone/bone_skull.png",
+      "category": "bone",
+      "w": 71,
+      "h": 73,
+      "sourceCrop": {
+        "x": 40,
+        "y": 660,
+        "w": 110,
+        "h": 145
+      }
+    },
+    "bone_ribs": {
+      "file": "sprites/bone/bone_ribs.png",
+      "category": "bone",
+      "w": 87,
+      "h": 82,
+      "sourceCrop": {
+        "x": 145,
+        "y": 650,
+        "w": 130,
+        "h": 155
+      }
+    },
+    "bone_long_01": {
+      "file": "sprites/bone/bone_long_01.png",
+      "category": "bone",
+      "w": 78,
+      "h": 58,
+      "sourceCrop": {
+        "x": 270,
+        "y": 660,
+        "w": 115,
+        "h": 145
+      }
+    },
+    "bone_long_02": {
+      "file": "sprites/bone/bone_long_02.png",
+      "category": "bone",
+      "w": 50,
+      "h": 64,
+      "sourceCrop": {
+        "x": 385,
+        "y": 660,
+        "w": 85,
+        "h": 145
+      }
+    },
+    "bone_chip": {
+      "file": "sprites/bone/bone_chip.png",
+      "category": "bone",
+      "w": 24,
+      "h": 32,
+      "sourceCrop": {
+        "x": 460,
+        "y": 660,
+        "w": 65,
+        "h": 145
+      }
+    },
+    "bone_crossed_01": {
+      "file": "sprites/bone/bone_crossed_01.png",
+      "category": "bone",
+      "w": 62,
+      "h": 44,
+      "sourceCrop": {
+        "x": 510,
+        "y": 660,
+        "w": 120,
+        "h": 145
+      }
+    },
+    "bone_crossed_02": {
+      "file": "sprites/bone/bone_crossed_02.png",
+      "category": "bone",
+      "w": 105,
+      "h": 70,
+      "sourceCrop": {
+        "x": 600,
+        "y": 660,
+        "w": 135,
+        "h": 145
+      }
+    },
+    "bone_skeleton": {
+      "file": "sprites/bone/bone_skeleton.png",
+      "category": "bone",
+      "w": 140,
+      "h": 91,
+      "sourceCrop": {
+        "x": 710,
+        "y": 650,
+        "w": 175,
+        "h": 155
+      }
+    },
+    "web_01": {
+      "file": "sprites/web/web_01.png",
+      "category": "web",
+      "w": 101,
+      "h": 100,
+      "sourceCrop": {
+        "x": 885,
+        "y": 650,
+        "w": 140,
+        "h": 165
+      }
+    },
+    "web_02": {
+      "file": "sprites/web/web_02.png",
+      "category": "web",
+      "w": 141,
+      "h": 100,
+      "sourceCrop": {
+        "x": 1010,
+        "y": 650,
+        "w": 150,
+        "h": 165
+      }
+    },
+    "web_03": {
+      "file": "sprites/web/web_03.png",
+      "category": "web",
+      "w": 165,
+      "h": 99,
+      "sourceCrop": {
+        "x": 1140,
+        "y": 650,
+        "w": 180,
+        "h": 165
+      }
+    },
+    "web_04": {
+      "file": "sprites/web/web_04.png",
+      "category": "web",
+      "w": 183,
+      "h": 100,
+      "sourceCrop": {
+        "x": 1300,
+        "y": 650,
+        "w": 215,
+        "h": 165
+      }
+    },
+    "grass_01": {
+      "file": "sprites/vegetation/grass_01.png",
+      "category": "vegetation",
+      "w": 47,
+      "h": 52,
+      "sourceCrop": {
+        "x": 35,
+        "y": 785,
+        "w": 95,
+        "h": 115
+      }
+    },
+    "grass_02": {
+      "file": "sprites/vegetation/grass_02.png",
+      "category": "vegetation",
+      "w": 40,
+      "h": 44,
+      "sourceCrop": {
+        "x": 125,
+        "y": 785,
+        "w": 95,
+        "h": 115
+      }
+    },
+    "grass_03": {
+      "file": "sprites/vegetation/grass_03.png",
+      "category": "vegetation",
+      "w": 63,
+      "h": 45,
+      "sourceCrop": {
+        "x": 215,
+        "y": 785,
+        "w": 115,
+        "h": 115
+      }
+    },
+    "grass_04": {
+      "file": "sprites/vegetation/grass_04.png",
+      "category": "vegetation",
+      "w": 50,
+      "h": 54,
+      "sourceCrop": {
+        "x": 320,
+        "y": 785,
+        "w": 115,
+        "h": 115
+      }
+    },
+    "grass_05": {
+      "file": "sprites/vegetation/grass_05.png",
+      "category": "vegetation",
+      "w": 52,
+      "h": 42,
+      "sourceCrop": {
+        "x": 420,
+        "y": 785,
+        "w": 135,
+        "h": 115
+      }
+    },
+    "grass_06": {
+      "file": "sprites/vegetation/grass_06.png",
+      "category": "vegetation",
+      "w": 53,
+      "h": 46,
+      "sourceCrop": {
+        "x": 540,
+        "y": 785,
+        "w": 125,
+        "h": 115
+      }
+    },
+    "grass_07": {
+      "file": "sprites/vegetation/grass_07.png",
+      "category": "vegetation",
+      "w": 69,
+      "h": 50,
+      "sourceCrop": {
+        "x": 650,
+        "y": 785,
+        "w": 140,
+        "h": 115
+      }
+    },
+    "grass_08": {
+      "file": "sprites/vegetation/grass_08.png",
+      "category": "vegetation",
+      "w": 46,
+      "h": 38,
+      "sourceCrop": {
+        "x": 775,
+        "y": 785,
+        "w": 145,
+        "h": 115
+      }
+    },
+    "moss_patch_01": {
+      "file": "sprites/vegetation/moss_patch_01.png",
+      "category": "vegetation",
+      "w": 127,
+      "h": 89,
+      "sourceCrop": {
+        "x": 1040,
+        "y": 785,
+        "w": 160,
+        "h": 115
+      }
+    },
+    "moss_patch_02": {
+      "file": "sprites/vegetation/moss_patch_02.png",
+      "category": "vegetation",
+      "w": 48,
+      "h": 80,
+      "sourceCrop": {
+        "x": 1180,
+        "y": 785,
+        "w": 160,
+        "h": 115
+      }
+    },
+    "moss_01": {
+      "file": "sprites/vegetation/moss_01.png",
+      "category": "vegetation",
+      "w": 46,
+      "h": 36,
+      "sourceCrop": {
+        "x": 45,
+        "y": 885,
+        "w": 65,
+        "h": 105
+      }
+    },
+    "moss_02": {
+      "file": "sprites/vegetation/moss_02.png",
+      "category": "vegetation",
+      "w": 77,
+      "h": 50,
+      "sourceCrop": {
+        "x": 90,
+        "y": 885,
+        "w": 85,
+        "h": 105
+      }
+    },
+    "moss_03": {
+      "file": "sprites/vegetation/moss_03.png",
+      "category": "vegetation",
+      "w": 28,
+      "h": 26,
+      "sourceCrop": {
+        "x": 175,
+        "y": 885,
+        "w": 75,
+        "h": 105
+      }
+    },
+    "moss_04": {
+      "file": "sprites/vegetation/moss_04.png",
+      "category": "vegetation",
+      "w": 71,
+      "h": 45,
+      "sourceCrop": {
+        "x": 260,
+        "y": 885,
+        "w": 95,
+        "h": 105
+      }
+    },
+    "moss_05": {
+      "file": "sprites/vegetation/moss_05.png",
+      "category": "vegetation",
+      "w": 95,
+      "h": 42,
+      "sourceCrop": {
+        "x": 340,
+        "y": 885,
+        "w": 95,
+        "h": 105
+      }
+    },
+    "moss_06": {
+      "file": "sprites/vegetation/moss_06.png",
+      "category": "vegetation",
+      "w": 76,
+      "h": 40,
+      "sourceCrop": {
+        "x": 445,
+        "y": 885,
+        "w": 80,
+        "h": 105
+      }
+    },
+    "moss_07": {
+      "file": "sprites/vegetation/moss_07.png",
+      "category": "vegetation",
+      "w": 90,
+      "h": 27,
+      "sourceCrop": {
+        "x": 510,
+        "y": 885,
+        "w": 90,
+        "h": 105
+      }
+    },
+    "moss_08": {
+      "file": "sprites/vegetation/moss_08.png",
+      "category": "vegetation",
+      "w": 140,
+      "h": 40,
+      "sourceCrop": {
+        "x": 600,
+        "y": 885,
+        "w": 140,
+        "h": 105
+      }
+    },
+    "moss_09": {
+      "file": "sprites/vegetation/moss_09.png",
+      "category": "vegetation",
+      "w": 90,
+      "h": 40,
+      "sourceCrop": {
+        "x": 725,
+        "y": 885,
+        "w": 95,
+        "h": 105
+      }
+    },
+    "moss_10": {
+      "file": "sprites/vegetation/moss_10.png",
+      "category": "vegetation",
+      "w": 38,
+      "h": 36,
+      "sourceCrop": {
+        "x": 880,
+        "y": 885,
+        "w": 155,
+        "h": 105
+      }
+    },
+    "moss_11": {
+      "file": "sprites/vegetation/moss_11.png",
+      "category": "vegetation",
+      "w": 91,
+      "h": 41,
+      "sourceCrop": {
+        "x": 1050,
+        "y": 885,
+        "w": 120,
+        "h": 105
+      }
+    },
+    "moss_12": {
+      "file": "sprites/vegetation/moss_12.png",
+      "category": "vegetation",
+      "w": 35,
+      "h": 27,
+      "sourceCrop": {
+        "x": 1240,
+        "y": 885,
+        "w": 105,
+        "h": 105
+      }
+    },
+    "moss_13": {
+      "file": "sprites/vegetation/moss_13.png",
+      "category": "vegetation",
+      "w": 32,
+      "h": 26,
+      "sourceCrop": {
+        "x": 1340,
+        "y": 885,
+        "w": 120,
+        "h": 105
+      }
+    }
+  }
+}

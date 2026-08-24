@@ -18,11 +18,11 @@
 | `ALLY-PALADIN-001` | `paladin` | パラディン（聖騎士） | 上位仲間 | ![パラディン・右向きv4](../proto/assets/sprites/allies/paladin/right-idle-v4-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/paladin/right-idle-v4-draft.png) | 右・待機1 | 承認済み | 未反映 | 金髪の女性聖騎士。明るい左目側の顔影、青いタバード、象牙色の鎧、盾、頭高まで届く長剣（ゲーム側の武器設定は現時点でメイス） |
 | `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向き](../proto/assets/sprites/allies/summoner/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/summoner/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 青緑の重ねフードとローブ、護符付きの杖、左後方の使い魔 |
 | `ALLY-ARCHMAGE-001` | `archmage` | 大魔導士 | 上位仲間 | ![大魔導士・右向きv2](../proto/assets/sprites/allies/archmage/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/archmage/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 腰を深く曲げた老魔術師。白眉・白髪・長い白髭、魔力球付きの杖 |
-| `ENEMY-BEAST-RUSH-001` | `beast / rush` | アッシュハウンド | 敵 | ![アッシュハウンド・右向きv3](../proto/assets/sprites/enemies/ash-hound/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-hound/right-idle-v3-draft.png) | 右・待機1 | v3・要確認 | 未反映 | 序盤の突進型。v2の全シルエットを維持し、琥珀眼の左下へ2pxの青紫影を追加 |
-| `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | v2・要確認 | 未反映 | 間合いを保つ遠距離型。胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
-| `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトード・右向きv2](../proto/assets/sprites/enemies/ash-toad/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-v2-draft.png) | 右・待機1 | v2・要確認 | 未反映 | 動かない高耐久砲台型。灰緑の低い体、眼丘、長い水平口、円い折れ後脚、小さな前脚と趾で蛙形を明示 |
-| `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv2](../proto/assets/sprites/enemies/stone-boar/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v2-draft.png) | 右・待機1 | v2・要確認 | 未反映 | 高速・低耐久の群れ型。短い尾、三角耳、箱型の豚鼻・鼻孔、短い牙と蹄で猪形を明示 |
-| `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv2](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v2-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v2-draft.png) | 右・待機1 | v2・要確認 | 未反映 | 第5階層の現象体。ネイティブ32px。大きな眼丘、上寄りの水平口、Z字に畳んだ巨大後脚、独立した小前脚と3趾 |
+| `ENEMY-BEAST-RUSH-001` | `beast / rush` | アッシュハウンド | 敵 | ![アッシュハウンド・右向きv5](../proto/assets/sprites/enemies/ash-hound/right-idle-v5-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-hound/right-idle-v5.png) | 右・待機1 | 承認済み | 未反映 | 別タスクでユーザーがレタッチし、最新版に指定した64×64画像を採用。透明画素を正規化して16×16へ復元し、可視画素は元画像と完全一致 |
+| `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | 承認済み | 未反映 | 胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
+| `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトード・右向きv3](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 苔灰色の低い体、大きな金眼、水平口、丸い折れ後脚を優先し、カエルの横姿としてゼロベース再設計 |
+| `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv3](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 選択された参考案を基準に、高い灰色の肩、茶色い耳・短脚、淡い眼、箱型の鼻と大きな上向き牙を整理 |
+| `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 冒険者デザイン候補
 
@@ -51,10 +51,10 @@
 | パラディン（聖騎士） | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 召喚士 | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 大魔導士 | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| アッシュハウンド | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| ダストスパイダー | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| アッシュトード | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| ストーンボア | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
+| アッシュハウンド | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
+| ダストスパイダー | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
+| アッシュトード | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
+| ストーンボア | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 灰の大蛙 | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 
 ## 共通制作ルール
@@ -97,3 +97,5 @@
 - 2026-08-24: 石の坑道に登場するアッシュ系の通常敵3体（ダストスパイダー、アッシュトード、ストーンボア）と、第5階層の中ボス「灰の大蛙」の右向き・待機1初稿を追加。
 - 2026-08-24: アッシュハウンドは透明マスクと全座標を維持し、赤褐色から石灰色・青紫影・琥珀眼へ変更したv2を追加。
 - 2026-08-24: 敵5体をフィードバックに合わせて改訂。アッシュハウンドv3、短脚化したダストスパイダーv2、蛙形を再設計したアッシュトードv2、猪形を強化したストーンボアv2、ネイティブ32×32の灰の大蛙v2を追加。
+- 2026-08-24: ダストスパイダーv2を承認済みに更新。アッシュハウンドを4段階陰影のv4へ改訂。アッシュトードをゼロベースのv3へ再設計。ユーザー選択の参考案を基準にストーンボアv3と灰の大蛙v3を原寸へ再構成。
+- 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
