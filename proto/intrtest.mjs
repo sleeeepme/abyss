@@ -1,10 +1,10 @@
-// 階段の詰み / 炉の分離 / 侵入者。
+// 階段の詰み / 鍛冶場の分離 / 侵入者。
 //
 // 1. 階段の上に物を置かない。置いてしまうと「その階から降りられない」詰みになる。
 //    実際に起きた事故なので、置き場所と interact() の順番を二重に検証する。
-// 2. 炉は鉱脈から切り離す。掘った直後にその場で鍛えられてはいけない
+// 2. 鍛冶場は鉱脈から切り離す。掘った直後にその場で鍛えられてはいけない
 //    （鉱石を抱えて運ぶ時間が、この仕掛けの本体なので）。
-// 3. 侵入者。1回の潜りが15分を超えると現れ、仲間を無視してプレイヤーだけを追う。
+// 3. 侵入者。1回の潜りが15分を超えると現れ、仲間を無視して主人公だけを追う。
 //    **階を降りても撒けない**（解除は帰還だけ）。5分ごとに強くなり、最後はこちらより速い。
 import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
@@ -60,7 +60,7 @@ R.stairWins = await pg.evaluate(()=>{
           ok: onst && stairsOpen && !mining && !forgeOpen};
 });
 
-/* ---------- 3. 掘った鉱脈はもう炉ではない ---------- */
+/* ---------- 3. 掘った鉱脈はもう鍛冶場ではない ---------- */
 R.forgeSplit = await pg.evaluate(()=>{
   TH.run(1, {seed:4}); TH.floor(12);
   const st=W.fl.stair;
@@ -76,7 +76,7 @@ R.forgeSplit = await pg.evaluate(()=>{
   updateHUD();
   const promptOnMined = el('prompt').style.display!=='none' ? el('prompt').textContent : '';
 
-  // 炉を別の場所に置けば、そちらでは開く
+  // 鍛冶場を別の場所に置けば、そちらでは開く
   const fs = pickSpot(W.fl) || {x:st.x+8, y:st.y+8};
   W.forge={x:fs.x, y:fs.y, seed:0};
   P.x=fs.x; P.y=fs.y;
@@ -89,7 +89,7 @@ R.forgeSplit = await pg.evaluate(()=>{
           ok: !openedOnMined && !nearMined && openedOnForge};
 });
 
-/* ---------- 4. 炉は鉱脈から離れて置かれる（運ぶ距離が残っているか） ---------- */
+/* ---------- 4. 鍛冶場は鉱脈から離れて置かれる（運ぶ距離が残っているか） ---------- */
 R.forgeDist = await pg.evaluate(()=>{
   S.hero=newHero();
   let n=0, tooClose=0, minD=999, atBoss=0, tooShallow=0;
@@ -172,7 +172,7 @@ R.intrIgnoresAllies = await pg.evaluate(()=>{
   S.hero.party.push(a);
   S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
   const e=liveIntruder();
-  // 仲間を侵入者のすぐ隣に、プレイヤーは遠くに置く
+  // 仲間を侵入者のすぐ隣に、主人公は遠くに置く
   a.x = e.x + 0.8; a.y = e.y;
   P.x = e.x + 25;  P.y = e.y + 25;
   const tg = enemyTarget(e);
@@ -195,7 +195,7 @@ R.intrChases = await pg.evaluate(()=>{
   const aggro = e.arch.aggro;
   const d0 = Math.hypot(e.x-P.x, e.y-P.y);
   const farOutsideAggro = d0 > aggro;
-  // プレイヤーは動かさず、侵入者だけを回す。
+  // 主人公は動かさず、侵入者だけを回す。
   // 追いつかれると殴られて死ぬので、ここでは無敵にしておく（見たいのは到達だけ）。
   P.invuln = 1e9;
   for(let i=0;i<600;i++) enemyUpdate(e, 1/60);
@@ -252,7 +252,7 @@ R.intrPathing = await pg.evaluate(()=>{
 });
 
 /* ---------- 9. 走れば逃げ切れる ----------
-   足がプレイヤーより遅いこと自体は 5 で見ている。ここでは実際に走らせて、
+   足が主人公より遅いこと自体は 5 で見ている。ここでは実際に走らせて、
    「まっすぐ逃げていれば距離が縮まらない」ことを見る。 */
 R.intrOutrun = await pg.evaluate(()=>{
   TH.run(1, {seed:19}); S.upg={}; TH.floor(21);                       // ボス階（20）を避ける
@@ -412,7 +412,7 @@ R.hud = await pg.evaluate(()=>{
     e.x=P.x+3;
     const liveTxt = nearTxt;
     for(let k=0;k<4;k++){ draw(); updateHUD(); }
-    // 炉も1度描く
+    // 鍛冶場も1度描く
     W.forge={x:P.x+2, y:P.y+2, seed:0};
     for(let k=0;k<3;k++){ draw(); updateHUD(); }
     return {failures:fails, warnShown, warnTxt, nearTxt, farTxt,

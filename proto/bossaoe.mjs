@@ -181,7 +181,7 @@ R.hitsAllies = await pg.evaluate(()=>{
   const a=makeAlly(10,S.hero);
   a.x=boss.x+1; a.y=boss.y;
   S.hero.party.push(a);
-  P.x=boss.x+40; P.y=boss.y+40;      // プレイヤーは範囲外
+  P.x=boss.x+40; P.y=boss.y+40;      // 主人公は範囲外
   const ph0=S.hero.hpNow;
   /* 仲間は回避することがある（ジョブによっては 30% 超）ので、
      1回の着弾で判定すると「たまたま避けた」だけで落ちる。

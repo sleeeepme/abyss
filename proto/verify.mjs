@@ -67,18 +67,21 @@ const upgrades = await pg.evaluate(() => {
 
 // --- 4. 店で買う / 強化を買う（所持金とスロットが正しく動くか）
 const shop = await pg.evaluate(() => {
-  S.upg = {}; S.stash = []; S.gold = 100000; S.deepest = 20; rerollShop();
+  /* 能力強化の対価は**欠片**であって金ではない（途中でそう変えた）。
+     ここが金のままだったので、この検証は数コミットのあいだ黙って false を
+     返し続けていた。掃引に出ていたのに、既知の false と思って見落としていた。 */
+  S.upg = {}; S.stash = []; S.gold = 100000; S.shards = 9999; S.deepest = 20; rerollShop();
   const priced = S.shop.every(i => i.price > 0 && i.ident);
   const g0 = S.gold, item = S.shop[0], p = item.price;
   setScreen('shop');                       // 道具屋は独立画面になった
   document.querySelector(`[data-buy="${item.uid}"]`).click();
   const bought = S.stash.some(i => i.uid === item.uid) && S.gold === g0 - p;
   setScreen('upg');                        // 永続強化も独立画面
-  const u = UPGRADES[0], c = upgCost(u, 0), g1 = S.gold;
+  const u = UPGRADES[0], c = upgCost(u, 0), s1 = S.shards;
   document.querySelector(`[data-upg="${u.id}"]`).click();
-  const upgraded = upgLv(u.id) === 1 && S.gold === g1 - c;
-  // 金が足りないときは買えないこと
-  S.gold = 0; renderUpg();
+  const upgraded = upgLv(u.id) === 1 && S.shards === s1 - c;
+  // 欠片が足りないときは買えないこと
+  S.shards = 0; renderUpg();
   const lv = upgLv(u.id);
   document.querySelector(`[data-upg="${u.id}"]`).click();
   const blocked = upgLv(u.id) === lv;

@@ -8,6 +8,7 @@ package-lock.json
 *.png
 !docs/**/*.png
 !proto/assets/*.png
+!proto/assets/sprites/**/*.png
 test-results/
 playwright-report/
 

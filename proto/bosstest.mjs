@@ -109,7 +109,10 @@ R.persistence = await pg.evaluate(()=>{
   startRun(1);
   S.run.depth=5; returnToTown();
   const afterReturn = S.hero.boons.length;
-  startRun(1); S.hero.hpNow=1; hitPlayer(null,99999,'blunt',5);
+  /* 初期装備の「疾き」で回避 6% が乗っている。1発で死ぬ前提だと、
+     たまたま回避を引いた回にこの検証が静かに false になる。死ぬまで殴る。 */
+  startRun(1);
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,'blunt',5); }
   const heroGone = S.hero===null;
   S.hero=newHero();
   return {survivesReturn: afterReturn===1, lostOnDeath: heroGone && S.hero.boons.length===0};

@@ -64,8 +64,14 @@
      「立ち止まって受ける」が一番したい場面なのに、そこだけできなかった。
 
      押しているあいだ構える専用ボタンを、大技の反対側に置く。
-     2本指の操作はそのまま残してある（動きながら構えるのはそちらが速い）。
-     盾を持っていないときは出さない——押しても何も起きないボタンを作らない。 */
+
+     **構える口はこのボタンだけ。** 以前は「画面の右側に2本目の指を置く」でも
+     構えられたが、これが分かりにくさの中心だった——移動の指を持ち替えた拍子に
+     勝手に構えが入り、なぜ足が遅くなったのか読めない。
+     入口が2つあるかぎり「押している間だけ構える」という約束は説明できない。
+
+     盾を持っていないときも**消さずにグレーで出す。**
+     消してしまうと「盾を持てば何かできる」こと自体が伝わらない。 */
   #guardbtn{position:absolute;left:16px;bottom:calc(96px + env(safe-area-inset-bottom));
     width:66px;height:66px;border-radius:50%;display:none;
     align-items:center;justify-content:center;font-size:26px;
@@ -73,6 +79,25 @@
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #guardbtn.on{display:flex}
+  /* 盾なし。押しても何も起きないことを、押す前に見せる */
+  #guardbtn.dim{opacity:.32;border-color:#2a3040;color:#5c6479;
+    background:rgba(16,20,28,.55)}
+  /* ---------- デバッグ ----------
+     出荷物には出ない。タイトルの版番号を5回叩いたときだけ現れる。
+     見えていると必ず押されるので、**入口を隠す**のではなく
+     入口そのものを普段は存在させない。 */
+  #dbgbtn{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));
+    width:38px;height:38px;border-radius:10px;display:none;
+    align-items:center;justify-content:center;font-size:18px;
+    background:rgba(60,20,20,.9);border:1.5px solid #b5563f;color:#ffb0a0;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    pointer-events:auto;user-select:none;z-index:40}
+  #dbgbtn.on{display:flex}
+  #m-debug .row{display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  #m-debug .row b{font-size:13px}
+  #m-debug .row s{display:block;text-decoration:none;color:var(--dim);font-size:11px;margin-top:2px}
+  #m-debug .sw{flex:0 0 auto;width:auto;padding:6px 14px;font-size:11px;margin:0}
   #guardbtn.held{background:rgba(40,64,96,.9);border-color:#8fc7ff;
     box-shadow:0 0 14px -2px #8fc7ff}
   #ultbtn.ready{border-color:currentColor;box-shadow:0 0 14px -2px currentColor}
@@ -130,7 +155,7 @@
   #nm-input:focus{outline:none;border-color:#3d7a5c}
 
   /* HUD */
-  /* HUD の文字は**背景を選べない。** 下に流れているのはダンジョンの床で、
+  /* HUD の文字は**背景を選べない。** 下に流れているのはアビスの床で、
      白の層のように明るい層では、薄い色の文字がそのまま消える（実際に消えた）。
      キャンバス側の label() が黒で縁取っているのと同じ理由で、こちらにも影を敷く。
      背景を付けて解決すると画面が箱だらけになるので、影だけで持たせる。 */
@@ -201,7 +226,7 @@
     background:rgba(10,12,18,.72);border:1px solid #262d3b;border-radius:10px;padding:5px 12px;
     max-width:74%}
   /* 侵入者の警告が出ているあいだは、その下へ逃がす（重なって両方読めなくなる） */
-  /* 炉の対象を選ぶ行。自分と還りを横に並べる */
+  /* 鍛冶場の対象を選ぶ行。自分とプレイヤーを横に並べる */
   #fg-who{display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
   .fgwho{border:1px solid #2a3040;border-radius:10px;padding:4px 10px;font-size:12px;
     line-height:1.4;text-align:center;background:#171c26;cursor:pointer}
@@ -270,7 +295,7 @@
      視聴完了ボタンが押せなくなる（重ねない運用にしているが、保険として明示する） */
   #m-ad{z-index:40}
   /* 中身が画面より高くなり得るモーダルは全部ある。
-     実際に踏んだ: 炉のメニューが伸びて「閉じる」が画面外へ出て、
+     実際に踏んだ: 鍛冶場のメニューが伸びて「閉じる」が画面外へ出て、
      **開いたら二度と閉じられない**状態になった。
      個別に付けて回ると必ず付け忘れが出るので、箱そのものに持たせる。 */
   .modal .box{width:100%;max-width:380px;max-height:88vh;overflow-y:auto;
@@ -326,7 +351,7 @@
 
 <!-- ============ 街（ハブ） ============
      ここは「次にどこへ行くか」を選ぶ場所であって、読む場所ではない。
-     以前は能力値・装備・馴れ・還り・呪いを全部この1画面に積んでいたので、
+     以前は能力値・装備・恩寵・プレイヤー・呪いを全部この1画面に積んでいたので、
      潜るまでに5回スクロールしていた。**見る物は別画面へ、決める物だけ残す。**
      残したのは「どこから潜るか」と「潜る」ボタン、そして各施設への入口。 -->
 <div class="screen" id="scr-town">
@@ -342,9 +367,10 @@
     <button class="menubtn" id="btn-go-gacha"><i>🎁</i><b>ガチャ</b><s id="m-gacha-sub"></s></button>
     <button class="menubtn" id="btn-go-shop"><i>🛒</i><b>道具屋</b><s id="m-shop-sub"></s></button>
     <button class="menubtn" id="btn-go-stash"><i>📦</i><b>倉庫</b><s id="m-stash-sub"></s></button>
-    <button class="menubtn" id="btn-go-forge"><i>⚒️</i><b>打ち直し所</b><s id="m-forge-sub"></s></button>
-    <button class="menubtn" id="btn-go-upg"><i>⬆️</i><b>支度</b><s id="m-upg-sub"></s></button>
+    <button class="menubtn" id="btn-go-forge"><i>⚒️</i><b>鍛冶屋</b><s id="m-forge-sub"></s></button>
+    <button class="menubtn" id="btn-go-upg"><i>⬆️</i><b>能力強化</b><s id="m-upg-sub"></s></button>
     <button class="menubtn" id="btn-go-bld"><i>🏛️</i><b>街開発</b><s id="m-bld-sub"></s></button>
+    <button class="menubtn" id="btn-go-tavern"><i>🍺</i><b>酒場</b><s id="m-tavern-sub"></s></button>
     <button class="menubtn" id="btn-go-mem"><i>🕯️</i><b>慰霊碑</b><s id="m-mem-sub"></s></button>
   </div>
 
@@ -355,11 +381,11 @@
 
 <!-- 潜るボタンはバナーと同じく画面に固定する。
      街で一番よく押すボタンが、スクロールしないと出てこないのはおかしい。 -->
-<div id="divebar"><button class="primary" id="btn-dive">ダンジョンへ潜る</button></div>
+<div id="divebar"><button class="primary" id="btn-dive">アビスへ潜る</button></div>
 
 <!-- ============ ステータス ============
      街から追い出した「見る物」の行き先。
-     能力値・装備・馴れ・還り・呪いはここに集める。 -->
+     能力値・装備・恩寵・プレイヤー・呪いはここに集める。 -->
 <div class="screen" id="scr-char">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>ステータス</h1><span class="gold" id="char-gold"></span></div>
@@ -369,10 +395,10 @@
   <h2>装備中</h2>
   <div class="grid" id="equipped"></div>
 
-  <h2>馴れ <span style="color:var(--dim);font-weight:400;font-size:11px">死ぬまで有効</span></h2>
+  <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:11px">死ぬまで有効</span></h2>
   <div class="grid" id="town-boons"></div>
 
-  <h2>還り <span style="color:var(--dim);font-weight:400;font-size:11px">タップで装備と技</span></h2>
+  <h2>プレイヤー <span style="color:var(--dim);font-weight:400;font-size:11px">タップで装備と技</span></h2>
   <div class="grid" id="town-party"></div>
 
   <h2>今週の呪い <span style="color:var(--dim);font-weight:400;font-size:11px">任意・重ねがけ可・毎週入れ替わる</span></h2>
@@ -412,10 +438,10 @@
   <div style="height:24px"></div>
 </div>
 
-<!-- ============ 支度 ============ -->
+<!-- ============ 能力強化 ============ -->
 <div class="screen" id="scr-upg">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
-    <h1>支度</h1><span class="gold" id="upg-gold"></span></div>
+    <h1>能力強化</h1><span class="gold" id="upg-gold"></span></div>
   <p class="sub">対価は<b style="color:#8fd8ff">欠片</b>。敵が落とし、<b>拾った瞬間に貯まる</b>ので
     <b style="color:#7fe0c0">死んでも失いません</b>。<br>
     どんな探索も、必ずここに変わります。</p>
@@ -435,9 +461,28 @@
 <div class="screen" id="scr-bld">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>街開発</h1><span class="gold" id="bld-gold"></span></div>
-  <p class="sub">支度が「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
+  <p class="sub">能力強化が「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
     帰ってくるたびに街が育つ。</p>
   <div class="grid" id="buildings"></div>
+  <div style="height:24px"></div>
+</div>
+
+<!-- ============ 酒場 ============
+     連れ帰ったプレイヤーが待っている場所。街に戻ると全員ここへ入る。
+     次に連れて行くときは金を払って雇い直す。 -->
+<div class="screen" id="scr-tavern">
+  <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
+    <h1>酒場</h1><span class="gold" id="tavern-gold"></span></div>
+  <p class="sub">金を払えば連れて行ける。<b style="color:#7fe0c0">酒場にいる間はあなたが死んでも失われない。</b></p>
+
+  <h2>連れ帰った者 <span style="color:#7fe0c0;font-weight:400;font-size:11px">半額</span></h2>
+  <p class="sub">生きて帰った相手は、装備もレベルも恩寵も持ったまま休んでいる。</p>
+  <div class="grid" id="tavernlist"></div>
+
+  <h2>流れ者 <span style="color:var(--dim);font-weight:400;font-size:11px">帰るたびに入れ替わる・定価</span></h2>
+  <p class="sub">アビスに用のある者は毎日この街に着く。<br>
+    <span style="font-size:11px">上位職（聖騎士・召喚士・大魔導士）は割高。</span></p>
+  <div class="grid" id="tavernpool"></div>
   <div style="height:24px"></div>
 </div>
 
@@ -445,8 +490,8 @@
 <div class="screen" id="scr-mem">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>慰霊碑</h1><span class="gold" id="mem-shards"></span></div>
-  <p class="sub">失った還りの名前が刻まれている。<br>
-    欠片を捧げれば、レベルと馴れを保ったまま呼び戻せる。<b>装備は戻らない。</b></p>
+  <p class="sub">失ったプレイヤーの名前が刻まれている。<br>
+    欠片を捧げれば、レベルと恩寵を保ったまま呼び戻せる。<b>装備は戻らない。</b></p>
   <div class="grid" id="memlist"></div>
   <div style="height:24px"></div>
 </div>
@@ -529,10 +574,10 @@
 
   <div class="card" id="bag-stats"></div>
 
-  <h2>馴れ <span style="color:var(--dim);font-weight:400;font-size:11px">ボス撃破で得た・死ぬまで有効</span></h2>
+  <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:11px">ボス撃破で得た・死ぬまで有効</span></h2>
   <div class="grid" id="bag-boons"></div>
 
-  <h2>還り <span style="color:var(--dim);font-weight:400;font-size:11px">最大3名・あなたが死ぬと一緒に失われる</span></h2>
+  <h2>プレイヤー <span style="color:var(--dim);font-weight:400;font-size:11px">最大3名・あなたが死ぬと一緒に失われる</span></h2>
   <div class="grid" id="bag-party"></div>
 
   <div style="height:14px"></div>
@@ -555,24 +600,24 @@
   <div style="height:20px"></div>
 </div></div>
 
-<!-- ============ 馴れの選択（ボス撃破報酬） ============ -->
+<!-- ============ 恩寵の選択（ボス撃破報酬） ============ -->
 <div class="modal" id="m-boon"><div class="box">
-  <h1 id="boon-title">馴れを得た</h1>
+  <h1 id="boon-title">恩寵を得た</h1>
   <p class="sub" id="boon-sub"></p>
   <div class="grid" id="boon-choices" style="grid-template-columns:1fr"></div>
   <p class="sub" style="margin-top:14px">効果は<b>このキャラが死ぬまで</b>続きます</p>
 </div></div>
 
-<!-- ============ 馴れの付与先（プレイヤー / 還り） ============ -->
+<!-- ============ 恩寵の付与先（主人公 / プレイヤー） ============ -->
 <div class="modal" id="m-btarget"><div class="box">
   <h1>誰に与えるか</h1>
   <p class="sub" id="bt-sub"></p>
   <div class="grid" id="bt-list" style="grid-template-columns:1fr"></div>
 </div></div>
 
-<!-- ============ 還り候補（道中の NPC） ============ -->
+<!-- ============ プレイヤー候補（道中の NPC） ============ -->
 <div class="modal" id="m-ally"><div class="box" style="text-align:left;max-height:88vh;overflow-y:auto">
-  <h1 style="text-align:center" id="ally-name">還り候補</h1>
+  <h1 style="text-align:center" id="ally-name">プレイヤー候補</h1>
   <p class="sub" style="text-align:center" id="ally-sub"></p>
   <div class="card" id="ally-skill"></div>
   <h2>能力</h2>
@@ -610,9 +655,9 @@
 
 <div id="adbar"><b>AD</b>バナー広告枠（街のみ・探索中は表示しない）</div>
 
-<!-- ============ 還りの装備 ============ -->
+<!-- ============ プレイヤーの装備 ============ -->
 <div class="modal" id="m-allyeq"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
-  <h1 id="ae-name" style="text-align:center">還り</h1>
+  <h1 id="ae-name" style="text-align:center">プレイヤー</h1>
   <p style="text-align:center;font-size:12px;font-weight:700;margin:0" id="ae-epithet"></p>
   <p class="sub" id="ae-sub" style="text-align:center"></p>
   <div class="card" id="ae-stats"></div>
@@ -629,9 +674,9 @@
   <button class="ghost" id="ae-close">閉じる</button>
 </div></div>
 
-<!-- ============ 打ち直し（街の打ち直し所 / 道中の露天の炉で共用） ============ -->
+<!-- ============ 打ち直し（街の鍛冶屋 / 道中の露天の鍛冶場で共用） ============ -->
 <div class="modal" id="m-forge"><div class="box">
-  <h1 id="fg-title">⚒ 打ち直し所</h1>
+  <h1 id="fg-title">⚒ 鍛冶屋</h1>
   <p class="sub" id="fg-sub"></p>
   <div id="fg-who"></div>
   <div class="card" id="fg-item" style="text-align:left;line-height:1.8"></div>
@@ -659,9 +704,9 @@
   <button class="ghost" id="ms-close">立ち去る</button>
 </div></div>
 
-<!-- ============ 還りの死亡 / 広告での蘇生 ============ -->
+<!-- ============ プレイヤーの死亡 / 広告での蘇生 ============ -->
 <div class="modal" id="m-fallen"><div class="box">
-  <h1 id="fal-title">還りが倒れた</h1>
+  <h1 id="fal-title">プレイヤーが倒れた</h1>
   <p class="sub" id="fal-sub"></p>
   <div class="card" id="fal-body" style="text-align:left"></div>
   <div style="height:14px"></div>
@@ -670,17 +715,48 @@
   <button class="ghost" id="fal-let">見送る（ロスト）</button>
 </div></div>
 
+<!-- ============ デバッグ ============
+     タイトルの「proto v0.3」を5回叩くと出る。
+     普段は DOM にあるが display:none で、押す手段が無い。 -->
+<button id="dbgbtn">🐞</button>
+<div class="modal" id="m-debug"><div class="box" style="text-align:left">
+  <h1>デバッグ</h1>
+  <p class="sub">検証用。再読み込みで全部消える（保存しない）。</p>
+  <div class="row">
+    <div><b>無敵</b><s>被弾・地形・継続ダメージを全部無視する</s></div>
+    <button class="sw ghost" id="dbg-god">OFF</button>
+  </div>
+  <div class="row">
+    <div><b>階層全開放</b><s>中継地点を無視して、5階ごとにどこからでも潜れる</s></div>
+    <button class="sw ghost" id="dbg-depth">OFF</button>
+  </div>
+  <div class="row">
+    <div><b>この階の敵を消す</b><s>いま居る階層だけ。降りると元に戻る</s></div>
+    <button class="sw ghost" id="dbg-clear">実行</button>
+  </div>
+  <div class="row">
+    <div><b>欠片・金・黒鉄を足す</b><s>それぞれ +9999</s></div>
+    <button class="sw ghost" id="dbg-rich">実行</button>
+  </div>
+  <div class="row">
+    <div><b>鞘無しを +1本</b><s>周回刃。恩寵を待たずに生やす（最大3本）</s></div>
+    <button class="sw ghost" id="dbg-blade">実行</button>
+  </div>
+  <div style="height:14px"></div>
+  <button class="primary" id="dbg-close">閉じる</button>
+</div></div>
+
 <!-- ============ 第50階層 踏破 ============ -->
 <div class="modal" id="m-clear"><div class="box">
   <h1 style="color:#ffd06a">アビスを踏破した</h1>
   <p class="sub" id="clr-sub"></p>
   <div class="card" id="clr-body" style="text-align:left"></div>
   <div style="height:14px"></div>
-  <button class="primary" id="clr-ok">馴れを選ぶ</button>
+  <button class="primary" id="clr-ok">恩寵を選ぶ</button>
 </div></div>
 
 <!-- ============ 操作説明 / 凡例 ============ -->
-<!-- 倉庫の装備を誰に着せるか。還りがいないときは出さない（1択の選択肢は選択ではない） -->
+<!-- 倉庫の装備を誰に着せるか。プレイヤーがいないときは出さない（1択の選択肢は選択ではない） -->
 <div class="modal" id="m-wear"><div class="box" style="text-align:left">
   <h1 id="wear-title" style="text-align:center">誰に装備させる</h1>
   <p class="sub" id="wear-sub" style="text-align:center"></p>
@@ -710,7 +786,7 @@
     <div class="row"><span class="k">移動</span><span>画面をドラッグ<br><span style="color:var(--dim);font-size:11px">操作はこれだけ</span></span></div>
     <div class="row"><span class="k">攻撃</span><span><b>自動</b><br><span style="color:var(--dim);font-size:11px">緑の点線＝攻撃範囲。<br>その中に敵が入ると自動で斬る</span></span></div>
     <div class="row"><span class="k">アイテム</span><span><b>自動で拾う</b><br><span style="color:var(--dim);font-size:11px">上を通るだけ</span></span></div>
-    <div class="row"><span class="k">ガード</span><span><b style="color:#8fc7ff">画面の右側を押さえる</b><br><span style="color:var(--dim);font-size:11px">盾を装備しているときだけ<br>2本目の指でもOK（移動しながら可）</span></span></div>
+    <div class="row"><span class="k">ガード</span><span><b style="color:#8fc7ff">左下の🛡を押さえている間</b><br><span style="color:var(--dim);font-size:11px">離すと解ける。移動しながらでも押せる<br>盾を装備していないときは灰色（押しても何も起きない）</span></span></div>
     <div class="row"><span class="k">持ち物</span><span>右上の🎒<br><span style="color:var(--dim);font-size:11px">探索中でも装備を替えられる<br>（開くとゲームは停止）</span></span></div>
     <div class="row"><span class="k">階段</span><span>乗ると出るボタンをタップ</span></div>
     <div class="row"><span class="k">キーボード</span><span>WASD / Shift ガード<br>I 持ち物 / E 階段</span></div>
@@ -718,7 +794,7 @@
 
   <h2>盾とパリイ</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
-    ・押さえている間はガード。盾の性能に応じて被ダメージを減らす。<br>
+    ・<b>🛡を押さえている間だけ</b>ガード。離せば解ける。盾の性能に応じて被ダメージを減らす。<br>
     ・<b style="color:#ffe08a">敵の攻撃が当たる瞬間に押す</b>と<b style="color:#ffe08a">パリイ</b>。
       攻撃が消滅し、盾も減らない。押しっぱなしでは発生しない。<br>
     ・ガード中は<b>移動が鈍る</b>。この game では移動が回避なので、これが代償。<br>
@@ -757,7 +833,7 @@
     追加属性（業火・雷光・氷結）が乗っていると、主属性の形の上にその色の粒が重なります。
   </div>
 
-  <h2>ボスと馴れ</h2>
+  <h2>ボスと恩寵</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     ・<b>5階層ごとにボス</b>。10の倍数は<b style="color:#ffd06a">大ボス</b>、
       それ以外の5の倍数は<b style="color:#d6b34a">中ボス</b>。<br>
@@ -772,45 +848,45 @@
       <span style="color:#ff9a5a">波動</span>＝広がる輪（<b>内側に入る</b>）<br>
     ・範囲攻撃も<b style="color:#8fc7ff">パリイ</b>できる。構えた瞬間だけ。<br>
     ・HPが半分を切ると<b style="color:#ff7050">激昂</b>。速くなり、<b>技が1つ増える</b>。<br>
-    ・撃破すると<b style="color:#d6b34a">馴れ</b>を3つ提示され、1つ選ぶ。
+    ・撃破すると<b style="color:#d6b34a">恩寵</b>を3つ提示され、1つ選ぶ。
       効果は<b>そのキャラが死ぬまで</b>続き、街に戻っても消えない。<br>
-    ・同じ馴れを選び直すと<b>重ねがけ</b>になる。<br>
+    ・同じ恩寵を選び直すと<b>重ねがけ</b>になる。<br>
     ・<b>第50階層</b>には<b style="color:#ff9a5a">初めの供物</b>がいる。倒しても階層は続く。<br>
-    ・馴れは<b>誰に与えるかを選べる</b>（あなた／還り）。
+    ・恩寵は<b>誰に与えるかを選べる</b>（あなた／プレイヤー）。
   </div>
 
   <h2>ユニークな敵</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     ・<b style="color:#c07fe0">紫の輪</b>と固有の名前を持つ一体が、まれに道中に紛れている。<br>
-    ・エリートより強く、中ボスよりは弱い。<b>倒すと馴れが確定で手に入る。</b><br>
+    ・エリートより強く、中ボスよりは弱い。<b>倒すと恩寵が確定で手に入る。</b><br>
     ・<b>階段は塞がない</b>ので、勝てないと思ったら無視して降りてよい。<br>
     ・ミニマップに紫の点で出る。
   </div>
 
-  <h2>還り</h2>
+  <h2>プレイヤー</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     ・道中に<b style="color:#ffd06a">？</b>の付いた人影がいる。<b>タップか足元のボタン</b>で
       能力を見てから加入を決める。<br>
     ・<b>名前は一人ひとり違います。</b>同じジョブでも別人です。<br>
-    ・<b>加入時点で馴れを持っていることがあります。</b>
+    ・<b>加入時点で恩寵を持っていることがあります。</b>
       あなたのレベルが高いほど、数もレア度も上がります。
       <span style="font-size:11px">加入前の画面に出るので、見てから決められます。</span><br>
-    ・良い馴れと良い装備を抱えた者には<b>二つ名</b>が付きます
+    ・良い恩寵と良い装備を抱えた者には<b>二つ名</b>が付きます
       （<span style="color:#7fe0c0">見習いの → 腕利きの → 高名な → 伝説の</span>）。
       <span style="font-size:11px">中身から計算しているので、育てば二つ名も上がります。</span><br>
     ・<b>最大3名</b>。武器種はジョブごとに固定で、能力はあなたより一段弱い。<br>
     ・指示は出せない（操作は移動だけ）。勝手に追ってきて勝手に戦う。<br>
-    ・還りが増えると<b>経験値は頭数で分配</b>される。ただし総量は人数ぶん少し増える。<br>
+    ・プレイヤーが増えると<b>経験値は頭数で分配</b>される。ただし総量は人数ぶん少し増える。<br>
     ・倒れると失われる。<b>1人につき1回だけ</b>広告で蘇生できるが、
       <b>Lv.1</b>に戻り装備をランダムに失う。<br>
-    ・還りはあなたに属している。<b>あなたが死ねば全員失われる</b>。<br>
+    ・プレイヤーはあなたに属している。<b>あなたが死ねば全員失われる</b>。<br>
     ・あなたの<b>足跡を辿って</b>ついてきます（壁で置いていかれません）。<br>
     ・HPが減ると<b>自分から退きます</b>。ジョブごとに引き際と<b>回避率</b>が違います
       （盗賊は<b style="color:#d6b34a">回避32%</b>で、薄い装備のまま前に出られます）。<br>
-    ・<b style="color:#7fe0c0">僧侶は後衛</b>です。近接の還りがいるあいだはその後ろに陣取り、
+    ・<b style="color:#7fe0c0">僧侶は後衛</b>です。近接のプレイヤーがいるあいだはその後ろに陣取り、
       <b>攻撃には参加しません</b>（祈りの回復は続きます）。<br>
-    ・街の<b>支度「還りの練度」</b>で、還り全員の能力が上がります。
-      <span style="font-size:11px">口座側の強化なので、これから拾う還りにも効きます。</span>
+    ・街の<b>能力強化「プレイヤーの練度」</b>で、プレイヤー全員の能力が上がります。
+      <span style="font-size:11px">口座側の強化なので、これから拾うプレイヤーにも効きます。</span>
   </div>
 
   <h2>道中のイベント</h2>
@@ -819,14 +895,14 @@
     どれも<b>「やるか、やめるか」の一択</b>で、得だけの物はありません。<b>無視して降りるのも常に正解です。</b><br>
     📦 <b style="color:#d6b34a">忘れられた荷</b>：装備3点。開けると敵が湧く<br>
     ⛲ <b style="color:#7fe0c0">癒しの泉</b>：全員全快。ただしこの階層の敵が速くなる<br>
-    🕯️ <b style="color:#c98adf">古びた祭壇</b>：最大HPの10%を永久に払い、3つの馴れから1つを選ぶ<br>
+    🕯️ <b style="color:#c98adf">古びた祭壇</b>：最大HPの10%を永久に払い、3つの恩寵から1つを選ぶ<br>
     🏺 <b style="color:#e0705a">賭博の壺</b>：未鑑定品を賭けて55%でレア度が1段階上がる
   </div>
 
   <h2>踏破済みの階層</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     最深到達より<b>4階層以上 浅い</b>ところは「踏破済」になり、
-    <b style="color:#7fe0c0">移動速度が1.45倍</b>になります（還りも一緒に速くなります）。<br>
+    <b style="color:#7fe0c0">移動速度が1.45倍</b>になります（プレイヤーも一緒に速くなります）。<br>
     一度きちんと抜けた場所を、毎回同じ速度で歩き直す必要はないからです。
   </div>
 
@@ -834,8 +910,8 @@
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     敵が<b style="color:#8fd8ff">◆欠片</b>を落とします。<b>拾った瞬間に貯まる</b>ので、
     そのあと死んでも失いません。<br>
-    欠片は<b>支度</b>の対価です（金では買えません）。<br>
-    どんなに酷い死に方をしても、潜った時間は必ず支度に変わります。<br>
+    欠片は<b>能力強化</b>の対価です（金では買えません）。<br>
+    どんなに酷い死に方をしても、潜った時間は必ず能力強化に変わります。<br>
     <span style="font-size:11px">エリート・ユニーク・ボスほど多く落とし、深いほど増えます。</span>
   </div>
 
@@ -847,7 +923,7 @@
     <span style="font-size:11px">
       飢餓（階段回復が効かない → 欠片+60%）/ 奔流（敵が速い → 黒鉄+80%）/
       重圧（最大HP-25% → 発見力+60）/ 静寂（大技が使えない → 経験値+50%）/
-      孤独（還りなし → 金+100%）/ 薄氷（被ダメージ+40% → 欠片・金+40%）/
+      孤独（プレイヤーなし → 金+100%）/ 薄氷（被ダメージ+40% → 欠片・金+40%）/
       アビスの呼び声（敵のレベル+4 → 全報酬+30%）</span><br><br>
     <b style="color:#e0705a">潜った時点で確定し、途中では外せません。</b><br>
     <span style="font-size:11px">デイリー報酬のような「得だけの物」は置かない方針なので、
@@ -868,7 +944,7 @@
     セットできるのは<b>1つだけ</b>。探索中は画面右下の丸ボタンで発動します。<br>
     <span style="font-size:11px">震撼（周囲を殴る）/ 瞬歩（跳んで無敵）/ 業火（前方へ炎）/
       守護（全員の被ダメージ減）/ 崩落（画面内すべて）</span><br><br>
-    技レベルは<b style="color:#8fd8ff">欠片</b>で上げられます（街 → 支度）。
+    技レベルは<b style="color:#8fd8ff">欠片</b>で上げられます（街 → 能力強化）。
     威力が上がり、<b>リキャストも短くなります</b>。<br>
     <span style="font-size:11px">操作は移動だけ、という原則の唯一の例外です。だから枠は1つ、
       リキャストは20〜40秒、狙いを付ける操作はありません。増えるのは「ここで切るかどうか」の判断だけです。</span>
@@ -901,19 +977,19 @@
   <h2>ジョブ一覧 <span style="color:var(--dim);font-weight:400;font-size:11px">固有スキルと Lv.10/20/30 で覚える技</span></h2>
   <div class="card" id="joblist" style="font-size:11px;line-height:1.7"></div>
 
-  <h2>還りの成長と装備</h2>
+  <h2>プレイヤーの成長と装備</h2>
   <div class="card" style="text-align:left;line-height:1.9">
-    還りは <b>Lv.10 / 20 / 30 / 40 / 50</b> で専用技を1つずつ覚えます（最大5つ）。<br>
+    プレイヤーは <b>Lv.10 / 20 / 30 / 40 / 50</b> で専用技を1つずつ覚えます（最大5つ）。<br>
     <span style="font-size:11px">攻撃力や被ダメージ軽減のほか、パーティ全員に掛かる技もあります。</span><br>
     <b style="color:#7fe0c0">Lv.50 の技はジョブごとの大技</b>で、リキャストを経て自動で出ます。<br>
     <span style="font-size:11px">回転斬り・守護陣・五月雨・焦土・幻影・恩寵・聖域・三重召喚・崩落。
       操作は移動だけという原則を崩さないため、ボタンは増やしていません。</span><br><br>
     <b>装備を付け替えられます。</b>街なら倉庫から、探索中なら持ち物から。<br>
     <span style="font-size:11px">武器はジョブの武器種のみ（狩人に大剣は持たせられません）。防具は自由です。
-      街の「還り」欄か、探索中は持ち物画面の還りをタップしてください。</span><br><br>
+      街の「プレイヤー」欄か、探索中は持ち物画面のプレイヤーをタップしてください。</span><br><br>
     <b>大ボスを倒すと新しいジョブが現れるようになります。</b><br>
     <span style="font-size:11px">聖騎士・召喚士・大魔導士。既存のジョブより派手なぶん、出現率は低めです。</span><br><br>
-    倒れた還りの広告蘇生は、<b>5階進むごとに権利が戻ります</b>。
+    倒れたプレイヤーの広告蘇生は、<b>5階進むごとに権利が戻ります</b>。
   </div>
 
   <h2>階段の見つけ方</h2>
@@ -930,7 +1006,7 @@
 
   <h2>黒鉄と打ち直し</h2>
   <div class="card" style="text-align:left;line-height:1.9">
-    ダンジョンの各階層に <b>鉱脈</b> がランダムに 1〜3 ヶ所あります（ミニマップにも出ます）。<br>
+    アビスの各階層に <b>鉱脈</b> がランダムに 1〜3 ヶ所あります（ミニマップにも出ます）。<br>
     近づいて <b>掘る</b>と黒鉄が手に入りますが、<b>掘っているあいだは動けません</b>。
     移動すると中断し、殴られても中断します。<br>
     <span style="font-size:11px">深さで等級が変わります：
@@ -942,21 +1018,21 @@
     <span style="font-size:11px">欠片は「潜った時間そのものの対価」なので絶対に失いません。
     黒鉄は「持ち帰るという判断の対価」なので失います。だから引き返す判断が生まれます。</span><br><br>
     <b>装備中の武器</b>を、黒鉄＋ゴールドで <b>+10</b> まで鍛えられます。<br>
-    ・街の<b>打ち直し所</b>＝口座のゴールド。定価（鍛冶場のレベルで割引）<br>
-    ・道中の<b>炉</b>（鉱脈とは別の場所にある）＝そのランで拾ったゴールド。<b>1.5倍</b><br>　<span style="font-size:11px">炉では<b>黒鉄で装備をまとめて修理</b>もできます（武器・防具・盾・装飾品。等級は問いません）。還りのぶんも。</span><br>
+    ・街の<b>鍛冶屋</b>＝口座のゴールド。定価（鍛冶屋のレベルで割引）<br>
+    ・道中の<b>鍛冶場</b>（鉱脈とは別の場所にある）＝そのランで拾ったゴールド。<b>1.5倍</b><br>　<span style="font-size:11px">鍛冶場では<b>黒鉄で装備をまとめて修理</b>もできます（武器・防具・盾・装飾品。等級は問いません）。プレイヤーのぶんも。</span><br>
     <span style="font-size:11px">道中の金はどのみち死ねば消えます。今叩くか、持ち帰って安く叩くかの判断です。</span><br><br>
     <b>+3・+6・+9</b> でランダムに<b>技</b>が1つ付きます（武器種に合う物だけが出ます）。<br>
     <span style="font-size:11px">疾撃（攻撃速度）/ 遠間（範囲）/ 連撃（もう一撃）/ 大振り（扇）/
       貫き（貫通）/ 鋭刃（会心）/ 重打（威力↑速度↓）/ 吸命 / 堅牢（耐久）/ 熾火・走雷・凍て（属性）</span><br><br>
     <span style="color:#e0705a">鍛えた武器も、装備したまま死ねば他の装備と同じく失われます。</span>
-    <span style="font-size:11px">道中の炉が割高なのは、それでも「今使う」ほうが得な場面を作るためです。</span>
+    <span style="font-size:11px">道中の鍛冶場が割高なのは、それでも「今使う」ほうが得な場面を作るためです。</span>
   </div>
 
   <h2>広告でできること</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     ・街の<b>ガチャ</b>：持ち込む武器か護符が手に入る（<b>1日5回</b>まで）<br>
-    ・還りが倒れたとき：<b>蘇生</b>（Lv.1・装備ランダムロスト／1人1回だけ）<br>
-    ・<b>階段で「全員回復」</b>：あなたと還りのHPが全快する
+    ・プレイヤーが倒れたとき：<b>蘇生</b>（Lv.1・装備ランダムロスト／1人1回だけ）<br>
+    ・<b>階段で「全員回復」</b>：あなたとプレイヤーのHPが全快する
       （<b>1回の探索につき2回</b>まで・探索ごとに戻る）<br>
     <span style="font-size:11px">回復の回数を絞っているのは、消耗が積み上がるからこそ
     「引き返すか、もう1階降りるか」の判断が生まれるからです。休憩ではなく手札として使ってください。</span>
@@ -990,11 +1066,11 @@
   <h2>ルール</h2>
   <div class="card" style="font-size:12px;line-height:1.8;color:var(--dim)">
     ・敵の周りに<b style="color:#ff7050">赤い輪</b>が広がったら攻撃の予兆。歩いて離れる。<br>
-    ・街では<b>支度</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
+    ・街では<b>能力強化</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
     ・<b style="color:#d6b34a">生きて帰ると帰還報酬</b>がもらえる。深いところから戻るほど大きい。<br>
-    ・その金で<b>街開発</b>（鍛冶場・酒場・祭壇・商館）を進められる。
-      支度がキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
-    　とくに<b style="color:#d6b34a">祭壇</b>は、死んだときに<b>馴れを次のキャラへ引き継ぐ</b>。<br>
+    ・その金で<b>街開発</b>（鍛冶屋・酒場・祭壇・商館）を進められる。
+      能力強化がキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
+    　とくに<b style="color:#d6b34a">祭壇</b>は、死んだときに<b>恩寵を次のキャラへ引き継ぐ</b>。<br>
     ・装備には<b>耐久</b>がある。0になると<b>破損</b>して性能を完全に失う。道具屋で修理できる。<br>
     ・残り25%を切ると<b style="color:#ffb08a">画面下に警告</b>が出っぱなしになる。
       壊れた瞬間は<b style="color:#e0705a">画面が橙に光ってバナー</b>が出る。<br>
@@ -1036,7 +1112,7 @@
   <p class="sub" id="d-body"></p>
   <div class="lost" id="d-lost"></div>
   <div style="height:16px"></div>
-  <button id="d-ad" style="display:none">広告を見て馴れを1つ引き継ぐ</button>
+  <button id="d-ad" style="display:none">広告を見て恩寵を1つ引き継ぐ</button>
   <div style="height:8px"></div>
   <button class="danger" id="d-ok">新しい冒険者で再開</button>
 </div></div>
@@ -1405,8 +1481,8 @@ const SUFFIX=[
   {id:'rFrost',nm:'耐氷',  stat:'resFrost',r:[8,20]},
   /* 大技のリキャスト短縮。
      ここまで大技を短くする手が**技レベル（欠片）だけ**だった。
-     装備でも馴れでも触れないので、「大技を軸に組む」という遊び方が作れなかった。
-     装備・馴れ・還りの3方向から詰められるようにする。 */
+     装備でも恩寵でも触れないので、「大技を軸に組む」という遊び方が作れなかった。
+     装備・恩寵・プレイヤーの3方向から詰められるようにする。 */
   {id:'haste', nm:'早鐘',  stat:'ultCdr',  r:[5,12]},
 ];
 const STATNM={dmgPct:'物理ダメージ +%v%',aspdPct:'攻撃速度 +%v%',hp:'最大HP +%v',msPct:'移動速度 +%v%',
@@ -1445,6 +1521,19 @@ function rollRarity(ilvl, mf){
 /* スロットごとの出現比。ベース種の数が増えても比率が崩れないよう、
    先にスロットを抽選してからその中のベースを選ぶ。 */
 const SLOT_WEIGHT = [[SLOT.W,28],[SLOT.S,14],[SLOT.A,34],[SLOT.C,24]];
+/* ---------- 最初の1階だけの手心 ----------
+   初回は素手で始まる。武器の出現比は 28/100 しかないので、
+   1階を丸ごと素手で歩く回りが普通に起きる。**そこが一番投げられる場所**で、
+   「殴れない」と「弱い」の区別がつかないまま終わる。
+
+   条件を狭く取ってあるのが肝。**1回目の探索の・第1階層で・まだ武器を
+   装備していないとき**だけ。武器を1本でも構えた時点で普通の配分に戻る。
+   ここを広げると、拾える物が武器ばかりの単調な床になる。 */
+const EARLY_ARM_MUL = 2.6;      // 武器スロットの比重
+function earlyArming(){
+  return !!(S.run && S.run.depth===1 && S.runs<=1
+            && S.hero && S.hero.equip && !S.hero.equip.weapon);
+}
 function pickBase(ilvl){
   /* 遺物「求道」。いま握っている武器種が出やすくなる。
      熟練（武器種ごとに育つ）と噛み合わせてある——
@@ -1455,7 +1544,9 @@ function pickBase(ilvl){
     if(want && want.ilvl<=Math.max(1,ilvl)) return want;
   }
   const avail = BASES.filter(b=>b.ilvl<=Math.max(1,ilvl));
-  const slots = SLOT_WEIGHT.filter(([s])=>avail.some(b=>b.slot===s));
+  const early = earlyArming();
+  const slots = SLOT_WEIGHT.filter(([s])=>avail.some(b=>b.slot===s))
+    .map(([s,w])=>[s, (early && s===SLOT.W) ? w*EARLY_ARM_MUL : w]);
   const tot = slots.reduce((a,[,w])=>a+w,0);
   let x = rnd()*tot, chosen = slots[0][0];
   for(const [s,w] of slots){ x-=w; if(x<=0){ chosen=s; break; } }
@@ -1477,7 +1568,7 @@ function buildItem(base, rar, ilvl){
   // 盾の軽減率は ilvl で伸ばさない（上限が壊れるので、盾種そのものの性能差にする）
   if(base.block) it.block = Math.round(rf(base.block[0],base.block[1]));
   // 耐久は ilvl で少しだけ伸びる
-  // 耐久は ilvl で少し伸び、鍛冶場のレベルでさらに伸びる
+  // 耐久は ilvl で少し伸び、鍛冶屋のレベルでさらに伸びる
   if(base.dur){ it.durMax = Math.round(base.dur*(1+(s-1)*0.25)*durBonus()); it.dur = it.durMax; }
 
   const n = ri(rar.aff[0], rar.aff[1]);
@@ -1501,13 +1592,13 @@ function buildItem(base, rar, ilvl){
 function genItem(ilvl, mf=0){
   return buildItem(pickBase(ilvl), rollRarity(ilvl, mf), Math.max(1,ilvl));
 }
-/* ベースを指定して作る。ジョブごとに武器種が固定されている還りの装備に使う。 */
+/* ベースを指定して作る。ジョブごとに武器種が固定されているプレイヤーの装備に使う。 */
 function genBaseItem(baseId, ilvl, maxRar=1){
   const base = BASES.find(b=>b.id===baseId) || BASES[1];
   let rar = rollRarity(ilvl, 0);
   if(rar.id>maxRar) rar = RARITY[maxRar];
   const it = buildItem(base, rar, Math.max(1,ilvl));
-  it.ident = true;              // 還りの装備は最初から見えている（加入判断の材料）
+  it.ident = true;              // プレイヤーの装備は最初から見えている（加入判断の材料）
   return it;
 }
 /* ---------- 名前の絵文字 ----------
@@ -1555,17 +1646,17 @@ function itemValue(it){
 function isBroken(it){ return it.durMax>0 && it.dur<=0; }
 function repairCost(it){
   if(!it.durMax || it.dur>=it.durMax) return 0;
-  // 鍛冶場のレベルぶん安くなる（街開発）
+  // 鍛冶屋のレベルぶん安くなる（街開発）
   return Math.max(1, Math.ceil(itemValue(it) * (1 - it.dur/it.durMax) * 0.6 * repairDiscount()));
 }
-/* ---------- 炉での修理（黒鉄で払う） ----------
-   街の道具屋は金で直す。炉は黒鉄で直す。財布を分けたのには理由がある。
+/* ---------- 鍛冶場での修理（黒鉄で払う） ----------
+   街の道具屋は金で直す。鍛冶場は黒鉄で直す。財布を分けたのには理由がある。
 
    耐久が切れかけた武器を抱えて深部にいるとき、今までは打つ手が無かった。
    引き返すしかなく、しかもその引き返しは「面白い判断」ではなく
    ただの移動時間だった（壊れると性能を完全に失うので、選ぶ余地もない）。
 
-   炉で直せるようにすると、黒鉄に2つめの使い道ができる。
+   鍛冶場で直せるようにすると、黒鉄に2つめの使い道ができる。
    強化に注ぎ込むか、修理に残しておくか——同じ資源の取り合いになる。
    ここが肝で、修理を金にしてしまうと（道中の金はどうせ死ねば消えるので）
    ただの無料回復になり、何も取り合わない。
@@ -1684,7 +1775,7 @@ function itemSubLine(it){
                   : (RARITY[it.rar].nm+' / 未鑑定');   // ilvl も伏せる（強さのヒントになる）
 }
 
-/* ---------- 支度（アカウント単位。ロストしても消えない成長要素） ---------- */
+/* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
 /* 対価は欠片（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
 const UPGRADES=[
   {id:'hp',    nm:'生命力',   max:8, shard:6,  step:'最大HP +12%',      desc:'倒れにくくなる'},
@@ -1695,15 +1786,15 @@ const UPGRADES=[
   {id:'mf',    nm:'発見力',   max:6, shard:11, step:'発見力 +12',       desc:'良い装備が出やすい'},
   {id:'crit',  nm:'会心',     max:5, shard:11, step:'クリティカル率 +4%',desc:'たまに大ダメージ'},
   {id:'stash', nm:'倉庫拡張', max:6, shard:7,  step:'倉庫スロット +6',  desc:'持ち帰れる量が増える'},
-  /* 還りの練度。ここまでの支度は全部「自分だけ」が伸びる物だったので、
+  /* プレイヤーの練度。ここまでの能力強化は全部「自分だけ」が伸びる物だったので、
      パーティを連れて歩くほど、強化の恩恵から外れる頭数が増えていた。
-     還りは死んで入れ替わるが、この強化は口座側に残る——
-     「今いる還り」ではなく「これから拾う還りも含めた全員」への投資になる。
+     プレイヤーは死んで入れ替わるが、この強化は口座側に残る——
+     「今いるプレイヤー」ではなく「これから拾うプレイヤーも含めた全員」への投資になる。
 
-     還りはプレイヤーを超えない（allyStats の softCap）という線は動かさない。
+     プレイヤーは主人公を超えない（allyStats の softCap）という線は動かさない。
      ここで上がるのはあくまで**そこへ届く速さ**で、上限そのものではない。 */
-  {id:'ally',  nm:'還りの練度', max:6, shard:14,
-   step:'還りの全能力 +6%',  desc:'HP・攻撃・防御・攻速・移動・射程'},
+  {id:'ally',  nm:'プレイヤーの練度', max:6, shard:14,
+   step:'プレイヤーの全能力 +6%',  desc:'HP・攻撃・防御・攻速・移動・射程'},
   /* 遺物の枠。**最初の遺物を手に入れるまで一覧に出さない。**
      持っていない物のための枠を先に見せても、何のことか分からないうえ、
      「開いているのに入れる物が無い枠」を眺めることになる。 */
@@ -1712,14 +1803,14 @@ const UPGRADES=[
 ];
 /* ---------- レリック（遺物） ----------
    ここまでの成長は、どれも「死ぬと消える」か「数字が増える」かのどちらかだった。
-   馴れはキャラが死ねば消え、支度は全部が能力値の底上げで、
+   恩寵はキャラが死ねば消え、能力強化は全部が能力値の底上げで、
    **遊び方そのものを変える物が1つも無かった。**
 
    レリックは死んでもロストしない。そして能力を伸ばすのではなく、
    **その人の戦い方に寄り添う**——剣ばかり使う人には剣が出やすくなり、
-   大技で戦う人には大技が重くなる。馴れに近いが、口座側に永久に残る。
+   大技で戦う人には大技が重くなる。恩寵に近いが、口座側に永久に残る。
 
-   枠は最初 0。試練を1つ越えて初めて1枠目が開く（支度に項目が現れる）。
+   枠は最初 0。試練を1つ越えて初めて1枠目が開く（能力強化に項目が現れる）。
    最大3枠にしてあるのは、全部載せを選べる数にすると
    「どれを付けるか」が消えて、ただの常時効果になるから。 */
 const RELIC_MAX_SLOTS = 3;
@@ -1735,6 +1826,12 @@ const RELICS=[
    desc:'12秒ごとに最大HPの 8% を回復', regenEvery:12, regenPct:8},
   {id:'wisp',  nm:'伴影の遺物', icon:'🜁', col:'#8fd8ff',
    desc:'攻撃してくれる影がひとつ付き従う', wisp:1},
+  /* 鞘無し。恩寵と同じ現象なので、同じ語で呼ぶ——
+     名前だけで「2つは同じ物」だと分かる。
+     引き運に関係なく1本を保証する役で、恩寵はそこに積み増す（合わせて上限3本）。 */
+  {id:'blade', nm:'鞘無しの遺物', icon:'🗡', col:'#cfd6e0',
+   desc:'鞘を失った刃がひとつ、身の回りを回る', note:'恩寵と合わせて最大3本',
+   blade:1},
   {id:'ember', nm:'不滅の遺物', icon:'🜂', col:'#ff9a5a',
    desc:'倒れたとき、1回の探索につき一度だけHP全快で立ち上がる', revive:true},
   {id:'quake', nm:'震撼の遺物', icon:'🜃', col:'#a97fe0',
@@ -1776,17 +1873,22 @@ function relicToggle(id){
   if(i>=0){ S.relicEq.splice(i,1); return; }
   if(S.relicEq.length >= relicSlots()){ log('遺物の枠が足りない'); return; }
   S.relicEq.push(id);
+  // 遺物から生えた1本目も同じように告げる（経路が違うだけで、起きることは同じ）
+  if(S.run && bladeCount()===1 && !S.run.bladeToldOnce){
+    S.run.bladeToldOnce = true;
+    showBanner('鞘無し', '近くの敵を勝手に斬る', '#e8eef6', 3.0);
+  }
 }
 
 /* ---------- 欠片 ----------
-   支度の対価を「金」から「敵が落とす石」に変えるためのもの。
+   能力強化の対価を「金」から「敵が落とす石」に変えるためのもの。
 
    金で買える成長は、結局のところ「上手く帰ってきた回数」の関数でしかない。
    死んだランは丸ごと無駄になり、死んだ瞬間に何も前進していないことになる。
    それが一番モチベーションを削る。
 
    欠片は<b>拾った瞬間に口座へ入る</b>ので、そのあと死んでも残る。
-   どんなに酷い死に方をしても、潜った時間そのものは必ず支度に変わる。
+   どんなに酷い死に方をしても、潜った時間そのものは必ず能力強化に変わる。
    逆に金は「生きて帰らないと1Gも手に入らない」ままにしてある（帰還の価値を残すため）。 */
 function upgCost(u,lv){ return Math.round(u.shard*Math.pow(lv+1,1.35)); }
 function upgLv(id){ return S.upg[id]||0; }
@@ -1814,7 +1916,7 @@ function gainShards(n, x, y){
    「その階から降りられない」という詰みが起きる（実際に起きた）。
 
    個々の生成側で気をつけるのではなく、置く物すべてが通る1つの関数にする。
-   増える物（鉱脈・イベント・炉・還り候補）を足すたびに同じ事故を繰り返さないため。 */
+   増える物（鉱脈・イベント・鍛冶場・プレイヤー候補）を足すたびに同じ事故を繰り返さないため。 */
 const STAIR_CLEAR = 3.0;     // 階段からこの距離までは何も置かない
 function clearOfStair(fl, x, y){
   return Math.hypot(fl.stair.x - x, fl.stair.y - y) >= STAIR_CLEAR;
@@ -1844,7 +1946,7 @@ function pickSpot(fl, tries){
    同じ間取りでも「どこを通るか」が毎回変わる。
 
    だから壁にはしない。全部「通れるが代償がある」で統一する。
-   そして敵にも同じだけ効かせる——プレイヤーだけが損をする仕掛けは、
+   そして敵にも同じだけ効かせる——主人公だけが損をする仕掛けは、
    避けるだけの作業になって判断にならない。敵を溶岩へ誘い込めるなら、
    ハザードは武器にもなる。 */
 const HAZARDS={
@@ -1905,7 +2007,7 @@ function hazardAt(x,y){
 }
 
 /* ---------- 黒鉄と武器の打ち直し ----------
-   欠片が「キャラの外側（支度）」を伸ばすのに対して、
+   欠片が「キャラの外側（能力強化）」を伸ばすのに対して、
    黒鉄は「今この1本の武器」を伸ばす。役割をはっきり分けてある。
 
    狙いは、拾った装備が使い捨てにならないこと。
@@ -1931,7 +2033,7 @@ function orePurse(id, mid){ return mid ? oreRun(id) : oreHave(id); }
      欠片 = 潜った時間そのものの対価。だから絶対に失わせない。
      黒鉄 = 持ち帰るという判断の対価。だから死ねば失う。
    両方を安全側にすると「深く潜って引き返す」という判断そのものが消える。
-   道中の炉が割高でも使われるのは、この「今使うか、持ち帰るか」があるからでもある。 */
+   道中の鍛冶場が割高でも使われるのは、この「今使うか、持ち帰るか」があるからでもある。 */
 function oreRun(id){ return (S.run && S.run.ore && S.run.ore[id]) || 0; }
 function oreRunTotal(){
   if(!S.run || !S.run.ore) return 0;
@@ -1974,16 +2076,16 @@ function spawnOres(fl, depth){
   return out;
 }
 
-/* ---------- 道中の炉 ----------
-   以前は「掘り尽くした鉱脈がそのまま炉になる」形だった。手触りが悪い。
+/* ---------- 道中の鍛冶場 ----------
+   以前は「掘り尽くした鉱脈がそのまま鍛冶場になる」形だった。手触りが悪い。
    掘った直後に同じ場所で叩けてしまうので、黒鉄は財布から出してすぐ使う小銭でしかなく、
    「死ねば失う物を抱えて歩いている」という時間が一秒も生まれない。
 
-   炉を鉱脈から切り離すと、掘ってから叩くまでに距離ができる。
+   鍛冶場を鉱脈から切り離すと、掘ってから叩くまでに距離ができる。
    その距離のあいだ、黒鉄は「まだ何にもなっていない、失うかもしれない物」でいられる。
-   そして炉が出ない階もある。だから「今は使えない。持って帰るか、もう一階探すか」
-   という判断が戻ってくる。運ぶ距離こそがこの仕掛けの本体で、炉はその終点にすぎない。 */
-const FORGE_CHANCE    = 0.30;   // 1階層に炉がある確率
+   そして鍛冶場が出ない階もある。だから「今は使えない。持って帰るか、もう一階探すか」
+   という判断が戻ってくる。運ぶ距離こそがこの仕掛けの本体で、鍛冶場はその終点にすぎない。 */
+const FORGE_CHANCE    = 0.30;   // 1階層に鍛冶場がある確率
 const FORGE_MIN_DEPTH = 3;      // 序盤には出さない。強化より先に戦い方を覚えてほしい
 const FORGE_ORE_CLEAR = 6.0;    // 鉱脈のすぐ隣には置かない（運ぶ距離が消えるため）
 function spawnForge(fl, depth, ores){
@@ -2100,13 +2202,13 @@ function upSkills(it){ return ((it&&it.ups)||[]).map(upSkillDef).filter(Boolean)
 function upGrade(lv){ return lv<3 ? 'raw' : lv<7 ? 'fine' : 'deep'; }
 function upOreCost(lv){ return Math.round(2 + lv*1.6); }
 /* 金は装備の価値に比例させる。良い武器ほど育てるのが重い（自動でバランスが取れる）。
-   鍛冶場（街開発）のレベルぶん安くなる。 */
+   鍛冶屋（街開発）のレベルぶん安くなる。 */
 function upGoldCost(it, lv, mid){
   // 下限を先に掛けてから割増を乗せる。逆にすると安い武器で割増が消えてしまう。
   const base = Math.max(10, Math.round(itemValue(it) * 0.35 * Math.pow(lv+1, 1.25) * repairDiscount()));
   return mid ? Math.round(base * FORGE_MID_MARKUP) : base;
 }
-const FORGE_MID_MARKUP = 1.5;   // 道中の炉は割高（帰る理由を消さないため）
+const FORGE_MID_MARKUP = 1.5;   // 道中の鍛冶場は割高（帰る理由を消さないため）
 function upgradable(it){ return !!(it && it.slot===SLOT.W && it.ident); }
 function upCheck(it, mid){
   if(!upgradable(it))       return {ok:false, why:'鍛えられるのは鑑定済みの武器だけ'};
@@ -2144,22 +2246,22 @@ function doUpgrade(it, mid){
 }
 
 /* ---------- 街開発 ----------
-   支度が「キャラの数字」を伸ばすのに対し、こちらは「ループそのもの」を良くする。
+   能力強化が「キャラの数字」を伸ばすのに対し、こちらは「ループそのもの」を良くする。
    帰ってくる理由が『倉庫に置く』しか無いと、帰還がただの作業になる。
    帰るたびに街が育っていくなら、帰る行為自体が前進になる。
 
    だから効果は全部「次の探索が楽になる」方向に寄せてある。
-   キャラのステータスは一切上げない（そこは支度の担当）。 */
+   キャラのステータスは一切上げない（そこは能力強化の担当）。 */
 const BUILDINGS=[
-  {id:'forge', nm:'鍛冶場', icon:'🔨', max:3, base:140,
+  {id:'forge', nm:'鍛冶屋', icon:'🔨', max:3, base:140,
    step:lv=>'修理費 -'+(lv*20)+'%　装備の耐久上限 +'+(lv*12)+'%',
    desc:'壊れにくくなり、直すのも安くなる'},
   {id:'tavern',nm:'酒場',   icon:'🍺', max:3, base:170,
-   step:lv=>'還りの出現率 +'+(lv*12)+'%　レベル差 -'+lv,
-   desc:'腕の立つ還りが集まるようになる'},
+   step:lv=>'出現率 +'+(lv*12)+'%　レベル差 -'+lv+'　雇用費 -'+(lv*10)+'%',
+   desc:'腕の立つ者が集まり、安く雇えるようになる'},
   {id:'altar', nm:'祭壇',   icon:'🕯️', max:3, base:260,
-   step:lv=>'死亡時、馴れを '+lv+' つ次のキャラへ引き継ぐ',
-   desc:'積み上げた馴れが完全には消えなくなる'},
+   step:lv=>'死亡時、恩寵を '+lv+' つ次のキャラへ引き継ぐ',
+   desc:'積み上げた恩寵が完全には消えなくなる'},
   {id:'market',nm:'商館',   icon:'⚖️', max:3, base:150,
    step:lv=>'売値 +'+(lv*15)+'%　道具屋の品揃え +'+lv,
    desc:'持ち帰った物の価値が上がる'},
@@ -2171,10 +2273,10 @@ function repairDiscount(){ return 1 - bldLv('forge')*0.20; }
 function durBonus(){       return 1 + bldLv('forge')*0.12; }
 function npcChanceBonus(){ return 1 + bldLv('tavern')*0.12; }
 function allyLevelGapCut(){return bldLv('tavern'); }
-/* 死んだとき次のキャラへ渡せる馴れの数。
-   祭壇（街開発）＋継承の馴れ＋死亡時に広告を見たぶん。
+/* 死んだとき次のキャラへ渡せる恩寵の数。
+   祭壇（街開発）＋継承の恩寵＋死亡時に広告を見たぶん。
 
-   ただし **積み上げた馴れの半分まで**。
+   ただし **積み上げた恩寵の半分まで**。
    ここに線が無いと、継承を重ねた時点で「死んでも何も失わない」状態が作れてしまい、
    潜る／引き返すの判断ごと消える。死は必ず何かを持っていく。 */
 function boonsInherited(){
@@ -2241,12 +2343,12 @@ function pruneGrave(){
    ただの持ち込みバフで、引いた瞬間に得が確定し、そこで話が終わっていた。
 
    持ち主を1人に絞ると、同じ護符が毎回ちがう問いになる:
-   疾風を自分に付ければ逃げ足が伸びる、置いていかれがちな重装の還りに付ければ
+   疾風を自分に付ければ逃げ足が伸びる、置いていかれがちな重装のプレイヤーに付ければ
    隊列が保つ。加護を前に出る盗賊に付けるか、集中砲火を浴びる自分に付けるか。
    ——渡す先を選べることが、護符に中身を与えている。
 
-   c.owner: null＝プレイヤー / 数値＝その還りの uidA。
-   還りを失うと、その還りが持っていた護符も一緒に失われる（装備と同じ扱い）。 */
+   c.owner: null＝主人公 / 数値＝そのプレイヤーの uidA。
+   プレイヤーを失うと、そのプレイヤーが持っていた護符も一緒に失われる（装備と同じ扱い）。 */
 const CHARMS=[
   {id:'heal',  nm:'治癒の護符', desc:'HPが30%を切ると1度だけ全回復', heal:true},
   {id:'guard', nm:'加護の護符', desc:'被ダメージ -20%',   dr:20},
@@ -2263,7 +2365,7 @@ function charmsOf(h){
   return h===S.hero ? list.filter(c=>c.owner==null)
                     : list.filter(c=>c.owner===h.uidA);
 }
-/* 護符の持ち主（表示用）。持ち主が居なくなっていたらプレイヤーに戻す。 */
+/* 護符の持ち主（表示用）。持ち主が居なくなっていたら主人公に戻す。 */
 function charmHolder(c){
   if(c.owner==null) return S.hero||null;
   return party().find(p=>p.uidA===c.owner) || null;
@@ -2272,13 +2374,13 @@ function charmHolderName(c){
   const h=charmHolder(c);
   return (!h || h===S.hero) ? '自分' : h.name;
 }
-/* 渡す / 引き取る。渡せるのは生きている還りだけ。 */
+/* 渡す / 引き取る。渡せるのは生きているプレイヤーだけ。 */
 function giveCharm(c, a){
   if(!c) return false;
   c.owner = (a && a!==S.hero && !a.dead) ? a.uidA : null;
   return true;
 }
-/* 失われた還りが持っていた護符も一緒に消える。装備と同じ扱いにしないと、
+/* 失われたプレイヤーが持っていた護符も一緒に消える。装備と同じ扱いにしないと、
    「死ぬ直前に全部持たせておけば無傷」という抜け道になる。 */
 function dropCharmsOf(a){
   if(!S.run || !a) return [];
@@ -2322,22 +2424,22 @@ function refreshGacha(){
   return S.gachaLeft;
 }
 
-/* ---------- 馴れ（ボス撃破報酬） ----------
+/* ---------- 恩寵（ボス撃破報酬） ----------
    5階層ごとのボスを倒すと 3 択で 1 つ選ぶ。効果は「そのキャラが死ぬまで」続くので、
    街に戻っても消えない。長生きしたキャラが確かに強くなる、を数字で成立させる部分。
-   同じ馴れを選び直すと重ねがけになる。 */
+   同じ恩寵を選び直すと重ねがけになる。 */
 const AVENGE_SECONDS = 20;    // 弔いが続く秒数
-const RENEW_EVERY    = 6;     // 再生の馴れが脈打つ間隔（秒）
+const RENEW_EVERY    = 6;     // 再生の恩寵が脈打つ間隔（秒）
 const KIN_CD         = 2.0;   // 眷属が撃つ間隔（秒）
 const KIN_RANGE      = 6.0;   // 眷属の射程（マス）
 
-/* ---------- 馴れのレア度 ----------
-   同じ「剛力の馴れ」でも +8% と +44% では別物になる。
+/* ---------- 恩寵のレア度 ----------
+   同じ「剛力の恩寵」でも +8% と +44% では別物になる。
    以前は効き目が出所（中ボスか大ボスか）だけで決まっていたので、
    同じボスからは毎回同じ強さの物しか出ず、引く楽しみが無かった。
 
    3択それぞれが個別にレア度を引く。だから
-   「エピックの微妙な馴れ」と「コモンの噛み合う馴れ」を天秤にかけることになる。
+   「エピックの微妙な恩寵」と「コモンの噛み合う恩寵」を天秤にかけることになる。
    —— これが無いと、3択は「一番強い数字を押す」だけの作業になる。 */
 const BOON_RAR=[
   {id:'common',   nm:'コモン',     col:'#c8ced9'},
@@ -2363,67 +2465,117 @@ const BOON_SRC={
   altar: {w:[30,36,26,8],  floor:0},
 };
 
-const BOONS=[
-  {id:'hp',    nm:'生命の馴れ',  v:[10,20,34,52], fmt:'最大HP +%v%'},
-  {id:'atk',   nm:'剛力の馴れ',  v:[8,17,28,44],  fmt:'攻撃力 +%v%'},
-  {id:'aspd',  nm:'迅速の馴れ',  v:[7,14,22,34],  fmt:'攻撃速度 +%v%'},
-  {id:'ms',    nm:'韋駄天の馴れ',v:[6,12,19,29],  fmt:'移動速度 +%v%'},
-  {id:'crit',  nm:'鋭利の馴れ',  v:[5,10,17,26],  fmt:'クリティカル率 +%v%'},
-  {id:'range', nm:'遠見の馴れ',  v:[8,17,27,42],  fmt:'攻撃範囲 +%v%'},
-  {id:'leech', nm:'吸血の馴れ',  v:[3,5,9,14],    fmt:'HP吸収 +%v%'},
-  {id:'dr',    nm:'不屈の馴れ',  v:[5,10,17,26],  fmt:'被ダメージ -%v%'},
-  {id:'def',   nm:'剛体の馴れ',  v:[12,26,44,68], fmt:'防御 +%v%'},
-  {id:'mf',    nm:'探求の馴れ',  v:[18,36,62,95], fmt:'発見力 +%v'},
-  {id:'fire',  nm:'業火の馴れ',  v:[7,15,27,42],  fmt:'追加 炎ダメージ +%v'},
-  {id:'shock', nm:'雷光の馴れ',  v:[7,15,27,42],  fmt:'追加 雷ダメージ +%v'},
-  {id:'frost', nm:'氷結の馴れ',  v:[7,15,27,42],  fmt:'追加 冷気ダメージ +%v'},
-  {id:'ail',   nm:'侵蝕の馴れ',  v:[22,45,76,115],fmt:'状態異常の蓄積 +%v%'},
-  {id:'regen', nm:'治癒の馴れ',  v:[16,30,48,72], fmt:'階層を降りるとHP %v% 回復'},
-  /* 弔い。還りを失った直後だけ牙が生える。
+/* ---------- 鞘無し（周回刃） ----------
+   本数は「恩寵で拾った数 ＋ 遺物のぶん」。**遺物込みで上限3本。**
+   遺物は引き運に関係なく1本を保証する役で、恩寵はそこに積み増す。
 
-     この馴れだけ、他と性格がちがう。ほかは「常に効いている」が、
+   回転速度がそのまま攻撃速度になる。判定は「その刃がその敵を最後に斬った時刻」
+   で持つので、1周に1回しか当たらない——速く回るほど手数が増える、が素直に成立する。 */
+const BLADE_MAX = 3;             // 遺物込みの上限
+const BLADE_MIN_DEPTH = 10;      // これより浅い階では恩寵に出さない
+const BLADE_R = 1.45;            // 軌道の半径（マス）
+const BLADE_SPIN = 2.2;          // 回転速度（ラジアン/秒）。1周 約2.9秒
+const BLADE_MULT = 0.62;         // 攻撃力に対する1撃の倍率
+const BLADE_HIT_R = 0.42;        // 刃そのものの当たり半径
+
+const BOONS=[
+  {id:'hp',    nm:'生命の恩寵',  v:[10,20,34,52], fmt:'最大HP +%v%'},
+  {id:'atk',   nm:'剛力の恩寵',  v:[8,17,28,44],  fmt:'攻撃力 +%v%'},
+  {id:'aspd',  nm:'迅速の恩寵',  v:[7,14,22,34],  fmt:'攻撃速度 +%v%'},
+  {id:'ms',    nm:'韋駄天の恩寵',v:[6,12,19,29],  fmt:'移動速度 +%v%'},
+  {id:'crit',  nm:'鋭利の恩寵',  v:[5,10,17,26],  fmt:'クリティカル率 +%v%'},
+  {id:'range', nm:'遠見の恩寵',  v:[8,17,27,42],  fmt:'攻撃範囲 +%v%'},
+  {id:'leech', nm:'吸血の恩寵',  v:[3,5,9,14],    fmt:'HP吸収 +%v%'},
+  {id:'dr',    nm:'不屈の恩寵',  v:[5,10,17,26],  fmt:'被ダメージ -%v%'},
+  {id:'def',   nm:'剛体の恩寵',  v:[12,26,44,68], fmt:'防御 +%v%'},
+  {id:'mf',    nm:'探求の恩寵',  v:[18,36,62,95], fmt:'発見力 +%v'},
+  {id:'fire',  nm:'業火の恩寵',  v:[7,15,27,42],  fmt:'追加 炎ダメージ +%v'},
+  {id:'shock', nm:'雷光の恩寵',  v:[7,15,27,42],  fmt:'追加 雷ダメージ +%v'},
+  {id:'frost', nm:'氷結の恩寵',  v:[7,15,27,42],  fmt:'追加 冷気ダメージ +%v'},
+  {id:'ail',   nm:'侵蝕の恩寵',  v:[22,45,76,115],fmt:'状態異常の蓄積 +%v%'},
+  {id:'regen', nm:'治癒の恩寵',  v:[16,30,48,72], fmt:'階層を降りるとHP %v% 回復'},
+  /* 弔い。プレイヤーを失った直後だけ牙が生える。
+
+     この恩寵だけ、他と性格がちがう。ほかは「常に効いている」が、
      これは**一番まずい瞬間にだけ**効く。壁役が落ちて、こちらに矛先が向いて、
      普通なら引くしかない——その数十秒を殴り返す時間に変える。
 
      倍率が高いのは、発動条件が取り返しのつかない損失だから。
-     還りを意図的に見殺しにして稼ぐ、という遊び方は成立しない：
-     消えるのはその還りのレベル・装備・馴れの全部で、
-     新しく拾った Lv.1 の還りを捨てても失った物は戻ってこない。
+     プレイヤーを意図的に見殺しにして稼ぐ、という遊び方は成立しない：
+     消えるのはそのプレイヤーのレベル・装備・恩寵の全部で、
+     新しく拾った Lv.1 のプレイヤーを捨てても失った物は戻ってこない。
      つまりこれは得をする仕掛けではなく、損の上に立ち上がるための仕掛け。 */
-  {id:'avenge',nm:'弔いの馴れ',  v:[50,85,130,190],
-   fmt:'還りを失うと '+AVENGE_SECONDS+' 秒 攻撃力と攻撃速度 +%v%'},
+  {id:'avenge',nm:'弔いの恩寵',  v:[50,85,130,190],
+   fmt:'プレイヤーを失うと '+AVENGE_SECONDS+' 秒 攻撃力と攻撃速度 +%v%'},
 
-  /* ---- ここから下は「常時 +x%」ではない馴れ ----
-     数字を足すだけの馴ればかりだと、どれを取っても同じ試合になる。
+  /* ---- ここから下は「常時 +x%」ではない恩寵 ----
+     数字を足すだけの恩寵ばかりだと、どれを取っても同じ試合になる。
      条件付き・時間差・別枠のものを混ぜて、
-     引いた馴れに合わせて立ち回りが変わるようにする。 */
-  {id:'renew',   nm:'再生の馴れ',  v:[2,3,5,8],
+     引いた恩寵に合わせて立ち回りが変わるようにする。 */
+  {id:'renew',   nm:'再生の恩寵',  v:[2,3,5,8],
    fmt:RENEW_EVERY+'秒ごとに最大HPの %v% を回復'},
-  {id:'xp',      nm:'研鑽の馴れ',  v:[10,20,32,50], fmt:'獲得経験値 +%v%'},
-  {id:'gold',    nm:'蓄財の馴れ',  v:[12,24,40,60], fmt:'獲得ゴールド +%v%'},
-  {id:'kin',     nm:'眷属の馴れ',  v:[35,55,80,120],
+  {id:'xp',      nm:'研鑽の恩寵',  v:[10,20,32,50], fmt:'獲得経験値 +%v%'},
+  {id:'gold',    nm:'蓄財の恩寵',  v:[12,24,40,60], fmt:'獲得ゴールド +%v%'},
+  {id:'kin',     nm:'眷属の恩寵',  v:[35,55,80,120],
    fmt:'眷属が '+KIN_CD+'秒ごとに攻撃力の %v% で敵を撃つ'},
   /* 盾は「短いほど強い」ので、重ねがけは足し算ではなく最小値を採る。
      足すと重ねるほど弱くなるという、読んで分かる嘘になってしまう。 */
-  {id:'aegis',   nm:'守護の馴れ',  v:[16,12,9,6], pick:'min',
+  {id:'aegis',   nm:'守護の恩寵',  v:[16,12,9,6], pick:'min',
    fmt:'%v秒ごとに、攻撃を1度だけ完全に防ぐ盾が張られる'},
-  {id:'pristine',nm:'万全の馴れ',  v:[15,28,45,70], fmt:'HPが満タンのあいだ 攻撃力 +%v%'},
-  {id:'banner',  nm:'旗印の馴れ',  v:[4,7,11,16],   fmt:'味方全員の 攻撃力と最大HP +%v%'},
+  {id:'pristine',nm:'万全の恩寵',  v:[15,28,45,70], fmt:'HPが満タンのあいだ 攻撃力 +%v%'},
+  {id:'banner',  nm:'旗印の恩寵',  v:[4,7,11,16],   fmt:'味方全員の 攻撃力と最大HP +%v%'},
   /* 復帰は「1度だけ」なので、重ねても回数は増えない（一番良い物が効く）。 */
-  {id:'phoenix', nm:'不死鳥の馴れ',v:[30,45,60,80], pick:'max',
+  {id:'phoenix', nm:'不死鳥の恩寵',v:[30,45,60,80], pick:'max',
    fmt:'倒れたとき1度だけ HP %v% で立ち上がる'},
-  {id:'thorns',  nm:'棘の馴れ',    v:[8,15,25,40],  fmt:'受けたダメージの %v% を反射'},
+  {id:'thorns',  nm:'棘の恩寵',    v:[8,15,25,40],  fmt:'受けたダメージの %v% を反射'},
   /* 継承は積むほど死のコストが軽くなる方向なので、
      レア度の刻みは付けつつ、実際に持ち越せる数には別に上限を掛けてある
      （boonsInherited を参照。「半分まで」という線を引かないと、
      エピックを2枚引いた時点で死んでも何も失わなくなる）。 */
-  {id:'legacy',  nm:'継承の馴れ',  v:[1,2,3,4],     fmt:'死んだとき引き継げる馴れ +%v'},
-  {id:'ultcdr',  nm:'早鐘の馴れ',  v:[8,15,24,35],  fmt:'大技のリキャスト -%v%'},
+  {id:'legacy',  nm:'継承の恩寵',  v:[1,2,3,4],     fmt:'死んだとき引き継げる恩寵 +%v'},
+  /* ---- 鞘無し（周回刃） ----
+     レント（貸）の回り種「フローティングブレイド」と地続きにしてある。
+     **敵として回っていた刃が、こちら側でも回り始める。**
+
+     既にある3つの周回体（眷属・伴影・使い魔）は「回りながら**撃つ**」が、
+     これは**刃そのものが当たる**。弾を1発も使わないので画面の弾数を圧迫せず、
+     当たるのは近距離だけなので、引き撃ちでは強くならない——
+     群れの中に立たないと当たらない。弾幕にしても立ち位置の判断が残る。
+
+     レア度は共通（v が全部同じ）。**本数で上限を切る以上、
+     レア度にも刻みを持たせると二重になって読めない。**
+     第10階層より浅いところでは出さない。序盤の学習を弾幕で潰さないため。 */
+  {id:'orbit',   nm:'鞘無しの恩寵', v:[1,1,1,1], minDepth:BLADE_MIN_DEPTH, cap:'blade',
+   /* **レア度を固定する。** 拾えるのは常に「刃が1本」で、等級では何も変わらない。
+      それなのに等級だけ振ると、エピックの鞘無しがコモンと同じ物になる——
+      見て損した気持ちだけが残る。値が動かない物は、等級も動かさない。 */
+   fixedRar:'rare',
+   fmt:'刃が1本、身の回りを回る（最大'+BLADE_MAX+'本）'},
+  {id:'ultcdr',  nm:'早鐘の恩寵',  v:[8,15,24,35],  fmt:'大技のリキャスト -%v%'},
 ];
 function boonDef(id){ return BOONS.find(b=>b.id===id); }
+
+function bladeCount(){
+  const fromBoons = S.hero ? boonCount(S.hero,'orbit') : 0;
+  const fromRelic = (typeof relicSum==='function') ? relicSum('blade') : 0;
+  return Math.min(BLADE_MAX, fromBoons + fromRelic);
+}
+/* 上限に達した恩寵は抽選から外す。
+   取っても何も起きない選択肢が3枠のうち1つを潰すのは、選ばせる意味を消す。 */
+function boonAtCap(id){
+  const d=boonDef(id); if(!d || !d.cap) return false;
+  if(d.cap==='blade') return bladeCount() >= BLADE_MAX;
+  return false;
+}
 function boonValue(id, rar){ return boonDef(id).v[BOON_RAR_I[rar]||0]; }
+/* 同じ恩寵を何個持っているか。値ではなく**数**が要る物のため（鞘無しの本数） */
+function boonCount(h, id){
+  if(!h || !h.boons) return 0;
+  let n=0; for(const x of h.boons) if(x.id===id) n++;
+  return n;
+}
 function boonText(id, rar){ return boonDef(id).fmt.replace('%v', boonValue(id,rar)); }
-/* 所持している馴れの合計値。
+/* 所持している恩寵の合計値。
    既定は足し算だが、意味が壊れる物だけ min / max を選べるようにしてある。 */
 function boonSum(h, id){
   if(!h || !h.boons) return 0;
@@ -2445,18 +2597,30 @@ function rollBoonRar(w){
   for(let i=0;i<w.length;i++){ r-=w[i]; if(r<=0) return BOON_RAR[i].id; }
   return BOON_RAR[0].id;
 }
-/* 3択を作る。馴れの種類は重複させず、レア度は1つずつ個別に引く。 */
+/* 3択を作る。恩寵の種類は重複させず、レア度は1つずつ個別に引く。 */
 function rollBoons(src, n){
   const cfg = BOON_SRC[src] || BOON_SRC.mid;
-  const pool=BOONS.map(b=>b.id), out=[];
+  /* 出さない物を先に落とす。
+     ・minDepth … 浅い階では出さない（序盤の学習を潰さないため）
+     ・cap      … 上限に達した物は出さない。取っても何も起きない選択肢は、
+                  3枠のうち1つを潰すだけで、選ばせる意味を消す */
+  const depth = (S.run && S.run.depth) || 1;
+  const pool=BOONS.filter(b=>(b.minDepth||0) <= depth && !boonAtCap(b.id))
+                  .map(b=>b.id);
+  const out=[];
   for(let i=0;i<n && pool.length;i++){
-    out.push({id:pool.splice(Math.floor(rnd()*pool.length),1)[0],
-              rar:rollBoonRar(cfg.w)});
+    const id=pool.splice(Math.floor(rnd()*pool.length),1)[0];
+    const d=boonDef(id);
+    out.push({id, rar: d && d.fixedRar ? d.fixedRar : rollBoonRar(cfg.w)});
   }
   // 出所に下限があるなら、1つは必ずそこまで引き上げる（大ボスのレア以上確定）
   if(cfg.floor>0 && out.length && !out.some(b=>BOON_RAR_I[b.rar]>=cfg.floor)){
-    const i=Math.floor(rnd()*out.length);
-    out[i].rar = BOON_RAR[cfg.floor].id;
+    // 等級を固定してある物は引き上げの対象にしない（固定の意味が消える）
+    const movable = out.map((b,i)=>i).filter(i=>!(boonDef(out[i].id)||{}).fixedRar);
+    if(movable.length){
+      const i = movable[Math.floor(rnd()*movable.length)];
+      out[i].rar = BOON_RAR[cfg.floor].id;
+    }
   }
   return out;
 }
@@ -2465,30 +2629,30 @@ function rollBoons(src, n){
    5階層ごと。10の倍数が大ボス、それ以外の5の倍数が中ボス。
    ボス階は既存の「帰還ポータル階」と同じなので、
    「ボスを倒すとポータルが開く」という一本の導線になる。 */
-/* ---------- ジョブと還り ----------
+/* ---------- ジョブとプレイヤー ----------
    道中で出会う NPC は「ジョブそのもの」が名前になる（戦士、魔法使い…）。
-   固有名を与えないのは、還りが消耗品だからという設計の宣言でもある。
+   固有名を与えないのは、プレイヤーが消耗品だからという設計の宣言でもある。
 
    武器種はジョブごとに固定。これが一番大事な部分で、
    「戦士は剣、狩人は弓」と決まっているから、加入前に何ができるかが名前だけで分かる。
-   装備を自由に選べる還りはプレイヤーの下位互換になるだけで、役割を持てない。
+   装備を自由に選べるプレイヤーは主人公の下位互換になるだけで、役割を持てない。
 
    固有スキルは全部「自動発動か常時効果」。このゲームには攻撃ボタンも回避ボタンも無く、
-   操作は移動だけで完結している。還りにスキルボタンを足した瞬間にその設計が崩れる。 */
+   操作は移動だけで完結している。プレイヤーにスキルボタンを足した瞬間にその設計が崩れる。 */
 const PARTY_MAX = 3;
-/* プレイヤー基準で弱くする係数。還りは頭数と役割であって、主役ではない。 */
+/* 主人公基準で弱くする係数。プレイヤーは頭数と役割であって、主役ではない。 */
 const ALLY_ATK_MUL = 0.62;
 const ALLY_HP_MUL  = 0.70;
-const ALLY_LV_GAP  = [1,3];   // プレイヤーより何レベル低いか
-const ALLY_RAR_MAX = 1;       // 還りの装備は Magic 止まり（Rare 以上は落ちない）
-/* 還り1人につき経験値プールがこれだけ増える。
-   完全な 1/N 分配だと還りを入れるほど損になり、誰も連れて行かなくなる。
+const ALLY_LV_GAP  = [1,3];   // 主人公より何レベル低いか
+const ALLY_RAR_MAX = 1;       // プレイヤーの装備は Magic 止まり（Rare 以上は落ちない）
+/* プレイヤー1人につき経験値プールがこれだけ増える。
+   完全な 1/N 分配だとプレイヤーを入れるほど損になり、誰も連れて行かなくなる。
    増えた手数のぶんだけプールを膨らませて、「分配されるが総量は増える」に着地させる。 */
 const XP_PARTY_BONUS = 0.15;
 const NPC_CHANCE = 0.42;      // 1階層に NPC が現れる確率
 
 /* evade = 回避率(%)。当たれば 0 ダメージ。
-     近接の還りが「相手がいる限り前に出続ける」だけだと即死するので、
+     近接のプレイヤーが「相手がいる限り前に出続ける」だけだと即死するので、
      生き残り方をジョブごとに変える。盾で受ける・硬さで耐える・避ける、の3系統。
    bail  = このHP割合を切ったら敵から距離を取る（引き際）。
      前に出続ける以外の行動を持たせるだけで、生存率が大きく変わる。 */
@@ -2528,7 +2692,7 @@ const JOBS=[
    毎週リセットされる遊びになる。 */
 const CURSES=[
   {id:'hunger', nm:'飢餓', icon:'◔', col:'#e0705a',
-   what:'階段での回復と、回復の馴れが働かない',
+   what:'階段での回復と、回復の恩寵が働かない',
    pay:'欠片 +60%',            shard:0.60},
   {id:'torrent',nm:'奔流', icon:'≈', col:'#7fc8e0',
    what:'敵の移動速度 +30%',
@@ -2540,7 +2704,7 @@ const CURSES=[
    what:'大技が使えない',
    pay:'経験値 +50%',          xp:0.50},
   {id:'solitude',nm:'孤独', icon:'⊙', col:'#d6b34a',
-   what:'還りを連れて行けない',
+   what:'プレイヤーを連れて行けない',
    pay:'金 +100%',             gold:1.00},
   {id:'thin',   nm:'薄氷', icon:'◇', col:'#ff9a5a',
    what:'被ダメージ +40%',
@@ -2599,7 +2763,7 @@ function curseBonus(){
    操作の忙しさは増えない。移動＝回避という核は壊れていない。
 
    解放は大ボス（10階ごと）を1体倒すごとに1つ。アカウント単位で恒久。
-   技レベルは欠片で上げる——支度がカンストしたあとの欠片の行き先でもある。 */
+   技レベルは欠片で上げる——能力強化がカンストしたあとの欠片の行き先でもある。 */
 const ULTS=[
   {id:'quake', nm:'震撼', icon:'✹', col:'#d6b34a', cd:26,
    desc:lv=>`周囲 ${(3.2+lv*0.35).toFixed(1)} マスに ATK×${(2.6+lv*0.55).toFixed(1)} の打撃。全員よろめく`,
@@ -2622,7 +2786,7 @@ function ultDef(id){ return ULTS.find(u=>u.id===id); }
 /* 解放済みの大技。大ボスを n 体倒していれば at<=n の技が使える。 */
 function unlockedUlts(){ return ULTS.filter(u=>greatKills() >= u.at); }
 function ultLv(id){ return (S.ultLv && S.ultLv[id]) || 1; }
-/* 技レベルの対価は欠片。支度を上げ切ったあとの行き先を作る意味もある。 */
+/* 技レベルの対価は欠片。能力強化を上げ切ったあとの行き先を作る意味もある。 */
 function ultUpCost(lv){ return Math.round(14 * Math.pow(lv+1, 1.45)); }
 function ultCanUp(id){
   const lv=ultLv(id);
@@ -2633,13 +2797,13 @@ function ultEquipped(){
   return (id && unlockedUlts().some(u=>u.id===id)) ? ultDef(id) : null;
 }
 /* 大技のリキャスト。
-   技レベル（欠片）＋装備／馴れ＋そばにいる盗賊、の3つで縮む。
+   技レベル（欠片）＋装備／恩寵＋そばにいる盗賊、の3つで縮む。
    下限を 35% に切ってあるのは、押しっぱなしで回るようになると
    「ここぞで切る手札」ではなく通常攻撃の一種になってしまうため。 */
 const ULT_CDR_FLOOR = 0.35;
 function ultCdrTotal(){
   const st = S.hero ? stats(S.hero) : null;
-  const gear = st ? (st.ultCdr||0) : 0;      // 装備＋馴れ
+  const gear = st ? (st.ultCdr||0) : 0;      // 装備＋恩寵
   return gear + rogueHasteBonus();           // そばにいる盗賊
 }
 function ultCooldown(u){
@@ -2648,7 +2812,7 @@ function ultCooldown(u){
   return u.cd * Math.max(ULT_CDR_FLOOR, (1-byLv) * (1-byGear));
 }
 /* 盗賊 Lv.40「刻み」。そばにいるあいだだけ、あなたの大技が早く戻る。
-   還りの技をパーティ全体ではなく**プレイヤーの手札**に効かせる初めての例で、
+   プレイヤーの技をパーティ全体ではなく**主人公の手札**に効かせる初めての例で、
    「連れて行く相手で自分の回し方が変わる」を作りたい。
    だから距離の条件を付けてある——置いてくれば効かない。 */
 const ROGUE_HASTE_RANGE = 4.5;
@@ -2671,7 +2835,11 @@ function rogueHasteBonus(){
    解放はアカウント単位。キャラが死んでも解放は残る——
    ここを消すと、大ボスを倒した意味が次のキャラに何も引き継がれない。 */
 const ELITE_JOBS=[
-  {id:'paladin', nm:'聖騎士',  col:'#e8d9a0', weapon:'mace',   shield:'kite', armor:'plate',
+  /* 武器は剣。以前は戦槌（mace）だったが、聖騎士は「前で受けながら斬る」役で、
+     速度 0.62 の戦槌では受けと手数が噛み合わなかった。
+     盾は 'kite' と書いてあったが **そんなベースは存在しない**——
+     genBaseItem の取りこぼしで BASES[1]（＝剣）が盾の枠に入っていた。大盾に直す。 */
+  {id:'paladin', nm:'聖騎士',  col:'#e8d9a0', weapon:'sword',  shield:'tower', armor:'plate',
    hp:1.36, atk:1.10, ms:0.90, aggro:7.5, evade:5,  bail:0.18, weight:0.45, at:1,
    sk:{id:'aegis',  nm:'聖盾',  desc:'そばにいる間、パーティ全員の被ダメージ -15%'}},
   {id:'summoner',nm:'召喚士',  col:'#7fd6e0', weapon:'staff',  armor:'robe',
@@ -2681,7 +2849,7 @@ const ELITE_JOBS=[
    hp:0.74, atk:1.45, ms:0.92, aggro:9.5, evade:8,  bail:0.55, weight:0.32, at:3,
    sk:{id:'nova',   nm:'炸裂',  desc:'魔弾が着弾すると小さく爆ぜ、周囲もまとめて焼く'}},
 ];
-/* ---------- 還りの専用技 ----------
+/* ---------- プレイヤーの専用技 ----------
    Lv10 / 20 / 30 で1つずつ、最大3枠。Lv30 で全部そろう。
 
    27個ぶんの実装を個別に書くと手に負えないので、効果の語彙を先に決めて
@@ -2696,8 +2864,8 @@ const ELITE_JOBS=[
      fam       … 召喚士の使い魔（{atk, count}）
      chain/pierce/nova/pray … 固有スキルの強化
 
-   還りが「レベルが上がった」ことを数値以外でも感じられるようにするのが目的で、
-   1つあたりの効果量は控えめ（プレイヤーを上回らせない前提は崩さない）。 */
+   プレイヤーが「レベルが上がった」ことを数値以外でも感じられるようにするのが目的で、
+   1つあたりの効果量は控えめ（主人公を上回らせない前提は崩さない）。 */
 const JOB_SKILLS={
   warrior: [{lv:10,nm:'不動',   desc:'被ダメージ -10%',          dr:10},
             {lv:20,nm:'反撃',   desc:'被弾時に 20% を打ち返す',  thorns:20},
@@ -2749,9 +2917,9 @@ const JOB_SKILLS={
             {lv:50,nm:'崩落',   desc:'一点に大質量を落とす（17秒ごと）', art:'collapse'}],
 };
 
-/* ---------- 還りの大技（Lv.50） ----------
+/* ---------- プレイヤーの大技（Lv.50） ----------
    このゲームには攻撃ボタンも回避ボタンも無く、操作は移動だけで完結している。
-   還りにスキルボタンを足した瞬間にその設計が崩れるので、
+   プレイヤーにスキルボタンを足した瞬間にその設計が崩れるので、
    Lv.50 の技も**自動発動＋リキャスト**にしてある（僧侶の祈り・召喚士の使い魔と同じ形）。
 
    狙いは「終盤のジョブに、そのジョブでしか見られない絵をひとつ持たせる」こと。
@@ -2792,7 +2960,7 @@ function isMeleeJob(id){
   const w=BASES.find(b=>b.id===j.weapon);
   return !!w && (w.reach||0) < MELEE_REACH;
 }
-/* 自分の代わりに前に立てる還り。生きていて、近接で、後衛でない者。 */
+/* 自分の代わりに前に立てるプレイヤー。生きていて、近接で、後衛でない者。 */
 function frontlineFor(a){
   return livingParty().find(m=>m!==a && !m.dead
                               && !jobDef(m.job).backline && isMeleeJob(m.job)) || null;
@@ -2820,7 +2988,7 @@ function allySkillSum(a){
   return o;
 }
 
-/* ---------- 還りの大技の発動 ---------- */
+/* ---------- プレイヤーの大技の発動 ---------- */
 function tickAllyArt(a, st, dt){
   // 癒しの輪（聖騎士 Lv.40）。技ではなく常時のにじみなので、ここで一緒に回す。
   const halo=(st.skills&&st.skills.halo)||0;
@@ -2904,7 +3072,7 @@ function fireAllyArt(a, st, id, tgt, def){
     say();
   }
 }
-/* 還りの技のダメージ。通常の一振りと同じ経路（属性・状態異常・撃破処理）を通す。 */
+/* プレイヤーの技のダメージ。通常の一振りと同じ経路（属性・状態異常・撃破処理）を通す。 */
 function hitEnemyByAlly(a, st, e, mult){
   if(!e || e.dead) return;
   if(eliteEvades(e)) return;           // 精鋭の性質「影の」
@@ -2945,8 +3113,8 @@ function tickArts(dt){
 /* パーティ全体に掛かる効果。誰か1人が持っていれば全員に乗る（重複は加算）。 */
 function partyAura(){
   const o={atk:0, hp:0, dr:0};
-  /* 旗印の馴れ。持っているのが誰であれ、パーティ全員に配る。
-     プレイヤーが持っていても還りが持っていても同じように効く——
+  /* 旗印の恩寵。持っているのが誰であれ、パーティ全員に配る。
+     主人公が持っていてもプレイヤーが持っていても同じように効く——
      「隊を鼓舞する」物なので、持ち主だけ強くなるのでは意味が反対になる。 */
   [S.hero, ...livingParty()].forEach(m=>{
     if(!m) return;
@@ -2979,10 +3147,10 @@ function pickJob(){
   return pool[0];
 }
 
-/* プレイヤーを基準に一段弱い還りを作る。 */
+/* 主人公を基準に一段弱いプレイヤーを作る。 */
 function makeAlly(depth, hero){
   const job = pickJob();
-  // 酒場のレベルぶん、プレイヤーとのレベル差が縮まる
+  // 酒場のレベルぶん、主人公とのレベル差が縮まる
   const gap = Math.max(0, ri(ALLY_LV_GAP[0], ALLY_LV_GAP[1]) - allyLevelGapCut());
   const lv  = clamp(hero.lv - gap, 1, Math.max(1,hero.lv));
   const ilvl= clamp(Math.round(depth*0.8), 1, 60);
@@ -2990,7 +3158,7 @@ function makeAlly(depth, hero){
     ally:true, uidA:(genItem._n=(genItem._n||0)+1), job:job.id, name:rollAllyName(), lv, xp:0,
     str:5+(lv-1), dex:5+(lv-1), vit:5+(lv-1), int:5,
     equip:{weapon:null, shield:null, armor:null, accessory:null},
-    // 加入時に馴れを持っていることがある（主人公のレベルで数もレア度も伸びる）
+    // 加入時に恩寵を持っていることがある（主人公のレベルで数もレア度も伸びる）
     hpNow:0, boons:rollAllyBoons(hero?hero.lv:1), revived:false, dead:false,
     x:0, y:0, r:0.30, atkCd:0, swing:0, hit:0, st:{}, bu:{},
     dirx:1, diry:0, shots:0, prayCd:rf(4,6),
@@ -3012,14 +3180,14 @@ function makeAlly(depth, hero){
   return a;
 }
 
-/* 還りのステータス。プレイヤーと同じ stats() を通してからジョブ係数と弱体係数を掛ける。
-   同じ計算器を通すので、馴れも装備も耐久も自動的に還りに効く。 */
-/* 還りの上限。プレイヤーのステータスに対する割合。
+/* プレイヤーのステータス。主人公と同じ stats() を通してからジョブ係数と弱体係数を掛ける。
+   同じ計算器を通すので、恩寵も装備も耐久も自動的にプレイヤーに効く。 */
+/* プレイヤーの上限。主人公のステータスに対する割合。
    knee を超えたぶんは圧縮されて ceil に漸近するので、
-   ・どんな装備を引いてもプレイヤーを超えない（ceil<1）
-   ・それでも馴れや装備は必ず数字を押し上げる（単調増加）
+   ・どんな装備を引いても主人公を超えない（ceil<1）
+   ・それでも恩寵や装備は必ず数字を押し上げる（単調増加）
    の両立ができる。単純なクリップだと後者が壊れ、
-   還りに馴れを与える意味そのものが消えてしまう。 */
+   プレイヤーに恩寵を与える意味そのものが消えてしまう。 */
 const ALLY_CAP_KNEE = 0.85, ALLY_CAP_CEIL = 0.97;
 function softCap(v, ref){
   const knee = ref*ALLY_CAP_KNEE, ceil = ref*ALLY_CAP_CEIL;
@@ -3031,7 +3199,7 @@ function allyStats(a){
   const s = stats(a);
   const k = allySkillSum(a);
   const au = partyAura();
-  // 支度「還りの練度」。全能力に同じだけ掛かる（口座側なので、次の還りにも効く）
+  // 能力強化「プレイヤーの練度」。全能力に同じだけ掛かる（口座側なので、次のプレイヤーにも効く）
   const AU = 1 + upgLv('ally')*0.06;
   s.maxHp = Math.max(1, Math.round(s.maxHp * j.hp * ALLY_HP_MUL * (1+(k.hp+au.hp)/100) * AU));
   s.atk   = s.atk * j.atk * ALLY_ATK_MUL * (1+(k.atk+au.atk)/100) * AU;
@@ -3046,8 +3214,8 @@ function allyStats(a){
   s.skills = k;
   s.aggro = j.aggro;
   if(j.sk.id==='scavenge') s.mf += 40;
-  // 係数だけだと、たまたま良い装備を引いた還りがプレイヤーを上回ることがある。
-  // 「プレイヤーを基準に弱い」を仕様として保証するため、上を漸近的に潰す。
+  // 係数だけだと、たまたま良い装備を引いたプレイヤーが主人公を上回ることがある。
+  // 「主人公を基準に弱い」を仕様として保証するため、上を漸近的に潰す。
   if(S.hero && a!==S.hero){
     const ps = stats(S.hero);
     s.maxHp = Math.max(1, Math.round(softCap(s.maxHp, ps.maxHp)));
@@ -3055,8 +3223,8 @@ function allyStats(a){
   }
   return s;
 }
-/* 還りはプレイヤーキャラに属する。馴れと同じで、街に戻っても解散せず、
-   プレイヤーが死ねば一緒に失われる。「長生きしたキャラが強い」を人数でも表す。 */
+/* プレイヤーは主人公キャラに属する。恩寵と同じで、街に戻っても解散せず、
+   主人公が死ねば一緒に失われる。「長生きしたキャラが強い」を人数でも表す。 */
 function party(){ return (S.hero && S.hero.party) || []; }
 
 /* ---------- 踏破済みの階層 ----------
@@ -3125,14 +3293,14 @@ function stairHint(){
   return clamp((t-STAIR_HINT_AFTER)/(STAIR_HINT_FULL-STAIR_HINT_AFTER), 0, 1);
 }
 function livingParty(){ return party().filter(a=>!a.dead); }
-/* 馴れの付与先候補。プレイヤーが先頭。 */
+/* 恩寵の付与先候補。主人公が先頭。 */
 function boonTargets(){ return S.hero ? [S.hero, ...livingParty()] : livingParty(); }
 function entName(h){ return h===S.hero ? h.name : (h.name+'（Lv.'+h.lv+'）'); }
 
 /* 同じジョブが重なったときだけ番号を振る。名前はジョブそのもの、が原則。 */
-/* ---------- 還りの名前 ----------
+/* ---------- プレイヤーの名前 ----------
    以前は名前がジョブ名そのものだった（「戦士」「戦士 II」）。
-   固有名を与えないのは「還りは消耗品だ」という宣言のつもりだったが、
+   固有名を与えないのは「プレイヤーは消耗品だ」という宣言のつもりだったが、
    実際に遊ぶと**消耗品にしか見えない**という当たり前の結果になっていた。
    失っても惜しくない相手のために引き返す判断は生まれない。
 
@@ -3154,17 +3322,17 @@ function uniqueAllyName(a, existing){
   return a;
 }
 
-/* ---------- 加入時に持っている馴れ ----------
-   「たまたま良い馴れを持った子が来た」を作るための仕掛け。
+/* ---------- 加入時に持っている恩寵 ----------
+   「たまたま良い恩寵を持った子が来た」を作るための仕掛け。
    全員が同じ性能で来ると、加入の判断は職業の good / bad だけになり、
    誰を連れて行くかが毎回同じ答えになる。
 
    数もレア度も**主人公のレベル**で伸びる。深く潜れる主人公のもとには
    それだけの者が集まる、という筋を通したい（階層で決めると、
-   浅い階に戻って良い還りを探す周回が最適解になってしまう）。
+   浅い階に戻って良いプレイヤーを探す周回が最適解になってしまう）。
 
    0個も普通に出る。全員が特別だと、特別が特別でなくなるので。 */
-const ALLY_BOON_FROM = 6;      // 主人公がこのレベル未満なら馴れ持ちは現れない
+const ALLY_BOON_FROM = 6;      // 主人公がこのレベル未満なら恩寵持ちは現れない
 const ALLY_BOON_SPAN = 34;     // ここまでで伸び切る
 function allyBoonTier(heroLv){ return clamp(((heroLv||1)-ALLY_BOON_FROM)/ALLY_BOON_SPAN, 0, 1); }
 /* 何も持たずに来る子の割合。レベルに関わらずここは固定にしてある。
@@ -3197,7 +3365,7 @@ function rollAllyBoons(heroLv){
 }
 
 /* ---------- 二つ名 ----------
-   持ち物で決まる。良い馴れと良い装備を抱えた子には自然に大仰な名が付く。
+   持ち物で決まる。良い恩寵と良い装備を抱えた子には自然に大仰な名が付く。
    固定の称号一覧から引くのではなく**中身から計算する**のが肝で、
    そうしないと「高名な」と書いてあるのに中身は空、が起きる。
    育てば二つ名も上がっていくので、名乗りがそのまま成長の記録になる。 */
@@ -3211,7 +3379,7 @@ const ALLY_RANK=[
   {min:16, nm:'高名な'},
   {min:26, nm:'伝説の'},
 ];
-/* 中身の重み。馴れはレア度の二乗で効かせる（エピック1個 > コモン3個にしたい）。 */
+/* 中身の重み。恩寵はレア度の二乗で効かせる（エピック1個 > コモン3個にしたい）。 */
 function allyRenown(a){
   if(!a) return 0;
   let n=0;
@@ -3231,7 +3399,7 @@ function allyEpithet(a){
 }
 /* 表示用のフルネーム。ログは短い名前のままにしてある——
    毎行「伝説の魔術師 リエラが」と出ると、肝心の出来事が読めなくなる。 */
-/* 還りの表示名。名前だけでは「この子に何ができるのか」が分からない。
+/* プレイヤーの表示名。名前だけでは「この子に何ができるのか」が分からない。
    固有名は愛着のため、職業は判断のため——別々の情報なので両方出す。 */
 function allyLabel(a){ return a.name+'・'+jobDef(a.job).nm; }
 function allyFullName(a){
@@ -3240,7 +3408,7 @@ function allyFullName(a){
 }
 
 /* ---------- ユニーク敵 ----------
-   道中に紛れる固有名の個体。撃破で馴れが確定で手に入る唯一の非ボス。
+   道中に紛れる固有名の個体。撃破で恩寵が確定で手に入る唯一の非ボス。
    ボスと違って階段を塞がないので「無視して進む」も常に選べる。
    名前はすべて造語で、既存作品からの引用は一切していない。 */
 /* 規格外が層と形式の組で決まらなかったときの控え。
@@ -3266,7 +3434,7 @@ function bossTierAt(depth){
 const BOSS_STATS={
   mid:  {nm:'長', hp:9,  atk:1.45, def:1.7, r:0.85, xp:14, gold:9,  drops:2, ilvl:3},
   great:{nm:'王', hp:20, atk:1.95, def:2.2, r:1.25, xp:34, gold:22, drops:4, ilvl:6},
-  // 第50階層の主。ここまでの全部（属性・盾・還り・馴れ）を使い切らせるための壁。
+  // 第50階層の主。ここまでの全部（属性・盾・プレイヤー・恩寵）を使い切らせるための壁。
   final:{nm:'主', hp:52, atk:2.6,  def:2.8, r:1.75, xp:90, gold:80, drops:7, ilvl:12},
 };
 /* 当たり判定の半径は 0.45 で頭打ちにする。
@@ -3281,7 +3449,7 @@ const BOSS_COLLIDE_MAX = 0.45;
    立ち位置を強制的に動かすことなので、技は全部「置き場所を奪う」形にする。
 
    すべて予兆（tele）付き。予兆の図形＝当たる範囲をそのまま描くので、
-   避けられなかった被弾は必ずプレイヤーの判断ミスになる（理不尽にしない）。 */
+   避けられなかった被弾は必ず主人公の判断ミスになる（理不尽にしない）。 */
 const BOSS_MOVES={
   // 足元を叩く。近接で張り付き続ける戦い方を否定する技。
   slam:  {nm:'叩きつけ', tele:0.85, rad:2.7, mult:1.30, cd:[3.6,5.0], min:0,   max:3.4},
@@ -3331,7 +3499,7 @@ const BOSS_MOVESET={
    協会は死亡扱いにできない（登録が抹消されていないので、書類上はいまも現役）。
    四人とも初号に随行した者で、番号が小さいほど古く、古い者ほど深い。
 
-   **この四体は、プレイヤーの行き先の見本になっている。**
+   **この四体は、主人公の行き先の見本になっている。**
    ヴェラ＝まだ人の形。ブレヒト＝直しすぎて形を失った。
    マレット＝他人との区別がつかなくなった。オルト＝目的だけが残って中身が消えた。
    主人公は還り損ないなので、この四段階のどこかに落ちる予定になっている。
@@ -3419,12 +3587,28 @@ function gachaNextBand(){
 /* ---------- ステート ---------- */
 const S={
   stash:[], gold:0, deepest:1, deaths:0, runs:0,
+  /* ---------- 生成の塩 ----------
+     階層の生成は S.runs と depth だけを種にしていた。決定的なのは良い
+     （同じ探索で同じ階へ戻れば同じ地形になる）が、**初回だけは誰がやっても
+     同じ地形**という副作用がついていた。1回目の1階が固定なので、
+     一度覚えてしまえば初手がただの作業になる。
+
+     **塩を引くのは confirmName()、つまり「新しく名前をつけた」瞬間だけ。**
+     ここを 0 のままにしてあるのはテストのため——回帰テストは種を固定して
+     同じ地形をもう一度出せることが前提で、その大半（25本）は _h.mjs を
+     通さず自前で起動する。塩を宣言時や startAdventure() で引くと、
+     その25本が**静かに毎回違う地形**を見るようになり、
+     たまたま落ちたのか壊れたのか区別がつかなくなる（実際に踏んだ）。
+     新しい保存が生まれる場所は1ヶ所しかないので、そこだけで引く。 */
+  salt:0,
   upg:{}, shop:[], shopSeed:1, startDepth:1,
   grave:null,            // {depth,x,y,items:[],gold,heroName,lv}
   carry:[], gachaLeft:GACHA_PER_DAY, gachaDay:'',   // 持ち込み枠（死ぬと失う）
   lastDepth:1,           // 直近の探索の到達最深度。ガチャの排出帯を決める
   cleared:0,             // 第50階層の主を倒した回数
   bld:{},                // 街開発の各施設のレベル
+  tavern:[],             // 酒場で待っている連れ帰った者（口座側。キャラが死んでも残る）
+  tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
   shards:0,              // 欠片。拾った瞬間に入る＝死んでも失わない
   shardsRun:0,           // 今回の探索で拾った数（結果表示用）
   ore:{},                // 黒鉄（口座）。生きて帰った分だけがここに入る
@@ -3432,9 +3616,9 @@ const S={
   greatKills:0,          // 倒した大ボスの数。大技と上位ジョブの解放段階
   ult:null,              // セットしている大技の id
   ultLv:{},              // 技レベル（欠片で上げる）
-  legacyBoons:[],        // 祭壇で次のキャラへ引き継ぐ馴れ
+  legacyBoons:[],        // 祭壇で次のキャラへ引き継ぐ恩寵
   deathAdBonus:0,        // 死亡時に広告を見て増やした引き継ぎ枠（その死の間だけ）
-  fallen:[],             // 慰霊碑。失った還り（アカウント単位・キャラが死んでも残る）
+  fallen:[],             // 慰霊碑。失ったプレイヤー（アカウント単位・キャラが死んでも残る）
   beacons:[],            // 大ボスを倒して開いた中継地点（倒した階の番号）
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
@@ -3444,7 +3628,7 @@ const S={
 
 /* ---------- 武器熟練度 ----------
    死ぬたびに、また第1階層から同じ道を歩き直す。
-   支度と馴れはあるが、どちらも「潜る前に選ぶ物」で、
+   能力強化と恩寵はあるが、どちらも「潜る前に選ぶ物」で、
    **歩いている最中に伸びる物が1つも無かった。**
    だから再走の道中は、ただの移動時間になっていた。
 
@@ -3503,9 +3687,23 @@ function stashCap(){ return 20 + upgLv('stash')*6; }
    踏破が地図に残る形になり、ボスを倒す意味が1つ増える。 */
 function beacons(){ return (S.beacons||[]).slice().sort((a,b)=>a-b); }
 function unlockedDepths(){
+  /* デバッグの「階層全開放」。中継地点を無視して5階ごとに並べる。
+     全階を並べると横に50個のボタンが出て選べなくなるので、刻みは5。 */
+  if(dbg('allDepths')){
+    const out=[1];
+    for(let d=5; d<=FINAL_DEPTH+10; d+=5) out.push(d);
+    return out;
+  }
   return [1, ...beacons().map(d=>d+1)];
 }
-/* 中継地点から始めるときの「最低限の支度」。
+
+/* ---------- デバッグ ----------
+   出荷物には出さない。タイトルの版番号を5回叩いたときだけ入口が現れる。
+   保存はしない（S.debug は毎回まっさらから始まる）——
+   検証用の状態が残ったまま普通に遊んでしまう事故のほうが高くつく。 */
+function dbg(k){ return !!(S.debug && S.debug[k]); }
+function godMode(){ return dbg('god'); }
+/* 中継地点から始めるときの「最低限の支給」。
    第11階層に Lv.1・素手で放り込まれても、できるのは死ぬことだけで、
    それは救済ではなく罰になる。歩かずに来たぶんの経験と装備は渡す。
 
@@ -3537,7 +3735,7 @@ function outfitForBeacon(h, depth){
 /* ---------- 名前と、その先の代 ----------
    名前を1回だけ聞くのは、そこが愛着の入口だから。
    死んだら別人になるが、**名前は受け継がれる**（二代目・三代目…）。
-   祭壇で馴れを次のキャラへ渡す仕掛けと辻褄が合うし、
+   祭壇で恩寵を次のキャラへ渡す仕掛けと辻褄が合うし、
    「何代目で第何階層まで行けたか」が、そのまま記録の読み方になる。 */
 const GEN_KANJI=['','','二','三','四','五','六','七','八','九','十'];
 function heroName(){
@@ -3567,10 +3765,10 @@ function newHero(){
   const lv = rebirthLevel(), up = lv-1;
   return {name:heroName(), lv, xp:0, str:5+up, dex:5+up, vit:5+up, int:5+up,
           equip:{weapon:null,shield:null,armor:null,accessory:null}, hpNow:0,
-          // 馴れは死ぬまで残る（街に戻っても消えない）。
-          // 祭壇があれば、前のキャラの馴れをいくつか引き継いで生まれる。
+          // 恩寵は死ぬまで残る（街に戻っても消えない）。
+          // 祭壇があれば、前のキャラの恩寵をいくつか引き継いで生まれる。
           boons:(S.legacyBoons||[]).slice(),
-          party:[]};   // 還りも同じ。プレイヤーが死ねば一緒に失われる
+          party:[]};   // プレイヤーも同じ。主人公が死ねば一緒に失われる
 }
 function xpNeed(lv){ return Math.round(18*Math.pow(lv,1.55)); }
 /* そのキャラが Lv.1 から今までに積んだ累計経験値。
@@ -3614,7 +3812,7 @@ function stats(h){
   // 節目で付いた技。武器に紐づくので、武器を持ち替えれば当然消える。
   if(wItem) upSkills(wItem).forEach(sk=>sk.ap(a, wItem));
   /* 武器熟練度。**素の武器性能に掛ける**ので、接頭辞の %増加より先に乗る。
-     還りには掛けない（熟練はプレイヤーの手癖であって、渡した装備の性能ではない）。 */
+     プレイヤーには掛けない（熟練は主人公の手癖であって、渡した装備の性能ではない）。 */
   const MM = (h===S.hero && wBase) ? masteryMul(wBase) : {atk:1, aspd:1, range:1};
   wAtk  *= MM.atk;
   wSpd  *= MM.aspd;
@@ -3622,18 +3820,18 @@ function stats(h){
 
   const as=a.allStat;
   const str=h.str+as, dex=h.dex+as, vit=h.vit+as, int=h.int+as;
-  // 支度を最後に乗算で適用する。装備の伸びを殺さず、底上げだけを担わせる。
+  // 能力強化を最後に乗算で適用する。装備の伸びを殺さず、底上げだけを担わせる。
   const U=id=>upgLv(id);
   // 護符はその探索のあいだだけ乗る。**持ち主のぶんだけ**（全員には乗らない）
   const ch=charmsOf(h);
   const C=k=>ch.reduce((s,c)=>s+(c[k]||0),0);
-  // 馴れ（ボス撃破報酬）はそのキャラが死ぬまで乗る
+  // 恩寵（ボス撃破報酬）はそのキャラが死ぬまで乗る
   const B=id=>boonSum(h,id);
-  // 弔い。還りを失った直後だけ乗る一時倍率（攻撃力と攻撃速度）
+  // 弔い。プレイヤーを失った直後だけ乗る一時倍率（攻撃力と攻撃速度）
   const AV = 1 + (((h.avengeT||0) > 0 ? B('avenge') : 0)/100);
-  // 聖騎士の聖域。張られているあいだ、パーティ全員（プレイヤー含む）に乗る。
+  // 聖騎士の聖域。張られているあいだ、パーティ全員（主人公含む）に乗る。
   const SA = 1 + ((S.run && S.run.sanct) ? S.run.sanct.pct : 0)/100;
-  /* 万全の馴れは「HP が満タンのあいだだけ」効くので、
+  /* 万全の恩寵は「HP が満タンのあいだだけ」効くので、
      攻撃力より先に最大HPを確定させないと自分自身を参照できない。
      旗印は自分ではなく味方に配る効果なので、ここでは足さない（partyAura が配る）。 */
   const maxHp = Math.max(1, Math.round((40 + vit*7 + h.lv*5 + a.hp) * (1 + U('hp')*0.12)
@@ -3650,13 +3848,13 @@ function stats(h){
            * (1 + (h===S.hero ? baneMul('aspd',0) : 0)/100),
     def:   (bDef + a.def + vit*0.6) * (1 + B('def')/100) * SA,
     crit:  clamp(4 + dex*0.5 + a.critPct + U('crit')*4 + B('crit'), 0, 75),
-    // 遺物はプレイヤー本人にだけ乗る（口座に残る物なので、渡す概念が無い）
+    // 遺物は主人公本人にだけ乗る（口座に残る物なので、渡す概念が無い）
     ms:    BASE_MOVE_SPEED * (1 + a.msPct/100) * (1 + U('ms')*0.05)
            * (1 + C('ms')/100) * (1 + B('ms')/100)
            * (1 + (h===S.hero ? relicSum('ms') : 0)/100) * SA
-           // 試練の枷。プレイヤーだけに掛かる（還りまで縛ると難度が跳ね上がりすぎる）
+           // 試練の枷。主人公だけに掛かる（プレイヤーまで縛ると難度が跳ね上がりすぎる）
            * (1 + (h===S.hero ? baneMul('ms',0) : 0)/100),
-    // 射程は武器の素の射程から。強化・護符・馴れはそこに乗る
+    // 射程は武器の素の射程から。強化・護符・恩寵はそこに乗る
     range: wReach * (1 + a.rangePct/100) * (1 + U('range')*0.10)
            * (1 + C('range')/100) * (1 + B('range')/100),
     arc: wArc + a.arcAdd, hands: wHands, proj: wProj,
@@ -3676,7 +3874,7 @@ function stats(h){
        + (h===S.hero ? curseBonus().mf + relicSum('mf') : 0),
     thorns:a.thorns + B('thorns'), lowDR:a.lowDR, charmDR:C('dr') + B('dr'),
     ailPct: B('ail'), regenPct: B('regen'),
-    // 大技のリキャスト短縮（装備＋馴れ）。還りぶんは ultCooldown 側で足す。
+    // 大技のリキャスト短縮（装備＋恩寵）。プレイヤーぶんは ultCooldown 側で足す。
     ultCdr: a.ultCdr + B('ultcdr')
   };
 }
@@ -3720,7 +3918,7 @@ function gearAlerts(){
 
 /* ---------- 属性ダメージと状態異常のエンジン ---------- */
 
-/* 対象の耐性%（-100〜75）。敵は系統から、プレイヤーは装備から。 */
+/* 対象の耐性%（-100〜75）。敵は系統から、主人公は装備から。 */
 function resistOf(target, type){
   const r = target.res ? (target.res[type]||0) : 0;
   return clamp(r, -100, 75);
@@ -3734,7 +3932,7 @@ function buildupNeed(target){
    これが無いと、傷の重さが**受けた側の体力と無関係**になる。
    dps は掛けた側のレベルで決まり、maxHp は受けた側のレベルで決まるので、
    釣り合っているうちは丁度よくても、離れた瞬間に一方的になる。
-   実測: 第6階層の苔に立ち続けたとき、Lv.1 の還りは 4.2秒で落ちていた
+   実測: 第6階層の苔に立ち続けたとき、Lv.1 のプレイヤーは 4.2秒で落ちていた
    （最大HP 66 に対して毎秒 16——1秒で4分の1）。
 
    割合で頭を打てば、掛けた側が誰であろうと「満タンから何秒か」が揃う。 */
@@ -3751,7 +3949,7 @@ function ourMaxHp(target){
   if(!target) return 0;
   if(target.maxHp) return target.maxHp;                           // 判定用の器が持ってきた値
   if(target.isPlayer) return S.hero ? stats(S.hero).maxHp : 0;
-  if(target.ally && target.job) return allyStats(target).maxHp;   // 還りの実体
+  if(target.ally && target.job) return allyStats(target).maxHp;   // プレイヤーの実体
   return 0;
 }
 /* 味方に効く分だけ弱める。敵に与えるぶんは触らない。 */
@@ -3762,9 +3960,9 @@ function dotCap(target, dps){
 function addStatus(target, id, srcLevel){
   const def=STATUS[id]; if(!def) return;
   target.st = target.st || {};
-  /* **還りはこちら側。** 以前は isPlayer だけを見ていたので、
-     還りには敵と同じ式（毎秒 6+lv*2.2）が当たっていた——プレイヤーの丁度2倍。
-     加入したての還りが溶けていたのは、ほぼこれ（利用者からの報告）。 */
+  /* **プレイヤーはこちら側。** 以前は isPlayer だけを見ていたので、
+     プレイヤーには敵と同じ式（毎秒 6+lv*2.2）が当たっていた——主人公の丁度2倍。
+     加入したてのプレイヤーが溶けていたのは、ほぼこれ（利用者からの報告）。 */
   const ours = !!(target.isPlayer || target.ally);
   const dps = ours ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
   target.st[id] = {t:def.dur, dps: ours ? dotCap(target, dps) : dps};
@@ -3833,9 +4031,9 @@ function resolveDamage(target, parts, srcLevel, opts){
    防御も回復手段も無い状態で、防御無視の継続ダメージを毎回もらうことになる。
 
    出血そのものを弱くすると中盤以降まで薄くなるので、**出る階を遅らせる**。
-   第5階層から——中ボスを一度見て、装備も馴れも1つは持っているころ。
+   第5階層から——中ボスを一度見て、装備も恩寵も1つは持っているころ。
 
-   プレイヤーと還りにだけ掛ける。こちらから敵に与える出血は最初から通る
+   主人公とプレイヤーにだけ掛ける。こちらから敵に与える出血は最初から通る
    （序盤に効く手を減らす理由は無い）。 */
 const BLEED_MIN_DEPTH = 5;
 function statusSuppressed(target, sid){
@@ -3845,7 +4043,7 @@ function statusSuppressed(target, sid){
   return !!S.run && S.run.depth < BLEED_MIN_DEPTH;
 }
 
-/* ---------- ダンジョン生成: BSP（連結性が構造的に保証される） ---------- */
+/* ---------- 階層の生成: BSP（連結性が構造的に保証される） ---------- */
 const T={WALL:0,FLOOR:1,STAIR:2};
 function genFloor(depth){
   const W = Math.min(96, 44+depth*2), H = Math.min(96, 40+depth*2);
@@ -4043,7 +4241,7 @@ function spawnEnemies(fl, depth){
 }
 
 /* ユニーク敵。エリートより強く中ボスより弱い、名前付きの一体。
-   撃破すると馴れが確定で手に入る唯一の非ボス。
+   撃破すると恩寵が確定で手に入る唯一の非ボス。
    階段を塞がないので、勝てないと思ったら無視して降りられる — そこが賭けになる。 */
 function makeUnique(fl, depth, fams){
   const lv = depth + Math.floor(depth/8) + 1;
@@ -4099,12 +4297,12 @@ function makeUnique(fl, depth, fams){
 
    だから時間そのものに顔をつけて、**帰る側に手を添える**。
 
-   ・還りを見ない。壁役を立てて時間を買えるなら、それが居座りの答えになってしまう。
+   ・プレイヤーを見ない。壁役を立てて時間を買えるなら、それが居座りの答えになってしまう。
    ・**階を降りても消えない。**（ここが最初の版からの一番大きな変更。
      降りて撒けるなら、それは「帰れ」ではなく「進め」になってしまう。）
      降りると 10 秒の猶予をもって追いついてくる。降りることには意味があるが、
      解決にはならない。
-   ・足は最初プレイヤーより遅い。走れば逃げ切れる。
+   ・足は最初主人公より遅い。走れば逃げ切れる。
      つまり殺しに来るのではなく、立ち止まる権利だけを取り上げに来る。
    ・**5分ごとに強くなる。**30分でこちらより速くなる＝もう逃げ切れない。
      これが「もう帰れ」の最終通告で、いつそうなるかは HUD に出す。
@@ -4118,8 +4316,8 @@ const INTRUDER_GRACE     = 10;   // 階を降りたとき、追いつかれる�
 const INTRUDER_RESPAWN   = 90;   // 倒してから次が来るまで
 const INTRUDER_TIER_EVERY= 300;  // この秒数（5分）ごとに一段強くなる
 const INTRUDER_TIER_MAX  = 3;
-/* 足の速さは「プレイヤーの今の移動速度に対する比」で決める。
-   固定値（3.5）にしていたが、移動速度の支度や馴れを積んだ側から見ると
+/* 足の速さは「主人公の今の移動速度に対する比」で決める。
+   固定値（3.5）にしていたが、移動速度の能力強化や恩寵を積んだ側から見ると
    段階が上がっても一生追いつかれない。この相手は数字ではなく
    「逃げ切れる／逃げ切れない」という関係そのものなので、比で持つのが正しい。 */
 const INTRUDER_SPEED_OF_PLAYER = [0.85, 0.92, 0.99, 1.06];
@@ -4186,7 +4384,7 @@ function makeIntruder(fl, depth){
     }
   }
   const fam = FAMILY[0];
-  // 足は「プレイヤーの今の速度に対する比」。段階3でこちらを上回る＝もう逃げ切れない。
+  // 足は「主人公の今の速度に対する比」。段階3でこちらを上回る＝もう逃げ切れない。
   const pms = S.hero ? stats(S.hero).ms : BASE_MOVE_SPEED;
   const e={
     x:best.cx+0.5, y:best.cy+0.5,
@@ -4217,9 +4415,9 @@ function makeIntruder(fl, depth){
    止まる追跡者はただの赤い点で、怖くもないし急かしもしない。
    ——追われている感じが出ないなら、この仕掛けは何もしていないのと同じ。
 
-   なのでプレイヤーの位置から幅優先で距離を配り、侵入者はそれを下って歩く。
-   1体ぶんだけ、しかもプレイヤーが別のマスへ移ったときにしか計算し直さない。
-   還りの足跡（パンくず）を流用しなかったのは、足跡が 56 点＝約30マスしか
+   なので主人公の位置から幅優先で距離を配り、侵入者はそれを下って歩く。
+   1体ぶんだけ、しかも主人公が別のマスへ移ったときにしか計算し直さない。
+   プレイヤーの足跡（パンくず）を流用しなかったのは、足跡が 56 点＝約30マスしか
    残らず、階の反対側にいる侵入者には端まで届かないから。 */
 let _intrF=null, _intrKey='';
 function intruderField(){
@@ -4337,12 +4535,12 @@ const EVENTS=[
    yes:'飲む（敵が速くなる）', no:'飲まない'},
   {id:'altar', nm:'古びた祭壇', icon:'🕯️', col:'#c98adf',
    sub:'何かを求めている。',
-   /* 以前は 20%。1回で最大HPの2割は、馴れ1つの見返りとしては重すぎた——
+   /* 以前は 20%。1回で最大HPの2割は、恩寵1つの見返りとしては重すぎた——
       「強くなるために弱くなる」の弱くなるほうが勝ってしまい、
       祭壇そのものを避けるのが最適解になっていた。10% にして、
       「もう1つ積むか」を毎回考えられる値幅にする。 */
    body:'<b>最大HPの'+Math.round(ALTAR_HP_COST*100)+'%</b>を永久に捧げると、<br>'
-       +'<b>3つの馴れ</b>が示され、そこから<b>1つを選べる</b>。<br>'
+       +'<b>3つの恩寵</b>が示され、そこから<b>1つを選べる</b>。<br>'
        +'<span style="color:var(--dim);font-size:11px">HPの減少はこのキャラが死ぬまで戻らない</span>',
    yes:'捧げる', no:'立ち去る'},
   {id:'urn', nm:'賭博の壺', icon:'🏺', col:'#e0705a',
@@ -4365,7 +4563,7 @@ function spawnEvent(fl, depth){
   return {id:def.id, x:s.x, y:s.y, used:false};
 }
 
-/* 階層に 1 体だけ現れる還り候補。パーティが満員なら出さない。 */
+/* 階層に 1 体だけ現れるプレイヤー候補。パーティが満員なら出さない。 */
 function spawnNpc(fl, depth){
   if(!S.hero) return null;
   if(hasCurse('solitude')) return null;         // 呪い「孤独」
@@ -4375,33 +4573,33 @@ function spawnNpc(fl, depth){
   if(!s) return null;
   const a = makeAlly(depth, S.hero);
   a.x = s.x; a.y = s.y;
-  a.npc = true;          // 加入前。倒れても「倒れた還り」ではなく消滅する
+  a.npc = true;          // 加入前。倒れても「倒れたプレイヤー」ではなく消滅する
   a.awake = false;       // まだ気づいていない（見られるまで戦わない）
   a.hpNow = allyStats(a).maxHp;
   return a;
 }
 
-/* ---------- 加入前の還り（NPC）の戦闘 ----------
+/* ---------- 加入前のプレイヤー（NPC）の戦闘 ----------
    以前は棒立ちで、周りで戦闘が起きても何もしなかった。
    隣で敵に囲まれている人が微動だにしないのは、人ではなく拾い物に見える。
 
    ただし「最初から戦わせる」は成立しない。NPC は階層に入った時点で
-   プレイヤーから遠い場所にいるので、**見えないところで交戦して、会う前に死ぬ。**
-   それは事件ですらなく、ただ還りが出ない階が増えるだけになる。
+   主人公から遠い場所にいるので、**見えないところで交戦して、会う前に死ぬ。**
+   それは事件ですらなく、ただプレイヤーが出ない階が増えるだけになる。
 
    だから **姿が見えたら戦い始める**。視界に入った瞬間に気づき、
-   そこからは本物の戦闘になる——負ければ死に、その還りは永久に失われる。
+   そこからは本物の戦闘になる——負ければ死に、そのプレイヤーは永久に失われる。
    「助けに行くか、見捨てるか」を、出会った瞬間に決めさせたい。
 
    その場から動かないのも意図。追わせると1人で群れに突っ込んで必ず死ぬので、
-   「その場で耐えている」形にして、間に合わせるかどうかをプレイヤーの足に預ける。 */
+   「その場で耐えている」形にして、間に合わせるかどうかを主人公の足に預ける。 */
 const NPC_WAKE_DIST = 8.5;    // ここまで近づき、かつ見通せたら気づく
 /* 相手にする距離。**索敵の広い遠距離敵に合わせて広く取る。**
    5.0 にしていたせいで、射程 5.0 の「守り手」に一方的に撃たれて、
    本人はそれを相手だとすら思っていない、という形になっていた。 */
 const NPC_ENGAGE    = 8.0;
 /* 間合いが足りないときだけ詰める。上限は**元いた場所からの距離**で持つ。
-   還りのように「相手を追う」形にすると、1体倒すたびに次の敵へ引っ張られて
+   プレイヤーのように「相手を追う」形にすると、1体倒すたびに次の敵へ引っ張られて
    1人で群れの中に立つ。動ける範囲そのものを縛れば、それは起きない。
 
    5.0 なのは、相手にする距離（8.0）の内側を実際に殴りに行ける値だから。
@@ -4477,7 +4675,7 @@ function startRun(depth){
            // 帰還は S.run を捨てて次にここを通るので、帰ることだけが解除になる。
            intruder:null, intrNext:INTRUDER_AFTER, intrWarned:false, intrSeen:false,
            healAds:HEAL_ADS_PER_RUN,    // 階段での全体回復（広告）。探索ごとに戻る
-           // 還りの蘇生。5階ごとの帯で、パーティ共通の回数を持つ
+           // プレイヤーの蘇生。5階ごとの帯で、パーティ共通の回数を持つ
            revBand:reviveBand(d), revLeft:REVIVE_PER_BAND,
            /* 疾風の加護の境目。潜り始めに固定するのが肝で、S.deepest を
               直接見ると、記録を更新した瞬間に境目ごと動いて永久に切れない。 */
@@ -4503,20 +4701,20 @@ function startRun(depth){
     h.phoenixUsed=false; h.aegisUp=false; h.aegisT=0; h.renewT=0; h.kin=null; h.avengeT=0;
   });
   S.deathAdBonus = 0;             // 死亡時の広告ぶんは持ち越さない
-  // 中継地点から始めるなら、歩かずに来たぶんの支度を渡す
+  // 中継地点から始めるなら、歩かずに来たぶんの装備を支給する
   const kit = outfitForBeacon(S.hero, d);
   if(kit){
     const parts=[];
     if(kit.lv) parts.push('Lv.'+S.hero.lv+' まで引き上げ');
     if(kit.gear.length) parts.push(kit.gear.join('・')+' を支給');
-    log('⛺ 中継地点の支度：'+parts.join(' / '));
+    log('⛺ 中継地点の支給：'+parts.join(' / '));
   }
   S.hero.hpNow = stats(S.hero).maxHp;
   enterFloor(d);
   setScreen('game');
 }
 function enterFloor(depth){
-  RNG = mulberry32((S.runs*7919 + depth*104729)>>>0);
+  RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
   const fl = genFloor(depth);
   const st = stats(S.hero);
   S.run.depth = depth;
@@ -4530,7 +4728,13 @@ function enterFloor(depth){
   const chests = clamp(1+Math.floor(depth/6),1,6);
   for(let i=0;i<chests;i++){
     const r=pick(fl.rooms);
-    W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it:genItem(depth+2, st.mf), chest:true});
+    /* 最初の1階の1つめだけは**コモンの武器で確定**させる。
+       確率で寄せるだけだと「出ないときは出ない」が残り、
+       一番投げられやすい場所を運に預けることになる。 */
+    const it = (i===0 && earlyArming())
+      ? genBaseItem(pick(BASES.filter(b=>b.slot===SLOT.W && b.ilvl<=1)).id, 1, 0)
+      : genItem(depth+2, st.mf);
+    W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it, chest:true});
   }
   W.seen = Array.from({length:fl.H},()=>new Uint8Array(fl.W));
 
@@ -4539,12 +4743,12 @@ function enterFloor(depth){
   pruneGrave();
   W.grave = (S.grave && S.grave.depth===depth) ? snapToFloor(fl, S.grave.x, S.grave.y) : null;
 
-  // 還り候補。ボス階には出さない（ボス部屋の直前で加入判断をさせない）
+  // プレイヤー候補。ボス階には出さない（ボス部屋の直前で加入判断をさせない）
   W.npc = bossTierAt(depth) ? null : spawnNpc(fl, depth);
   W.ev  = spawnEvent(fl, depth);      // 道中の判断を1つ置く
   W.haz  = spawnHazards(fl, depth);   // 層のテーマに合わせた「踏むと痛い床」
   W.ores = spawnOres(fl, depth);      // 鉱脈。掘ると黒鉄になるが、その場では鍛えられない
-  W.forge = spawnForge(fl, depth, W.ores);   // 炉は別の場所。黒鉄を運ぶ距離をつくる
+  W.forge = spawnForge(fl, depth, W.ores);   // 鍛冶場は別の場所。黒鉄を運ぶ距離をつくる
   W.shop  = spawnMerchant(fl, depth, [W.forge, ...(W.ores||[])]);   // 道中の商人
   W.trial = spawnTrial(fl, depth, [W.forge, W.shop, W.ev, ...(W.ores||[])]);  // 試練の石碑
   W.mine = null;
@@ -4570,13 +4774,13 @@ function enterFloor(depth){
   P.invuln = 0; S.run.ward = null;    // 無敵と守護は階層をまたがない
   S.run.hinted = false;
 
-  // 還りはプレイヤーの脇に付いてくる。壁に埋まらないよう床へスナップする。
+  // プレイヤーは主人公の脇に付いてくる。壁に埋まらないよう床へスナップする。
   livingParty().forEach((a,i)=>{
     const p = snapToFloor(fl, P.x + Math.cos(i*2.1)*1.2, P.y + Math.sin(i*2.1)*1.2);
     a.x=p.x; a.y=p.y; a.atkCd=0; a.swing=0; a.st={}; a.bu={};
     a.crumb=0; a.stuck=0; a.svx=0; a.svy=0; a.mode='follow';
     a.lastDp=undefined; a.slideT=0;
-    // 階層を降りるたびに少し回復する。還りだけ削れっぱなしだと事故死しかしなくなる。
+    // 階層を降りるたびに少し回復する。プレイヤーだけ削れっぱなしだと事故死しかしなくなる。
     const as=allyStats(a);
     a.hpNow = Math.min(as.maxHp, a.hpNow + as.maxHp*0.25);
   });
@@ -4585,18 +4789,18 @@ function enterFloor(depth){
   S.run.bossTier = bossTierAt(depth);
   S.run.bossAlive = !!S.run.bossTier;
 
-  // 治癒の馴れ: 階層を降りるたびに回復する
+  // 治癒の恩寵: 階層を降りるたびに回復する
   const rst=stats(S.hero);
   if(rst.regenPct>0 && !hasCurse('hunger')){
     const healAmt = rst.maxHp*rst.regenPct/100;
-    if(S.hero.hpNow < rst.maxHp){ heal(healAmt); log('治癒の馴れ：HP回復'); }
+    if(S.hero.hpNow < rst.maxHp){ heal(healAmt); log('治癒の恩寵：HP回復'); }
   }
 
   // 装飾品は戦闘では減らず、階層を降りるごとに擦り減る。
-  // 還りにも同じ規則を通す——ここを抜かすと、還りの指輪だけが永久に無傷になる。
+  // プレイヤーにも同じ規則を通す——ここを抜かすと、プレイヤーの指輪だけが永久に無傷になる。
   damageGear('accessory', DUR.accessoryPerFloor);
   livingParty().forEach(a=>damageAllyGear(a, 'accessory', DUR.accessoryPerFloor));
-  P.guard=false; guardId=null; P.parryFx=0;
+  P.guard=false; P.parryFx=0;
 
   // 層が切り替わったときだけ名前を大きく出す（10階層ごと）
   const z = fl.zone;
@@ -4619,7 +4823,7 @@ function enterFloor(depth){
   if(W.enemies.some(e=>e.uniq && !e.dead)) log('見慣れぬ気配がひとつ');
   if(W.ev) log(eventDef(W.ev.id).icon+' '+eventDef(W.ev.id).nm+'がある');
   if(W.ores.length) log('⛏ 鉱脈 '+W.ores.length+'ヶ所');
-  if(W.forge) log('🔥 どこかで炉が焚かれている');
+  if(W.forge) log('🔥 どこかで鍛冶場が焚かれている');
   if(W.shop)  log('🎒 商人がいるらしい');
   if(W.trial) log('🗿 試練の石碑がある');
   if(W.haz) log('⚠ '+hazardDef(W.haz.kind).nm+'がある');
@@ -4646,17 +4850,17 @@ function snapToFloor(fl, x, y){
   return {x:fl.start.cx+0.5, y:fl.start.cy+0.5};
 }
 
-/* ---------- ワールド / プレイヤー ---------- */
+/* ---------- ワールド / 主人公 ---------- */
 const P={x:0,y:0,vx:0,vy:0,dirx:1,diry:0,atkCd:0,swing:0,r:0.32,
          guard:false, guardStart:-99, parryFx:0};
 const W={fl:null,enemies:[],drops:[],fx:[],pops:[],seen:null,grave:null,npc:null,
          ev:null,     // その階層のイベント
          haz:null,    // 地形ハザード（溶岩・毒沼など）
-         ores:[],     // 鉱脈。掘ると露天の炉になる
+         ores:[],     // 鉱脈。掘ると露天の鍛冶場になる
          mine:null,   // 採掘中（掘っているあいだは動けない）
-         arts:[],     // 還りの大技が置いた効果（焦土・聖域）
+         arts:[],     // プレイヤーの大技が置いた効果（焦土・聖域）
          trial:null,  // 試練の石碑（遺物の唯一の入手口）
-         trail:[]};   // プレイヤーの足跡。還りの追従に使う
+         trail:[]};   // 主人公の足跡。プレイヤーの追従に使う
 
 function solid(x,y){
   const f=W.fl; if(!f) return true;
@@ -4697,7 +4901,7 @@ function dmgCalc(atk, mult, def, lv, fire, res=0){
    1フレームに1度だけ敵をマス目に配って、以降は近傍のマスだけ見る。
    計算量が「弾 × 敵」から「弾 × 近くの敵」に変わる。 */
 /* 1マスの大きさ（タイル）。小さいほど1マスに入る敵が減るが、見るマス数は増える。
-   敵が固まる場所（プレイヤーの周り）で効かせたいので、射程より小さめに取る。 */
+   敵が固まる場所（主人公の周り）で効かせたいので、射程より小さめに取る。 */
 const GRID_CELL = 2;
 const EGrid = {cw:0, ch:0, cells:null, stamp:-1, n:-1};
 function gridBuild(){
@@ -4752,8 +4956,8 @@ function nearestEnemy(maxDist){
   return best;
 }
 
-/* プレイヤーの周囲 leash マス以内にいる敵のうち、(x,y) から最も近いもの。
-   還りの交戦範囲に使う。還りが単騎で釣られていくのを止めるのが目的。 */
+/* 主人公の周囲 leash マス以内にいる敵のうち、(x,y) から最も近いもの。
+   プレイヤーの交戦範囲に使う。プレイヤーが単騎で釣られていくのを止めるのが目的。 */
 function nearestEnemyNearPlayer(x, y, maxDist, leash){
   let best=null, bd=maxDist;
   for(const e of nearEnemies(x, y, maxDist+1)){
@@ -4775,18 +4979,18 @@ function nearestEnemyTo(x, y, maxDist){
   }
   return best;
 }
-/* 敵が狙う相手。プレイヤーと生存している還りのうち最も近い者。
-   還りが壁役として機能するのは、この一行があるからこそ。 */
+/* 敵が狙う相手。主人公と生存しているプレイヤーのうち最も近い者。
+   プレイヤーが壁役として機能するのは、この一行があるからこそ。 */
 function enemyTarget(e){
-  // 侵入者だけは還りを見ない。壁役で時間を買えるなら、それが居座りの答えになってしまう。
+  // 侵入者だけはプレイヤーを見ない。壁役で時間を買えるなら、それが居座りの答えになってしまう。
   if(e.intruder) return {x:P.x, y:P.y, ent:null};
   let best={x:P.x, y:P.y, ent:null}, bd=Math.hypot(P.x-e.x, P.y-e.y);
   for(const a of livingParty()){
     const d=Math.hypot(a.x-e.x, a.y-e.y);
     if(d<bd){ bd=d; best={x:a.x, y:a.y, ent:a}; }
   }
-  /* 加入前の還りも、**気づいたあとだけ**狙われる。
-     気づく前から狙わせると、プレイヤーが着く前に死んでいる。 */
+  /* 加入前のプレイヤーも、**気づいたあとだけ**狙われる。
+     気づく前から狙わせると、主人公が着く前に死んでいる。 */
   if(npcAwake()){
     const a=W.npc, d=Math.hypot(a.x-e.x, a.y-e.y);
     if(d<bd){ bd=d; best={x:a.x, y:a.y, ent:a}; }
@@ -4798,7 +5002,7 @@ function enemyTarget(e){
    実測すると、飛び道具の理論火力はむしろ最下位（弓105 / 短剣153 / 剣126）。
    にもかかわらず弓が強すぎたのは、火力ではなく**構造**の問題だった。
 
-     プレイヤーの移動速度 4.13 は、全アーキタイプ（最速の蟲でも 3.2）より速い。
+     主人公の移動速度 4.13 は、全アーキタイプ（最速の蟲でも 3.2）より速い。
      つまり射程 6.5 の弓で後ろに歩き続けるだけで、敵は永久に届かない。
      同じ火力でも、剣は「殴られながら」出す数字で、弓は「無傷で」出す数字だった。
 
@@ -4807,7 +5011,7 @@ function enemyTarget(e){
    「弓は下がりながら撃つ武器」ではなく「間合いを保って足を止める武器」にする。
 
    近接には一切かからない（かけるとゲームが別物になる）。 */
-/* 引き撃ちはほぼ無リスク（プレイヤーの足のほうが速い）なので、
+/* 引き撃ちはほぼ無リスク（主人公の足のほうが速い）なので、
    火力は「どの選択肢より低い」が正しい形。ただし潰しはしない。
    0.55 まで下げたら横移動に火力でも安全性でも負けて選択肢が死んだので 0.62 に戻した。 */
 const KITE={ still:1.00, advance:0.95, strafe:0.85, retreat:0.62 };
@@ -4829,8 +5033,8 @@ function kiteMul(st, mvx, mvy, moving, tx, ty, fx, fy){
 /* 両手武器はガード中に振れない。片手武器は盾を構えたまま戦える。 */
 function canAttackNow(st){ return !(P.guard && st.hasShield && st.hands===2); }
 
-/* プレイヤーの一撃を属性ごとに分解する。武器の物理 + 装備で付いた属性ダメージ。 */
-/* 攻撃側が持つ状態異常の蓄積倍率（侵蝕の馴れ） */
+/* 主人公の一撃を属性ごとに分解する。武器の物理 + 装備で付いた属性ダメージ。 */
+/* 攻撃側が持つ状態異常の蓄積倍率（侵蝕の恩寵） */
 function playerAilMul(st){ return 1 + (st.ailPct||0)/100; }
 /* 武器に乗っている追加属性のうち、いちばん大きいもの。
    「斬撃 + 炎」の武器を振ったときに炎の粒も出したいので、描画用に拾っておく。 */
@@ -4848,7 +5052,7 @@ function playerParts(st, mult){
   }
   return parts;
 }
-/* opt.src = 攻撃者（省略時はプレイヤー）。還りも同じ解決器を通す。
+/* opt.src = 攻撃者（省略時は主人公）。プレイヤーも同じ解決器を通す。
    opt.forceCrit = 狩人の「狙撃」用。 */
 function hitEnemy(e, st, mult, opt){
   opt = opt||{};
@@ -4872,7 +5076,7 @@ function hitEnemy(e, st, mult, opt){
   if(e.hp<=0 && !e.dead) killEnemy(e, opt.src||null);
   return r;
 }
-/* プレイヤー / 還りの共通回復 */
+/* 主人公 / プレイヤーの共通回復 */
 function healEnt(h, v){
   if(!h) return;
   const mx = (h===S.hero) ? stats(h).maxHp : allyStats(h).maxHp;
@@ -4978,8 +5182,8 @@ function onGreatBossDown(e){
 }
 
 /* ---------- ハザードの適用 ----------
-   プレイヤー・還り・敵に、まったく同じ規則で効かせる。
-   プレイヤーだけが損をする仕掛けは「避けるだけの作業」になって判断にならない。
+   主人公・プレイヤー・敵に、まったく同じ規則で効かせる。
+   主人公だけが損をする仕掛けは「避けるだけの作業」になって判断にならない。
    敵を溶岩へ誘い込めるなら、同じ床が武器にもなる。 */
 const HAZ_TICK = 0.5;            // この間隔でまとめてダメージを入れる（毎フレームは重い）
 function hazardSlowAt(x,y){
@@ -4993,9 +5197,9 @@ function tickHazards(dt){
   const step = W.hazT; W.hazT = 0;
   const lv = S.run.depth;
 
-  // プレイヤー
+  // 主人公
   const ph = hazardAt(P.x, P.y);
-  if(ph && S.hero && (P.invuln||0)<=0){
+  if(ph && S.hero && !godMode() && (P.invuln||0)<=0){
     // 踏み続けている間の削れも、割合で頭を打つ（出血と同じ理由）
     const cap = stats(S.hero).maxHp*dotPct()*step;
     const dmg = Math.max(1, Math.round(Math.min(ph.dps*step*(1+lv*0.06), cap)));
@@ -5008,13 +5212,13 @@ function tickHazards(dt){
   }
   if(!S.hero || !S.run) return;
 
-  // 還り
+  // プレイヤー
   livingParty().forEach(a=>{
     const h=hazardAt(a.x,a.y); if(!h) return;
     const cap = allyStats(a).maxHp*dotPct()*step;
     const dmg=Math.max(1, Math.round(Math.min(h.dps*step*(1+lv*0.05)*0.8, cap)));
     a.hpNow-=dmg; pop(a.x,a.y-0.4,dmg,h.edge);
-    // 浅い階の出血よけは還りにも掛ける（ここだけ通していなかった）
+    // 浅い階の出血よけはプレイヤーにも掛ける（ここだけ通していなかった）
     if(h.st && rnd()<0.30 && !statusSuppressed(a, h.st)) addStatus(a, h.st, lv);
     if(a.hpNow<=0) downAlly(a);
   });
@@ -5117,22 +5321,22 @@ function fireUlt(){
   return true;
 }
 
-/* ---------- 還りの行動 ----------
-   還りは「追う・戦う・倒れる」しかしない。指示は一切出せない。
+/* ---------- プレイヤーの行動 ----------
+   プレイヤーは「追う・戦う・倒れる」しかしない。指示は一切出せない。
    操作は移動だけ、という原則をパーティにも通すため、
    面倒を見るのではなく、勝手に戦う頭数として扱う。 */
-const ALLY_FOLLOW_DIST = 3.2;   // これ以上離れたら敵を捨ててプレイヤーに戻る
-/* 還りが相手にしてよい敵の範囲（プレイヤーからの距離）。
+const ALLY_FOLLOW_DIST = 3.2;   // これ以上離れたら敵を捨てて主人公に戻る
+/* プレイヤーが相手にしてよい敵の範囲（主人公からの距離）。
    これを超えた敵は、目の前にいても無視して戻ってくる。 */
 const ALLY_ENGAGE = 5.5;
-/* 交戦中に立ってよい、プレイヤーからの最大距離。
+/* 交戦中に立ってよい、主人公からの最大距離。
    敵を見失う距離（ALLY_FOLLOW_DIST*1.6 = 5.12）より内側に取る。 */
 const ALLY_LEASH = ALLY_FOLLOW_DIST*1.6*0.85;
 function allyUpdate(a, dt){
   if(a.dead) return;
   const st = allyStats(a);
 
-  // 状態異常は敵・プレイヤーと同じエンジンを通す
+  // 状態異常は敵・主人公と同じエンジンを通す
   tickStatus(a, dt, (d,col)=>{ a.hpNow-=d; pop(a.x,a.y-0.4,d,col); });
   if(a.hpNow<=0){ downAlly(a); return; }
   if(hasStatus(a,'stagger')){ a.hit=Math.max(a.hit,0.05); return; }
@@ -5171,10 +5375,10 @@ function allyUpdate(a, dt){
   const dp = Math.hypot(P.x-a.x, P.y-a.y);
   const hpFrac = a.hpNow / Math.max(1, st.maxHp);
 
-  /* 交戦の範囲は「還りから見た距離」ではなく「プレイヤーから見た距離」で決める。
-     還り基準にすると、還りが前に出た先でさらに次の敵を見つけて、
+  /* 交戦の範囲は「プレイヤーから見た距離」ではなく「主人公から見た距離」で決める。
+     プレイヤー基準にすると、プレイヤーが前に出た先でさらに次の敵を見つけて、
      数珠つなぎに引っ張られて単騎で群れに突っ込む。1体ずつなら勝てる相手でも、
-     これが起きると必ず死ぬ。プレイヤーの周りの敵だけを相手にさせる。 */
+     これが起きると必ず死ぬ。主人公の周りの敵だけを相手にさせる。 */
   /* 交戦を降りる距離（5.12）と、追従に切り替える距離（3.2）が違うと、
      そのあいだの帯で「戻る→敵が見える→出る→戻る」を延々と往復する。
      一度交戦に入ったら 5.12 まで粘らせ、そこで初めて追従へ落とす。 */
@@ -5184,14 +5388,14 @@ function allyUpdate(a, dt){
   if(!tgt) a.mode='follow';
   a.tgt = tgt;                    // 今相手にしている敵（表示と検証で使う）
 
-  /* 傷ついたら退く。近接の還りが突っ込んで即死するのは、
+  /* 傷ついたら退く。近接のプレイヤーが突っ込んで即死するのは、
      「相手がいる限り前に出続ける」以外の行動を持っていなかったから。
      引き際を持たせるだけで生存率が変わる（回復役がいれば立て直せる）。 */
   const wounded = hpFrac < j.bail;
 
   let mvx=0, mvy=0, goal=null;
   if(wounded && tgt){
-    // 敵から離れつつ、プレイヤーの方へ寄る（1人で逃げて孤立しないように）
+    // 敵から離れつつ、主人公の方へ寄る（1人で逃げて孤立しないように）
     const ex=a.x-tgt.x, ey=a.y-tgt.y, ed=Math.hypot(ex,ey)||1e-6;
     const px=(P.x-a.x), py=(P.y-a.y), pd=Math.hypot(px,py)||1e-6;
     mvx = ex/ed*0.75 + px/pd*0.45;
@@ -5201,16 +5405,16 @@ function allyUpdate(a, dt){
     const dn=Math.hypot(a.dirx,a.diry)||1e-6; a.dirx/=dn; a.diry/=dn;
   }else if(!tgt || (!allyEngaged(a) && dp > ALLY_FOLLOW_DIST)){
     a.mode='follow';
-    /* 追従はプレイヤーの足跡（パンくず）を辿る。直線で寄せると、
+    /* 追従は主人公の足跡（パンくず）を辿る。直線で寄せると、
        部屋の角や通路の入口で壁に押し付けられて動けなくなる。
-       プレイヤーが通った道は必ず通れるので、それを辿るのが一番確実。
+       主人公が通った道は必ず通れるので、それを辿るのが一番確実。
        ただし全員が同じ足跡を辿ると一列に重なるので、
        スロットごとに横へずらした点を目標にする。 */
     goal = trailGoal(a);
     const off = slotOffset(a);
     /* 隊列のずらしは、ずらした先が床のときだけ効かせる。
        通路で足跡の脇にずらすと目標が壁の中に入り、そこへは永久に着けないので
-       足跡が次へ進まず、その還りだけ置き去りになる。 */
+       足跡が次へ進まず、そのプレイヤーだけ置き去りになる。 */
     let tx=goal.x+off.x, ty=goal.y+off.y;
     if(solid(tx,ty)){ tx=goal.x; ty=goal.y; }
     const gx=tx-a.x, gy=ty-a.y, gd=Math.hypot(gx,gy);
@@ -5221,7 +5425,7 @@ function allyUpdate(a, dt){
       const ease = Math.min(1, (gd-ALLY_ARRIVE*0.5)/ALLY_SLOWDOWN);
       mvx=gx/gd*ease; mvy=gy/gd*ease;
     }
-    /* 目標に着いていても、プレイヤーから離れていたら必ず寄る。
+    /* 目標に着いていても、主人公から離れていたら必ず寄る。
        足跡が古い・短いときに「その場で立ち尽くす」のを防ぐ最後の保険。 */
     if(dp > ALLY_FOLLOW_DIST && Math.hypot(mvx,mvy) < 0.25){
       const px=(P.x-a.x)/dp, py=(P.y-a.y)/dp;
@@ -5229,7 +5433,7 @@ function allyUpdate(a, dt){
     }
   }else if(j.backline && (a.cover=frontlineFor(a))){
     /* ---------- 後衛の立ち位置 ----------
-       僧侶は戦槌＝近接なので、他の還りと同じ規則で動かすと最前線まで出る。
+       僧侶は戦槌＝近接なので、他のプレイヤーと同じ規則で動かすと最前線まで出る。
        回復役が真っ先に落ちるので、パーティ全体が立て直せなくなっていた。
 
        前衛がいるあいだは、その**後ろ**（敵から見て前衛の向こう側）に立つ。
@@ -5248,7 +5452,7 @@ function allyUpdate(a, dt){
     // 前衛から見て「敵の反対側」に、少し離れて立つ
     const ex=f.x-tgt.x, ey=f.y-tgt.y, ed=Math.hypot(ex,ey)||1e-6;
     let spot={x:f.x+ex/ed*BACKLINE_GAP, y:f.y+ey/ed*BACKLINE_GAP};
-    // ただしプレイヤーのリードの外へは出ない（1人だけ置き去りにならないように）
+    // ただし主人公のリードの外へは出ない（1人だけ置き去りにならないように）
     const sdp=Math.hypot(spot.x-P.x, spot.y-P.y);
     if(sdp > ALLY_LEASH){
       const k=ALLY_LEASH/sdp;
@@ -5276,11 +5480,11 @@ function allyUpdate(a, dt){
     const step = Math.max(0.55, 1.0/Math.max(0.6, keep));
     const ring = ((a.slot||0)-1) * step;           // 敵を中心に左右へ散る角度
     const wob  = Math.sin(nowSec()*0.9 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
-    /* 基準の向きは「プレイヤーから見た敵」。ここを「自分から見た敵」にすると、
+    /* 基準の向きは「主人公から見た敵」。ここを「自分から見た敵」にすると、
        毎フレーム自分の新しい位置から測り直して ring ぶん回るので、
        立ち位置が決まらず敵の周りを永久に周回してしまう（＝震え・往復の正体）。
-       プレイヤー基準にすれば、スロットごとの立ち位置が動かない点として決まり、
-       しかも必ずプレイヤー側の面に立つ。 */
+       主人公基準にすれば、スロットごとの立ち位置が動かない点として決まり、
+       しかも必ず主人公側の面に立つ。 */
     const base = Math.atan2(tgt.y-P.y, tgt.x-P.x);
     const ang  = base + ring + wob;
     const spot = {x:tgt.x-Math.cos(ang)*keep, y:tgt.y-Math.sin(ang)*keep};
@@ -5365,8 +5569,8 @@ function allyUpdate(a, dt){
     a.stuck = (a.stuck||0) + dt*0.5;
   a.lastDp = dp;
 
-  /* 最終手段。壁の向こうに取り残されて戻れなくなった還りは、
-     プレイヤーの足跡の上に置き直す。見えない位置でだけ行う。 */
+  /* 最終手段。壁の向こうに取り残されて戻れなくなったプレイヤーは、
+     主人公の足跡の上に置き直す。見えない位置でだけ行う。 */
   if((a.stuck||0) > 1.8 && dp > 5){
     const spot = W.trail.length ? W.trail[Math.max(0, W.trail.length-3)] : {x:P.x, y:P.y};
     const p = snapToFloor(W.fl, spot.x, spot.y);
@@ -5374,7 +5578,7 @@ function allyUpdate(a, dt){
     W.fx.push({t:'grave',x:a.x,y:a.y,life:0.4,max:0.4});
   }
 
-  a.mvx=mvx; a.mvy=mvy; a.moving=!!(mvx||mvy);   // 引き撃ち判定（還りにも同じ規則）
+  a.mvx=mvx; a.mvy=mvy; a.moving=!!(mvx||mvy);   // 引き撃ち判定（プレイヤーにも同じ規則）
 
   /* 後衛（前衛の陰にいる僧侶）は撃たない。
      間合いだけ下げても、届く位置まで出ることが危険の本体なので、
@@ -5393,8 +5597,8 @@ function allyUpdate(a, dt){
    力で押し合うのをこれ以上強くすると、今度は震えが戻る。
    なので、全員が動き終わったあとに一度だけ「めり込んでいたら押し戻す」を掛ける。
    力ではなく位置の拘束なので、重なっていないときは何もせず、振動しようがない。 */
-const ALLY_MIN_GAP  = 0.46;     // 還りどうしがこれより近づくことは無い
-const PLAYER_MIN_GAP= 0.40;     // プレイヤーの上にも乗らない（動かすのは還りの側だけ）
+const ALLY_MIN_GAP  = 0.46;     // プレイヤーどうしがこれより近づくことは無い
+const PLAYER_MIN_GAP= 0.40;     // 主人公の上にも乗らない（動かすのはプレイヤーの側だけ）
 function resolveAllyOverlap(){
   const p=livingParty();
   // 2 回だけ回す。1 回だと 3 人が数珠つなぎに重なったときに解ききれない。
@@ -5419,8 +5623,8 @@ function resolveAllyOverlap(){
 }
 
 /* ---------- 追いつき ----------
-   重騎士や戦士はジョブ係数で素の移動速度がプレイヤーより遅い。
-   プレイヤーが走り続けるかぎり、その差は積み上がるだけで永久に縮まらない。
+   重騎士や戦士はジョブ係数で素の移動速度が主人公より遅い。
+   主人公が走り続けるかぎり、その差は積み上がるだけで永久に縮まらない。
    実測でも、9秒ほど走り回ると 6〜9 マス後ろに置き去りになっていた。
    これは「遅い」ではなく「いない」で、パーティが成立しない。
 
@@ -5444,7 +5648,7 @@ function slotOffset(a){
   const w = Math.sin(nowSec()*0.7 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
   return {x:lane[0]+w, y:lane[1]-w*0.6};
 }
-/* 分離力。近すぎる相手（還り・プレイヤー）から押し離す向きを返す。 */
+/* 分離力。近すぎる相手（プレイヤー・主人公）から押し離す向きを返す。 */
 const ALLY_PERSONAL = 0.62;      // これより近づいたら押し合う
 const ALLY_SEP_PUSH = 0.9;       // 押し返す強さ。1 を超えると寄る力に勝って震える
 const ALLY_ARRIVE   = 0.55;      // ここまで来たら「着いた」
@@ -5467,19 +5671,19 @@ function separation(a){
     sx+=dx/d*w; sy+=dy/d*w; n++;
   };
   livingParty().forEach(m=>{ if(m!==a) push(m.x, m.y, ALLY_PERSONAL); });
-  push(P.x, P.y, ALLY_PERSONAL*0.85);      // プレイヤーの上にも乗らない
+  push(P.x, P.y, ALLY_PERSONAL*0.85);      // 主人公の上にも乗らない
   if(!n) return null;
   /* 正規化しない。単位ベクトルにして返すと「1mm めり込んだだけ」でも
      全速力で押し返してしまい、目標へ寄る → 押し返される → また寄る、を
-     毎フレーム繰り返して還りが細かく震える。
+     毎フレーム繰り返してプレイヤーが細かく震える。
      めり込んだ深さに比例した強さにすれば、触れた瞬間はごく弱く効く。 */
   const m=Math.hypot(sx,sy);
   return m>1 ? {x:sx/m, y:sy/m} : {x:sx, y:sy};
 }
 
-/* ---------- プレイヤーの足跡（パンくず） ----------
-   還りの追従に使う。直線で寄せると角や通路の入口で壁に貼り付くので、
-   「プレイヤーが実際に通った座標」を辿らせる。必ず通れることが保証される。 */
+/* ---------- 主人公の足跡（パンくず） ----------
+   プレイヤーの追従に使う。直線で寄せると角や通路の入口で壁に貼り付くので、
+   「主人公が実際に通った座標」を辿らせる。必ず通れることが保証される。 */
 const TRAIL_MAX = 56, TRAIL_STEP = 0.55;
 function pushTrail(){
   const t=W.trail;
@@ -5491,7 +5695,7 @@ function pushTrail(){
     livingParty().forEach(m=>{ m.crumb = Math.max(0,(m.crumb||0)-1); });
   }
 }
-/* その還りが今めざすべき足跡を返す */
+/* そのプレイヤーが今めざすべき足跡を返す */
 /* 2点のあいだに壁が無いか。足跡を辿るべきかどうかの判断に使う。 */
 function losClear(x0,y0,x1,y1){
   const dx=x1-x0, dy=y1-y0, d=Math.hypot(dx,dy);
@@ -5506,13 +5710,13 @@ function trailGoal(a){
   const t=W.trail;
   if(!t.length) return {x:P.x, y:P.y};
   /* 足跡は「角で壁に貼り付かない」ための道具であって、目的ではない。
-     プレイヤーが見えているなら、遠回りせず直線で寄る。
-     これが無いと、プレイヤーが走り回った軌跡をそのままなぞる羽目になり、
+     主人公が見えているなら、遠回りせず直線で寄る。
+     これが無いと、主人公が走り回った軌跡をそのままなぞる羽目になり、
      直線距離では 3 マスなのに経路では 20 マス、という事態が普通に起きる
      （実測で 6〜9 マス後ろに置き去りになっていた原因はここだった）。 */
   if(losClear(a.x, a.y, P.x, P.y)){
     /* 見失った瞬間に辿り始める地点を用意しておく。
-       ここで「最新の足跡」に固定すると、プレイヤーが角を曲がった瞬間に
+       ここで「最新の足跡」に固定すると、主人公が角を曲がった瞬間に
        目標が壁の向こうになり、壁に貼り付いたまま追ってこなくなる。
        自分にいちばん近い足跡を持っておけば、そこから前へ辿り直せる。 */
     let bi=0, bd=Infinity;
@@ -5589,7 +5793,7 @@ function tickRelics(dt){
       }
     }
   }
-  // 伴影：プレイヤーの周りを回り、近くの敵を撃つ
+  // 伴影：主人公の周りを回り、近くの敵を撃つ
   const n=relicSum('wisp');
   P.wisps = P.wisps || [];
   while(P.wisps.length < n) P.wisps.push({ang:rnd()*6.28, cd:rf(0,RELIC_WISP_CD)});
@@ -5613,6 +5817,48 @@ function tickRelics(dt){
   });
 }
 const RELIC_WISP_CD=1.9, RELIC_WISP_RANGE=5.0, RELIC_WISP_MULT=0.5;
+
+/* ---------- 鞘無し（周回刃）の毎フレーム処理 ----------
+   弾を撃たない。刃そのものが当たる。だから W.fx を1つも使わず、
+   判定は「刃のいるマスの近傍を1回引く」だけで済む。
+
+   **同じ敵には1周に1回しか当たらない。**
+   刃ごとに「その敵を最後に斬った時刻」を持っているので、
+   毎フレーム重なっていても連打にはならない。
+   結果として**回転速度がそのまま攻撃速度になる**——
+   速く回る刃を作れば手数が増える、が説明なしで成立する。 */
+function tickBlades(dt){
+  if(!S.run || !S.hero) return;
+  const n = bladeCount();
+  P.blades = P.blades || [];
+  while(P.blades.length < n) P.blades.push({hits:new Map()});
+  P.blades.length = n;
+  if(!n){ P.bladeAng = 0; return; }
+
+  P.bladeAng = (P.bladeAng||0) + dt*BLADE_SPIN;
+  const st = stats(S.hero);
+  const now = S.run.elapsed || 0;
+  const period = (Math.PI*2)/BLADE_SPIN;      // 1周にかかる秒数
+  P.blades.forEach((bl,i)=>{
+    const ang = P.bladeAng + (i * Math.PI*2 / n);
+    bl.x = P.x + Math.cos(ang)*BLADE_R;
+    bl.y = P.y + Math.sin(ang)*BLADE_R;
+    for(const e of nearEnemies(bl.x, bl.y, BLADE_HIT_R + 1.0)){
+      if(e.dead) continue;
+      if(Math.hypot(bl.x-e.x, bl.y-e.y) > e.r + BLADE_HIT_R) continue;
+      const last = bl.hits.get(e);
+      if(last!==undefined && now - last < period*0.92) continue;
+      bl.hits.set(e, now);
+      // blade:true は「この一撃は刃から」の印。検証で本体の攻撃と混ざらないようにする
+      hitEnemy(e, st, BLADE_MULT, {foot:'still', blade:true});
+    }
+    // 倒した相手を覚え続けない（Map が階をまたいで太る）
+    if(bl.hits.size > 40){
+      for(const [e,t] of bl.hits) if(e.dead || now-t > period*2) bl.hits.delete(e);
+    }
+  });
+}
+
 /* 遺物「震撼」。近接が当たった場所から衝撃波が広がる。
    本体より軽く、当たった相手には二重に入らない（1発が2回分にならないように）。 */
 const RELIC_SHOCK_R=1.9, RELIC_SHOCK_MULT=0.45;
@@ -5626,7 +5872,7 @@ function relicShockwave(st, e){
   });
 }
 
-/* 還りが敵に当てたときの追加効果。近接も飛び道具もここを通す。 */
+/* プレイヤーが敵に当てたときの追加効果。近接も飛び道具もここを通す。 */
 function applyAllyOnHit(a, e, st){
   if(!a || !e || e.dead) return;
   const k = (st && st.skills) || allySkillSum(a);
@@ -5656,7 +5902,7 @@ function allyAttack(a, st, tgt){
   const forceCrit = j.sk.id==='snipe' && a.shots%3===0;
 
   if(st.proj){
-    // 還りの射手にも同じ引き撃ち規則を通す（下がりながら撃てば弱くなる）
+    // プレイヤーの射手にも同じ引き撃ち規則を通す（下がりながら撃てば弱くなる）
     const foot = kiteMul(st, a.mvx, a.mvy, a.moving, tgt.x, tgt.y, a.x, a.y);
     W.fx.push({t:'ashot', kind:st.proj, x:a.x, y:a.y,
                vx:Math.cos(ang)*(st.proj==='arrow'?13:8.5),
@@ -5685,7 +5931,7 @@ function allyAttack(a, st, tgt){
   });
 }
 
-/* 還りの被弾。プレイヤーと違って盾のパリイは無い（構える操作を持たないので）。 */
+/* プレイヤーの被弾。主人公と違って盾のパリイは無い（構える操作を持たないので）。 */
 function hitAlly(a, e, boltDmg, dmgType, boltLv){
   if(!a || a.dead) return;
   const j = jobDef(a.job);
@@ -5699,7 +5945,7 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
     W.pops.push({x:a.x, y:a.y-0.4, txt:'幻影', c:'#d6b34a', life:0.6});
     return;
   }
-  if(spendAegis(a, a.x, a.y)) return;   // 守護の馴れ
+  if(spendAegis(a, a.x, a.y)) return;   // 守護の恩寵
   if(spendBarrier(a, a.x, a.y)) return; // 重騎士の守護陣
   const st = allyStats(a);
   const lv = e ? e.lv : (boltLv || (S.run?S.run.depth:1));
@@ -5725,7 +5971,7 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
     pop(e.x, e.y-0.3, back, j.col);
     if(e.hp<=0) killEnemy(e, a);
   }
-  // 精鋭・ユニークの性質。プレイヤーと同じ物が還りにも効く。
+  // 精鋭・ユニークの性質。主人公と同じ物がプレイヤーにも効く。
   if(e && !e.dead){
     const pr=affOf(e,'proc');
     if(pr && !statusSuppressed(a, pr)) addStatus(a, pr, e.lv);
@@ -5746,10 +5992,10 @@ function damageAllyGear(a, slot, amount){
   if(it.dur<=0){ it.dur=0; log(a.name+'の'+it.nm+'が壊れた'); }
 }
 
-/* 還りが倒れた。ここでロストが確定し、広告での蘇生を 1 度だけ提案する。 */
+/* プレイヤーが倒れた。ここでロストが確定し、広告での蘇生を 1 度だけ提案する。 */
 function downAlly(a){
   if(a.dead) return;
-  /* 加入前の還りは、蘇生の対象にならない。
+  /* 加入前のプレイヤーは、蘇生の対象にならない。
      「1人につき1回だけ」の広告蘇生は**連れ歩いた相手**への救済であって、
      まだ名前しか知らない相手に使えると、あらゆる階で保険が効いてしまう。
      ここで消えるからこそ、間に合わなかったことに意味が出る。 */
@@ -5757,11 +6003,11 @@ function downAlly(a){
     a.dead=true; a.hpNow=0;
     W.fx.push({t:'grave',x:a.x,y:a.y,life:0.9,max:0.9});
     log('✕ '+allyLabel(a)+'は倒れてしまった');
-    showBanner('間に合わなかった', a.name+'を還りにできなかった', '#e0705a', 2.2);
+    showBanner('間に合わなかった', a.name+'をプレイヤーにできなかった', '#e0705a', 2.2);
     W.npc=null;
     return;
   }
-  if(tryPhoenix(a, false)) return;      // 不死鳥の馴れ
+  if(tryPhoenix(a, false)) return;      // 不死鳥の恩寵
   a.dead=true; a.hpNow=0;
   W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
   log(allyLabel(a)+'が倒れた');
@@ -5771,8 +6017,8 @@ function heal(v){ const st=stats(S.hero); S.hero.hpNow=Math.min(st.maxHp,S.hero.
 function pop(x,y,v,c,mark){ W.pops.push({x,y,v:Math.round(v),c,mark:mark||'',life:0.7}); }
 
 /* ---------- 経験値の分配 ----------
-   還りが増えるほど 1 人あたりの取り分は減る。これが還りを入れる代償。
-   ただし完全な 1/N にすると還りを入れるほど損になって誰も入れなくなるので、
+   プレイヤーが増えるほど 1 人あたりの取り分は減る。これがプレイヤーを入れる代償。
+   ただし完全な 1/N にするとプレイヤーを入れるほど損になって誰も入れなくなるので、
    人数に応じてプールそのものを少し膨らませ、
    「1人あたりは減るが、パーティ全体では増える」という形にしている。 */
 function grantXp(total){
@@ -5784,7 +6030,7 @@ function grantXp(total){
   return share;
 }
 function addXp(h, amount, isPlayer){
-  // 研鑽の馴れ。受け取る本人の馴れで伸びる（パーティ全体の分配とは別勘定）
+  // 研鑽の恩寵。受け取る本人の恩寵で伸びる（パーティ全体の分配とは別勘定）
   h.xp += amount * (1 + boonSum(h,'xp')/100);
   while(h.xp >= xpNeed(h.lv)){
     h.xp -= xpNeed(h.lv); h.lv++;
@@ -5848,11 +6094,11 @@ function killEnemy(e, byAlly){
   const xp = Math.round((6+e.lv*4.2)*(e.elite?2.5:1)*(cfg?cfg.xp:1));
   grantXp(xp);
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
-                       *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の馴れ
+                       *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
   S.run.gold+=g;
 
   if(e.boss){
-    // 確定ドロップ。ボスに挑む理由は馴れだけでなく物としても要る。
+    // 確定ドロップ。ボスに挑む理由は恩寵だけでなく物としても要る。
     for(let i=0;i<cfg.drops;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
                     it:genItem(S.run.depth+cfg.ilvl, st.mf+40)});
@@ -5885,7 +6131,7 @@ function killEnemy(e, byAlly){
     return;
   }
 
-  // ユニーク敵は馴れが確定。ボスと違って階段を塞がないので、
+  // ユニーク敵は恩寵が確定。ボスと違って階段を塞がないので、
   // 「戦うかどうか」を選ばせたうえでの報酬になる。
   if(e.uniq){
     log(e.name+'を討ち取った');
@@ -5906,7 +6152,7 @@ function killEnemy(e, byAlly){
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), it:makeConsum()});
 
   let rate = 0.22 + (e.elite?0.35:0);
-  // 盗賊の「物色」: 還りがとどめを刺したときに追加のドロップ
+  // 盗賊の「物色」: プレイヤーがとどめを刺したときに追加のドロップ
   if(byAlly && jobDef(byAlly.job).sk.id==='scavenge' && rnd()<0.18)
     W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40)});
   if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf)});
@@ -5926,7 +6172,7 @@ function enemyUpdate(e,dt){
   const slow = hasStatus(e,'chill') ? (1-CHILL_SLOW) : 1;
 
   const a=e.arch;
-  // 狙う相手はプレイヤーと還りのうち最も近い者。還りが壁役になれるのはここ。
+  // 狙う相手は主人公とプレイヤーのうち最も近い者。プレイヤーが壁役になれるのはここ。
   const tg = enemyTarget(e);
   const dx=tg.x-e.x, dy=tg.y-e.y, d=Math.hypot(dx,dy)||1e-6;
   // 侵入者は視界を持たない。どこに隠れても真っ直ぐ歩いてくる（それが唯一の武器）。
@@ -6053,7 +6299,7 @@ function bossCast(e, dt, slow, tg){
   return true;
 }
 
-/* 範囲内の対象（プレイヤーと還り）を集める */
+/* 範囲内の対象（主人公とプレイヤー）を集める */
 function aoeTargets(){
   const out = livingParty().map(a=>({ent:a, x:a.x, y:a.y, r:a.r||0.3}));
   if(S.hero && S.run) out.push({ent:null, x:P.x, y:P.y, r:P.r});
@@ -6166,11 +6412,12 @@ function resolveBossMove(e){
 }
 function hitPlayer(e, boltDmg, dmgType, boltLv){
   if(!S.hero || !S.run) return true;   // 死亡した同フレームの後続ヒットを無視する
+  if(godMode()) return true;           // デバッグ。⟡ は出さない（毎発出ると読めない）
   if((P.invuln||0) > 0){               // 瞬歩の抜け際
     pop(P.x,P.y-0.4,0,'#8fc7ff','⟡');
     return true;
   }
-  // 守護の馴れ。張ってあれば、この一撃だけ完全に無かったことになる。
+  // 守護の恩寵。張ってあれば、この一撃だけ完全に無かったことになる。
   if(spendAegis(S.hero, P.x, P.y)) return true;
   // 重騎士の守護陣。数発ぶん受け止めてから割れる。
   if(spendBarrier(S.hero, P.x, P.y)) return true;
@@ -6198,12 +6445,12 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
     }
   }
 
-  /* 回避。「疾き」装備で積む。還りの回避（hitAlly）と同じ形で、
+  /* 回避。「疾き」装備で積む。プレイヤーの回避（hitAlly）と同じ形で、
      成立したらダメージも状態異常も一切通らない。
 
      **パリイより後ろに置く。** 先に回避を引くと、狙って合わせたパリイが
      「たまたま避けた」に食われて、よろめきも光も出ない。
-     結果は同じ無傷でも、プレイヤーから見れば操作が無かったことになる。 */
+     結果は同じ無傷でも、主人公から見れば操作が無かったことになる。 */
   if(st.evade>0 && rnd()*100 < st.evade){
     W.pops.push({x:P.x, y:P.y-0.4, txt:'回避', c:'#8fc7ff', life:0.7});
     return true;
@@ -6211,7 +6458,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
 
   const lv = e ? e.lv : (boltLv||S.run.depth);
   const type = (e ? e.dt : dmgType) || 'blunt';
-  // プレイヤーを resolveDamage の「対象」として扱う（耐性・状態異常蓄積を共通化）
+  // 主人公を resolveDamage の「対象」として扱う（耐性・状態異常蓄積を共通化）
   const target = {isPlayer:true, lv:S.hero.lv, def:st.def, res:st.res,
                   st:S.run.pst, bu:S.run.pbu};
   const r = resolveDamage(target, [{type, amount: boltDmg ?? e.atkV}], lv);
@@ -6253,7 +6500,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
     if(cover.hpNow<=0) downAlly(cover);
   }
 
-  dm = Math.max(1, dm);                    // 当たった攻撃は必ず 1 以上通す（還りと同じ規則）
+  dm = Math.max(1, dm);                    // 当たった攻撃は必ず 1 以上通す（プレイヤーと同じ規則）
   S.hero.hpNow-=dm;
   cancelMine('殴られて手が止まった');      // 掘っている最中に殴られたら中断
   pop(P.x,P.y-0.4,dm,guarded?'#8fc7ff':(DTYPE[type]?DTYPE[type].col:'#ff8a80'));
@@ -6277,7 +6524,11 @@ function nowSec(){ return (performance.now?performance.now():Date.now())/1000; }
 /* ---------- 死亡 / 帰還 ---------- */
 function die(){
   if(!S.hero || !S.run) return;
-  // 不死鳥の馴れ。1回の探索につき1度だけ、死なずに立ち上がる。
+  /* 上の3ヶ所で止めているが、ここも塞ぐ。
+     入口を数え上げて塞ぐやり方は「1つ増やしたときに忘れる」ので、
+     出口にも同じ判定を置いておく。 */
+  if(godMode()){ S.hero.hpNow = stats(S.hero).maxHp; return; }
+  // 不死鳥の恩寵。1回の探索につき1度だけ、死なずに立ち上がる。
   if(tryPhoenix(S.hero, true)) return;
   S.deaths++;
 
@@ -6350,7 +6601,7 @@ function die(){
     html += '<div style="color:#8fd8ff;margin-top:14px">'
       + 'この探索で <b>◆ '+S.shardsRun+' 欠片</b> を持ち帰った<br>'
       + '<span style="color:var(--dim);font-size:11px">欠片は死んでも失われない。'
-      + '所持 ◆ '+(S.shards||0)+' — 支度に使える</span></div>';
+      + '所持 ◆ '+(S.shards||0)+' — 能力強化に使える</span></div>';
   }
   if(keptOreN>0 || oreRunTotal()>0){
     const lost = oreRunTotal() - keptOreN;
@@ -6369,15 +6620,15 @@ function die(){
       + '倒した大ボス <b>'+greatKills()+'</b> 体ぶん、次の代は <b>Lv.'+rebirthLevel()+'</b> から始まる'
       + '<br><span style="color:var(--dim);font-size:11px">武器の熟練と遺物もそのまま残っている</span></div>';
   }
-  /* 祭壇（街開発）。積み上げた馴れが完全には消えなくなる。
+  /* 祭壇（街開発）。積み上げた恩寵が完全には消えなくなる。
      全部残すと死のコストが無くなるので、価値の高い順に数個だけ。 */
   /* 引き継ぎの元手。レア度の高い順に並べておき、
-     何個渡すかは祭壇 + 継承の馴れ + 広告で決まる。
+     何個渡すかは祭壇 + 継承の恩寵 + 広告で決まる。
      広告は死んだ**後**に押されるので、元の並びを残しておく必要がある。 */
   _deathPool = S.hero.boons.slice()
     .sort((a,b)=>(BOON_RAR_I[b.rar]||0)-(BOON_RAR_I[a.rar]||0));
-  _deathBase = boonsInherited();      // 上限（積んだ馴れの半分まで）はここで掛かる
-  // 上限は「積んだ馴れの半分」。1つも持っていなければ 0（何も残らない）。
+  _deathBase = boonsInherited();      // 上限（積んだ恩寵の半分まで）はここで掛かる
+  // 上限は「積んだ恩寵の半分」。1つも持っていなければ 0（何も残らない）。
   _deathCap  = _deathPool.length ? Math.max(1, Math.floor(_deathPool.length/2)) : 0;
   S.deathAdBonus = 0;
   el('d-lost').innerHTML = html;
@@ -6401,9 +6652,9 @@ function renderDeathLegacy(){
             + '<span style="color:var(--dim);font-size:11px">'
             + S.legacyBoons.map(b=>boonRarDef(b.rar).nm+'の'+boonDef(b.id).nm).join('、')
             + '</span>'
-          : '引き継げる馴れは無い<br>'
+          : '引き継げる恩寵は無い<br>'
             + '<span style="color:var(--dim);font-size:11px">'
-            + '街の祭壇を建てるか、継承の馴れを持っていると残せる</span>')
+            + '街の祭壇を建てるか、継承の恩寵を持っていると残せる</span>')
       + '</div>';
   }
   el('d-lost').innerHTML = html;
@@ -6491,8 +6742,19 @@ function returnToTown(){
   + `修理 → 装備を整える → 街開発</span></div>`;
 
   el('r-loot').innerHTML = loot.length? loot.map(it=>itemHTML(it,false)).join('') : '<div class="empty">戦利品なし</div>';
+  /* ---------- プレイヤーは酒場へ ----------
+     生きて連れ帰った相手は、街に着いた時点でパーティから外れて酒場に入る。
+     次に連れて行くには雇い直す（金が要る）。
+     装備・レベル・恩寵はそのまま持ったまま待っている。 */
+  const back=livingParty();
+  if(back.length){
+    back.forEach(tavernPut);
+    S.hero.party = party().filter(a=>!back.includes(a));
+    log(back.map(a=>a.name).join('・')+'は酒場で休んでいる');
+  }
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
+  rerollTavern();                                   // 酒場の流れ者も同じ周期で入れ替わる
   setScreen('none'); el('m-ret').classList.add('on');
 }
 
@@ -6596,15 +6858,18 @@ const cv=el('cv'), ctx=cv.getContext('2d');
 
    これで「どこに触れても動ける」「どこに触れても構えられる」が両立する。
    片手ずつでも、片手の2本指でも同じように成立する。 */
-let guardId=null;
+/* 構えられるのは盾を装備しているときだけ。
+   持っていないときに P.guard を立てても軽減もパリイも乗らないので、
+   **押した見た目だけが変わる**という一番たちの悪い嘘になる。ここで止める。 */
+function canGuard(){ return !!(S.hero && stats(S.hero).hasShield); }
 function beginGuard(){
-  if(P.guard) return;
+  if(P.guard || !canGuard()) return;
   P.guard=true;
   P.guardStart=nowSec();     // この瞬間からパリイ受付が始まる
 }
 function endGuard(){ P.guard=false; }
 
-/* 画面座標がその階層の還り候補に当たっているか。
+/* 画面座標がその階層のプレイヤー候補に当たっているか。
    NPC を直接タップして話しかけられるようにするため。
    足元のプロンプトボタンでも同じことができるので、これは「当たれば嬉しい」補助。 */
 function tapHitsNpc(cx, cy){
@@ -6623,10 +6888,10 @@ function touchStart(ev){
       stickEl.style.display='block';
       stickEl.style.left=(t.clientX-65)+'px'; stickEl.style.top=(t.clientY-65)+'px';
       knobEl.style.left='38px'; knobEl.style.top='38px';
-    }else if(guardId===null){
-      guardId=t.identifier;
-      beginGuard();
     }
+    /* 2本目の指では**構えない。** 以前はここで beginGuard していたが、
+       移動の指を置き直すだけで構えが入り、足が遅くなった理由が読めなかった。
+       構える口は左下のボタン1つに寄せてある。 */
   }
 }
 function touchMove(ev){
@@ -6643,15 +6908,13 @@ function touchMove(ev){
 function touchEnd(ev){
   for(const t of ev.changedTouches){
     if(t.identifier===stickId){ stickId=null; stickDx=stickDy=0; stickEl.style.display='none'; }
-    if(t.identifier===guardId){ guardId=null; endGuard(); }
   }
-  /* スティックの指だけ離してガードの指が残っている、という持ち替えが起きる。
-     そのまま放置すると「触れているのに動けない」になるので、
-     残っている指をスティックに引き継ぐ（構えは解ける）。 */
-  if(stickId===null && guardId!==null){
-    const t=[...(ev.touches||[])].find(x=>x.identifier===guardId);
+  /* 指を持ち替えたとき、画面に残っている指をスティックへ引き継ぐ。
+     残さないと「触れているのに動けない」になる。 */
+  if(stickId===null){
+    const t=[...(ev.touches||[])].find(x=>
+      !(x.target && x.target.closest && x.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn')));
     if(t){
-      guardId=null; endGuard();
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
       stickEl.style.left=(t.clientX-65)+'px'; stickEl.style.top=(t.clientY-65)+'px';
@@ -6670,15 +6933,18 @@ bindTap(el('ultbtn'), ()=>{ fireUlt(); });
    構えっぱなしにできないので、押下と離しを直に拾う。
    指が滑ってボタンの外へ出たときも必ず解除する——
    構えたまま固まると、移動速度が落ちたまま戻らない。 */
+let gbHeld=false;
 (function(){
   const gb=el('guardbtn');
-  let held=false;
   const on = e=>{ if(S.screen!=='game') return;
                   if(e.cancelable) e.preventDefault();
-                  held=true; beginGuard(); };
-  const off= e=>{ if(!held) return; held=false;
+                  /* 盾が無いときは押下そのものを受けない。
+                     見た目（グレー）と挙動を一致させる。 */
+                  if(!canGuard()) return;
+                  gbHeld=true; beginGuard(); };
+  const off= e=>{ if(!gbHeld) return; gbHeld=false;
                   if(e && e.cancelable) e.preventDefault();
-                  if(guardId===null) endGuard(); };
+                  endGuard(); };
   gb.addEventListener('touchstart', on, {passive:false});
   gb.addEventListener('touchend',   off, {passive:false});
   gb.addEventListener('touchcancel',off, {passive:false});
@@ -6711,7 +6977,7 @@ function nearOre(){
 }
 /* ---------- 道中の商人 ----------
    街の道具屋は「帰ってから買う店」で、潜っている最中は
-   金をいくら持っていても使い道が炉しか無かった。
+   金をいくら持っていても使い道が鍛冶場しか無かった。
    そして道中の金は死ねばどのみち消えるので、**持っているだけ損**という
    おかしな状態になっていた。使い道があってはじめて「今使うか、持ち帰るか」になる。
 
@@ -6721,13 +6987,13 @@ function nearOre(){
    （手ぶらで深部へ潜って稼ぐ、という抜け道にもなる。）
 
    値段は街の 1.4 倍。割高なのは帰る理由を消さないため——
-   炉の「道中は1.5倍」とまったく同じ考え方で、
+   鍛冶場の「道中は1.5倍」とまったく同じ考え方で、
    ここで買うのは便利さに対して払う手数料になっている。 */
 const MERCHANT_CHANCE   = 0.28;   // 1階層に商人がいる確率
 const MERCHANT_MIN_DEPTH= 3;
 const MERCHANT_MARKUP   = 1.4;    // 街の売価に対する倍率
 const MERCHANT_STOCK    = 4;      // 品数（装備3＋消耗品1相当）
-const MERCHANT_CLEAR    = 5.0;    // 炉や鉱脈と重ならない距離
+const MERCHANT_CLEAR    = 5.0;    // 鍛冶場や鉱脈と重ならない距離
 function merchantPrice(it){
   return Math.max(1, Math.round(itemValue(it) * 2.0 * MERCHANT_MARKUP));
 }
@@ -6803,9 +7069,9 @@ function renderMerchant(){
       }).join('');
 }
 function nearForge(){
-  /* 掘り尽くした鉱脈は炉ではない。**運ぶ距離のほうが本体**なので、
+  /* 掘り尽くした鉱脈は鍛冶場ではない。**運ぶ距離のほうが本体**なので、
      その場で叩けると黒鉄は「出してすぐ使う小銭」になってしまう
-     （5.5.3 でそう決めて、炉を鉱脈から切り離した）。
+     （5.5.3 でそう決めて、鍛冶場を鉱脈から切り離した）。
      絵も掘り跡のまま。合っていなかったのはログの文言だけだった。 */
   return (W.forge && Math.hypot(W.forge.x-P.x, W.forge.y-P.y) < 1.6) ? W.forge : null;
 }
@@ -6885,7 +7151,7 @@ function tickTrial(dt){
     S.run.trial=null;
   }
 }
-/* 湧く場所はプレイヤーから一定の距離を空ける。
+/* 湧く場所は主人公から一定の距離を空ける。
    足元に出すと避けようが無く、それは難度ではなく事故になる。 */
 function spawnTrialEnemy(){
   if(!W.fl || !S.run) return;
@@ -6941,7 +7207,7 @@ function openStairs(){
   /* 巡回者に見つかっているあいだは、緑（既定の選択肢）を「帰還」に付け替える。
      文章で「帰れ」と言いながら、押しやすい方が「さらに深く潜る」のままなのは
      ちぐはぐで、指はほぼ緑を押す。促したいのはこちらなので、色のほうを動かす。
-     選択肢は減らさない——決めるのはあくまでプレイヤーで、こちらは重心を寄せるだけ。 */
+     選択肢は減らさない——決めるのはあくまで主人公で、こちらは重心を寄せるだけ。 */
   const urge = intruderAwake();
   el('st-down').className = urge ? '' : 'primary';
   el('st-ret').className  = urge ? 'primary' : '';
@@ -7071,16 +7337,17 @@ function update(dt){
      「もう切れているのに効いている」状態を作らないため。 */
   if(S.hero.avengeT>0) S.hero.avengeT=Math.max(0, S.hero.avengeT-dt);
   party().forEach(a=>{ if(a.avengeT>0) a.avengeT=Math.max(0, a.avengeT-dt); });
-  // 時間で動く馴れ（再生・眷属・守護）。持ち主ごとに回す。
+  // 時間で動く恩寵（再生・眷属・守護）。持ち主ごとに回す。
   tickBoonTimers(S.hero, dt, true);
   livingParty().forEach(a=>tickBoonTimers(a, dt, false));
   tickArts(dt);                     // 焦土・聖域などの置き型
   const st=stats(S.hero);
   S.run.elapsed+=dt;
 
-  // プレイヤーの状態異常（火傷・出血の継続ダメージ、凍傷の減速、感電の被ダメ増）
+  // 主人公の状態異常（火傷・出血の継続ダメージ、凍傷の減速、感電の被ダメ増）
   const pt={isPlayer:true, st:S.run.pst};
   tickStatus(pt, dt, (d,col)=>{
+    if(godMode()) return;
     S.hero.hpNow-=d; pop(P.x,P.y-0.4,d,col);
   });
   if(S.hero.hpNow<=0){ die(); return; }
@@ -7092,8 +7359,8 @@ function update(dt){
 
   // キーボードでもガードできるように（Shift / Space 長押し）
   const kGuard = !!(keys['shift']||keys[' ']);
-  if(kGuard && !P.guard && guardId===null) beginGuard();
-  if(!kGuard && guardId===null && P.guard) endGuard();
+  if(kGuard && !P.guard) beginGuard();
+  if(!kGuard && !gbHeld && P.guard) endGuard();
 
   let ix=stickDx, iy=stickDy;
   if(keys['a']||keys['arrowleft'])ix=-1; if(keys['d']||keys['arrowright'])ix=1;
@@ -7145,24 +7412,25 @@ function update(dt){
     if(P.follow.t<=0){ const f=P.follow; P.follow=null; meleeSwing(stats(S.hero), f.ang, MULTI_MULT); }
   }
 
-  pushTrail();        // 還りが辿る足跡を残す
+  pushTrail();        // プレイヤーが辿る足跡を残す
   tickRelics(dt);     // 遺物の定期効果（脈動・伴影）
+  tickBlades(dt);     // 鞘無し（周回刃）。弾を撃たず、刃そのものが当たる
   tickTrial(dt);      // 試練の籠城戦
   autoPickup();
   if(W.grave && Math.hypot(W.grave.x-P.x, W.grave.y-P.y) < 0.9) collectGrave();
   livingParty().forEach(a=>allyUpdate(a,dt));
-  updateNpc(dt);                 // 加入前の還り。見られてから戦い始める
+  updateNpc(dt);                 // 加入前のプレイヤー。見られてから戦い始める
   resolveAllyOverlap();          // 全員動かしたあとに、めり込みだけ直す
   if(!S.hero || !S.run) return;
   W.enemies.forEach(e=>enemyUpdate(e,dt));
   if(!S.hero || !S.run) return;   // このフレームで死亡した場合はここで抜ける
-  // 弾（敵の弾とプレイヤーの飛び道具）
+  // 弾（敵の弾と主人公の飛び道具）
   W.fx=W.fx.filter(f=>{
     f.life-=dt;
     if(f.t==='bolt'){
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
-      // 敵の弾は当たった者に入る。還りが前に出ていれば還りが受ける。
+      // 敵の弾は当たった者に入る。プレイヤーが前に出ていればプレイヤーが受ける。
       if(npcAwake() && Math.hypot(f.x-W.npc.x,f.y-W.npc.y)<0.45){
         hitAlly(W.npc,null,f.dmg,f.dt,f.lv); return false;
       }
@@ -7172,7 +7440,7 @@ function update(dt){
       if(Math.hypot(f.x-P.x,f.y-P.y)<0.45){ hitPlayer(null,f.dmg,f.dt,f.lv); return false; }
     }
     if(f.t==='pshot'){
-      // このフレーム中に敵の弾でプレイヤーが死ぬことがある（上の bolt 判定）。
+      // このフレーム中に敵の弾で主人公が死ぬことがある（上の bolt 判定）。
       // その後で stats(S.hero) を触ると null 参照でループが落ちるので、必ず先に抜ける。
       if(!S.hero || !S.run) return false;
       f.x+=f.vx*dt; f.y+=f.vy*dt;
@@ -7205,8 +7473,8 @@ function update(dt){
       });
       return true;
     }
-    if(f.t==='ashot'){          // 還りの矢・魔弾
-      if(!S.hero || !S.run) return false;   // 同上（allyStats はプレイヤーを参照する）
+    if(f.t==='ashot'){          // プレイヤーの矢・魔弾
+      if(!S.hero || !S.run) return false;   // 同上（allyStats は主人公を参照する）
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
       if(f.src.dead) return false;
@@ -7317,7 +7585,7 @@ function draw(){
   if(!stairRevealed()){
     const h=stairHint();
     if(h>0){
-      /* 気配。位置ではなく向きだけを、プレイヤーの足元から指す。
+      /* 気配。位置ではなく向きだけを、主人公の足元から指す。
          「あっちだ」とは言うが「そこだ」とは言わない。 */
       const px=P.x*TS-camX, py=P.y*TS-camY;
       const ang=Math.atan2(f.stair.y-P.y, f.stair.x-P.x);
@@ -7520,8 +7788,8 @@ function draw(){
     ctx.globalAlpha=1;
   });
 
-  // --- 還りと還り候補 ---
-  // 還りは「六角形＋ジョブ色」。敵（三角・四角・ひし形・円）とは形が被らないので、
+  // --- プレイヤーとプレイヤー候補 ---
+  // プレイヤーは「六角形＋ジョブ色」。敵（三角・四角・ひし形・円）とは形が被らないので、
   // 混戦でも一目で味方だと分かる。
   const drawMate=(a, isNpc)=>{
     const sx=a.x*TS-camX, sy=a.y*TS-camY;
@@ -7596,7 +7864,33 @@ function draw(){
   });
   if(W.npc) drawMate(W.npc,true);
 
-  /* 馴れの「見える部分」。数字だけの馴れと違って、
+  /* 鞘無し（周回刃）。**軌道の円は描かない。**
+     刃が回っていれば届く範囲は目で読めるので、円まで敷くと
+     ただの線が1本増えるだけになる（画面は既に線が多い）。
+     向きは進行方向ではなく接線——回っている物として読ませる。 */
+  (P.blades||[]).forEach((bl,i)=>{
+    if(bl.x===undefined) return;
+    const bx=bl.x*TS-camX, by=bl.y*TS-camY;
+    const n=(P.blades.length||1);
+    const ang=(P.bladeAng||0) + (i*Math.PI*2/n) + Math.PI/2;   // 接線
+    ctx.save();
+    ctx.translate(bx,by); ctx.rotate(ang);
+    // 尾。回っていることが1フレームでも分かるように、後ろへ薄く引く
+    ctx.globalAlpha=0.22; ctx.strokeStyle='#cfd6e0';
+    ctx.lineWidth=Math.max(1.5,TS*0.10); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,TS*0.06); ctx.lineTo(0,TS*0.52); ctx.stroke();
+    // 刃。細い菱形
+    ctx.globalAlpha=1; ctx.fillStyle='#e8eef6';
+    ctx.beginPath();
+    ctx.moveTo(0,-TS*0.30); ctx.lineTo(TS*0.085,0);
+    ctx.lineTo(0,TS*0.22);  ctx.lineTo(-TS*0.085,0);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#0b0e14'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.lineCap='butt';
+    ctx.restore();
+  });
+
+  /* 恩寵の「見える部分」。数字だけの恩寵と違って、
      眷属と守護は画面に出ていないと持っていることを忘れる。 */
   [S.hero, ...livingParty()].forEach(h=>{
     if(!h || h.dead) return;
@@ -7642,7 +7936,7 @@ function draw(){
     }
   });
 
-  // 鉱脈。掘る前は結晶、掘ったあとは掘り跡（何も起きない。炉は別の場所）。
+  // 鉱脈。掘る前は結晶、掘ったあとは掘り跡（何も起きない。鍛冶場は別の場所）。
   (W.ores||[]).forEach(o=>{
     const sx=o.x*TS-camX, sy=o.y*TS-camY;
     if(sx<-80 || sy<-80 || sx>innerWidth+80 || sy>innerHeight+80) return;
@@ -7680,7 +7974,7 @@ function draw(){
     ctx.restore();
   });
 
-  // 炉。鉱脈とは別の場所にある。掘った黒鉄をここまで運んで初めて鍛えられる。
+  // 鍛冶場。鉱脈とは別の場所にある。掘った黒鉄をここまで運んで初めて鍛えられる。
   if(W.forge){
     const sx=W.forge.x*TS-camX, sy=W.forge.y*TS-camY;
     if(sx>-80 && sy>-80 && sx<innerWidth+80 && sy<innerHeight+80){
@@ -7698,7 +7992,7 @@ function draw(){
       ctx.fillStyle='#ffd9c0';
       ctx.fillText('⚒', sx, sy-TS*0.02);
       ctx.textBaseline='alphabetic';
-      if(Math.hypot(W.forge.x-P.x, W.forge.y-P.y)<8) label('炉', sx, sy+TS*0.82, '#e0705a', 1);
+      if(Math.hypot(W.forge.x-P.x, W.forge.y-P.y)<8) label('鍛冶場', sx, sy+TS*0.82, '#e0705a', 1);
       ctx.restore();
     }
   }
@@ -7729,7 +8023,7 @@ function draw(){
     }
   }
 
-  /* 還りの大技が置いた効果。キャラより下に敷く（上に描くと足元が見えない）。 */
+  /* プレイヤーの大技が置いた効果。キャラより下に敷く（上に描くと足元が見えない）。 */
   (W.arts||[]).forEach(f=>{
     const sx=f.x*TS-camX, sy=f.y*TS-camY;
     if(sx<-160||sy<-160||sx>innerWidth+160||sy>innerHeight+160) return;
@@ -7751,7 +8045,7 @@ function draw(){
     ctx.restore();
   });
 
-  // 商人。炉と同じく「そこに何かある」と遠目で分かるようにする。
+  // 商人。鍛冶場と同じく「そこに何かある」と遠目で分かるようにする。
   if(W.shop){
     const sx=W.shop.x*TS-camX, sy=W.shop.y*TS-camY;
     if(sx>-80 && sy>-80 && sx<innerWidth+80 && sy<innerHeight+80){
@@ -7875,7 +8169,7 @@ function draw(){
       ctx.beginPath(); ctx.moveTo(f.x*TS-camX,f.y*TS-camY);
       ctx.lineTo(f.x2*TS-camX,f.y2*TS-camY); ctx.stroke();
     }
-    if(f.t==='ashot') drawShot(f, camX, camY, true);   // 還りの矢・魔弾
+    if(f.t==='ashot') drawShot(f, camX, camY, true);   // プレイヤーの矢・魔弾
     if(f.t==='grave'){
       const p=1-f.life/f.max;
       ctx.strokeStyle='rgba(127,224,192,'+(1-p)+')'; ctx.lineWidth=3;
@@ -7916,12 +8210,12 @@ function draw(){
       ctx.fillStyle='rgba(0,0,0,.45)';
       ctx.beginPath(); ctx.arc(bx,by,TS*0.06,0,7); ctx.fill();
     }
-    if(f.t==='pshot'){          // プレイヤーの矢・魔弾
+    if(f.t==='pshot'){          // 主人公の矢・魔弾
       drawShot(f, camX, camY, false);
     }
   });
 
-  // プレイヤー（＝自分。二重リング＋向き矢印で他と絶対に混ざらない見た目にする）
+  // 主人公（＝自分。二重リング＋向き矢印で他と絶対に混ざらない見た目にする）
   const px=innerWidth/2, py=innerHeight/2;
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -7993,7 +8287,7 @@ function draw(){
   }
   /* 画面の外周が脈打つ＝ピンチ。数字を読ませずに危険を伝える。
 
-     この game の画面は情報が多い（HPバー・状態異常・還り・巡回者・ミニマップ）。
+     この game の画面は情報が多い（HPバー・状態異常・プレイヤー・巡回者・ミニマップ）。
      一番大事な「あと何発で死ぬか」が、その中の1本のバーでしかなかった。
      戦っている最中に視線が向いているのは自キャラの周りなので、
      画面の端を色で染めるのがいちばん確実に目に入る。
@@ -8231,7 +8525,7 @@ function drawSwing(f, camX, camY){
     ctx.beginPath(); ctx.arc(sx,sy, r*1.07, Math.max(a-half, lead-half*0.45), lead); ctx.stroke();
   }
 
-  // 追加属性（接尾辞や馴れで乗った炎・雷・冷気）を粒として重ねる
+  // 追加属性（接尾辞や恩寵で乗った炎・雷・冷気）を粒として重ねる
   if(f.elem && f.elem!==dt) emberBurst(sx, sy, a, half, r, p, DTYPE[f.elem].col, 4);
 
   // 味方の攻撃は外周に細いジョブ色のリングを足して、敵の攻撃と取り違えないようにする
@@ -8403,7 +8697,7 @@ function drawMinimap(){
     }
   }
   if(W.grave){ ctx.fillStyle='#7fe0c0'; ctx.fillRect(ox+W.grave.x*s-2,oy+W.grave.y*s-2,4.5,4.5); }
-  // ユニーク敵と還り候補はミニマップに出す。避けるか会いに行くかを選ばせるため。
+  // ユニーク敵とプレイヤー候補はミニマップに出す。避けるか会いに行くかを選ばせるため。
   W.enemies.forEach(e=>{ if(e.uniq && !e.dead){
     ctx.fillStyle='#c07fe0'; ctx.fillRect(ox+e.x*s-2,oy+e.y*s-2,4.5,4.5); } });
   if(W.npc){ ctx.fillStyle='#ffd06a'; ctx.fillRect(ox+W.npc.x*s-2,oy+W.npc.y*s-2,4.5,4.5); }
@@ -8417,7 +8711,7 @@ function drawMinimap(){
       for(let x=0;x<f.W;x++) if(row[x]&&W.seen[y][x]) ctx.fillRect(ox+x*s,oy+y*s,s,s); }
     ctx.globalAlpha=1;
   }
-  // 鉱脈と炉をミニマップに出す。「掘ってから炉まで運ぶ」経路を地図の上で引かせたい。
+  // 鉱脈と鍛冶場をミニマップに出す。「掘ってから鍛冶場まで運ぶ」経路を地図の上で引かせたい。
   (W.ores||[]).forEach(o=>{ ctx.fillStyle=o.mined?'#3f4452':oreDef(o.grade).col;
     ctx.fillRect(ox+o.x*s-1.5,oy+o.y*s-1.5,3.5,3.5); });
   if(W.forge){ ctx.fillStyle='#e0705a';
@@ -8441,7 +8735,7 @@ function drawMinimap(){
 function updateHUD(){
   const st=stats(S.hero);
 
-  // プレイヤーの状態異常
+  // 主人公の状態異常
   const pst=(S.run&&S.run.pst)||{};
   const act=Object.keys(pst).filter(k=>pst[k].t>0);
   // 弔いは状態異常と同じ帯に出す。残り秒数が見えないと、
@@ -8511,11 +8805,13 @@ function updateHUD(){
     el('ult-cd').textContent = ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s';
   }else ub.classList.remove('on');
 
-  /* 盾のボタン。盾を持っているときだけ出す。
+  /* 盾のボタン。**盾が無くても消さない**——グレーで出しておく。
+     消すと「盾を持てば何かできる」ことが画面から一切分からなくなる。
      押しているあいだだけ構えるので、状態はここで見た目に返す。 */
   const gb=el('guardbtn');
-  gb.classList.toggle('on', !!st.hasShield);
-  gb.classList.toggle('held', !!P.guard);
+  gb.classList.add('on');
+  gb.classList.toggle('dim', !st.hasShield);
+  gb.classList.toggle('held', !!P.guard && !!st.hasShield);
 
   // ボスHPバー。ボス階では「あと何割か」が最重要の情報になる。
   // ただし出るのは一撃入れてから（revealed）。それまでは名前もゲージも伏せる。
@@ -8643,7 +8939,7 @@ function updateHUD(){
   }
   else if(nearForge()){
     pr.style.display='block';
-    pr.textContent = '⚒ 炉で鍛える／直す';
+    pr.textContent = '⚒ 鍛冶場で鍛える／直す';
   }
   else if(nearTrial()){
     pr.style.display='block';
@@ -8659,8 +8955,8 @@ function updateHUD(){
 }
 
 /* ---------- 左上の積み方 ----------
-   実際に踏んだ表示バグ: 還りが3人いて敵の情報パネルが出ている状態で
-   還りの技が続けて出ると、**3行のログと還りのHPバーと敵の名前が同じ場所に重なって**
+   実際に踏んだ表示バグ: プレイヤーが3人いて敵の情報パネルが出ている状態で
+   プレイヤーの技が続けて出ると、**3行のログとプレイヤーのHPバーと敵の名前が同じ場所に重なって**
    どれも読めなくなっていた。
 
    原因は #log の top を 150px で決め打ちしていたこと。上の帯は固定ではない——
@@ -8675,7 +8971,7 @@ const HUD_STACK = ['partybar','targetinfo','intruder','statusbar','gravehint','b
    以前は表示状態と文字数から署名を作って、変わったときだけ測っていた。
    だが署名は衝突する——文字数がたまたま前と同じ組み合わせになると、
    見た目が変わっているのに測り直しを飛ばして、ログが前の位置に残った
-   （実際に踏んだ: 還り2人を出し直したのにログが上に残る）。
+   （実際に踏んだ: プレイヤー2人を出し直したのにログが上に残る）。
 
    updateHUD はどのみち毎フレーム innerHTML を書き換えていて、
    その時点でレイアウトは無効化されている。まとめて1回測るだけなら
@@ -8698,12 +8994,35 @@ function layoutTargetInfo(base){
   }
   if(top > r0.top-base) ti.style.top=Math.round(top)+'px';
 }
+/* ---------- 左肩の縦積み ----------
+   左肩には2つが**同じ座標**で置かれている。状態異常の帯（#statusbar。
+   疾風の加護や弔いもここに出る）と、遺体の場所（#gravehint）。
+   どちらも「その時だけ出る」物なので素の座標で書いても普段は成立するが、
+   **両方出た瞬間に重なって両方とも読めなくなる。**
+   実際に踏んだ: 疾風の加護が出ているあいだ、遺体が何階にあるか読めない。
+
+   上に居る物の下へ積む。#log の置き方（HUD_STACK）と同じ考え方で、
+   座標を決め打ちせず、出ている物の一番下を測ってその下に置く。 */
+const LEFT_COL = ['statusbar','gravehint'];
+function layoutLeftColumn(base){
+  let top=null;
+  for(const id of LEFT_COL){
+    const n=el(id); if(!n) continue;
+    n.style.top='';                              // まず CSS の素の位置に戻して測る
+    if(n.style.display==='none') continue;
+    let r=n.getBoundingClientRect();
+    if(r.height<=0) continue;                    // 中身が空なら場所も取らない
+    if(top!==null){ n.style.top=Math.round(top)+'px'; r=n.getBoundingClientRect(); }
+    top = r.bottom - base + 6;
+  }
+}
 function layoutHud(force){
   const lg=el('log'); if(!lg) return;
   if(!force && _hudLaidTick===_tickCount) return;
   _hudLaidTick=_tickCount;
 
   const base = el('hud').getBoundingClientRect().top;
+  layoutLeftColumn(base);                   // 左肩を先に積んでから
   layoutTargetInfo(base);                   // ログより先に、こちらの位置を決める
 
   let top = 150;                            // 何も出ていないときの位置
@@ -8726,9 +9045,11 @@ function log(t){
    1画面あたりの情報量を抑えるため、街をハブにして道具屋・倉庫・強化・ガチャを
    それぞれ独立した画面に分けている。 */
 const SCREENS={title:'scr-title', town:'scr-town', char:'scr-char', shop:'scr-shop',
-               stash:'scr-stash', upg:'scr-upg', bld:'scr-bld', gacha:'scr-gacha', mem:'scr-mem'};
+               stash:'scr-stash', upg:'scr-upg', bld:'scr-bld', gacha:'scr-gacha', mem:'scr-mem',
+               tavern:'scr-tavern'};
 const RENDERERS={title:renderTitle, town:renderTown, char:renderChar, shop:renderShop,
-                 stash:renderStash, upg:renderUpg, bld:renderBld, gacha:renderGacha, mem:renderMem};
+                 stash:renderStash, upg:renderUpg, bld:renderBld, gacha:renderGacha, mem:renderMem,
+                 tavern:renderTavern};
 function isMenu(s){ return !!SCREENS[s]; }
 
 /* 街系の画面にだけバナーを出す。ゲーム中とモーダル専有中は出さない。 */
@@ -8743,6 +9064,7 @@ function syncAdBar(){
   dive.classList.toggle('banner', show);
 }
 function setScreen(s){
+  if(typeof syncDebugBtn==='function') syncDebugBtn();   // 全消去のあと 🐞 を畳む
   if(isMenu(S.screen) && S.screen!==s) S.prevScreen=S.screen;
   S.screen=s;
   for(const k in SCREENS) el(SCREENS[k]).classList.toggle('on', k===s);
@@ -8872,24 +9194,24 @@ function renderBld(){
 }
 
 /* ---------- 慰霊碑 ----------
-   失った還りを、欠片を払って呼び戻せる場所。
+   失ったプレイヤーを、欠片を払って呼び戻せる場所。
 
    道中の広告蘇生（Lv.1・装備ランダムロスト・1人1回）とは役割を分けてある。
    あちらは「今この場をしのぐ」ための手で、こちらは
    「あの子をもう一度連れて行きたい」という気持ちのための手。
-   だから **レベルと馴れはそのまま戻る**。時間を注いだ相手が
+   だから **レベルと恩寵はそのまま戻る**。時間を注いだ相手が
    別人になって帰ってくるなら、呼び戻す意味が薄い。
 
    代わりに **装備は戻らない**。装備は失われた物として扱わないと、
    死んでも何も減らないことになってしまう。
    値段は欠片。金にしなかったのは、金は帰還のたびに増えるので
-   「重い決断」にならないから。欠片は支度と取り合う唯一の資源で、
+   「重い決断」にならないから。欠片は能力強化と取り合う唯一の資源で、
    自分を強くするか、あの子を連れ戻すかを天秤にかけさせたい。
 
    全滅していても使える。むしろ全滅したときのための場所なので。 */
 const MEM_MAX = 6;              // 刻まれる名前の上限（古い順に消える）
 function memCost(f){ return clamp(18 + Math.round((f.lv||1)*2.5), 18, 140); }
-/* 失った還りを刻む。口座と同じでアカウント単位——キャラが死んでも残る。 */
+/* 失ったプレイヤーを刻む。口座と同じでアカウント単位——キャラが死んでも残る。 */
 function memInter(a){
   S.fallen = S.fallen || [];
   S.fallen.push({
@@ -8916,7 +9238,7 @@ function memRevive(uidA){
   if(!c.ok) return c;
   S.shards -= memCost(f);
   const a = makeAlly(Math.max(1,f.lv), S.hero);
-  // 生まれ直しではなく「あの子」なので、名前もレベルも馴れもそのまま戻す
+  // 生まれ直しではなく「あの子」なので、名前もレベルも恩寵もそのまま戻す
   a.uidA=f.uidA; a.job=f.job; a.name=f.name; a.lv=f.lv; a.xp=0;
   a.str=f.str; a.dex=f.dex; a.vit=f.vit; a.int=f.int;
   a.boons=(f.boons||[]).slice();
@@ -8939,7 +9261,7 @@ function renderMem(){
         const afford=(S.shards||0)>=cost;
         const c=memCheck(f);
         const bl=(f.boons&&f.boons.length)
-          ? f.boons.map(x=>boonRarDef(x.rar).nm+'の'+boodName(x.id)).join('・') : '馴れなし';
+          ? f.boons.map(x=>boonRarDef(x.rar).nm+'の'+boodName(x.id)).join('・') : '恩寵なし';
         return `<div class="item" data-mem="${f.uidA}" style="border-left-color:${j.col};opacity:${c.ok?1:0.55}">
           <div class="nm" style="color:${j.col}">${allyFullName(f)}
             <span style="font-size:11px;color:var(--dim)">Lv.${f.lv} ${j.nm}</span></div>
@@ -8952,6 +9274,154 @@ function renderMem(){
       }).join('');
 }
 function boodName(id){ const d=boonDef(id); return d?d.nm:id; }
+
+/* ---------- 酒場 ----------
+   街開発の「酒場」は今まで**数字だけの施設**だった（プレイヤーの出現率が上がる）。
+   建てても街の何も変わらないので、上げた実感が湧かない。
+
+   ここを場所にする。生きて連れ帰ったプレイヤーは、街に着いた時点で全員この酒場に入る。
+   次の探索へ連れて行くには**金を払って雇い直す。**
+
+   なぜ払わせるか。連れて行くこと自体は今まで無料で、
+   「3人埋まっているなら埋めておく」以外の選択が存在しなかった。
+   値段が付くと『この階層に Lv.28 の僧侶を連れて行く価値があるか』が
+   毎回の判断になる。金の使い道が街開発と鍛冶しか無かった問題にも効く。
+
+   そして**酒場にいる間は失われない。** 連れて行ったプレイヤーはあなたが死ねば
+   一緒に消えるという線は動かさない。だから「置いていく」が守る手になる。
+   ここが慰霊碑（失った後に欠片で呼び戻す場所）との役割の違いで、
+   酒場は失う前に決める場所、慰霊碑は失った後に悔やむ場所。 */
+const TAVERN_MAX = 8;              // 待たせておける人数
+
+/* ---------- 酒場に並ぶのは二種類 ----------
+   **連れ帰った者**（S.tavern）と、**流れ者**（S.tavernPool）。
+
+   連れ帰った者だけだと、酒場は「誰も連れ帰れなかった回」に空になる。
+   一番人手が要るのは**全滅して帰った直後**なので、そこで空の棚を見せるのは順序が逆。
+   だから帰るたびに 1〜4 人が流れ着いている。
+
+   値段で二つを区別する。連れ帰った者は**半額**——
+   一度アビスから引き上げた相手をもう一度連れて行くのは、
+   雇い直しではなく**続き**なので。流れ者は定価。
+   これで「連れ帰る」こと自体に金銭的な意味が付く。 */
+const TAVERN_ROLL   = [1, 4];      // 帰るたびに流れ着く人数
+const HIRE_RETURNED_MUL = 0.5;     // 連れ帰った者は半額
+const HIRE_ELITE_MUL    = 1.9;     // 上位職は割高
+function tavernStock(){ return (S.tavern = S.tavern || []); }
+function tavernPool(){  return (S.tavernPool = S.tavernPool || []); }
+function isEliteJob(id){ return ELITE_JOBS.some(j=>j.id===id); }
+/* 雇用費。レベルに比例させる——強い相手ほど高い。
+   上位職（聖騎士・召喚士・大魔導士）は**割高**。
+   出現率を落としてあるだけだと「引ければ得」で終わるので、
+   値段の側にも差を付けて、引いたあとにもう一度選ばせる。
+   街開発の酒場を上げると安くなる（施設のレベルが場所の値段に効く）。 */
+function hireCost(a){
+  let c = 20 + Math.round((a.lv||1)*6);
+  if(isEliteJob(a.job)) c *= HIRE_ELITE_MUL;
+  if(a.returned)        c *= HIRE_RETURNED_MUL;
+  return Math.max(8, Math.round(c * (1 - bldLv('tavern')*0.10)));
+}
+/* 流れ者を並べ直す。品揃えと同じで**帰還のたびに入れ替わる**。
+   常設にすると「良いのが出るまで街を出入りする」が最適手になってしまう。 */
+function rerollTavern(){
+  if(!S.hero) return;
+  const n = ri(TAVERN_ROLL[0], TAVERN_ROLL[1]);
+  const depth = Math.max(1, S.lastDepth || S.deepest || 1);
+  S.tavernPool = [];
+  for(let i=0;i<n;i++){
+    const a = makeAlly(depth, S.hero);
+    a.returned = false;            // 定価。アビスから引き上げた相手ではない
+    uniqueAllyName(a, [...party(), ...tavernStock(), ...S.tavernPool]);
+    S.tavernPool.push(a);
+  }
+}
+/* 連れ帰った1人を酒場へ預ける。満員なら**一番弱い1人**が去る。
+   古い順に切ると、育てた相手が黙って消える事故が起きる。 */
+function tavernPut(a){
+  if(!a) return;
+  const st=tavernStock();
+  a.dead=false; a.hpNow=allyStats(a).maxHp;
+  a.x=a.y=undefined; a.slot=undefined;
+  a.returned=true;                 // 半額の印。ここに入るのは連れ帰った者だけ
+  st.push(a);
+  while(st.length > TAVERN_MAX){
+    let wi=0;
+    for(let i=1;i<st.length;i++) if((st[i].lv||1) < (st[wi].lv||1)) wi=i;
+    const gone=st.splice(wi,1)[0];
+    log(gone.name+'は酒場を出て行った（'+TAVERN_MAX+'人まで）');
+  }
+}
+function hireCheck(a){
+  if(!a) return {ok:false, why:'選ばれていない'};
+  if(!S.hero) return {ok:false, why:'冒険者がいない'};
+  if(S.run) return {ok:false, why:'探索中は雇えない'};
+  if(party().length >= PARTY_MAX) return {ok:false, why:'これ以上は連れて行けない'};
+  if(S.gold < hireCost(a)) return {ok:false, why:'金が足りない'};
+  return {ok:true};
+}
+/* 酒場にいる全員（連れ帰った者＋流れ者）。雇う側はどちらの棚かを気にしない。 */
+function tavernAll(){ return [...tavernStock(), ...tavernPool()]; }
+function hireAlly(uidA){
+  for(const list of [tavernStock(), tavernPool()]){
+    const i=list.findIndex(a=>a.uidA===uidA);
+    if(i<0) continue;
+    const a=list[i];
+    const c=hireCheck(a);
+    if(!c.ok) return c;
+    const cost=hireCost(a);
+    S.gold -= cost;
+    list.splice(i,1);
+    a.dead=false; a.hpNow=allyStats(a).maxHp;
+    a.slot=party().length;
+    S.hero.party.push(a);
+    return {ok:true, ally:a, cost};
+  }
+  return {ok:false, why:'見つからない'};
+}
+/* 1人ぶんの札。連れ帰った者と流れ者で**同じ形**にしてある——
+   違うのは値段と、そこに至った経緯の1行だけ。 */
+function tavernRow(a){
+  const j=jobDef(a.job), cost=hireCost(a), c=hireCheck(a);
+  const full=party().length>=PARTY_MAX;
+  const bl=(a.boons&&a.boons.length)
+    ? a.boons.map(x=>boonRarDef(x.rar).nm+'の'+boodName(x.id)).join('・') : '恩寵なし';
+  const gear=Object.values(a.equip||{}).filter(Boolean).length;
+  const elite=isEliteJob(a.job);
+  const why = a.returned
+    ? '装備 '+gear+' 点を持ったまま待っている　<span style="color:#7fe0c0">半額</span>'
+    : '流れ着いた者。装備 '+gear+' 点'
+      + (elite ? '　<span style="color:#e8d9a0">上位職（割高）</span>' : '');
+  return `<div class="item" data-hire="${a.uidA}" style="border-left-color:${j.col};opacity:${c.ok?1:0.55}">
+    <div class="nm" style="color:${j.col}">${allyFullName(a)}
+      <span style="font-size:11px;color:var(--dim)">Lv.${a.lv} ${j.nm}</span></div>
+    <div class="af">${why}</div>
+    <div class="af" style="color:#d6b34a">${bl}</div>
+    <div class="af" style="color:${c.ok?'#7fe0c0':(S.gold>=cost?'#5c6479':'#e0705a')}">
+      ${c.ok ? cost+' G で雇う' : (full ? 'パーティが満員' : cost+' G（所持 '+S.gold+'）')}
+    </div>
+  </div>`;
+}
+function renderTavern(){
+  el('tavern-gold').textContent = S.gold+' G';
+  // 初めて開いたときの棚。以後は帰還のたびに入れ替わる
+  if(!S.tavernPool) rerollTavern();
+  const st=tavernStock(), pool=tavernPool();
+  el('tavernlist').innerHTML = st.length
+    ? st.slice().reverse().map(tavernRow).join('')
+    : '<div class="empty">連れ帰った者はいない<br><span style="font-size:11px">生きて帰れば、次からは半額で連れて行ける</span></div>';
+  el('tavernpool').innerHTML = pool.length
+    ? pool.map(tavernRow).join('')
+    : '<div class="empty">今日は誰も来ていない</div>';
+}
+bindRowTap(el('scr-tavern'), '[data-hire]', t=>{
+  const r=hireAlly(+t.dataset.hire);
+  /* 雇えなかったら**理由を言う。** 慰霊碑と同じで、
+     黙って何も起きないのが一番わけが分からない。 */
+  if(r.ok) log(r.ally.name+'を雇った（-'+r.cost+' G）');
+  else showBanner('雇えない', r.why||'', '#e0705a', 2.0);
+  renderTavern(); renderTown();
+});
+
 bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   const r=memRevive(+t.dataset.mem);
   /* 呼び戻せなかったら**理由を言う。**
@@ -9014,11 +9484,11 @@ function renderChar(){
       <div class="af" style="color:${j.col}">技 ${sk.length}/5${sk.length?'：'+sk.map(x=>x.nm).join('・'):''}
         ${nx?`<span style="color:var(--dim)">　次は Lv.${nx.lv}</span>`:''}</div>
     </div>`;
-  }).join('') : '<div class="empty">まだ誰もいない。潜って還りを見つけよう</div>';
+  }).join('') : '<div class="empty">まだ誰もいない。潜ってプレイヤーを見つけよう</div>';
 }
 
 /* 街は「次にどこへ行くか」を決める画面。
-   能力値・装備・馴れ・還り・呪いは renderChar（ステータス画面）が持つ。
+   能力値・装備・恩寵・プレイヤー・呪いは renderChar（ステータス画面）が持つ。
    ここに全部を並べていたときは、潜るまでに5回スクロールが要った。 */
 function renderTown(){
   if(!S.hero) S.hero=newHero();
@@ -9033,7 +9503,7 @@ function renderTown(){
     `<b>${S.hero.name}</b>　Lv.${S.hero.lv}`
     + `　<span style="color:#d6b34a">${S.gold} G</span>`
     + `　<span style="color:#8fd8ff">◆ ${S.shards||0}</span>`
-    + (livingParty().length ? `　還り ${livingParty().length}` : '')
+    + (livingParty().length ? `　プレイヤー ${livingParty().length}` : '')
     + (need ? `<br><span style="color:#ffb08a">⚠ 壊れかけの装備が ${need} 点ある</span>` : '')
     + (S.grave ? `<br><span style="color:#7fe0c0">遺体は第${S.grave.depth}階層に残っている</span>` : '');
 
@@ -9064,8 +9534,8 @@ const uds=unlockedDepths();
   // ステータスの副題。中を見なくても「今どうなっているか」が分かる一言にする。
   const bn=(S.hero.boons||[]).length;
   el('m-char-sub').textContent = `Lv.${S.hero.lv}`
-    + (bn?`・馴れ ${bn}`:'')
-    + (livingParty().length?`・還り ${livingParty().length}`:'');
+    + (bn?`・恩寵 ${bn}`:'')
+    + (livingParty().length?`・プレイヤー ${livingParty().length}`:'');
   const buyable = UPGRADES.filter(u=>upgLv(u.id)<u.max && (S.shards||0)>=upgCost(u,upgLv(u.id))).length
                 + unlockedUlts().filter(u=>ultCanUp(u.id)).length;
   el('m-upg-sub').textContent   = buyable ? `${buyable}件 習得可能` : `◆ ${S.shards||0} 欠片`;
@@ -9085,6 +9555,14 @@ const uds=unlockedDepths();
   const can=fal.filter(f=>memCheck(f).ok).length;
   el('m-mem-sub').textContent = !fal.length ? '誰も刻まれていない'
     : can ? `${can}人 呼び戻せる` : `${fal.length}人 刻まれている`;
+  // 酒場。待たせている人数と、今すぐ雇える人数を入口で見せる。
+  if(!S.tavernPool) rerollTavern();
+  const tv=tavernAll();
+  const hirable=tv.filter(a=>hireCheck(a).ok).length;
+  const back=tavernStock().length;
+  el('m-tavern-sub').textContent = !tv.length ? '誰もいない'
+    : hirable ? `${hirable}人 雇える` + (back?`（連れ帰り ${back}人は半額）`:'')
+              : `${tv.length}人 いる`;
 }
 
 /* ---------- 呪いの選択（街） ----------
@@ -9125,25 +9603,25 @@ function curseBonusPreview(){
   return o;
 }
 
-/* ---------- 還りの装備 ----------
+/* ---------- プレイヤーの装備 ----------
    武器種はジョブで固定（狩人が大剣を振り始めたら、それはもう狩人ではない）。
    ただし「同じ武器種のより良い個体」と防具は付け替えられる。
 
-   これが無いと、還りの強さは加入時の運で固定されてしまい、
+   これが無いと、プレイヤーの強さは加入時の運で固定されてしまい、
    長く連れ歩く理由が「レベルが上がるから」だけになっていた。
 
    持ち物の出所は場所で変わる。探索中は今背負っている物、街は倉庫。
    金と黒鉄を場所で切り替えているのと同じ考え方。 */
 let _aeAlly=null;
 function aeSource(){ return S.run ? S.run.loot : S.stash; }
-/* その還りが装備できるか。武器はジョブ指定の武器種のみ。 */
+/* そのプレイヤーが装備できるか。武器はジョブ指定の武器種のみ。 */
 function allyCanEquip(a, it){
   if(!it || isConsum(it) || !it.ident || isBroken(it)) return false;
   const j=jobDef(a.job);
   if(it.slot===SLOT.W) return it.base===j.weapon;
   if(it.slot===SLOT.S) return !!j.shield && it.base===j.shield;
   if(it.slot===SLOT.A) return true;      // 防具は自由
-  /* 装飾品も渡せる。以前は禁じていたが、その理由は「還りを強くしすぎない」だった。
+  /* 装飾品も渡せる。以前は禁じていたが、その理由は「プレイヤーを強くしすぎない」だった。
      いまは allyStats の softCap が上限を保証しているので、
      ここで別に絞る必要が無い（二重に絞ると、渡した物が数字に出なくなる）。
      指輪の1つで役割が変わるほうが、連れて行く相手を選ぶ理由になる。 */
@@ -9231,7 +9709,7 @@ function renderAllyEquip(){
       <div class="nm" style="color:${mine?'#a97fe0':'#e6e9f0'}">${charmName(c)}</div>
       <div class="af">${c.desc}</div>
       <div class="af" style="color:${mine?'#7fe0c0':'var(--dim)'}">
-        ${mine ? 'この還りが持っている（タップで自分に戻す）'
+        ${mine ? 'このプレイヤーが持っている（タップで自分に戻す）'
                : `いまは <b>${nm}</b>　タップで ${a.name} に渡す`}</div>
     </div>`;
   }).join('');
@@ -9267,7 +9745,7 @@ bindRowTap(el('m-allyeq'), '[data-aeon],[data-aeoff],[data-aecharm]', (n,e)=>{
   const ch=e.target.closest('[data-aecharm]');
   if(ch){ allyCharmToggle(+ch.dataset.aecharm); return; }
 });
-/* 護符の持ち主を、この還り ⇄ 自分 で入れ替える。 */
+/* 護符の持ち主を、このプレイヤー ⇄ 自分 で入れ替える。 */
 function allyCharmToggle(i){
   const a=_aeAlly; if(!a) return;
   const c=(S.run && S.run.charms || [])[i];
@@ -9279,22 +9757,22 @@ function allyCharmToggle(i){
 }
 bindTap(el('ae-close'), closeAllyEquip);
 
-/* ---------- 打ち直し所 / 露天の炉 ----------
+/* ---------- 鍛冶屋 / 露天の鍛冶場 ----------
    街でも道中でも同じ画面を出す。違うのは「どの財布から払うか」だけ。
      街  = 口座の金。定価。
      道中  = そのランで拾った金。1.5倍。
    道中の金は死ねばどのみち消えるので「今使うか、持ち帰って安く使うか」になる。
    帰る理由を消さずに、道中でも手を入れられるようにするための値付け。 */
 let _forgeMid=false;
-/* 誰の武器を叩くか。null＝自分、数値＝その還りの uidA。
-   以前は S.hero.equip.weapon 固定だった。還りの武器は拾った物のまま一生使うことになり、
+/* 誰の武器を叩くか。null＝自分、数値＝そのプレイヤーの uidA。
+   以前は S.hero.equip.weapon 固定だった。プレイヤーの武器は拾った物のまま一生使うことになり、
    「装備を渡せる」と言いながら、その装備を育てる手段だけが無い状態だった。 */
 let _forgeWho=null;
 function forgeHolder(){
   if(_forgeWho==null) return S.hero;
   return party().find(a=>a.uidA===_forgeWho && !a.dead) || S.hero;
 }
-/* 炉で選べる相手。倒れている還りは選べない（渡す手が無いので）。 */
+/* 鍛冶場で選べる相手。倒れているプレイヤーは選べない（渡す手が無いので）。 */
 function forgeCandidates(){
   return [S.hero, ...livingParty()].filter(Boolean);
 }
@@ -9305,14 +9783,14 @@ function forgeTarget(){
   const h=forgeHolder();
   return h ? h.equip.weapon : null;
 }
-/* 対象を選ぶ行。自分と還りを横に並べ、タップで切り替える。 */
+/* 対象を選ぶ行。自分とプレイヤーを横に並べ、タップで切り替える。 */
 function renderForgeWho(){
   const row=el('fg-who');
   const list=forgeCandidates();
-  // 選んでいた還りが倒れた・外れた場合は自分に戻す
+  // 選んでいたプレイヤーが倒れた・外れた場合は自分に戻す
   if(_forgeWho!=null && !list.some(h=>h!==S.hero && h.uidA===_forgeWho)) _forgeWho=null;
-  // 隠すときは中身も消す。残したままだと、倒れた還りの名前が行に残り、
-  // 次にまた還りが増えて行が出たときに一瞬だけ古い名前が見える。
+  // 隠すときは中身も消す。残したままだと、倒れたプレイヤーの名前が行に残り、
+  // 次にまたプレイヤーが増えて行が出たときに一瞬だけ古い名前が見える。
   if(list.length<=1){ row.style.display='none'; row.innerHTML=''; return; }
   row.style.display='flex';
   row.innerHTML = list.map(h=>{
@@ -9344,10 +9822,10 @@ function closeForge(){
 function renderForge(){
   const mid=_forgeMid, it=forgeTarget(), h=forgeHolder();
   renderForgeWho();
-  el('fg-title').textContent = mid ? '🔥 炉' : '⚒ 打ち直し所';
+  el('fg-title').textContent = mid ? '🔥 鍛冶場' : '⚒ 鍛冶屋';
   el('fg-sub').textContent = mid
-    ? '誰かが焚いたまま去った炉。黒鉄で武器を鍛え、傷んだ装備をまとめて直せる。金は持ち出したぶんだけ（割高）。還りも選べる。'
-    : '武器を鍛え、傷んだ装備をまとめて直す。還りも選べる。持ち帰った黒鉄を使う。鍛冶場のレベルぶん安くなる。';
+    ? '誰かが焚いたまま去った鍛冶場。黒鉄で武器を鍛え、傷んだ装備をまとめて直せる。金は持ち出したぶんだけ（割高）。プレイヤーも選べる。'
+    : '武器を鍛え、傷んだ装備をまとめて直す。プレイヤーも選べる。持ち帰った黒鉄を使う。鍛冶屋のレベルぶん安くなる。';
 
   if(!upgradable(it)){
     el('fg-item').innerHTML = '<div style="color:var(--dim)">'
@@ -9445,8 +9923,8 @@ bindTap(el('fg-fix'), ()=>{
   renderForge();
 });
 /* 鍛えたり直したりすると最大HPが動くことがある（装備由来の HP）。
-   持ち主のぶんだけ詰める。プレイヤー固定にしていると、
-   還りの武器を叩いたときに還りのHPがはみ出したままになる。 */
+   持ち主のぶんだけ詰める。主人公固定にしていると、
+   プレイヤーの武器を叩いたときにプレイヤーのHPがはみ出したままになる。 */
 function forgeClampHp(h){
   if(!h) return;
   const mx = (h===S.hero) ? stats(h).maxHp : allyStats(h).maxHp;
@@ -9477,7 +9955,7 @@ bindRowTap(el('m-mshop'), '[data-mbuy]', t=>{
 });
 bindTap(el('btn-go-forge'), ()=>openForge(false));
 
-/* ---------- 道具屋 / 倉庫 / 支度 / ガチャ ---------- */
+/* ---------- 道具屋 / 倉庫 / 能力強化 / ガチャ ---------- */
 function goldLabel(id){ el(id).textContent = S.gold+' G'; }
 
 /* 修理対象 = 装備中と倉庫の、耐久が減っている物すべて */
@@ -9608,7 +10086,7 @@ function renderGacha(){
     (next
       ? '<div class="row"><span class="k">次の帯</span><span>第 '+next.min+' 階層まで潜れば「'+next.nm+'」</span></div>'
       : '<div class="row"><span class="k">次の帯</span><span>最高帯に到達している</span></div>')+
-    '<div class="row"><span class="k">補充</span><span>ダンジョンに潜るとリセット</span></div>';
+    '<div class="row"><span class="k">補充</span><span>アビスに潜るとリセット</span></div>';
   const btn=el('btn-gacha');
   btn.textContent = S.gachaLeft>0 ? '広告を見て引く' : '今日はもう引けない（明日また5回）';
   btn.className = S.gachaLeft>0 ? 'primary' : 'ghost';
@@ -9618,7 +10096,7 @@ function renderGacha(){
 
 /* ---------- ガチャ ---------- */
 let _adTimer=null;
-/* ダミー広告。onDone を渡すとその場で報酬処理へ回す（還りの蘇生がこちらを使う）。
+/* ダミー広告。onDone を渡すとその場で報酬処理へ回す（プレイヤーの蘇生がこちらを使う）。
    実装時の鉄則: 報酬の抽選・付与は必ず「視聴完了コールバックの中」でだけ行うこと。 */
 let _adDone=null;
 /* 広告の下に開いていたモーダル。閉じたときに戻すために覚えておく。
@@ -9748,7 +10226,7 @@ function townTap(e){
           if(S.hero) S.hero.hpNow=Math.min(S.hero.hpNow, stats(S.hero).maxHp);
           redraw(); return; }
 
-  // 支度の購入
+  // 能力強化の購入
   const ub=e.target.closest('[data-upg]');
   if(ub){
     const u=UPGRADES.find(x=>x.id===ub.dataset.upg), lv=upgLv(u.id);
@@ -9770,7 +10248,7 @@ function townTap(e){
     redraw(); return;
   }
 
-  // 還り（街から装備を整える）
+  // プレイヤー（街から装備を整える）
   const ap=e.target.closest('[data-ally]');
   if(ap){
     const a=livingParty().find(m=>m.uidA===+ap.dataset.ally);
@@ -9827,8 +10305,8 @@ function townTap(e){
   const uid=+n.dataset.uid;
   const inStash=S.stash.find(i=>i.uid===uid);
   if(inStash){
-    /* 還りがいるなら、誰に着せるかを聞く。
-       還りに装備を渡す道は還りの画面にしか無かったので、
+    /* プレイヤーがいるなら、誰に着せるかを聞く。
+       プレイヤーに装備を渡す道はプレイヤーの画面にしか無かったので、
        倉庫で良い物を見つけても、そこからは自分にしか着せられなかった。
        ただし**自分しかいないときは聞かない**——選択肢が1つの問いは、ただの手間。 */
     if(wearCandidates(inStash).length > 1){ openWearPick(inStash); return; }
@@ -10063,7 +10541,7 @@ function buildLegend(){
             : t==='blunt' ?'戦槌・戦斧'
             : t==='slash' ?'剣・大剣'
             : t==='arcane'?'杖'
-            : '接尾辞や馴れで乗る追加属性';
+            : '接尾辞や恩寵で乗る追加属性';
     return `<div class="lg" style="padding:4px 0;border-bottom:1px solid #1e232e">
       ${svgFx(t, d.col)}
       <div><b style="color:${d.col}">${d.nm}</b>　<span style="color:var(--dim)">${ex}</span><br>
@@ -10096,7 +10574,7 @@ function buildLegend(){
 
   /* ジョブ一覧。**定義から組み立てる**のが肝で、ここを手で書くと
      ジョブや技をいじるたびに必ずずれる（祭壇の説明文で一度それをやった）。
-     プレイヤーにとっては書いてあることが仕様なので、ずれた説明は嘘になる。
+     主人公にとっては書いてあることが仕様なので、ずれた説明は嘘になる。
      以前は基本6ジョブの固有スキルだけを出していて、
      Lv.10/20/30 で覚える技はどこにも書いていなかった。 */
   el('joblist').innerHTML = ALL_JOBS.map(j=>{
@@ -10115,7 +10593,7 @@ function buildLegend(){
         <b style="color:${j.col}">${j.sk.nm}</b>
         <span style="color:var(--dim)">${j.sk.desc}</span></div>
       ${rows}
-      ${j.backline?'<div style="padding-left:14px;color:#7fe0c0">近接の還りがいるあいだは後ろに下がり、攻撃には参加しません（祈りは続きます）</div>':''}
+      ${j.backline?'<div style="padding-left:14px;color:#7fe0c0">近接のプレイヤーがいるあいだは後ろに下がり、攻撃には参加しません（祈りは続きます）</div>':''}
     </div>`;
   }).join('');
 
@@ -10135,7 +10613,7 @@ function clampHp(){
   const mx=stats(S.hero).maxHp;
   if(S.hero.hpNow>mx) S.hero.hpNow=mx;
 }
-/* 所持している馴れを集計して並べる（同じ馴れは合算） */
+/* 所持している恩寵を集計して並べる（同じ恩寵は合算） */
 function boonListHTML(h){
   if(!h || !h.boons || !h.boons.length) return '<div class="empty">まだ無い</div>';
   /* 合算は boonSum に任せる。ここで足し算を書き直すと、
@@ -10187,7 +10665,7 @@ function renderBag(){
   el('bag-party').innerHTML = livingParty().length ? livingParty().map(a=>{
     const j=jobDef(a.job), as=allyStats(a);
     const bl=(a.boons&&a.boons.length)
-      ? a.boons.map(x=>boonDef(x.id).nm).join('・') : '馴れなし';
+      ? a.boons.map(x=>boonDef(x.id).nm).join('・') : '恩寵なし';
     const sk=allySkills(a), nx=allyNextSkill(a);
     return `<div class="item" data-ally="${a.uidA}" style="border-left-color:${j.col}">
       <div class="nm" style="color:${j.col}">${allyFullName(a)} <span style="color:var(--dim);font-size:11px">${j.nm} Lv.${a.lv}</span>
@@ -10210,7 +10688,7 @@ function renderBag(){
             <span style="font-size:11px;color:var(--dim)">　${nm}が所持</span></div>
           <div class="af">護符 / この探索のあいだ有効${c.heal&&mine&&S.run.healUsed?' ・使用済み':''}</div>
           <div class="af">${c.desc}</div>
-          <div class="af" style="color:var(--dim);font-size:11px">還りの画面から渡し先を変えられる</div>
+          <div class="af" style="color:var(--dim);font-size:11px">プレイヤーの画面から渡し先を変えられる</div>
           </div>`; }).join('')
       : '')
     + (eq.length ? eq.map(it=>itemHTML(it,true)).join('')
@@ -10290,7 +10768,7 @@ function bagTap(e){
 document.addEventListener('click', bagTap, false);
 document.addEventListener('touchend', bagTap, {passive:false});
 
-/* ---------- 馴れの選択 ---------- */
+/* ---------- 恩寵の選択 ---------- */
 let _boonPending=null;
 const BOON_SRC_LABEL={unique:'ユニーク撃破', mid:'中ボス撃破', great:'大ボス撃破',
                       final:'初めの供物を撃破', altar:'祭壇に捧げた'};
@@ -10311,12 +10789,12 @@ function openBoonPick(tier, srcName){
   _boonTier = tier;
   S.screen='boon';
   el('hud').classList.remove('on');
-  el('boon-title').textContent = BOON_SRC_LABEL[tier]||'馴れを得た';
+  el('boon-title').textContent = BOON_SRC_LABEL[tier]||'恩寵を得た';
   const cfg = BOON_SRC[tier] || BOON_SRC.mid;
   el('boon-sub').textContent = (BOON_SRC_LEAD[tier] || srcName+'を倒した。')
     + '3つから1つ選ぶ。'
     + (cfg.floor>0 ? '（'+BOON_RAR[cfg.floor].nm+'以上が1つ確定）' : '');
-  /* レア度は色と名前の両方で出す。色だけだと、同じ馴れの別レア度が
+  /* レア度は色と名前の両方で出す。色だけだと、同じ恩寵の別レア度が
      並んだときに「どっちが強いのか」を覚えていないと読めない。 */
   el('boon-choices').innerHTML = _boonPending.map((b,i)=>{
     const r=boonRarDef(b.rar);
@@ -10339,7 +10817,7 @@ function boonTap(e){
   const b=_boonPending[+n.dataset.boon];
   _boonPending=null;
   el('m-boon').classList.remove('on');
-  // 還りがいるなら「誰に与えるか」を選ばせる。ここがパーティ運用の一番の判断点。
+  // プレイヤーがいるなら「誰に与えるか」を選ばせる。ここがパーティ運用の一番の判断点。
   const targets = boonTargets();
   if(targets.length<=1){ applyBoon(S.hero, b); return; }
   openBoonTarget(b, targets);
@@ -10347,7 +10825,7 @@ function boonTap(e){
 document.addEventListener('click', boonTap, false);
 document.addEventListener('touchend', boonTap, {passive:false});
 
-/* ---------- 馴れの付与先 ---------- */
+/* ---------- 恩寵の付与先 ---------- */
 let _btPending=null, _btTargets=[];
 function openBoonTarget(b, targets){
   _btPending=b; _btTargets=targets;
@@ -10384,15 +10862,21 @@ document.addEventListener('click', btTap, false);
 document.addEventListener('touchend', btTap, {passive:false});
 
 function applyBoon(h, b){
+  const firstBlade = (b.id==='orbit' && h===S.hero && bladeCount()===0);
   h.boons.push(b);
-  log((h===S.hero?'':h.name+'に') + '馴れを獲得：'+boonDef(b.id).nm);
-  // 最大HPが増える馴れなら、その増分ぶんは回復させる（実感が出る）
+  log((h===S.hero?'':h.name+'に') + '恩寵を獲得：'+boonDef(b.id).nm);
+  /* 1本目だけは言葉で言う。
+     ここまで「届く距離を測って立つ」ゲームだったのが、
+     **群れに寄る理由**を初めて持つ瞬間になる。
+     黙って生やすと、なぜ急に減るのかが分からないまま死ぬ。 */
+  if(firstBlade) showBanner('鞘無し', '近くの敵を勝手に斬る', '#e8eef6', 3.0);
+  // 最大HPが増える恩寵なら、その増分ぶんは回復させる（実感が出る）
   const mx = (h===S.hero) ? stats(h).maxHp : allyStats(h).maxHp;
   h.hpNow = Math.min(mx, h.hpNow + mx*0.15);
   setScreen('game'); last=performance.now();
 }
 
-/* ---------- 還り候補（道中の NPC） ---------- */
+/* ---------- プレイヤー候補（道中の NPC） ---------- */
 function allyGearHTML(a){
   const html = ['weapon','shield','armor','accessory']
     .map(s=>a.equip[s]).filter(Boolean).map(it=>itemHTML(it,false)).join('');
@@ -10405,12 +10889,12 @@ function openAllyInspect(){
   el('hud').classList.remove('on');
   el('ally-name').textContent = a.name;
   el('ally-name').style.color = j.col;
-  /* 二つ名と持っている馴れは、加入を決める前に見えていなければならない。
+  /* 二つ名と持っている恩寵は、加入を決める前に見えていなければならない。
      加入してから分かるのでは「誰を連れて行くか」の判断材料にならない。 */
   const ep=allyEpithet(a);
   const hurt = a.hpNow < st.maxHp;
   el('ally-sub').innerHTML = (ep ? '<b style="color:'+j.col+'">'+ep+'</b><br>' : '')
-    + j.nm+'　Lv.'+a.lv+'　還り '+livingParty().length+' / '+PARTY_MAX
+    + j.nm+'　Lv.'+a.lv+'　プレイヤー '+livingParty().length+' / '+PARTY_MAX
     /* 傷ついたまま加入することがある（助けに入るのが遅れた場合）。
        連れて行くかどうかの判断材料なので、傷は隠さない。 */
     + (hurt ? '<br><span style="color:#e0705a;font-size:11px">傷ついている　HP '
@@ -10426,7 +10910,7 @@ function openAllyInspect(){
       <span style="color:var(--dim);font-size:11px">${j.sk.desc}</span></span></div>
      <div class="row"><span class="k">武器種</span><span>${(BASES.find(b=>b.id===j.weapon)||{}).nm}
       <span style="color:var(--dim);font-size:11px">（ジョブで固定・変更不可）</span></span></div>`;
-  // プレイヤーとの差をそのまま出す。弱いのは仕様なので隠さない。
+  // 主人公との差をそのまま出す。弱いのは仕様なので隠さない。
   const cmp=(mine,theirs)=>{
     const d=Math.round((theirs/Math.max(0.01,mine)-1)*100);
     const c = d>=0?'#7fe0c0':'#d97a7a';
@@ -10446,7 +10930,7 @@ function openAllyInspect(){
   el('ally-gear').innerHTML = allyGearHTML(a);
   const full = livingParty().length >= PARTY_MAX;
   const btn = el('ally-join');
-  btn.textContent = full ? '還りは満員（3人まで）' : '連れて行く';
+  btn.textContent = full ? 'プレイヤーは満員（3人まで）' : '連れて行く';
   btn.className = full ? 'ghost' : 'primary';
   el('m-ally').classList.add('on');
 }
@@ -10459,7 +10943,7 @@ function joinAlly(){
   const used=party().map(m=>m.slot);
   a.slot = [0,1,2,3].find(i=>!used.includes(i)) ?? party().length;
   /* 加入したら「加入前」の印を落とす。残したままだと、
-     以後この還りが倒れたときに downAlly が NPC の枝を通ってしまい、
+     以後このプレイヤーが倒れたときに downAlly が NPC の枝を通ってしまい、
      蘇生の相談も無く黙って消える。 */
   a.npc=false; a.awake=false; a.tgt=null;
   a.mode='follow'; a.crumb=Math.max(0, W.trail.length-2);
@@ -10497,12 +10981,12 @@ function tickMine(dt, moving){
   W.mine=null;
   gainOre(m.o.grade, m.o.n, m.o.x, m.o.y);
   W.fx.push({t:'parry', x:m.o.x, y:m.o.y, life:0.5, max:0.5});
-  /* 昔は「掘った鉱脈がそのまま炉になる」仕掛けで、この一行はその名残だった。
-     炉を切り離したあともログだけ残っていて、**その場で鍛えられると言いながら
+  /* 昔は「掘った鉱脈がそのまま鍛冶場になる」仕掛けで、この一行はその名残だった。
+     鍛冶場を切り離したあともログだけ残っていて、**その場で鍛えられると言いながら
      近づいても何も起きない**状態になっていた（利用者からの報告）。
      いま黒鉄に要るのは「運ぶ先がどこか」なので、それを言う。 */
   const fd = W.forge ? Math.round(Math.hypot(W.forge.x-P.x, W.forge.y-P.y)) : 0;
-  log('⛏ 掘り終えた'+(W.forge ? '（炉まで '+fd+'m）' : ' — この階に炉は無い'));
+  log('⛏ 掘り終えた'+(W.forge ? '（鍛冶場まで '+fd+'m）' : ' — この階に鍛冶場は無い'));
 }
 
 /* ---------- 道中のイベント ---------- */
@@ -10582,7 +11066,7 @@ function resolveEvent(){
     const after=stats(S.hero);
     S.hero.hpNow = Math.min(S.hero.hpNow, after.maxHp);
     log('祭壇に捧げた');
-    W.ev.used=true;                       // 馴れの選択に入る前に消費済みにする
+    W.ev.used=true;                       // 恩寵の選択に入る前に消費済みにする
     /* 出所は 'altar'。ボスと同じ 3択だが、レア度の重みは祭壇専用にしてある。
        払うのが**恒久的な最大HP**なので、中ボスより出が良くないと釣り合わない。
        （以前はここで 'unique' を渡していて、定義してあった altar の重みが
@@ -10622,16 +11106,16 @@ bindTap(el('ev-no'), closeEvent);
 bindTap(el('tr-yes'), startTrial);
 bindTap(el('tr-no'),  closeTrial);
 
-/* ---------- 還りの死亡と広告蘇生 ----------
+/* ---------- プレイヤーの死亡と広告蘇生 ----------
    「1人につき1回だけ」→「5階進むごとに1人1回」と直してきたが、
    どちらも**人ごとの権利**だったのが問題だった。
 
    ボス戦では複数人がまとめて落ちる。人ごとの権利だと、
    同じ戦闘で2人目が倒れた瞬間にもう打つ手がない。
-   逆に、還りが1人しかいない人は権利が1つしか無く、常に不利になる。
+   逆に、プレイヤーが1人しかいない人は権利が1つしか無く、常に不利になる。
 
    **5階ごとに、パーティ共通で4回**にする。
-   誰に使ってもいい。還りが少ないほど1人あたりの猶予が増えるので、
+   誰に使ってもいい。プレイヤーが少ないほど1人あたりの猶予が増えるので、
    「まず1人連れて行く」の敷居も下がる。 */
 const REVIVE_BAND     = 5;   // この階層数ごとに権利が戻る
 const REVIVE_PER_BAND = 4;   // 1帯あたりの回数（全キャラ共通）
@@ -10658,12 +11142,12 @@ function openFallen(a){
   const can = canRevive(a);
   const left = revivesLeft();
   el('fal-body').innerHTML = can
-    ? `<div class="row"><span class="k">見送ると</span><span>この還りは失われる<br>
-         <span style="color:var(--dim);font-size:11px">装備も馴れも護符も一緒に消える</span><br>
+    ? `<div class="row"><span class="k">見送ると</span><span>このプレイヤーは失われる<br>
+         <span style="color:var(--dim);font-size:11px">装備も恩寵も護符も一緒に消える</span><br>
          <span style="color:#8fd8ff;font-size:11px">◆ ${allyLossShards(a)} 欠片が残る（死んでも消えない）</span>
-         ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:11px">弔いの馴れが発動する</span>':''}</span></div>
+         ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:11px">弔いの恩寵が発動する</span>':''}</span></div>
        <div class="row"><span class="k">蘇生すると</span><span><b>Lv.1</b> に戻り、装備をランダムに失う<br>
-         <span style="color:var(--dim);font-size:11px">馴れは残る</span></span></div>
+         <span style="color:var(--dim);font-size:11px">恩寵は残る</span></span></div>
        <div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}
          <span style="color:var(--dim);font-size:11px">（誰に使ってもよい）</span><br>
          <span style="color:var(--dim);font-size:11px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
@@ -10681,40 +11165,40 @@ function closeFallen(){
   if(next && next.dead){ openFallen(next); return; }
   if(S.hero && S.run){ setScreen('game'); last=performance.now(); }
 }
-/* ---------- 還りを失ったときに起きること ----------
+/* ---------- プレイヤーを失ったときに起きること ----------
    ここまで、ロストは「消えて終わり」だった。
-   レベルも装備も馴れも一度に消えて、画面には一行のログしか出ない。
-   その還りに注いだ時間が丸ごと無かったことになるので、
+   レベルも装備も恩寵も一度に消えて、画面には一行のログしか出ない。
+   そのプレイヤーに注いだ時間が丸ごと無かったことになるので、
    潜りを続ける気力ごと折れる（死亡時に何も進まないのがつらい、というのと同じ話）。
 
    欠片を渡すのは、その時間を「無かったこと」にしないため。
    額はレベルに比例させてある——だから**わざと失って稼ぐことはできない**。
    拾ったばかりの Lv.1 を捨てても 2 しか出ず、
-   育った還りを失えば大きいが、それは注いだ物のほうがずっと大きいから。
+   育ったプレイヤーを失えば大きいが、それは注いだ物のほうがずっと大きいから。
    利益ではなく、目減りの緩和。 */
 function allyLossShards(a){
   return clamp(2 + Math.round((a.lv||1)*0.8), 2, 30);
 }
-/* 弔いの馴れを持っている者に火を入れる。持ち主が誰であれ全員に効く
-   （プレイヤーも還りも、同じ喪失を見ているので）。 */
+/* 弔いの恩寵を持っている者に火を入れる。持ち主が誰であれ全員に効く
+   （主人公もプレイヤーも、同じ喪失を見ているので）。 */
 function igniteAvenge(){
   const holders=[S.hero, ...party()].filter(h=>h && !h.dead && boonSum(h,'avenge')>0);
   holders.forEach(h=>{ h.avengeT = AVENGE_SECONDS; });
   if(holders.length){
-    log('弔いの馴れが燃え上がった');
+    log('弔いの恩寵が燃え上がった');
     W.fx.push({t:'parry', x:P.x, y:P.y, life:0.8, max:0.8});
     showBanner('弔い', AVENGE_SECONDS+'秒 攻撃力と攻撃速度が跳ね上がる', '#c4433f', 2.4);
   }
   return holders.length;
 }
-/* ---------- 時間で動く馴れ（再生・眷属・守護） ----------
-   「常に +x%」の馴ればかりだと、どれを取っても同じ試合になる。
-   時間差で動く物を混ぜると、引いた馴れに合わせて立ち回りが変わる:
+/* ---------- 時間で動く恩寵（再生・眷属・守護） ----------
+   「常に +x%」の恩寵ばかりだと、どれを取っても同じ試合になる。
+   時間差で動く物を混ぜると、引いた恩寵に合わせて立ち回りが変わる:
      再生 → 削られ続けても粘れる＝長居できる
      眷属 → 自分が届かない距離にも手が出る
      守護 → 一撃だけ無かったことにできる＝踏み込める
 
-   3つとも「持ち主ごと」に回る。プレイヤーでも還りでも同じ関数を通す。 */
+   3つとも「持ち主ごと」に回る。主人公でもプレイヤーでも同じ関数を通す。 */
 function tickBoonTimers(h, dt, isPlayer){
   if(!h || h.dead) return;
   const st = isPlayer ? stats(h) : allyStats(h);
@@ -10750,7 +11234,7 @@ function tickBoonTimers(h, dt, isPlayer){
 
   // 眷属: 主人の周りを回り、射程内の敵を勝手に撃つ。
   //       弾を飛ばさず直接当てるのは、飛ばすと「誰の弾か」を持ち回る必要があり、
-  //       プレイヤーと還りで別の経路になるため。ここは見た目の線で足りる。
+  //       主人公とプレイヤーで別の経路になるため。ここは見た目の線で足りる。
   const kn = boonSum(h,'kin');
   if(kn>0){
     const hx = h===S.hero?P.x:h.x, hy = h===S.hero?P.y:h.y;
@@ -10792,8 +11276,8 @@ function spendBarrier(h, x, y){
 
 /* 不死鳥。1回の探索につき1度だけ立ち上がる。防げたら true。 */
 function tryPhoenix(h, isPlayer){
-  /* 遺物「不滅」。プレイヤーだけ、1回の探索につき一度だけ全快で立ち上がる。
-     馴れの不死鳥（割合回復）とは別枠にしてある——
+  /* 遺物「不滅」。主人公だけ、1回の探索につき一度だけ全快で立ち上がる。
+     恩寵の不死鳥（割合回復）とは別枠にしてある——
      どちらも同じ枠にすると、両方積んでも1回しか起きないことになり、
      せっかく2つ揃えた意味が消える。 */
   if(isPlayer && relicOn('ember') && S.run && !S.run.emberUsed){
@@ -10814,7 +11298,7 @@ function tryPhoenix(h, isPlayer){
   h.dead = false;
   const x = isPlayer?P.x:h.x, y = isPlayer?P.y:h.y;
   W.fx.push({t:'parry', x, y, life:1.0, max:1.0});
-  log((isPlayer?'':h.name+'は')+'不死鳥の馴れで立ち上がった');
+  log((isPlayer?'':h.name+'は')+'不死鳥の恩寵で立ち上がった');
   if(isPlayer){ P.invuln = Math.max(P.invuln||0, 1.5); showBanner('不死鳥', 'HP '+h.hpNow+' で立ち上がった', '#ff9a5a', 2.4); }
   return true;
 }
@@ -10899,6 +11383,7 @@ bindTap(el('btn-go-stash'), ()=>setScreen('stash'));
 bindTap(el('btn-go-upg'),   ()=>setScreen('upg'));
 bindTap(el('btn-go-bld'),   ()=>setScreen('bld'));
 bindTap(el('btn-go-mem'),   ()=>setScreen('mem'));
+bindTap(el('btn-go-tavern'),()=>setScreen('tavern'));
 bindTap(el('btn-go-gacha'), ()=>setScreen('gacha'));
 
 bindTap(el('btn-sellall'), ()=>{
@@ -10928,6 +11413,7 @@ bindTap(el('btn-reset'), ()=>{
   /* 名前も消してタイトルへ戻す。「全消去」と言っておいて名前だけ残るのは、
      消えたのかどうかが分からない一番よくない形。 */
   S.name=''; S.mastery={}; S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
+  S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   setScreen('title');
 });
 
@@ -10939,7 +11425,7 @@ bindTap(el('ad-ok'), ()=>{
   if(el('ad-ok').disabled) return;      // 視聴完了前は受け取れない
   const done=_adDone;
   closeAd(false);
-  if(done){ done(); return; }           // 還りの蘇生など、ガチャ以外の報酬
+  if(done){ done(); return; }           // プレイヤーの蘇生など、ガチャ以外の報酬
   _pending = rollGacha();
   if(_pending) showGachaResult(_pending);
   renderGacha();
@@ -10999,6 +11485,9 @@ function closeNameEntry(){ el('m-name').classList.remove('on'); }
 function confirmName(){
   const v=(el('nm-input').value||'').trim().slice(0,10);
   S.name = v || '冒険者';
+  /* ここが「新しい保存が生まれる」唯一の場所。生成の塩はここで引く。
+     これで初回の第1階層が人ごと・遊びごとに変わる（S の salt の注記を参照）。 */
+  S.salt = (Math.random()*4294967296)>>>0;
   closeNameEntry();
   startAdventure();
 }
@@ -11015,6 +11504,68 @@ bindTap(el('t-start'), ()=>{
   if(S.hero) startAdventure(); else openNameEntry();
 });
 bindTap(el('t-help'), openHelp);
+
+/* ---------- デバッグの入口 ----------
+   タイトルの版番号を5回叩くと出る。
+   「隠しコマンド」にしたいのではなく、**普通に遊んでいる人の指が届かない**
+   場所に置きたいだけ。押せるボタンとして置くと、必ず押される。 */
+let _dbgTaps=0;
+bindTap(document.querySelector('#scr-title .ver'), ()=>{
+  _dbgTaps++;
+  if(_dbgTaps<5) return;
+  _dbgTaps=0;
+  S.debug = S.debug || {};
+  S.debug.on = !S.debug.on;
+  syncDebugBtn();
+  showBanner(S.debug.on?'デバッグ 有効':'デバッグ 無効',
+             S.debug.on?'右下の🐞から':'', S.debug.on?'#ffb0a0':'#5c6479', 2.2);
+});
+function syncDebugBtn(){
+  el('dbgbtn').classList.toggle('on', dbg('on'));
+}
+function renderDebug(){
+  const sw=(id,on)=>{ const n=el(id);
+    n.textContent = on?'ON':'OFF';
+    n.className = 'sw '+(on?'primary':'ghost'); };
+  sw('dbg-god',   dbg('god'));
+  sw('dbg-depth', dbg('allDepths'));
+}
+function openDebug(){ renderDebug(); el('m-debug').classList.add('on'); }
+bindTap(el('dbgbtn'), openDebug);
+bindTap(el('dbg-close'), ()=>{ el('m-debug').classList.remove('on'); last=performance.now(); });
+bindTap(el('dbg-god'), ()=>{
+  S.debug.god = !dbg('god');
+  if(godMode() && S.hero) S.hero.hpNow = stats(S.hero).maxHp;
+  renderDebug(); updateHUD();
+});
+bindTap(el('dbg-depth'), ()=>{
+  S.debug.allDepths = !dbg('allDepths');
+  // 開放を切ったときに、選んでいた階層が届かない場所に残らないようにする
+  const u=unlockedDepths();
+  if(!u.includes(S.startDepth)) S.startDepth = u[u.length-1];
+  renderDebug();
+  if(RENDERERS[S.screen]) RENDERERS[S.screen]();
+});
+bindTap(el('dbg-clear'), ()=>{
+  if(!S.run){ log('探索中だけ'); return; }
+  const n=W.enemies.filter(e=>!e.dead).length;
+  W.enemies.length=0;
+  log('🐞 敵を '+n+' 体消した');
+  el('m-debug').classList.remove('on'); last=performance.now();
+});
+bindTap(el('dbg-blade'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  if(bladeCount() >= BLADE_MAX){ log('🐞 鞘無しは上限（'+BLADE_MAX+'本）'); return; }
+  S.hero.boons.push({id:'orbit', rar:'common'});
+  log('🐞 鞘無し '+bladeCount()+' 本');
+  el('m-debug').classList.remove('on'); last=performance.now();
+});
+bindTap(el('dbg-rich'), ()=>{
+  S.shards=(S.shards||0)+9999; S.gold=(S.gold||0)+9999;
+  S.ore=S.ore||{}; ['raw','fine','deep'].forEach(k=>S.ore[k]=(S.ore[k]||0)+9999);
+  log('🐞 欠片・金・黒鉄を足した');
+  renderDebug(); if(RENDERERS[S.screen]) RENDERERS[S.screen]();
+});
 bindTap(el('nm-ok'),   confirmName);
 bindTap(el('nm-back'), closeNameEntry);
 bindTap(el('nm-roll'), ()=>{ el('nm-input').value = rollAllyName()+rollAllyName().slice(-1); });

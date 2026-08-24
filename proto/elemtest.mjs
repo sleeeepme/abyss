@@ -128,7 +128,7 @@ R.inCombat = await pg.evaluate(async ()=>{
   return {bluntVsUndead, slashVsUndead, bluntIsBetter: bluntVsUndead>slashVsUndead};
 });
 
-// --- 10. プレイヤーも状態異常になる（炎の敵に焼かれる）
+// --- 10. 主人公も状態異常になる（炎の敵に焼かれる）
 R.playerStatus = await pg.evaluate(async ()=>{
   S.upg={hp:8}; S.hero=newHero(); startRun(1);
   S.run.pst={}; S.run.pbu={};

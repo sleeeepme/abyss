@@ -70,7 +70,7 @@ const stage = (job, fn)=>pg.evaluate(({job, fnSrc})=>{
   uniqueAllyName(a,party()); S.hero.party.push(a);
   const e=W.enemies.find(x=>!x.boss && !x.dead);
   W.enemies=[e]; e.x=a.x+1.6; e.y=a.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
-  S.hero.equip.weapon=null;                 // プレイヤーは手出ししない
+  S.hero.equip.weapon=null;                 // 主人公は手出ししない
   a.artCd=0;
   return (new Function('a','e','def','return ('+fnSrc+')(a,e,def)'))(
     a, e, ALLY_ARTS[allySkillSum(a).art]||{});

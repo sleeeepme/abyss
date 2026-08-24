@@ -180,4 +180,60 @@ R.logFollowsParty = await pg.evaluate(()=>{
           ok: withTwo>alone && withTwo>=pb.bottom};
 });
 
+/* ================= 5. 左肩の縦積み =================
+   状態異常の帯（#statusbar。疾風の加護や弔いもここに出る）と
+   遺体の場所（#gravehint）は、CSS では**同じ座標**に置いてある。
+   どちらも「その時だけ出る」ので普段は成立するが、
+   両方出た瞬間に重なって両方とも読めなくなっていた。 */
+
+// 5-a. 疾風の加護と遺体の行が同時に出ても重ならない
+R.leftColumnClear = await pg.evaluate(()=>{
+  TH.busyFloor();
+  TH.clearEnemies(); P.target=null;
+  // 疾風の加護（未踏より浅いところ）と、遺体の行を同時に出す
+  S.deepest=40; S.run.startDeepest=40;
+  S.grave={depth:99, x:P.x, y:P.y, items:[], gold:10, ore:{}, xp:0,
+           heroName:'テスト', lv:9, t:nowMs()};
+  W.grave=null;
+  stepSim(0.1);
+  const sb=el('statusbar').getBoundingClientRect();
+  const gh=el('gravehint').getBoundingClientRect();
+  const overlap = sb.width>0 && gh.width>0 &&
+                  sb.left<gh.right && gh.left<sb.right &&
+                  sb.top<gh.bottom && gh.top<sb.bottom;
+  return {grace: windGrace(), statusShown: sb.height>0, graveShown: gh.height>0,
+          sbBottom:Math.round(sb.bottom), ghTop:Math.round(gh.top),
+          clear: !overlap, below: gh.top >= sb.bottom,
+          ok: windGrace() && sb.height>0 && gh.height>0 && !overlap && gh.top>=sb.bottom};
+});
+
+/* 5-b. 上が空なら、下は元の位置まで戻る。
+       一度押し下げたまま固定すると、状態異常が切れたあとに
+       意味のない余白だけが残る。 */
+R.leftColumnRestores = await pg.evaluate(()=>{
+  const pushed=el('gravehint').getBoundingClientRect().top;
+  S.deepest=1; S.run.startDeepest=1; S.hero.avengeT=0; S.run.pst={};
+  stepSim(0.1);
+  const sb=el('statusbar').getBoundingClientRect();
+  const back=el('gravehint').getBoundingClientRect().top;
+  return {pushed:Math.round(pushed), back:Math.round(back), sbH:Math.round(sb.height),
+          statusEmpty: sb.height===0, restored: back < pushed,
+          ok: sb.height===0 && back < pushed};
+});
+
+// 5-c. ログはこの2つより下（左肩が2段になっても潜り込まない）
+R.logBelowLeftColumn = await pg.evaluate(()=>{
+  TH.busyFloor();
+  TH.clearEnemies(); P.target=null;
+  S.deepest=40; S.run.startDeepest=40;
+  S.grave={depth:99, x:P.x, y:P.y, items:[], gold:10, ore:{}, xp:0,
+           heroName:'テスト', lv:9, t:nowMs()};
+  W.grave=null;
+  stepSim(0.1);
+  const lg=el('log').getBoundingClientRect();
+  const gh=el('gravehint').getBoundingClientRect();
+  return {logTop:Math.round(lg.top), ghBottom:Math.round(gh.bottom),
+          ok: lg.top >= gh.bottom};
+});
+
 await done(b, errs, R);

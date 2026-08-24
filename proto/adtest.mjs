@@ -223,7 +223,7 @@ R.live = await pg.evaluate(async ()=>{
   a.hpNow=allyStats(a).maxHp;
   S.hero.party.push(a);
   /* ここで見たいのは「実プレイの最中に仲間が倒れても、蘇生ボタンが押せる」こと。
-     プレイヤー自身の生死も、他の仲間の死も、この 1.2 秒のあいだに割り込むと
+     主人公自身の生死も、他の仲間の死も、この 1.2 秒のあいだに割り込むと
      別の画面が出て検証にならないので、両方とも起きないようにしておく。 */
   P.invuln=1e9;
   await new Promise(r=>setTimeout(r,1200));     // 通常のゲームループを回しておく

@@ -20,7 +20,7 @@ const R=await pg.evaluate(()=>{
   const hit=(st,famId)=>{ const fam=FAMILY.find(f=>f.id===famId);
     const t={lv:10,def:0,res:fam.res,st:{},bu:{}};
     return resolveDamage(t, playerParts(st,1), 10, {noVariance:true}).total; };
-  // 属性耐性の接尾辞がプレイヤー側で効くか
+  // 属性耐性の接尾辞が主人公側で効くか
   S.hero.equip.armor={uid:9,base:'chain',nm:'鎖帷子',slot:'armor',ilvl:10,rar:1,ident:true,
     def:8,spd:1,dur:100,durMax:100,aff:[{t:'s',id:'rFire',nm:'耐火',stat:'resFire',v:40}]};
   const withRes=stats(S.hero);

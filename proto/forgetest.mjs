@@ -131,23 +131,23 @@ R.mineCancelHit = await pg.evaluate(async ()=>{
           ok: before && !after && !W.ores[0].mined};
 });
 
-/* 2-d. 掘ったあとの鉱脈では鍛えられない。炉は別の場所にある。
+/* 2-d. 掘ったあとの鉱脈では鍛えられない。鍛冶場は別の場所にある。
 
-   以前はここが「掘り尽くした鉱脈がそのまま炉になる」だった。
+   以前はここが「掘り尽くした鉱脈がそのまま鍛冶場になる」だった。
    その場で叩けると、鉱石は財布から出してすぐ使う小銭でしかなくなり、
    「死ねば失う物を抱えて歩いている」時間が一秒も生まれない。
-   運ぶ距離のほうが本体なので、炉を切り離した。 */
+   運ぶ距離のほうが本体なので、鍛冶場を切り離した。 */
 await setupVein('raw', 5, 6);
 R.forgeNotAtVein = await pg.evaluate(async ()=>{
   S.hero.equip.weapon=genBaseItem('sword',6,1);
   interact();
   stepSim(1.7);
   const mined=W.ores[0].mined;
-  interact();                               // 2回目。以前はここで炉が開いた
+  interact();                               // 2回目。以前はここで鍛冶場が開いた
   const openedAtVein=document.getElementById('m-forge').classList.contains('on');
   document.getElementById('m-forge').classList.remove('on');
 
-  // 別の場所に置かれた炉でなら開く
+  // 別の場所に置かれた鍛冶場でなら開く
   W.forge={x:P.x, y:P.y, seed:0};
   interact();
   const openedAtForge=document.getElementById('m-forge').classList.contains('on');
@@ -159,7 +159,7 @@ R.forgeNotAtVein = await pg.evaluate(async ()=>{
   return {mined, veinDoesNotForge:!openedAtVein, openedAtForge, title, screen,
           backToGame:S.screen==='game',
           ok: mined && !openedAtVein && openedAtForge
-              && title.includes('炉') && screen==='forge'};
+              && title.includes('鍛冶場') && screen==='forge'};
 });
 
 /* ================= 3. 鍛造のコスト ================= */
@@ -180,7 +180,7 @@ R.costCurve = await pg.evaluate(()=>{
           lastCostsMost: golds[9]>golds[0]*8};
 });
 
-// 3-b. 道中は1.5倍。鍛冶場（拠点開発）のレベルで安くなる
+// 3-b. 道中は1.5倍。鍛冶屋（拠点開発）のレベルで安くなる
 R.pricing = await pg.evaluate(()=>{
   S.hero=newHero(); S.bld={};
   const it=genBaseItem('sword',20,2);
@@ -481,7 +481,7 @@ R.veinYield = await pg.evaluate(()=>{
 
 /* ================= 7. UI ================= */
 
-// 7-a. 拠点の鍛造所は口座の金、道中の炉はランの金を使う
+// 7-a. 拠点の鍛造所は口座の金、道中の鍛冶場はランの金を使う
 R.purses = await pg.evaluate(()=>{
   S.hero=newHero(); S.bld={}; S.ore={raw:999,fine:999,deep:999};
   const it=genBaseItem('sword',20,2); S.hero.equip.weapon=it;
@@ -597,7 +597,7 @@ R.live = await pg.evaluate(async ()=>{
   return out;
 });
 
-// 8-b. 鉱脈と炉を描いても落ちない（両方の状態＋採掘ゲージ）
+// 8-b. 鉱脈と鍛冶場を描いても落ちない（両方の状態＋採掘ゲージ）
 R.drawAll = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(30);
   const fails=[];

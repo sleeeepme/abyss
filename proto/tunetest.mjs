@@ -78,7 +78,7 @@ R.swiftEvade = await pg.evaluate(()=>{
           ok: af.stat2==='evade' && af.v2>0 && lines.includes('回避率')};
 });
 
-// 2-b. 実際にプレイヤーの回避率へ乗る（上限は 40%）
+// 2-b. 実際に主人公の回避率へ乗る（上限は 40%）
 R.evadeApplies = await pg.evaluate(()=>{
   S.hero=newHero();
   const base=stats(S.hero).evade;
@@ -114,35 +114,40 @@ R.evadeBlocks = await pg.evaluate(()=>{
 
 /* ================= 3. 盾 ================= */
 
-// 3-a. 指の役割は画面の左右ではなく順番で決まる（右側でも動かせる）
+/* 3-a. 指の役割は画面の左右ではなく順番で決まる（右側でも動かせる）。
+       そして **2本目の指は何もしない。**
+       以前はここでガードが始まっていたが、それが「盾の挙動が読めない」の
+       中心だった——移動の指を置き直しただけで構えが入り、
+       足が遅くなった理由が画面のどこにも出ていなかった。
+       構える口は左下のボタン1つに寄せてある（7-a）。 */
 R.stickAnywhere = await pg.evaluate(()=>{
   TH.run(1,{seed:8}); TH.floor(3);
   setScreen('game');
-  stickId=null; guardId=null; P.guard=false;
+  S.hero.equip.shield=genBaseItem('round',5,1);   // 盾は持たせる（持っていても構えない）
+  stickId=null; P.guard=false;
   const right={identifier:1, clientX:innerWidth*0.9, clientY:innerHeight*0.7, target:document.body};
   touchStart({changedTouches:[right]});
   const gotStick = stickId===1;
   const guardedByFirst = P.guard;
-  // 2本目でガード（どこに触れても）
   const left={identifier:2, clientX:innerWidth*0.1, clientY:innerHeight*0.7, target:document.body};
   touchStart({changedTouches:[left]});
-  const gotGuard = P.guard && guardId===2;
+  const guardedBySecond = P.guard;
   touchEnd({changedTouches:[right,left], touches:[]});
-  return {gotStick, firstIsNotGuard: !guardedByFirst, gotGuard,
-          ok: gotStick && !guardedByFirst && gotGuard};
+  return {gotStick, firstIsNotGuard: !guardedByFirst, secondIsNotGuard: !guardedBySecond,
+          ok: gotStick && !guardedByFirst && !guardedBySecond};
 });
 
 // 3-b. スティックの指だけ離したら、残った指が引き継ぐ（動けなくならない）
 R.stickHandover = await pg.evaluate(()=>{
-  stickId=null; guardId=null; P.guard=false;
+  stickId=null; P.guard=false;
   const a={identifier:1, clientX:100, clientY:400, target:document.body};
   const c={identifier:2, clientX:300, clientY:400, target:document.body};
   touchStart({changedTouches:[a]});
   touchStart({changedTouches:[c]});
   touchEnd({changedTouches:[a], touches:[c]});
-  const r={stick:stickId, guardCleared: guardId===null, notGuarding: !P.guard};
+  const r={stick:stickId, notGuarding: !P.guard};
   touchEnd({changedTouches:[c], touches:[]});
-  return {...r, ok: r.stick===2 && r.guardCleared && r.notGuarding};
+  return {...r, ok: r.stick===2 && r.notGuarding};
 });
 
 // 3-c. 近接をパリイすると、相手がよろめき状態になる
@@ -330,41 +335,44 @@ R.rebirthAfterDeath = await pg.evaluate(()=>{
 
 /* ================= 7. 報告から直した4件 ================= */
 
-/* 7-a. 盾のボタン。構えは「2本目の指」で出す仕掛けだったが、
-       **止まっているときは1本目の指がまだ画面に無い**ので、
-       まず動き出さないと構えられなかった。
-       「立ち止まって受ける」が一番したい場面なのに、そこだけできなかった。 */
+/* 7-a. 盾のボタン。**構える口はこれだけ。**
+       押しているあいだ構え、離せば解ける。立ち止まったまま（指を1本も
+       置いていない状態から）押せることが要件——「立ち止まって受ける」が
+       一番したい場面なので。 */
 R.guardButton = await pg.evaluate(()=>{
   TH.run(1,{seed:5}); TH.floor(3);
   setScreen('game'); el('hud').classList.add('on');
   const gb=el('guardbtn');
-  S.hero.equip.shield=null; updateHUD();
-  const hiddenNoShield = !gb.classList.contains('on');
   S.hero.equip.shield=genBaseItem('round',5,1); updateHUD();
-  const shown = gb.classList.contains('on');
+  const shown = gb.classList.contains('on') && !gb.classList.contains('dim');
   // #hud は pointer-events:none なので、押せるものは自分で auto に戻す必要がある
   const pe = getComputedStyle(gb).pointerEvents;
   // 立ち止まったまま（指は1本も置いていない）押して構えられる
-  stickId=null; guardId=null; P.guard=false;
+  stickId=null; P.guard=false;
   gb.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
   const guardsWhileStill = P.guard===true;
   const parryWindowOpen = (nowSec()-P.guardStart) < stats(S.hero).parryWin+0.2;
   dispatchEvent(new MouseEvent('mouseup',{bubbles:true,cancelable:true}));
   const released = P.guard===false;
-  return {hiddenNoShield, shown, pe, guardsWhileStill, parryWindowOpen, released,
-          ok: hiddenNoShield && shown && pe==='auto' && guardsWhileStill && released};
+  return {shown, pe, guardsWhileStill, parryWindowOpen, released,
+          ok: shown && pe==='auto' && guardsWhileStill && released};
 });
 
-// 7-b. 2本指の操作も残っている（動きながら構えるのはそちらが速い）
-R.guardTwoFingerStillWorks = await pg.evaluate(()=>{
-  stickId=null; guardId=null; P.guard=false;
-  const a={identifier:1, clientX:120, clientY:400, target:document.body};
-  const c={identifier:2, clientX:300, clientY:400, target:document.body};
-  touchStart({changedTouches:[a]});
-  touchStart({changedTouches:[c]});
-  const r={stick:stickId===1, guard:P.guard===true};
-  touchEnd({changedTouches:[a,c], touches:[]});
-  return {...r, ok: r.stick && r.guard};
+/* 7-b. 盾を持っていないときは**消さずにグレーで出す。**
+       消してしまうと「盾を持てば何かできる」ことが画面から一切消える。
+       ただし押しても構えない——見た目と挙動を一致させる。 */
+R.guardDimNoShield = await pg.evaluate(()=>{
+  const gb=el('guardbtn');
+  S.hero.equip.shield=null; updateHUD();
+  const stillShown = gb.classList.contains('on');
+  const dimmed = gb.classList.contains('dim');
+  stickId=null; P.guard=false;
+  gb.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
+  const didNotGuard = !P.guard;
+  dispatchEvent(new MouseEvent('mouseup',{bubbles:true,cancelable:true}));
+  S.hero.equip.shield=genBaseItem('round',5,1); updateHUD();
+  return {stillShown, dimmed, didNotGuard,
+          ok: stillShown && dimmed && didNotGuard};
 });
 
 /* 7-c. 「疾風の加護が切れた」は、掛かっていたときにだけ言う。
@@ -392,7 +400,7 @@ R.graceExpiryMessage = await pg.evaluate(()=>{
 });
 
 /* 7-d. 掘ったあとのログが、実装と食い違わないこと。
-       炉を鉱脈から切り離したあともログだけ「ここで鍛えられる」と残っていて、
+       鍛冶場を鉱脈から切り離したあともログだけ「ここで鍛えられる」と残っていて、
        その場で叩けると言いながら近づいても何も起きなかった（利用者からの報告）。
        **鉱脈で鍛えられないのは正しい**（運ぶ距離がこの仕掛けの本体）ので、
        直すのは文章のほう。 */
@@ -407,7 +415,7 @@ R.minedVeinCopy = await pg.evaluate(()=>{
   startMine(ore);
   stepSim(MINE_TIME+2);
   const line=logs.find(l=>l.includes('掘り終えた'))||'';
-  // 掘ったあとも、そこは炉ではない
+  // 掘ったあとも、そこは鍛冶場ではない
   const notForge = !nearForge();
   W.ev=null; W.npc=null; W.trial=null; W.shop=null;
   interact();
@@ -415,9 +423,9 @@ R.minedVeinCopy = await pg.evaluate(()=>{
   el('m-forge').classList.remove('on');
   return {line, mined:ore.mined, notForge, stayedShut: !openedAtVein,
           noLieInCopy: !line.includes('ここで鍛えられる'),
-          tellsWhereToGo: line.includes('炉'),
+          tellsWhereToGo: line.includes('鍛冶場'),
           ok: ore.mined===true && notForge && !openedAtVein
-              && !line.includes('ここで鍛えられる') && line.includes('炉')};
+              && !line.includes('ここで鍛えられる') && line.includes('鍛冶場')};
 });
 
 /* 7-e. 浅い階では出血を配らない。
@@ -436,7 +444,7 @@ R.noEarlyBleed = await pg.evaluate(()=>{
           ok: !shallow && !edge && deep};
 });
 
-/* 7-f. 仲間も同じ扱い。プレイヤーだけ守っても、
+/* 7-f. 仲間も同じ扱い。主人公だけ守っても、
        序盤に連れている仲間が溶けるなら意味が半分になる。 */
 R.alliesShareTheRule = await pg.evaluate(()=>{
   TH.run(1,{seed:8}); TH.floor(2);
@@ -531,7 +539,7 @@ Object.assign(R.wearRowTapEquips, await pg.evaluate(()=>({
   ok: !el('m-wear').classList.contains('on') && !!S.hero.equip.weapon && S.stash.length===0
 })));
 
-// 8-d. 炉の対象選択も同じ経路（報告は来ていないが、同じ書き方で壊れていた）
+// 8-d. 鍛冶場の対象選択も同じ経路（報告は来ていないが、同じ書き方で壊れていた）
 await pg.evaluate(()=>{
   S.hero=newHero(); S.run=null; S.gold=999999; S.ore={raw:999,fine:999,deep:999};
   S.hero.equip.weapon=genBaseItem('sword',20,1);
@@ -565,7 +573,7 @@ R.noClickOnlyLists = await pg.evaluate(()=>{
 
 /* 9-a. 仲間はこちら側の式で計算される。
        以前は isPlayer だけを見ていたので、仲間には敵と同じ式が当たっていた
-       （プレイヤーの丁度2倍）。加入したての仲間が溶けていたのは、ほぼこれ。 */
+       （主人公の丁度2倍）。加入したての仲間が溶けていたのは、ほぼこれ。 */
 R.allyDotIsOurs = await pg.evaluate(()=>{
   TH.run(1,{seed:4}); TH.floor(12);
   const lv=8;

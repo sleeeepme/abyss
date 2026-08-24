@@ -81,7 +81,7 @@ R.needsATarget = await pg.evaluate(()=>{
           ok: idle===0 && fighting>0};
 });
 
-// 1-f. 仲間には乗らない（熟練はプレイヤーの手癖で、渡した装備の性能ではない）
+// 1-f. 仲間には乗らない（熟練は主人公の手癖で、渡した装備の性能ではない）
 R.alliesUnaffected = await pg.evaluate(()=>{
   S.mastery={sword:{lv:MASTERY_MAX, xp:0}};
   TH.run(1,{seed:5}); TH.floor(3);

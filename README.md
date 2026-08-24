@@ -25,11 +25,12 @@
 
 | パス | 内容 |
 |---|---|
-| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約580KB / 11,029行）。外部依存なし |
-| `proto/*.mjs` | 回帰テスト42スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
+| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約620KB / 11,513行）。外部依存なし |
+| `proto/*.mjs` | 回帰テスト46スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
 | `sweep.sh` | 全スイートを回して、false になった項目だけを並べる。`--since` で絞り込み |
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
-| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約200KB） |
+| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約208KB） |
+| `docs/BULLET_STORM.md` | 後半を弾幕嵐にする設計案（実測つき） |
 | `docs/abyss-引継書-収益設計監査.md` | 収益設計の監査・引継書（第3版／広告のみ前提） |
 | `docs/handoff.html` | 同上のHTML版 |
 | `unity/` | **凍結中。** C# は「引き撃ちの抑制」時点まで。再開時は差分を追わずプロトタイプから書き直す |
@@ -51,7 +52,7 @@ npm i -g playwright && npx playwright install chromium   # 初回のみ
 node proto/verify.mjs        # 個別に実行
 ```
 
-42スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
+46スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
 
 ```bash
 ./sweep.sh                   # 全部回して false になった項目だけ並べる（約5分）
@@ -64,7 +65,8 @@ for f in verify touchtest scrolltest bagtest gravetest hubtest gearttest \
          rangedtest elemtest afftest bosstest pacetest partytest fxtest \
          bossaoe zonetest kitetest adtest basetest looptest forgetest movetest \
          ulttest allytest cursetest scaletest intrtest mournrest boontest \
-         allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest loretest; do
+         allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest loretest dbgtest bladetest \
+         taverntest starttest; do
   echo "=== $f ==="; node proto/$f.mjs
 done
 ```
@@ -93,7 +95,7 @@ done
 
 どのスイートも見ていない語があれば `--list` が名前を挙げる。**黙って落とさない。**
 
-実測: 盾ボタンまわりの1行を触ったとき **8/42本・34秒**（全数は約5分）。
+実測: 盾ボタンまわりの1行を触ったとき **8/44本・34秒**（全数は約5分）。
 
 ### テストを書くときの2つの約束
 
@@ -126,6 +128,29 @@ stepSim(4, {until:()=>!!boss.cast})              // 条件が満たされたら�
 stepSim(7, {draw:true})                          // 描画も回す（例外が出ないことを見る）
 ```
 
+**3. 乱数を触ったら、同じ掃引を2回回す。**
+
+階層の生成には**起動ごとの塩**が入っている（`S.salt`。初回の第1階層が
+毎回同じにならないように）。塩を引くのは名前を決める `confirmName()` だけで、
+既定は 0——**テストは塩を持たない。**
+
+ここを間違えると症状が出にくい。塩を宣言時や `startAdventure()` で引くと、
+`_h.mjs` を通さず自前で起動しているスイート（46本中25本）が
+**静かに毎回違う地形**を見るようになる。1回目の掃引はたまたま緑で通り、
+2回目で落ちる。落ちたときに「壊したのか、たまたまか」が区別できない。
+
+だから乱数まわりを触ったら掃引を2回。1回では固定と非固定の区別がつかない。
+
+**4. 「1発で死ぬ」と書かない。死ぬまで殴る。**
+
+初期装備の「疾き」には**回避 6%** が乗っている。`hpNow=1` にして 99999 で
+殴る書き方は 6% の確率で外れ、乱数の流れが1つずれるたびに当たり外れが入れ替わる。
+見たいのが *死んだあと* なら、死ぬまで殴ればいい。1発に賭ける理由はどこにも無い。
+
+```js
+for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,3); }
+```
+
 **使ってはいけない場面がひとつある。** `performance.now()` を直に読む処理
 （パリィの受付、盾の構え、ダミー広告のタイマー、描画のアニメ位相）は進まない。
 時計ではなくフレームを進めているだけなので。その手の検証は実時間待ちのまま残すこと
@@ -145,6 +170,36 @@ stepSim(7, {draw:true})                          // 描画も回す（例外が�
 | kitetest | `.hud.melee.shown` |
 | adtest | `.reviveDone.dead` |
 | basetest | `.durWarn.healthy.shown` / `.repairHint.clean.coloured` |
+
+**この一覧と名前が一致しても、同じ理由で false とは限らない。**
+実際に `verify.shop.upgraded` は「能力強化の対価を金→欠片に変えた」時点から
+落ちていたのに、既知の false だと思って4コミットぶん見過ごした。
+名前ではなく**中身**を読むこと。
+
+## 同期の手順（クラウド ⇄ Mac ⇄ GitHub）
+
+書き込みが**3ヶ所から来る**。クラウドのセッション、Mac のエディタ／Codex、
+そして GitHub Desktop。ここを間違えると**片方の作業が黙って消える。**
+
+**実際に消した。** クラウド側の複製を正だと思い込んで `proto/index.html` を
+全文で書き戻したところ、その間に Mac 側で入っていたアートプレビュー機能
+（`?artPreview` の 124 行）が丸ごと消え、そのまま commit された。
+消えたことに数コミット気づかなかった。
+
+### 守ること
+
+1. **書き戻す前に `git fetch` して `origin/main` に合わせる。**
+   クラウドの複製は放っておくと必ず古くなる。`git reset --mixed origin/main` で
+   HEAD を合わせ、自分の変更だけが差分に残る形にしてから作業する。
+2. **全文の上書きは、Mac 側が止まっているときだけ。**
+   相手が作業中なら、触るファイルを名指しで確認してからにする。
+3. **`git status` の `D`（削除）を必ず読む。**
+   意図しない削除は、たいていここに最初に出る。
+
+### Mac 側でファイルを消すとき
+
+クラウドから Mac のファイルは**削除できない**（`rm` が拒否される）。
+`_to_delete/` へ `mv` して、GitHub Desktop 側で削除としてコミットする。
 
 ## 進め方の取り決め
 

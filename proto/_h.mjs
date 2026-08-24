@@ -37,6 +37,9 @@ export async function install(pg){
        各スイートが見たいのは拠点から先なので、ここで済ませておく
        （タイトルそのものの検証は titletest.mjs が install を使わずに行う）。 */
     if(!S.hero){ S.name='テスト'; startAdventure(); }
+    /* 生成の塩を落としておく。既定でも 0 だが、
+       「テストは塩を持たない」を明示しておく（本編は名前を決めた瞬間に引く）。 */
+    S.salt = 0;
     window.TH = {
       /* 潜りを1つ始める。**S.run を手で作らないための唯一の入口。**
          seed を渡すと生成が固定される（startRun が S.runs を ++ するので -1 して渡す）。

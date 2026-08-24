@@ -263,7 +263,7 @@ R.trialSpawns = await pg.evaluate(()=>{
           ok: active && spawned >= TRIAL_PER_WAVE*2};
 });
 
-/* 3-e. 湧く位置はプレイヤーから離す。
+/* 3-e. 湧く位置は主人公から離す。
        足元に出すと避けようが無く、それは難度ではなく事故になる。 */
 R.spawnsAtDistance = await pg.evaluate(()=>{
   TH.clearEnemies();

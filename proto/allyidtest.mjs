@@ -232,11 +232,11 @@ R.live = await pg.evaluate(()=>{
   }catch(e){ fails.push(e.message); return {failures:fails, ok:false}; }
 });
 
-/* ================= 6. 炉で仲間の武器を鍛える／直す ================= */
+/* ================= 6. 鍛冶場で仲間の武器を鍛える／直す ================= */
 R.forgeAlly = await pg.evaluate(()=>{
   TH.run(1,{seed:37}); TH.floor(20);
   /* 主人公のレベルを仲間に合わせておく。
-     仲間の数字は softCap でプレイヤー基準に抑えられるので、
+     仲間の数字は softCap で主人公基準に抑えられるので、
      Lv.1 の主人公のままだと上限に張り付いて、鍛えても atk が動かない
      （仕様どおりの挙動だが、鍛造が効いたかどうかはここでは見えない）。 */
   S.hero.lv=24; S.hero.str=30; S.hero.dex=30; S.hero.vit=30;
@@ -328,7 +328,7 @@ R.allyAccessory = await pg.evaluate(()=>{
   const after=+allyStats(a).atk.toFixed(2);
   const hpAfter=allyStats(a).maxHp;
 
-  // 階を降りると擦り減る（プレイヤーだけの規則にしない）
+  // 階を降りると擦り減る（主人公だけの規則にしない）
   const dur0=ring.dur;
   TH.floor(19);
   const worn=ring.dur<dur0;

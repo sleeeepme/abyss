@@ -25,7 +25,7 @@ R.upgListed = await pg.evaluate(()=>{
           ok: !!u && shown && lv1===1 && u.max>0};
 });
 
-// 1-b. 仲間の全能力が上がる。プレイヤーは上がらない。
+// 1-b. 仲間の全能力が上がる。主人公は上がらない。
 R.upgApplies = await pg.evaluate(()=>{
   TH.run(1,{seed:5}); TH.floor(14);
   const a=makeAlly(14,S.hero); a.hpNow=allyStats(a).maxHp;
@@ -62,7 +62,7 @@ R.upgIsAccount = await pg.evaluate(()=>{
   return {before:a0, after:a1, newAllyBenefits: a1>a0, ok: a1>a0};
 });
 
-// 1-d. それでもプレイヤーは超えない（仲間の上限は動かさない）
+// 1-d. それでも主人公は超えない（仲間の上限は動かさない）
 R.upgKeepsCap = await pg.evaluate(()=>{
   TH.run(1,{seed:11}); TH.floor(20);
   S.upg={ally:6};
@@ -87,7 +87,7 @@ R.priestCovers = await pg.evaluate(()=>{
   fr.hpNow=allyStats(fr).maxHp*99;
   uniqueAllyName(pr,party()); S.hero.party.push(pr);
   uniqueAllyName(fr,party()); S.hero.party.push(fr);
-  // 的を1体だけ、プレイヤーの前に
+  // 的を1体だけ、主人公の前に
   const e=W.enemies.find(x=>!x.boss && !x.dead);
   W.enemies=[e]; e.x=P.x+3.5; e.y=P.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
   pr.x=P.x; pr.y=P.y; fr.x=P.x; fr.y=P.y;
@@ -124,7 +124,7 @@ R.priestHoldsFire = await pg.evaluate(()=>{
   // 僧侶が振った回数を数える（swing が立った瞬間）
   let priestSwings=0, frontSwings=0, prevP=0, prevF=0;
   S.hero.hpNow=1;                        // 祈りが効いているかを見るため削っておく
-  S.hero.equip.weapon=null;              // プレイヤーは手出ししない
+  S.hero.equip.weapon=null;              // 主人公は手出ししない
   stepSim(8, {after:()=>{
     if(pr.swing>prevP) priestSwings++;
     if(fr.swing>prevF) frontSwings++;
@@ -188,7 +188,7 @@ R.priestSurvives = await pg.evaluate(()=>{
     const runs=8;
     for(let i=0;i<runs;i++){
       TH.run(1,{seed:31+i}); TH.floor(22);
-      TH.immortal();                       // プレイヤーは死なせない（比較にならないので）
+      TH.immortal();                       // 主人公は死なせない（比較にならないので）
       const pr=makeAlly(22,S.hero); pr.job='priest'; pr.slot=0;
       pr.hpNow=allyStats(pr).maxHp;
       const fr=makeAlly(22,S.hero); fr.job='knight'; fr.slot=1;
@@ -197,7 +197,7 @@ R.priestSurvives = await pg.evaluate(()=>{
       uniqueAllyName(fr,party()); S.hero.party.push(fr);
       // 後衛の仕組みを切ってみる比較用
       jobDef('priest').backline = backline;
-      // 敵を数体、プレイヤーの前に固める
+      // 敵を数体、主人公の前に固める
       W.enemies.slice(0,5).forEach((e,k)=>{
         e.x=P.x+3.0+Math.cos(k)*0.8; e.y=P.y+Math.sin(k)*0.8; });
       W.enemies=W.enemies.slice(0,5);
@@ -297,7 +297,7 @@ R.beaconSteps = await pg.evaluate(()=>{
           ok: JSON.stringify(list)===JSON.stringify([1,11,21,31,41])};
 });
 
-/* 4-c. 救済措置: 中継地点から始めると、歩かずに来たぶんの支度が渡る。
+/* 4-c. 救済措置: 中継地点から始めると、歩かずに来たぶんの能力強化が渡る。
    Lv.1・素手で第11階層に放り込まれても、できるのは死ぬことだけ。 */
 R.beaconOutfit = await pg.evaluate(()=>{
   S.hero=null; S.beacons=[10]; S.upg={}; S.carry=[]; S.legacyBoons=[];

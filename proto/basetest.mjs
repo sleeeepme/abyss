@@ -134,8 +134,8 @@ R.leash = await pg.evaluate(()=>{
     maxHp:999, hp:999, atkV:0, def:0, res:{}, dt:'slash', st:{}, bu:{},
     state:'idle', t:0, cd:9e9, vx:0, vy:0, hit:0, tele:0, dead:false, r:0.34,
     ms:0, teleMul:1, col:'#b5563f', name:'的'});
-  // 近い敵（プレイヤーのそば）と、遠い敵（仲間から見えるがプレイヤーから遠い）
-  // far は「仲間からは見えるが、プレイヤーからは遠い」位置に置く
+  // 近い敵（主人公のそば）と、遠い敵（仲間から見えるが主人公から遠い）
+  // far は「仲間からは見えるが、主人公からは遠い」位置に置く
   const near=mk(P.x+2, P.y), far=mk(P.x+9, P.y);
   W.enemies=[near, far];
   const pickedNear = nearestEnemyNearPlayer(a.x,a.y,st.aggro,ALLY_ENGAGE)===near;
@@ -161,7 +161,7 @@ R.duel = await pg.evaluate(async ()=>{
     const as=allyStats(a);
     const e=W.enemies.find(x=>!x.boss);
     W.enemies=[e]; e.x=P.x+2; e.y=P.y;
-    S.hero.equip.weapon=null;                 // プレイヤーは手出ししない
+    S.hero.equip.weapon=null;                 // 主人公は手出ししない
     stepSim(8, {after:()=>{ if(_fallen) letFallenGo(); }});
     document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
     _fallen=null; _fallenQueue=[];

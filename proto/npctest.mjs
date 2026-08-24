@@ -51,7 +51,7 @@ R.asleepSafe = await pg.evaluate(()=>{
 R.needsLos = await pg.evaluate(()=>{
   TH.run(1,{seed:12}); TH.floor(4); TH.immortal();
   const a=TH.npc(4,{dx:0,dy:0});
-  // プレイヤーの近くで、見通せない点を探す
+  // 主人公の近くで、見通せない点を探す
   let placed=false;
   for(let r=3; r<=NPC_WAKE_DIST && !placed; r+=0.5){
     for(let k=0;k<24 && !placed;k++){

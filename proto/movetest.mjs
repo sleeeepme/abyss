@@ -23,13 +23,13 @@ const shake = (label, setup)=>pg.evaluate(async ({label,setup})=>{
   /* 立ち位置が安定しているか。交戦中は隊列の「揺らぎ」で常に少しずつ動くので、
      経路の長さで測ると揺らぎまで異常扱いになる。
      見たいのは「持ち場から離れていかないこと」なので、
-     プレイヤーからの距離が何マスの幅に収まっているかで測る。 */
+     主人公からの距離が何マスの幅に収まっているかで測る。 */
   const dpLog=livingParty().map(()=>[]);
   const deLog=livingParty().map(()=>[]);
   const sp=logs=>Math.max(...logs.map(l=>l.length?Math.max(...l)-Math.min(...l):0));
   const spread=()=>sp(dpLog);
   /* 交戦中は隊列の「揺らぎ」で敵の周りを少しだけ移動する（意図した挙動）ので、
-     プレイヤーからの距離は当然ゆれる。落ち着きを測るなら
+     主人公からの距離は当然ゆれる。落ち着きを測るなら
      「相手との間合いを保てているか」を見るほうが正しい。 */
   const keepSpread=()=>sp(deLog);
   const sample=()=>{
@@ -93,7 +93,7 @@ R.leashBand.settled = R.leashBand.flipRate < 0.05 && R.leashBand.keepSpread < 1.
 
 /* ================= 2. 立ち位置が決まる（周回しない） ================= */
 
-// 2-a. 囲む角度はプレイヤー基準。自分基準だと毎フレーム測り直して永久に周回する
+// 2-a. 囲む角度は主人公基準。自分基準だと毎フレーム測り直して永久に周回する
 R.orbit = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=22;
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
@@ -169,7 +169,7 @@ R.follow = await pg.evaluate(async ()=>{
 });
 
 // 3-b. 視線が切れても足跡から辿り直せる（角を曲がったとき）
-//     ループを止めたままプレイヤーだけを歩かせて、確実に視線が切れる状況を作る。
+//     ループを止めたまま主人公だけを歩かせて、確実に視線が切れる状況を作る。
 R.corner = await pg.evaluate(async ()=>{
   /* 見たいのは「角を曲がって視線が切れても、足跡を辿って戻ってこられるか」。
      **特定の地図に頼らない。** 層の間取りを触るたびに落ちるのでは検証にならない。
@@ -209,7 +209,7 @@ R.corner = await pg.evaluate(async ()=>{
   do{
     tries++;
     setup();
-    S.screen='bag';                       // ループを止めて、プレイヤーだけ歩かせる
+    S.screen='bag';                       // ループを止めて、主人公だけ歩かせる
     moved = walkAway();
     blocked = party().map(a=>!losClear(a.x,a.y,P.x,P.y));
   }while(!blocked.some(Boolean) && tries<15);
@@ -233,7 +233,7 @@ R.strandedRecovers = await pg.evaluate(async ()=>{
   S.hero.party=[]; W.enemies=[]; W.ores.length=0;
   const a=makeAlly(20,S.hero); a.hpNow=allyStats(a).maxHp*99;
   S.hero.party.push(a);
-  // 遠くの床へプレイヤーだけ飛ばし、足跡も潰す（最悪の状況）
+  // 遠くの床へ主人公だけ飛ばし、足跡も潰す（最悪の状況）
   let far=null;
   for(let y=1;y<W.fl.H-1 && !far;y++) for(let x=1;x<W.fl.W-1;x++){
     if(W.fl.g[y][x]!==T.WALL && Math.hypot(x-P.x,y-P.y)>10){ far={x:x+0.5,y:y+0.5}; break; }

@@ -22,7 +22,9 @@ R.onDeath = await pg.evaluate(()=>{
   S.run.gold=317;
   P.x=12.3; P.y=8.7;
   const depth=S.run.depth;
-  S.hero.hpNow=1; hitPlayer(null,99999,0,3);
+  /* 初期装備の「疾き」で回避 6% が乗っている。1発で死ぬ前提だと、
+     たまたま回避を引いた回にこの検証が静かに false になる。死ぬまで殴る。 */
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,3); }
   const g=S.grave;
   return {
     created: !!g,
@@ -71,7 +73,7 @@ R.overwrite = await pg.evaluate(()=>{
   RNG=mulberry32(5);
   for(let i=0;i<10;i++) S.run.loot.push(genItem(6,50));
   S.run.gold=200; P.x=10.5; P.y=10.5;
-  S.hero.hpNow=1; hitPlayer(null,99999,0,4);
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,4); }
   const first=S.grave, firstUids=first.items.map(i=>i.uid);
 
   // 回収せずに別の階層で死ぬ
@@ -79,7 +81,7 @@ R.overwrite = await pg.evaluate(()=>{
   RNG=mulberry32(6);
   for(let i=0;i<10;i++) S.run.loot.push(genItem(6,50));
   S.run.gold=90; P.x=20.5; P.y=20.5;
-  S.hero.hpNow=1; hitPlayer(null,99999,0,9);
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,9); }
   const second=S.grave;
   return {
     onlyOneGrave: second && second.depth===9,
@@ -94,20 +96,28 @@ R.overwrite = await pg.evaluate(()=>{
    Lv.1 で経験値ゼロのとき以外は、手ぶらで死んでも取りに戻る理由が残る。
    再走でいちばん痛いのは持ち物ではなくレベル差なので、これは意図した変更。 */
 R.edge = await pg.evaluate(()=>{
+  /* **死ぬまで殴る。** 一撃だけだと、初期装備に付いている「疾き」の
+     回避 6% を引いた回に、この検証まるごとが静かに false になる。
+     実際にそれで落ちた（乱数の塩を 0 に固定した瞬間に、たまたま当たりを引いた）。
+     見たいのは「殴られたとき」ではなく「死んだとき何が残るか」なので、
+     死ぬまで殴るのが正しい書き方。 */
+  const kill=(depth)=>{ for(let i=0;i<40 && S.hero;i++){
+    S.hero.hpNow=1; hitPlayer(null,99999,0,depth); } };
+
   S.hero=newHero(); S.grave=null; startRun(2);
-  S.run.loot=[]; S.run.gold=80; S.hero.hpNow=1; hitPlayer(null,99999,0,2);
+  S.run.loot=[]; S.run.gold=80; kill(2);
   const goldOnly = S.grave && S.grave.items.length===0 && S.grave.gold===40;
 
   // 経験値だけでも遺体はできる（取りに戻る理由になる）
   S.hero=newHero(); S.grave=null; startRun(2);
   S.hero.lv=8; S.hero.xp=0;
-  S.run.loot=[]; S.run.gold=0; S.hero.hpNow=1; hitPlayer(null,99999,0,2);
+  S.run.loot=[]; S.run.gold=0; kill(2);
   const xpOnly = !!S.grave && S.grave.items.length===0 && S.grave.gold===0 && S.grave.xp>0;
 
   // 本当に何も積んでいなければ、遺体も残らない
   S.hero=newHero(); S.grave=null; startRun(1);
   S.hero.lv=1; S.hero.xp=0;
-  S.run.loot=[]; S.run.gold=0; S.hero.hpNow=1; hitPlayer(null,99999,0,1);
+  S.run.loot=[]; S.run.gold=0; kill(1);
   const none = S.grave===null;
   return {goldOnlyGrave:goldOnly, xpOnlyGrave:xpOnly, noGraveWhenEmpty:none};
 });
@@ -117,7 +127,8 @@ R.ui = await pg.evaluate(()=>{
   S.hero=newHero(); S.grave=null; startRun(6);
   RNG=mulberry32(77);
   for(let i=0;i<8;i++) S.run.loot.push(genItem(6,50));
-  S.run.gold=150; S.hero.hpNow=1; hitPlayer(null,99999,0,6);
+  S.run.gold=150;
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,6); }
   const modal=document.getElementById('d-lost').innerHTML;
   // 能力値カードは拠点からステータス画面へ移した（拠点は決める場所だけにした）
   S.hero=newHero(); setScreen('char');

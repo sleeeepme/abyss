@@ -1,5 +1,5 @@
 // 侵入者の経路探索が重くないか。
-// 幅優先はプレイヤーがマスをまたぐたびに走るので、走り回っている最中がいちばん重い。
+// 幅優先は主人公がマスをまたぐたびに走るので、走り回っている最中がいちばん重い。
 // 深い階（敵130体・広い間取り）で、侵入者ありと無しの fps を比べる。
 import { chromium, devices } from 'playwright'; import path from 'path';
 const b=await chromium.launch();

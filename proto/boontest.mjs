@@ -16,6 +16,10 @@ R.rarity = await pg.evaluate(()=>{
   const bad=[];
   BOONS.forEach(d=>{
     if(d.v.length!==BOON_RAR.length){ bad.push(d.id+':長さ'+d.v.length); return; }
+    /* 等級を固定してある恩寵は、この検査から外す。
+       値が動かないぶん等級も動かさないので、「等級が嘘になる」が起きない。
+       （鞘無しは常に「刃が1本」。等級を振ると、エピックがコモンと同じ物になる） */
+    if(d.fixedRar) return;
     // 守護だけは「短いほど強い」ので単調減少が正しい
     const rising = d.id!=='aegis';
     // それ以外は全部「レア度が上がれば必ず強くなる」——
@@ -227,14 +231,18 @@ R.phoenix = await pg.evaluate(()=>{
   S.hero.boons=[{id:'phoenix', rar:'epic'}];
   S.hero.phoenixUsed=false;
   P.invuln=0;
-  S.hero.hpNow=1;
-  hitPlayer(null, 99999, 'blunt', 9);
+  /* 回避 6% を引くと「不死鳥が働かないまま生き残った」ことになり、
+     この検証が別物を見る。**不死鳥が使われるまで**殴る。 */
+  for(let _i=0;_i<40 && S.hero && !S.hero.phoenixUsed;_i++){
+    P.invuln=0; S.hero.hpNow=1; hitPlayer(null, 99999, 'blunt', 9);
+  }
   const survived = !!S.hero && S.hero.hpNow>0;
   const hpAfter = S.hero ? S.hero.hpNow : 0;
   const used = S.hero ? S.hero.phoenixUsed : null;
   // 2度目
-  P.invuln=0; S.hero.hpNow=1;
-  hitPlayer(null, 99999, 'blunt', 9);
+  for(let _i=0;_i<40 && S.hero;_i++){
+    P.invuln=0; S.hero.hpNow=1; hitPlayer(null, 99999, 'blunt', 9);
+  }
   const diedSecond = !S.hero;
   document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
   return {survived, hpAfter, used, diedSecond,
@@ -462,12 +470,12 @@ R.altarPick = await pg.evaluate(()=>{
           threeChoices: rows===3,
           picksTheOneTapped: gotRight,
           // 文言: 「1つ授かる」ではなく「3つから1つ選べる」と書いてある
-          bodySaysChoice: evText.includes('3つの馴れ') && evText.includes('1つを選べる'),
+          bodySaysChoice: evText.includes('3つの恩寵') && evText.includes('1つを選べる'),
           // 「祭壇を倒した」になっていない
           notKilled: !sub.includes('倒した'),
           subSaysChoice: sub.includes('3つから1つ選ぶ'),
           ok: boonOpen && rows===3 && gotRight && (S.hero.hpDebt||0)>0
-              && evText.includes('3つの馴れ') && evText.includes('1つを選べる')
+              && evText.includes('3つの恩寵') && evText.includes('1つを選べる')
               && !sub.includes('倒した') && sub.includes('3つから1つ選ぶ')};
 });
 

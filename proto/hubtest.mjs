@@ -140,7 +140,8 @@ R.deathHidesLoss = await pg.evaluate(()=>{
   for(let i=0;i<10;i++){ const g=genItem(9,60); g.ident=true; S.run.loot.push(g); names.push(itemName(g)); }
   const eq=genItem(9,0); eq.ident=true; S.hero.equip.weapon=eq; names.push(itemName(eq));
   S.run.gold=200;
-  S.hero.hpNow=1; hitPlayer(null,99999,0,5);
+  // 回避 6% を引いた回に静かに落ちないよう、死ぬまで殴る
+  for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,5); }
   const html=document.getElementById('d-lost').innerHTML;
   return {
     noItemNames: !names.some(n=>html.includes(n)),

@@ -128,7 +128,7 @@ R.famBias = await pg.evaluate(()=>{
     }
     return c;
   };
-  // 層の並びは 石(1-10) 水(11-20) 根(21-30) 跡(31-40) 炉(41-50) 白(51-60)
+  // 層の並びは 石(1-10) 水(11-20) 根(21-30) 跡(31-40) 鍛冶場(41-50) 白(51-60)
   const ruin=sample(35,300), furnace=sample(45,300), pale=sample(55,300);
   const pct=(c,id)=>{ const t=Object.values(c).reduce((a,b)=>a+b,0);
                       return +(((c[id]||0)/t)*100).toFixed(1); };

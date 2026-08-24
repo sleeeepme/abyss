@@ -1,4 +1,4 @@
-// 炉での修理 / 護符の受け渡し / 仲間ロストの秘石 / 弔いの潜在。
+// 鍛冶場での修理 / 護符の受け渡し / 仲間ロストの秘石 / 弔いの潜在。
 //
 // この4つは別々の機能に見えて、1本の線でつながっている:
 //   「注いだ物が消えて終わり」にしない、という一点。
@@ -8,7 +8,7 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
-/* ================= 1. 炉での修理（鉱石で払う） ================= */
+/* ================= 1. 鍛冶場での修理（鉱石で払う） ================= */
 
 // 1-a. 傷んだ武器が鉱石で満タンに戻る。等級は安いほうから減る。
 R.repair = await pg.evaluate(()=>{
@@ -70,7 +70,7 @@ R.repairAnyGrade = await pg.evaluate(()=>{
           ok: r1.ok && paidDeep===need && !r2.ok && S.run.ore.raw===before && it.dur===1};
 });
 
-// 1-d. 拠点の鍛造所は口座の鉱石、道中の炉はそのランの鉱石（金とまったく同じ扱い）
+// 1-d. 拠点の鍛造所は口座の鉱石、道中の鍛冶場はそのランの鉱石（金とまったく同じ扱い）
 R.repairPurse = await pg.evaluate(()=>{
   TH.run(1, {seed:9}); TH.floor(16);
   const it=genBaseItem('sword', 20, 2); it.ident=true;
@@ -91,7 +91,7 @@ R.repairUI = await pg.evaluate(()=>{
   S.hero.equip.weapon=it; it.dur=Math.floor(it.durMax*0.3);
   S.run.ore={raw:40};
   W.forge={x:P.x, y:P.y, seed:0};
-  interact();                                   // 炉が開く
+  interact();                                   // 鍛冶場が開く
   const opened=TH.open('m-forge');
   const label=el('fg-fix').textContent;
   const enabled=el('fg-fix').className!=='ghost';
@@ -259,8 +259,8 @@ R.charmUI = await pg.evaluate(()=>{
   const backToHero = S.run.charms[0].owner==null;
   closeAllyEquip();
   return {shown, nowAlly, backToHero,
-          saysHolder: label.includes('この還りが持っている'),
-          ok: shown && nowAlly && backToHero && label.includes('この還りが持っている')};
+          saysHolder: label.includes('このプレイヤーが持っている'),
+          ok: shown && nowAlly && backToHero && label.includes('このプレイヤーが持っている')};
 });
 
 /* ================= 3. 仲間を失うと秘石が残る ================= */
@@ -398,7 +398,7 @@ R.live = await pg.evaluate(()=>{
     W.enemies.slice(0,5).forEach((e,i)=>{ e.x=P.x+Math.cos(i)*2.2; e.y=P.y+Math.sin(i)*2.2; });
     stepSim(5, {draw:true, each:(t)=>{ stickDx=Math.cos(t*0.8); stickDy=Math.sin(t*1.1); }});
     stickDx=0; stickDy=0;
-    // 炉で直す
+    // 鍛冶場で直す
     P.x=W.forge.x; P.y=W.forge.y;
     interact();
     const forgeOpen=TH.open('m-forge');

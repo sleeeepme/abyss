@@ -37,11 +37,11 @@ R.jobs = await pg.evaluate(()=>{
           allFixed:Object.values(out).every(o=>o.matchesDef && o.shieldAlways)};
 });
 
-// 1-b. 仲間はプレイヤーより明確に弱い
+// 1-b. 仲間は主人公より明確に弱い
 R.weaker = await pg.evaluate(()=>{
   RNG=mulberry32(777);
   S.hero=newHero(); S.upg={}; startRun(12);
-  // プレイヤーにそれなりの装備を持たせる
+  // 主人公にそれなりの装備を持たせる
   S.hero.lv=18; S.hero.str=22; S.hero.dex=22; S.hero.vit=22;
   S.hero.equip.weapon=genBaseItem('sword',18,2);
   S.hero.equip.armor =genBaseItem('chain',18,2);
@@ -123,7 +123,7 @@ R.inspect = await pg.evaluate(()=>{
 
 /* ============ 3. 戦闘とスキル ============ */
 
-// 3-a. 敵はプレイヤーではなく「最も近い味方」を狙う
+// 3-a. 敵は主人公ではなく「最も近い味方」を狙う
 R.targeting = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(6); S.hero.party=[];
   const a=makeAlly(6,S.hero); a.x=P.x+3; a.y=P.y; S.hero.party.push(a);
@@ -142,7 +142,7 @@ R.allyDamage = await pg.evaluate(async ()=>{
   a.job='knight'; a.equip.weapon=genBaseItem('great',8,1);   // 近接で確実に殴る
   a.hpNow=allyStats(a).maxHp;
   a.x=P.x+0.6; a.y=P.y; S.hero.party.push(a);
-  // プレイヤーは武器を持たず、遠くの敵は消す。仲間だけが届く状況を作る
+  // 主人公は武器を持たず、遠くの敵は消す。仲間だけが届く状況を作る
   S.hero.equip.weapon=null;
   W.enemies=W.enemies.filter(e=>e.boss);
   const dummy={x:P.x+1.4, y:P.y, arch:ARCH.find(x=>x.id==='turret')||ARCH[0],
@@ -173,7 +173,7 @@ R.prayer = await pg.evaluate(async ()=>{
           ok: S.hero.hpNow>hp0 && m.hpNow>ally0};
 });
 
-// 3-d. 戦士の「庇う」がプレイヤーの被ダメを肩代わりする
+// 3-d. 戦士の「庇う」が主人公の被ダメを肩代わりする
 R.cover = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(6); S.hero.party=[];
   const w=makeAlly(6,S.hero); w.job='warrior';
@@ -223,7 +223,14 @@ R.fallen = await pg.evaluate(()=>{
   const gearBefore=['weapon','shield','armor','accessory'].filter(s=>a.equip[s]).length;
   const lvBefore=a.lv>1 ? a.lv : (a.lv=6);
   a.boons=[{id:'atk',rar:'uncommon'}];
-  hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false});
+  /* **倒れるまで殴る。** 一撃だけだと、たまたま盗賊が引かれた回に
+     回避（ジョブ固有）が出て、この検証まるごとが静かに false になる。
+     実際にそれで落ちた——見たいのは「当たったとき」ではなく
+     「倒れたとき何が起きるか」なので、倒れるまで殴るのが正しい書き方。 */
+  for(let i=0;i<40 && !a.dead;i++){
+    a.hpNow=5;
+    hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false});
+  }
   const modalOn=document.getElementById('m-fallen').classList.contains('on');
   const isDead=a.dead;
   const inPartyStill=party().includes(a);
@@ -252,8 +259,11 @@ R.reviveShared = await pg.evaluate(()=>{
   const c=makeAlly(10,S.hero); c.x=P.x; c.y=P.y;
   S.hero.party.push(a,c);
   a.revived=true; a.revivedAt=10;          // 既に一度蘇生している体にする
-  a.hpNow=1;
-  hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false});
+  // ここも同じ。回避で1発すり抜けると、以降の検証が全部ずれる
+  for(let i=0;i<40 && !a.dead;i++){
+    a.hpNow=1;
+    hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false});
+  }
   const btn=document.getElementById('fal-revive');
   const canAgain = btn.className==='primary';      // 同じ相手でも、持ち分があれば押せる
   const body=document.getElementById('fal-body').textContent;
@@ -276,7 +286,7 @@ R.reviveShared = await pg.evaluate(()=>{
           ok: canAgain && blocked && noAd && backNextBand};
 });
 
-// 5-c. プレイヤーが死ぬと仲間ごと失われる
+// 5-c. 主人公が死ぬと仲間ごと失われる
 R.heroDeath = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(6); S.hero.party=[];
   S.hero.party.push(makeAlly(6,S.hero), makeAlly(6,S.hero));
@@ -342,7 +352,7 @@ R.uniqKill = await pg.evaluate(()=>{
 /* ============ 7. 潜在の付与先 ============ */
 R.boonTarget = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(10); S.hero.party=[];
-  // 仲間がいなければ即プレイヤーへ
+  // 仲間がいなければ即主人公へ
   openBoonPick('mid','試験体');
   const b0=_boonPending[0];
   document.querySelector('#boon-choices [data-boon="0"]').click();
