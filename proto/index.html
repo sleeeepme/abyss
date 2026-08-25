@@ -6175,6 +6175,7 @@ function enemyUpdate(e,dt){
   // 狙う相手は主人公とプレイヤーのうち最も近い者。プレイヤーが壁役になれるのはここ。
   const tg = enemyTarget(e);
   const dx=tg.x-e.x, dy=tg.y-e.y, d=Math.hypot(dx,dy)||1e-6;
+  e.artDx=dx; e.artDy=dy;
   // 侵入者は視界を持たない。どこに隠れても真っ直ぐ歩いてくる（それが唯一の武器）。
   const vis = e.intruder || d < a.aggro;
   e.hit=Math.max(0,e.hit-dt);
@@ -7526,6 +7527,55 @@ function resize(){
 }
 addEventListener('resize',resize);
 
+/* ---------- キャラクターアート ----------
+   キャラクターアート対応表の「右・待機1」をゲームで使う。
+   左向きだけ水平反転し、上下向きでは直前の左右を保つ。 */
+const CharacterArt = (function(){
+  const DIR='assets/sprites/';
+  const FILES={
+    hero:'characters/hero/scout-right-idle.png',
+    warrior:'characters/allies/warrior-right-idle.png',
+    knight:'characters/allies/knight-right-idle.png',
+    rogue:'characters/allies/rogue-right-idle.png',
+    priest:'characters/allies/priest-right-idle.png',
+    hunter:'characters/allies/hunter-right-idle.png',
+    mage:'characters/allies/mage-right-idle.png',
+    paladin:'characters/allies/paladin-right-idle.png',
+    summoner:'characters/allies/summoner-right-idle.png',
+    archmage:'characters/allies/archmage-right-idle.png',
+    ashHound:'enemies/ash-hound/right-idle-v5.png',
+    dustSpider:'enemies/dust-spider/right-idle-v2-draft.png',
+    ashToad:'enemies/ash-toad/right-idle-v3-draft.png',
+    stoneBoar:'enemies/stone-boar/right-idle-v3-draft.png',
+    greatAshFrog:'enemies/great-ash-frog/right-idle-v4-draft.png'
+  };
+  const IMG={};
+  for(const [id,file] of Object.entries(FILES)){
+    const im=new Image(); im.src=DIR+file; IMG[id]=im;
+  }
+  const ready=id=>{ const im=IMG[id]; return !!(im&&im.complete&&im.naturalWidth>0); };
+  function enemyId(e){
+    if(e.uniqueBoss===5) return 'greatAshFrog';
+    if(!e.fam || e.fam.id!=='beast') return null;
+    return {rush:'ashHound',range:'dustSpider',turret:'ashToad',swarm:'stoneBoar'}[e.arch.id]||null;
+  }
+  function put(id,x,y,size,ent,dx,dy,alpha=1){
+    if(!ready(id)) return false;
+    if(ent && Math.abs(dx||0)>Math.abs(dy||0)+0.02) ent._artFace=(dx<0?-1:1);
+    const face=(ent&&ent._artFace)||1;
+    const n=Math.max(1,Math.round(size));
+    ctx.save();
+    ctx.imageSmoothingEnabled=false;
+    ctx.globalAlpha*=alpha;
+    ctx.translate(Math.round(x),Math.round(y));
+    ctx.scale(face,1);
+    ctx.drawImage(IMG[id],-Math.round(n/2),-Math.round(n/2),n,n);
+    ctx.restore();
+    return true;
+  }
+  return {put,enemyId};
+})();
+
 function draw(){
   ctx.fillStyle='#0d0f14'; ctx.fillRect(0,0,innerWidth,innerHeight);
   if(S.screen!=='game'||!W.fl||!S.hero||!S.run) return;
@@ -7709,12 +7759,17 @@ function draw(){
       ctx.strokeStyle='rgba(255,110,80,'+(0.4+p*0.55)+')'; ctx.lineWidth=2+p*3;
       ctx.beginPath(); ctx.arc(sx,sy,TS*(0.5+p*0.4),0,7); ctx.stroke();
     }
-    ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
-    ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
-    shape(e.arch.id, sx, sy, R);
-    ctx.fill(); ctx.stroke();
+    const artId=CharacterArt.enemyId(e);
+    const artSize=e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1);
+    const spriteDrawn=artId && CharacterArt.put(artId,sx,sy,artSize,e,e.artDx,e.artDy,e.dead?Math.max(0,e.fade/0.3):1);
+    if(!spriteDrawn){
+      ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
+      ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
+      shape(e.arch.id, sx, sy, R);
+      ctx.fill(); ctx.stroke();
+    }
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
-    if(e.boss && !e.dead){
+    if(e.boss && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
       ctx.fillStyle='#0d0f14';
       shape(e.arch.id, sx, sy, R*0.55);
@@ -7731,9 +7786,11 @@ function draw(){
       ctx.globalAlpha=0.30+0.30*pl;
       ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(sx,sy,R+13+pl*4,0,7); ctx.stroke();
       ctx.globalAlpha=1;
-      ctx.fillStyle='#0d0f14'; ctx.globalAlpha=0.4;
-      shape(e.arch.id, sx, sy, R*0.5); ctx.fill();
-      ctx.globalAlpha=1;
+      if(!spriteDrawn){
+        ctx.fillStyle='#0d0f14'; ctx.globalAlpha=0.4;
+        shape(e.arch.id, sx, sy, R*0.5); ctx.fill();
+        ctx.globalAlpha=1;
+      }
     }
     // ユニーク敵は紫の脈打つ二重リング。ボスの金とは色で区別する。
     if(e.uniq && !e.dead){
@@ -7789,22 +7846,24 @@ function draw(){
   });
 
   // --- プレイヤーとプレイヤー候補 ---
-  // プレイヤーは「六角形＋ジョブ色」。敵（三角・四角・ひし形・円）とは形が被らないので、
-  // 混戦でも一目で味方だと分かる。
+  // 対応表のジョブ別スプライト。白リングは味方の識別用に残す。
   const drawMate=(a, isNpc)=>{
     const sx=a.x*TS-camX, sy=a.y*TS-camY;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
     const j=jobDef(a.job), R=TS*0.30;
-    ctx.beginPath();
-    for(let i=0;i<6;i++){
-      const ang=i/6*Math.PI*2-Math.PI/2;
-      const fx2=sx+Math.cos(ang)*R, fy2=sy+Math.sin(ang)*R;
-      i?ctx.lineTo(fx2,fy2):ctx.moveTo(fx2,fy2);
+    const spriteDrawn=CharacterArt.put(a.job,sx,sy,TS,a,a.dirx,a.diry);
+    if(!spriteDrawn){
+      ctx.beginPath();
+      for(let i=0;i<6;i++){
+        const ang=i/6*Math.PI*2-Math.PI/2;
+        const fx2=sx+Math.cos(ang)*R, fy2=sy+Math.sin(ang)*R;
+        i?ctx.lineTo(fx2,fy2):ctx.moveTo(fx2,fy2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = a.hit>0 ? '#fff' : j.col;
+      ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
+      ctx.fill(); ctx.stroke();
     }
-    ctx.closePath();
-    ctx.fillStyle = a.hit>0 ? '#fff' : j.col;
-    ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
-    ctx.fill(); ctx.stroke();
     // 味方の証として白い細リングを1本
     ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.arc(sx,sy,R+3,0,7); ctx.stroke();
@@ -8215,7 +8274,7 @@ function draw(){
     }
   });
 
-  // 主人公（＝自分。二重リング＋向き矢印で他と絶対に混ざらない見た目にする）
+  // 主人公（候補B・遺跡の斥候）。緑のリングは自分の識別用に残す。
   const px=innerWidth/2, py=innerHeight/2;
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -8247,17 +8306,11 @@ function draw(){
 
   ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
-  ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
-  // 向き矢印
-  const ang=Math.atan2(P.diry,P.dirx);
-  ctx.fillStyle='#7fe0c0';
-  ctx.beginPath();
-  ctx.moveTo(px+Math.cos(ang)*TS*0.62, py+Math.sin(ang)*TS*0.62);
-  ctx.lineTo(px+Math.cos(ang+2.5)*TS*0.34, py+Math.sin(ang+2.5)*TS*0.34);
-  ctx.lineTo(px+Math.cos(ang-2.5)*TS*0.34, py+Math.sin(ang-2.5)*TS*0.34);
-  ctx.closePath(); ctx.fill();
+  if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry)){
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
+    ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
+  }
   ctx.globalAlpha=1;
   label('自分', px, py-TS*0.72, '#7fe0c0');
   // 攻撃エフェクト（属性ごとに形が変わる）
