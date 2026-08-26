@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>石の層 — 軽量マッププレビュー</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0624}
+  body{display:grid;place-items:center}
+  canvas{width:min(100vw,1254px);height:auto;max-height:100vh;image-rendering:pixelated}
+  #error{position:fixed;inset:auto 16px 16px;color:#ffd8d8;font:13px system-ui;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<canvas id="map" width="1254" height="1254" aria-label="石の層 仮マッププレビュー"></canvas>
+<img id="rendered" alt="" width="1" height="1" style="position:fixed;left:-10px;top:-10px;opacity:0;pointer-events:none">
+<div id="error" role="status"></div>
+<script>
+(() => {
+  'use strict';
+  const ROOT='assets/sprites/stone-layer/';
+  const FILES={
+    wall_run_01:'wall/wall_run_01.png', wall_run_02:'wall/wall_run_02.png',
+    wall_run_03:'wall/wall_run_03.png', wall_run_05:'wall/wall_run_05.png',
+    wall_block_01:'wall/wall_block_01.png', wall_block_02:'wall/wall_block_02.png',
+    wall_block_03:'wall/wall_block_03.png', wall_single:'wall/wall_single.png',
+    wall_broken_tall:'wall/wall_broken_tall.png', wall_corner_01:'wall/wall_corner_01.png',
+    wall_corner_03:'wall/wall_corner_03.png', wall_arch:'wall/wall_arch.png',
+    wall_rubble_01:'wall/wall_rubble_01.png', wall_rubble_02:'wall/wall_rubble_02.png',
+    wall_rubble_03:'wall/wall_rubble_03.png',
+    stone_loose_01:'wall/stone_loose_01.png', stone_loose_02:'wall/stone_loose_02.png',
+    brazier_small_flame:'brazier/brazier_small_flame.png',
+    puddle_02:'puddle/puddle_02.png', puddle_03:'puddle/puddle_03.png',
+    puddle_05:'puddle/puddle_05.png',
+    bone_skeleton:'bone/bone_skeleton.png', bone_long_01:'bone/bone_long_01.png',
+    bone_long_02:'bone/bone_long_02.png', web_01:'web/web_01.png',
+    grass_02:'vegetation/grass_02.png', grass_03:'vegetation/grass_03.png',
+    grass_06:'vegetation/grass_06.png', moss_03:'vegetation/moss_03.png',
+    moss_11:'vegetation/moss_11.png', moss_13:'vegetation/moss_13.png',
+  };
+  const cv=document.getElementById('map'), ctx=cv.getContext('2d');
+  ctx.imageSmoothingEnabled=false;
+  const IMG={};
+
+  function load(name,path){
+    return new Promise((resolve,reject)=>{
+      const im=new Image();
+      im.onload=()=>{ IMG[name]=im; resolve(); };
+      im.onerror=()=>reject(new Error(path));
+      im.src=ROOT+path;
+    });
+  }
+
+  function sprite(name,x,y,scale=1,ax=.5,ay=.5,flipX=1,flipY=1,alpha=1){
+    const im=IMG[name]; if(!im) return;
+    const w=Math.round(im.naturalWidth*scale), h=Math.round(im.naturalHeight*scale);
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(Math.round(x),Math.round(y));
+    ctx.scale(flipX,flipY);
+    ctx.drawImage(im,Math.round(-w*ax),Math.round(-h*ay),w,h);
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.fillStyle='#0b0624'; ctx.fillRect(0,0,cv.width,cv.height);
+
+    /* 周囲と床。石の抜き色に合わせた濃紫で、タイル格子は描かない。 */
+    const halo=ctx.createRadialGradient(625,610,170,625,610,900);
+    halo.addColorStop(0,'#140c34'); halo.addColorStop(.62,'#0e082a'); halo.addColorStop(1,'#0a051f');
+    ctx.fillStyle=halo; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='#110a2e';
+    ctx.beginPath();
+    ctx.moveTo(236,268); ctx.lineTo(948,266); ctx.lineTo(982,320); ctx.lineTo(1006,404);
+    ctx.lineTo(1070,452); ctx.lineTo(1076,562); ctx.lineTo(1052,676); ctx.lineTo(1018,770);
+    ctx.lineTo(1000,882); ctx.lineTo(946,954); ctx.lineTo(858,982); ctx.lineTo(760,1008);
+    ctx.lineTo(654,1016); ctx.lineTo(548,1028); ctx.lineTo(446,1008); ctx.lineTo(348,986);
+    ctx.lineTo(258,954); ctx.lineTo(198,902); ctx.lineTo(168,814); ctx.lineTo(154,712);
+    ctx.lineTo(176,608); ctx.lineTo(196,510); ctx.lineTo(198,404); ctx.lineTo(214,324);
+    ctx.closePath(); ctx.fill();
+
+    /* 後ろ壁。まとまりを少し重ね、上下をずらして直線感を消す。 */
+    sprite('wall_run_01',238,306,1.04,0,1);
+    sprite('wall_run_03',426,294,1.10,0,1);
+    sprite('wall_block_03',570,306,.96,0,1);
+    sprite('wall_run_02',690,303,1.02,0,1);
+    sprite('wall_block_02',914,314,.94,0,1);
+
+    /* 左右壁。横素材を回転させず、単石と短い塊だけで輪郭を崩す。 */
+    const left=[
+      ['wall_single',238,292,1.02], ['wall_block_02',230,354,.66],
+      ['wall_single',224,421,1.05], ['wall_broken_tall',207,490,.64],
+      ['wall_single',179,569,1.10], ['wall_block_03',151,652,.72],
+      ['wall_single',145,737,1.04], ['wall_broken_tall',160,822,.66],
+      ['wall_single',190,906,1.10], ['wall_block_02',220,962,.70],
+    ];
+    const right=[
+      ['wall_single',958,286,1.02], ['wall_block_03',1002,350,.65],
+      ['wall_single',1020,420,1.08], ['wall_broken_tall',1060,500,.65],
+      ['wall_single',1082,586,1.10], ['wall_block_02',1080,670,.72],
+      ['wall_single',1050,752,1.05], ['wall_broken_tall',1010,832,.66],
+      ['wall_single',990,910,1.10], ['wall_block_03',970,964,.70],
+    ];
+    left.forEach(d=>sprite(d[0],d[1],d[2],d[3],.5,.5));
+    right.forEach(d=>sprite(d[0],d[1],d[2],d[3],.5,.5,-1,1));
+
+    /* 四隅と手前壁。 */
+    sprite('wall_corner_01',188,205,1.00,0,0);
+    sprite('wall_corner_03',970,194,1.02,0,0,-1,1);
+    sprite('wall_run_03',220,948,1.02,0,0);
+    sprite('wall_block_01',395,963,1.00,0,0);
+    sprite('wall_run_05',515,972,1.00,0,0);
+    sprite('wall_block_03',824,958,1.00,0,0);
+    sprite('wall_single',940,946,1.08,0,0);
+
+    /* 参考画の上部アーチ。 */
+    sprite('wall_arch',622,300,1.12,.5,1);
+
+    /* 水たまりは大・中・小を別配置にし、同じ形の反復を避ける。 */
+    sprite('puddle_03',780,514,1.43,.5,.5);
+    sprite('puddle_05',456,738,1.10,.5,.5);
+    sprite('puddle_02',810,878,1.34,.5,.5);
+
+    /* 草・苔。安全な切り抜きだけを使用。 */
+    sprite('moss_03',330,286,.82,.5,.5);
+    sprite('moss_13',806,278,.78,.5,.5);
+    sprite('grass_03',466,500,.58,.5,.5);
+    sprite('grass_06',334,606,.82,.5,.5);
+    sprite('grass_02',818,780,.84,.5,.5);
+    sprite('moss_11',350,924,.74,.5,.5);
+    sprite('grass_03',696,985,.58,.5,.5);
+    sprite('moss_13',1000,664,.64,.5,.5);
+
+    /* 骨と蜘蛛の巣。 */
+    sprite('bone_skeleton',590,430,.78,.5,.5);
+    sprite('bone_long_02',799,414,.90,.5,.5);
+    sprite('bone_long_01',582,914,.86,.5,.5);
+    sprite('web_01',930,270,.98,0,0,-1,1);
+    sprite('web_01',234,922,.92,0,0,1,-1);
+
+    /* 燭台は完成フレーム1枚のみ。 */
+    const glow=ctx.createRadialGradient(386,455,0,386,455,165);
+    glow.addColorStop(0,'rgba(255,163,45,.30)'); glow.addColorStop(1,'rgba(255,107,20,0)');
+    ctx.fillStyle=glow; ctx.fillRect(210,280,352,350);
+    sprite('brazier_small_flame',386,516,1.02,.5,1);
+
+    /* 壁際の小石。 */
+    sprite('wall_rubble_01',990,570,.55,.5,.5,.9,1,.9);
+    sprite('wall_rubble_02',410,338,.42,.5,.5,1,1,.88);
+    sprite('wall_rubble_03',930,930,.44,.5,.5,1,1,.90);
+    sprite('stone_loose_01',252,676,.52,.5,.5,1,1,.88);
+    sprite('stone_loose_02',630,918,.48,.5,.5,1,1,.88);
+
+    /* ごく薄い周辺減光。 */
+    const vignette=ctx.createRadialGradient(625,620,360,625,620,870);
+    vignette.addColorStop(.55,'rgba(3,1,14,0)'); vignette.addColorStop(1,'rgba(3,1,14,.62)');
+    ctx.fillStyle=vignette; ctx.fillRect(0,0,cv.width,cv.height);
+    document.getElementById('rendered').src=cv.toDataURL('image/png');
+    window.__previewReady=true;
+  }
+
+  Promise.all(Object.entries(FILES).map(([n,p])=>load(n,p)))
+    .then(draw)
+    .catch(err=>{ document.getElementById('error').textContent='sprite load failed: '+err.message; });
+})();
+</script>
+</body>
+</html>
