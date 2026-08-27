@@ -106,10 +106,15 @@ R.rules = await pg.evaluate(()=>{
 R.swap = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(12); S.hero.party=[];
   const a=makeAlly(12,S.hero); a.job='knight'; a.name='重騎士'; a.lv=12;
-  a.equip.weapon=genBaseItem('great',6,0); a.equip.armor=genBaseItem('plate',6,0);
+  /* **武器種はジョブ定義から引く。** ここに 'great' と書き写していたせいで、
+     重騎士を戦斧に変えた回に、渡せる武器が1本も並ばず静かに落ちた。
+     渡せるのは「そのジョブの武器種」だけ、という規則が本編側にあるので、
+     テストも同じ場所を見る。 */
+  const WB=jobDef('knight').weapon;
+  a.equip.weapon=genBaseItem(WB,6,0); a.equip.armor=genBaseItem(jobDef('knight').armor,6,0);
   a.hpNow=allyStats(a).maxHp;
   S.hero.party=[a];
-  const strong=genBaseItem('great',30,2); strong.ident=true;
+  const strong=genBaseItem(WB,30,2); strong.ident=true;
   S.run.loot=[strong];
   const atk0=allyStats(a).atk, old=a.equip.weapon.uid;
   openAllyEquip(a,'bag');

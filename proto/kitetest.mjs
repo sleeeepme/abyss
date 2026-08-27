@@ -144,9 +144,16 @@ R.dpsTable = await pg.evaluate(()=>{
   const rangedStill=[out.bow.still, out.staff.still];
   const rangedKite=[out.bow.kite, out.staff.kite];
   return {table:out,
-          // 止まって撃つなら近接の下限あたり = 安全なぶん火力は控えめ、で釣り合う
-          stillIsFair: rangedStill.every(v=>v >= Math.min(...meleeStill)*0.9
-                                         && v <= Math.max(...meleeStill)),
+          /* ---------- 飛び道具の取り分 ----------
+             以前は「止まって撃つなら近接の下限あたり」（0.9倍以上）だった。
+             弓と杖の攻撃速度を一段落としたので、この線は動かしてある。
+
+             **止まって撃っても近接には届かない。** 射程がそのまま安全なので、
+             手数まで近接並みにあると近接を選ぶ理由が消える。
+             ただし引き撃ち（0.6倍）ほどは落とさない——
+             「足を止める」に意味が残っていないと、飛び道具に判断が無くなる。 */
+          stillIsFair: rangedStill.every(v=>v >= Math.min(...meleeStill)*0.70
+                                         && v <  Math.min(...meleeStill)),
           // 引き撃ちは近接の最低火力より明確に下
           kiteIsWorst: rangedKite.every(v=>v < Math.min(...meleeStill)*0.75),
           bowReach:out.bow.reach, staffReach:out.staff.reach,

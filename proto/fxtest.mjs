@@ -178,7 +178,10 @@ R.allySwing = await pg.evaluate(()=>{
     out[job]= sw ? {dt:sw.dt, ally:!!sw.ally} : null;
   });
   return {jobs:out,
-          knightSlash: out.knight && out.knight.dt==='slash',
+          /* 属性はジョブではなく**武器種**から出る。ここに 'slash' と書き写していたので、
+             重騎士を大剣から戦斧に替えた回に落ちた。武器のほうを見る。 */
+          knightSlash: out.knight
+            && out.knight.dt===(BASES.find(b=>b.id===jobDef('knight').weapon)||{}).dt,
           priestBlunt: out.priest && out.priest.dt==='blunt',
           roguePierce: out.rogue && out.rogue.dt==='pierce',
           taggedAsAlly: Object.values(out).every(o=>o && o.ally)};

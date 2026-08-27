@@ -22,7 +22,7 @@
 | `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | 承認済み | 未反映 | 胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
 | `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトード・右向きv3](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 苔灰色の低い体、大きな金眼、水平口、丸い折れ後脚を優先し、カエルの横姿としてゼロベース再設計 |
 | `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv3](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 選択された参考案を基準に、高い灰色の肩、茶色い耳・短脚、淡い眼、箱型の鼻と大きな上向き牙を整理 |
-| `ENEMY-MOSS-BALL-001` | `moss-ball` | 苔玉 | 敵 | ![苔玉・左向きv1](../proto/assets/sprites/enemies/moss-ball/left-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/left-idle-v1.png) | 左・待機1 | 承認済み | 未反映 | ユーザー指定の最新v6を採用。段状の頭、1pxの両目、短い腕、左右非対称の足、必要箇所のみの濃紺アウトライン |
+| `ENEMY-MOSS-BALL-001` | `moss-ball` | 苔玉 | 敵 | ![苔玉・正面v1](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1.png) | 正面・待機1 | 承認済み | ゲーム反映済み | ユーザー指定の最新v6を採用。段状の頭、1pxの両目、短い腕、左右非対称の足、必要箇所のみの濃紺アウトライン |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 冒険者デザイン候補
@@ -56,7 +56,7 @@
 | ダストスパイダー | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | アッシュトード | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | ストーンボア | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| 苔玉 | 未着手 | 未着手 | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 |
+| 苔玉 | 承認済み（正面） | 未着手 | 不要 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 灰の大蛙 | 要確認 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 
 ## 共通制作ルール
@@ -102,4 +102,4 @@
 - 2026-08-24: 敵5体をフィードバックに合わせて改訂。アッシュハウンドv3、短脚化したダストスパイダーv2、蛙形を再設計したアッシュトードv2、猪形を強化したストーンボアv2、ネイティブ32×32の灰の大蛙v2を追加。
 - 2026-08-24: ダストスパイダーv2を承認済みに更新。アッシュハウンドを4段階陰影のv4へ改訂。アッシュトードをゼロベースのv3へ再設計。ユーザー選択の参考案を基準にストーンボアv3と灰の大蛙v3を原寸へ再構成。
 - 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
-- 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、左・待機1の承認済み画像として採用。
+- 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。

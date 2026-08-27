@@ -9,10 +9,14 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
-/* ================= 1. 帰ってきたら酒場へ ================= */
+/* ================= 1. 帰ってきたあと ================= */
 
-// 1-a. 生きて連れ帰ったプレイヤーはパーティから外れて酒場に入る
-R.returnStores = await pg.evaluate(()=>{
+/* 1-a. **帰っても隊から外れない。**
+       一度は「街に着いたら全員酒場へ」にしていたが、毎回雇い直すのは税でしかない。
+       連れて行くかどうかは潜る前に決めているので、
+       同じ判断を帰るたびにやり直させても増えるのは手数だけだった。
+       外したいときは酒場で預ける（1-c）。 */
+R.returnKeepsParty = await pg.evaluate(()=>{
   S.tavern=[]; S.hero=newHero();
   TH.run(3,{seed:11});
   const a=makeAlly(5,S.hero), c=makeAlly(5,S.hero);
@@ -21,21 +25,69 @@ R.returnStores = await pg.evaluate(()=>{
   const before=party().length;
   returnToTown();
   return {before, partyAfter:party().length, stock:tavernStock().length,
-          keepsLevel: tavernStock().every(x=>x.lv>=1),
-          // 装備を持ったまま待っている（脱がされない）
-          keepsGear: tavernStock().every(x=>Object.values(x.equip||{}).filter(Boolean).length>0),
-          ok: before===2 && party().length===0 && tavernStock().length===2};
+          stillTogether: party().length===before,
+          // 連れ帰った印は付く（次に雇い直すときに半額）
+          marked: party().every(x=>x.returned===true),
+          ok: party().length===2 && party().every(x=>x.returned===true)};
 });
 
-/* 1-b. **酒場にいる相手は主人公が死んでも失われない。**
+/* 1-b. 酒場に預けると隊から外れる。**外す側の操作。** */
+R.parkMovesToTavern = await pg.evaluate(()=>{
+  S.run=null;
+  const a=party()[0];
+  const r=tavernPark(a.uidA);
+  return {moved:r.ok, leftParty: !party().includes(a),
+          inTavern:tavernStock().includes(a),
+          slots:party().map(m=>m.slot),
+          // 隊列は詰め直す（穴が空いたまま並ばない）
+          packed: party().every((m,i)=>m.slot===i),
+          ok: r.ok && !party().includes(a) && tavernStock().includes(a)
+              && party().every((m,i)=>m.slot===i)};
+});
+
+// 1-c. 探索中は預けられない（街の施設なので）
+R.parkBlockedInRun = await pg.evaluate(()=>{
+  TH.run(2,{seed:14});
+  const a=party()[0];
+  const r=a ? tavernPark(a.uidA) : {ok:false, why:'仲間がいない'};
+  const still=a ? party().includes(a) : true;
+  S.run=null;
+  return {why:r.why, still, ok: !r.ok && still};
+});
+
+/* 1-d. **酒場にいる相手は主人公が死んでも失われない。**
        連れて行った相手は一緒に消える（その線は動かさない）。
        この差があるから「置いていく」が守る手になる。 */
 R.survivesDeath = await pg.evaluate(()=>{
   const kept=tavernStock().map(x=>x.uidA);
   TH.run(3,{seed:12});
+  S.hero.party=[];                       // 連れて下りたぶんの話は 1-e で別に見る
   S.hero.hpNow=0; die();
   return {stock:tavernStock().length, sameOnes: tavernStock().every(x=>kept.includes(x.uidA)),
-          ok: tavernStock().length===kept.length};
+          ok: tavernStock().length>=kept.length && kept.every(u=>tavernStock().some(x=>x.uidA===u))};
+});
+
+/* 1-e. **連れて下りたぶんは失われる。** ただし黙って消さず、慰霊碑に刻む。
+       育てた相手が痕跡なく消えるのは、痛みではなく理不尽になる。 */
+R.fallenAreCarved = await pg.evaluate(()=>{
+  S.run=null; S.hero=newHero(); S.hero.party=[]; S.fallen=[];
+  TH.run(3,{seed:15});
+  const a=makeAlly(9,S.hero), c=makeAlly(9,S.hero);
+  a.x=P.x; a.y=P.y; c.x=P.x; c.y=P.y;
+  S.hero.party.push(a,c);
+  const names=[a.name, c.name];
+  for(let i=0;i<40 && S.hero;i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,3); }
+  const carved=(S.fallen||[]).map(f=>f.name);
+  return {names, carved,
+          bothCarved: names.every(n=>carved.includes(n)),
+          ok: names.every(n=>carved.includes(n))};
+});
+
+/* 1-f. **死んだ直後も酒場は空にしない。**
+       一番人手が要るのがここなので、棚が空だと詰む。 */
+R.refilledAfterDeath = await pg.evaluate(()=>{
+  return {pool:tavernPool().length,
+          ok: tavernPool().length>=TAVERN_ROLL[0]};
 });
 
 /* ================= 2. 値段 ================= */
@@ -97,9 +149,10 @@ R.discountsStack = await pg.evaluate(()=>{
 R.buildingCutsCost = await pg.evaluate(()=>{
   const a=makeAlly(20,S.hero); a.lv=20; a.returned=false; a.job='warrior';
   S.bld={}; const lv0=hireCost(a);
-  S.bld={tavern:3}; const lv3=hireCost(a);
+  const max=BUILDINGS.find(x=>x.id==='tavern').max;
+  S.bld={tavern:max}; const lvMax=hireCost(a);
   S.bld={};
-  return {lv0, lv3, ok: lv3 < lv0 && lv3 >= 8};
+  return {lv0, lvMax, max, ok: lvMax < lv0 && lvMax >= 8};
 });
 
 /* ================= 3. 雇う ================= */
@@ -266,17 +319,30 @@ R.twoShelves = await pg.evaluate(()=>{
               && poolRows.length===tavernPool().length};
 });
 
-// 6-f. 半額の印は、帰ってきた相手にだけ付く
+/* 6-f. 半額の印は、**生きて連れ帰った相手にだけ**付く。
+       帰っても隊からは外れないので、印は隊にいるまま付く。
+       流れ者には付かない（定価）。 */
 R.returnMarks = await pg.evaluate(()=>{
-  S.run=null; S.tavern=[]; S.hero=newHero();
+  S.run=null; S.tavern=[]; S.hero=newHero(); S.hero.party=[];
   TH.run(3,{seed:32});
   const a=makeAlly(5,S.hero); a.x=P.x; a.y=P.y; a.returned=false;
   S.hero.party.push(a);
   returnToTown();
-  const stocked=tavernStock().find(x=>x.uidA===a.uidA);
-  return {marked: !!stocked && stocked.returned===true,
+  const still=party().find(x=>x.uidA===a.uidA);
+  // 預ければ、その印を持ったまま酒場へ移る＝半額で連れ出せる
+  tavernPark(a.uidA);
+  const parked=tavernStock().find(x=>x.uidA===a.uidA);
+  S.bld={};
+  const half=parked ? hireCost(parked) : 0;
+  const asIfNew=parked ? Math.round((20+parked.lv*6)) : 0;
+  return {marked: !!still && still.returned===true,
+          parkedKeepsMark: !!parked && parked.returned===true,
+          half, asIfNew,
           poolUnmarked: tavernPool().every(x=>!x.returned),
-          ok: !!stocked && stocked.returned===true && tavernPool().every(x=>!x.returned)};
+          ok: !!still && still.returned===true
+              && !!parked && parked.returned===true
+              && half < asIfNew
+              && tavernPool().every(x=>!x.returned)};
 });
 
 await done(b, errs, R);

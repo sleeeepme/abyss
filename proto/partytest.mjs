@@ -176,7 +176,10 @@ R.prayer = await pg.evaluate(async ()=>{
 // 3-d. 戦士の「庇う」が主人公の被ダメを肩代わりする
 R.cover = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(6); S.hero.party=[];
-  const w=makeAlly(6,S.hero); w.job='warrior';
+  /* 「庇う」は戦士から**重騎士へ移した**（一番硬い者が持たないと、
+     肩代わりしたぶんだけ庇う側が先に落ちる）。持ち主をジョブ定義から引く。 */
+  const COVER_JOB = ALL_JOBS.find(j=>j.sk && j.sk.id==='cover').id;
+  const w=makeAlly(6,S.hero); w.job=COVER_JOB;
   w.hpNow=allyStats(w).maxHp; w.x=P.x+0.4; w.y=P.y;
   S.hero.party.push(w);
   const e={x:P.x+1, y:P.y, lv:20, atkV:60, dt:'slash', dead:false, tele:0, cd:0};

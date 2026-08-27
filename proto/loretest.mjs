@@ -71,18 +71,35 @@ R.zakoAreKatakana = await pg.evaluate(()=>{
 // 2-c. 実際に湧いた敵が、その固定名を名乗る（表を作っただけで繋いでいない、を防ぐ）
 R.spawnedUseTheTable = await pg.evaluate(()=>{
   TH.run(1,{seed:5}); TH.floor(23);
-  const zako=W.enemies.filter(e=>!e.boss && !e.uniq);
+  /* 苔玉は雑魚三十二種の表に載っていない別枠（層ごとの一種もの）なので外す。
+     苔玉の側の名前は 2-e で別に見る。 */
+  const zako=W.enemies.filter(e=>!e.boss && !e.uniq && !e.moss);
   const named=zako.map(e=>({name:e.name, reg:e.reg,
     fromTable: e.name.includes(zakoName(e.fam.id, e.arch.id)||'\0')}));
   return {sample:named.slice(0,4), count:zako.length,
           ok: zako.length>0 && named.every(x=>x.fromTable)};
 });
 
+/* 2-e. 苔玉。**表示名はカタカナ**（雑魚の規則どおり）で、
+       「苔玉」は種別の呼び名として登録行の側に出る。 */
+R.mossNaming = await pg.evaluate(()=>{
+  const rows=[];
+  for(const z of mossZones()){
+    const depth=ZONES.findIndex(x=>x.id===z)*10+3;
+    TH.floor(depth);
+    const m=W.enemies.find(e=>e.moss);
+    if(m) rows.push({z, name:m.name, reg:m.reg});
+  }
+  const katakana=rows.every(r=>/^[ァ-ヴー]+$/.test(r.name));
+  const marked=rows.every(r=>r.reg.startsWith('苔玉／'));
+  return {rows, katakana, marked, ok: rows.length===mossZones().length && katakana && marked};
+});
+
 /* 2-d. 協会の登録記号（乾・寄）が付いている。
        カタカナの通り名と漢字の事務語、その温度差が世界の手触りになる。 */
 R.regMarksExist = await pg.evaluate(()=>{
   TH.run(1,{seed:5}); TH.floor(23);
-  const zako=W.enemies.filter(e=>!e.boss);
+  const zako=W.enemies.filter(e=>!e.boss && !e.moss);
   const shaped=zako.every(e=>/^[乾滞生築熱欠貸損]・[寄回飛溜]/.test(e.reg||''));
   return {sample:zako.slice(0,4).map(e=>e.reg), ok: zako.length>0 && shaped};
 });
@@ -156,9 +173,14 @@ R.oldWordsGone = await pg.evaluate(()=>{
              /* ここから下は後から引退した語。
                 「支度」は準備の意味と紛れるので能力強化へ、
                 「打ち直し所」は施設名を鍛冶屋に寄せ、
-                「還り」は仲間の呼び名をプレイヤーへ移したときに空いた。
+                「還り」は仲間の呼び名を仲間へ移したときに空いた。
+
+                「仲間」は一度「プレイヤー」で通した——が、
+                日本語で読めば操作している当人を指すし、英語では
+                prayer（祈る者）と player（遊ぶ人）のどちらにも読める。
+                設定書 8.3-2 の「掛詞を使わない」に自分で触っていた。
                 （層の名前の「炉の層」は別物なので触っていない） */
-             '支度','打ち直し所','還り'];
+             '支度','打ち直し所','還り','プレイヤー'];
   /* 見るのは**画面に出る文字**。<script> の中身（コード注釈）は対象外にする。
      注釈まで縛ると、実装の話をするのに旧語が使えなくなって窮屈になる。 */
   const clone=document.body.cloneNode(true);
@@ -173,7 +195,10 @@ R.oldWordsGone = await pg.evaluate(()=>{
 R.newWordsPresent = await pg.evaluate(()=>{
   setScreen('town');
   const t=document.body.innerHTML;
-  const want=['欠片','黒鉄','恩寵','能力強化','街','プレイヤー','鍛冶屋','酒場'];
+  /* 「探索者」は協会の登録上の呼び方として世界の側に残してある（酒場の一行）。
+     ただし**画面で仲間を指す語は「仲間」**——能力強化や全員回復の文で
+     「探索者」と書かれていると、誰のことか一読で決まらない。 */
+  const want=['欠片','黒鉄','恩寵','能力強化','街','仲間','鍛冶屋','酒場','探索者'];
   const missing=want.filter(w=>!t.includes(w));
   return {missing, ok: missing.length===0};
 });

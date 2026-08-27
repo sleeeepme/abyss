@@ -259,8 +259,8 @@ R.charmUI = await pg.evaluate(()=>{
   const backToHero = S.run.charms[0].owner==null;
   closeAllyEquip();
   return {shown, nowAlly, backToHero,
-          saysHolder: label.includes('このプレイヤーが持っている'),
-          ok: shown && nowAlly && backToHero && label.includes('このプレイヤーが持っている')};
+          saysHolder: label.includes('この仲間が持っている'),
+          ok: shown && nowAlly && backToHero && label.includes('この仲間が持っている')};
 });
 
 /* ================= 3. 仲間を失うと秘石が残る ================= */

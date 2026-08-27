@@ -25,11 +25,13 @@
 
 | パス | 内容 |
 |---|---|
-| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ（約620KB / 11,513行）。外部依存なし |
-| `proto/*.mjs` | 回帰テスト46スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
+| `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ。外部依存なし（16px の絵は data URI で本文に埋めてある） |
+| `proto/*.mjs` | 回帰テスト47スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
 | `sweep.sh` | 全スイートを回して、false になった項目だけを並べる。`--since` で絞り込み |
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
-| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある（約208KB） |
+| `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある |
+| `docs/CHARACTER_ART_LIST.md` | キャラアートの一覧と採用状況。**絵の正はここと `proto/assets/sprites/`** |
+| `proto/assets/sprites/` | 16px のスプライト。本体には data URI で写しが入る（**直すのは PNG のほう**） |
 | `docs/BULLET_STORM.md` | 後半を弾幕嵐にする設計案（実測つき） |
 | `docs/abyss-引継書-収益設計監査.md` | 収益設計の監査・引継書（第3版／広告のみ前提） |
 | `docs/handoff.html` | 同上のHTML版 |
@@ -52,7 +54,7 @@ npm i -g playwright && npx playwright install chromium   # 初回のみ
 node proto/verify.mjs        # 個別に実行
 ```
 
-46スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
+47スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
 
 ```bash
 ./sweep.sh                   # 全部回して false になった項目だけ並べる（約5分）
@@ -66,7 +68,7 @@ for f in verify touchtest scrolltest bagtest gravetest hubtest gearttest \
          bossaoe zonetest kitetest adtest basetest looptest forgetest movetest \
          ulttest allytest cursetest scaletest intrtest mournrest boontest \
          allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest loretest dbgtest bladetest \
-         taverntest starttest; do
+         taverntest starttest mosstest; do
   echo "=== $f ==="; node proto/$f.mjs
 done
 ```
@@ -141,7 +143,28 @@ stepSim(7, {draw:true})                          // 描画も回す（例外が�
 
 だから乱数まわりを触ったら掃引を2回。1回では固定と非固定の区別がつかない。
 
-**4. 「1発で死ぬ」と書かない。死ぬまで殴る。**
+**4. 定数を書き写さない。本編と同じ場所を見る。**
+
+乱数の流れが1つずれただけで落ちる検証が、一度に **7本**出たことがある。
+どれも本編の値をテスト側に**書き写して**いた——重騎士の武器種 `'great'`、
+庇うの持ち主 `'warrior'`、大技を持つジョブの数 `8`。
+本編を直した瞬間、テストだけが古い世界を見ることになる。
+
+```js
+// 書き写す（本編を直すと嘘になる）
+a.equip.weapon = genBaseItem('great', 6, 0);
+// 同じ場所を見る（本編を直すと付いてくる）
+a.equip.weapon = genBaseItem(jobDef('knight').weapon, 6, 0);
+```
+
+**落ちたから直す、より、落ちない書き方にしておくほうが安い。**
+
+同じ理由で、**回数や秒数の決め打ちもしない。**
+「鉱脈が出る階は 6/7/8」「追いつくのに 9 秒」は、生成が少し変わるだけで嘘になる。
+出るまで探す・追いついたら早じまいする（`stepSim` の `until`）と書けば、
+見たいこと（掘れるか／戻ってこられるか）だけが残る。
+
+**5. 「1発で死ぬ」と書かない。死ぬまで殴る。**
 
 初期装備の「疾き」には**回避 6%** が乗っている。`hpNow=1` にして 99999 で
 殴る書き方は 6% の確率で外れ、乱数の流れが1つずれるたびに当たり外れが入れ替わる。

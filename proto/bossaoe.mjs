@@ -250,9 +250,18 @@ R.live = await pg.evaluate(async ()=>{
   // 索敵範囲の外にいるとボスは何もしない（これは正しい挙動）ので、隣に立たせる
   P.x=boss.x+2.2; P.y=boss.y;
   const seen={};
-  const frames=stepSim(14, {after:()=>{
-    if(boss.cast) seen[boss.cast.id]=(seen[boss.cast.id]||0)+1;
-  }});
+  /* ---------- 間合いを動かしながら 40 秒 ----------
+     技は**その間合いで意味のある物だけ**が候補に入る（bossCast の usable）。
+     一点に立ち続けると候補が1つに固定されて、
+     「手札が1枚しかない」ように見えてしまう。実際にそれで落ちた——
+     階の形が変わってボスが動かなくなった回に、summon だけが出続けた。
+
+     見たいのは**手札が複数あること**なので、こちらが間合いを変えて確かめる。 */
+  let t=0;
+  const frames=stepSim(40, {
+    each:(el)=>{ t=el; const far = 2.2 + (Math.floor(t/3)%3)*3.2;   // 2.2 → 5.4 → 8.6
+                 P.x=boss.x+far; P.y=boss.y; },
+    after:()=>{ if(boss.cast) seen[boss.cast.id]=(seen[boss.cast.id]||0)+1; }});
   return {ranSeconds:+(frames/60).toFixed(1),
           castsSeen:Object.keys(seen).sort(),
           castCount:Object.keys(seen).length,

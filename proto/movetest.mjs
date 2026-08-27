@@ -12,7 +12,18 @@ const PARTY = `
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
   startRun(10); S.hero.party=[]; W.ores.length=0;
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
-    a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
+    a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99;
+    /* ---------- 個体差を止める ----------
+       makeAlly は「似た役割の別人」に見せるため、歩く速さ・保つ間合い・
+       立ち位置の揺らぎを 1 体ずつ散らす（wobble は 0.10〜0.30）。
+
+       ここで見たいのは**周回や往復**——数マス規模のぶれであって、
+       その揺らぎそのものではない。散らしたまま測ると、
+       たまたま揺らぎの大きい個体を引いた回だけ落ちる
+       （実際に落ちた。同じ検証が 30 サンプルで通り 125 サンプルで落ちた）。
+
+       真ん中の値に固定して、**個体差ではなく仕掛けを見る。** */
+    a.msJit=1; a.keepJit=1; a.cdJit=1; a.wobble=0.20; a.seed=i*2.1; }
 `;
 const shake = (label, setup)=>pg.evaluate(async ({label,setup})=>{
   eval(setup);
@@ -217,7 +228,10 @@ R.corner = await pg.evaluate(async ()=>{
   const start = party().map(a=>+Math.hypot(a.x-P.x,a.y-P.y).toFixed(1));
   S.screen=keep; last=performance.now();
 
-  stepSim(9);
+  /* 追いつくまで進める。**歩かせた距離は毎回ちがう**（壁の形も開始部屋も生成任せ）ので、
+     秒数を決め打ちにすると「遠かった回」に静かに落ちる。実際に落ちた。
+     見たいのは「角で詰まらずに戻ってくる」ことなので、戻ったら早じまいする。 */
+  stepSim(40, {until:()=>livingParty().every(a=>Math.hypot(a.x-P.x,a.y-P.y)<3)});
   return {tries, walked:+moved.toFixed(1), losBlocked:blocked, startGaps:start,
           trail:W.trail.length,
           losGotBlocked: blocked.some(Boolean),

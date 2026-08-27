@@ -576,7 +576,12 @@ R.live = await pg.evaluate(async ()=>{
       ? ['twin','bore','swift'] : ['twin','sweep','heavy'];
     S.hero.equip.weapon=it;
     S.hero.hpNow=stats(S.hero).maxHp;
-    for(const d of [6,7,8]){
+    /* **鉱脈が出るまで階を替える。** 1階層あたりの出現は確率なので、
+       3階ぶん決め打ちだと「たまたま3回とも出なかった」回に静かに落ちる。
+       実際に落ちた——生成の種がずれた拍子に 6/7/8 が3連続で空になった。
+       見たいのは「掘れるか」であって「湧くか」ではない（湧きは別の検証）。 */
+    for(const d of [6,7,8,9,11,12,13,14]){
+      if(mined>=1 && veins>0) break;
       enterFloor(d);
       veins+=W.ores.length;
       if(W.ores.length){                       // 鉱脈まで飛んで掘る

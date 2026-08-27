@@ -189,18 +189,67 @@ R.quakeShock = await pg.evaluate(()=>{
           ok: off.side===0 && on.side>0 && on.hit>0};
 });
 
-/* 2-g. 求道：いま使っている武器種が出やすくなる。
-       熟練（武器種ごとに育つ）と噛み合わせてある。 */
+/* 2-g. 求道：**指した武器種**が出やすくなる。
+       以前は「いま握っている種」に自動で追随していたので、
+       付けるか付けないかしか選べなかった。武器種ごとに別の遺物に割ってある。 */
 R.hoardBias = await pg.evaluate(()=>{
   TH.run(1,{seed:4}); TH.floor(20);
+  S.upg=S.upg||{}; S.upg.relic=RELIC_MAX_SLOTS;
   const w=genBaseItem('mace',20,1); w.ident=true; S.hero.equip.weapon=w;
-  const count=()=>{ let n=0; for(let i=0;i<600;i++) if(pickBase(20).id==='mace') n++; return n; };
+  const count=(id)=>{ let n=0; for(let i=0;i<600;i++) if(pickBase(20).id===id) n++; return n; };
   S.relicEq=[];
-  const off=count();
-  S.relicEq=['hoard'];
-  const on=count();
-  return {off, on, ratio:+(on/Math.max(1,off)).toFixed(2),
-          biased: on > off*1.5, ok: on > off*1.5};
+  const off=count('mace');
+  /* **握っている武器（戦槌）ではなく、遺物が指す種（弓）が増える。**
+     ここが「自動で追随しない」ことの検証そのもの。 */
+  S.relicEq=['hoard_bow'];
+  const onMace=count('mace'), onBow=count('bow');
+  S.relicEq=[];
+  const offBow=count('bow');
+  return {off, onMace, onBow, offBow,
+          ratio:+(onBow/Math.max(1,offBow)).toFixed(2),
+          biasesTheNamedOne: onBow > offBow*1.5,
+          leavesHeldAlone: onMace <= off*1.35,
+          ok: onBow > offBow*1.5 && onMace <= off*1.35};
+});
+
+/* 2-h. 指した種は**レア度も上がる。**
+       出やすくなるだけだと「同じ白い剣が増える」で終わってしまう。 */
+R.hoardRarity = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(30);
+  S.upg=S.upg||{}; S.upg.relic=RELIC_MAX_SLOTS;
+  const avgRar=()=>{
+    let sum=0, n=0;
+    for(let i=0;i<1500;i++){
+      const it=genItem(30,0);
+      if(it.base!=='bow') continue;
+      sum+=it.rar; n++;
+    }
+    return n ? sum/n : 0;
+  };
+  S.relicEq=[];             RNG=mulberry32(77); const off=avgRar();
+  S.relicEq=['hoard_bow'];  RNG=mulberry32(77); const on =avgRar();
+  S.relicEq=[];
+  return {off:+off.toFixed(3), on:+on.toFixed(3), mf:HOARD_MF,
+          richer: on > off,
+          ok: on > off};
+});
+
+// 2-i. 抽選では8種まとめて1枠。他の遺物が埋もれない
+R.hoardIsOneSlot = await pg.evaluate(()=>{
+  S.relics=[]; S.relicEq=[];
+  const seen={};
+  for(let i=0;i<1200;i++){
+    S.relics=[];
+    const r=rollNewRelic();
+    if(r) seen[r.fam==='hoard'?'hoard':r.id]=(seen[r.fam==='hoard'?'hoard':r.id]||0)+1;
+  }
+  const hoardShare=(seen.hoard||0)/1200;
+  const families=RELICS.filter(r=>r.fam!=='hoard').length + 1;
+  return {seen, hoardShare:+hoardShare.toFixed(3), families,
+          hoardKinds:RELICS.filter(r=>r.fam==='hoard').length,
+          // 1枠ぶんの取り分（1/families）に収まっている
+          notFlooded: hoardShare < 1.8/families,
+          ok: hoardShare < 1.8/families && RELICS.filter(r=>r.fam==='hoard').length>=6};
 });
 
 /* ================= 3. 試練の石碑 ================= */

@@ -36,12 +36,17 @@ R.artsDefined = await pg.evaluate(()=>{
   const withArt=rows.filter(r=>r.art);
   const unknown=withArt.filter(r=>!ALLY_ARTS[r.art]);
   const dupes=withArt.map(r=>r.art).filter((v,i,arr)=>arr.indexOf(v)!==i);
-  return {rows, unknown, dupes,
-          // 召喚士（三重召喚）だけが常時効果。残り8ジョブは全部ちがう大技。
-          eightArts: withArt.length===8,
+  /* 大技を持たないジョブ＝召喚士（三重召喚）とドゥラントリー（芽吹き）。
+     数を書き写すと、ジョブが1つ増えるたびにここだけ嘘になるので、
+     **持っていないジョブの側**を名指しで数える。 */
+  const PASSIVE_TOP=['summoner','durantree'];
+  const want=Object.keys(JOB_SKILLS).length - PASSIVE_TOP.length;
+  return {rows, unknown, dupes, want,
+          passiveTop: rows.filter(r=>r.passive).map(r=>r.job),
+          rightCount: withArt.length===want,
           allKnown: unknown.length===0,
           allDistinct: dupes.length===0,
-          ok: withArt.length===8 && unknown.length===0 && dupes.length===0};
+          ok: withArt.length===want && unknown.length===0 && dupes.length===0};
 });
 
 // 1-c. 技は Lv でしか開かない（Lv.49 では出ない）
@@ -107,17 +112,34 @@ R.bulwark = await stage('knight', (a,e,def)=>{
           ok: heroShield===BULWARK_HITS && allyShield===BULWARK_HITS && blocked && through};
 });
 
-// 2-c. 狩人 五月雨: 5本を扇状に
-R.volley = await stage('hunter', (a,e,def)=>{
-  W.fx=[];
+/* 2-c. 狩人 矢の雨: 攻撃範囲内へ 25 本。
+       五月雨（前方5方向の扇）から差し替えた——扇は前にしか届かず、
+       囲まれたときに一番効いてほしい技が一番効かなかった。
+
+       **弾（ashot）にはしない。** 25発を飛ばすと画面の弾数を食って
+       後半の弾幕と競合するので、着弾だけを予約する形にしてある。 */
+R.rain = await stage('hunter', (a,e,def)=>{
+  W.arts=[]; W.fx=[];
   stepSim(0.05);
-  const shots=W.fx.filter(f=>f.t==='ashot');
-  const angs=shots.map(f=>+Math.atan2(f.vy,f.vx).toFixed(3));
-  const spread=angs.length ? Math.max(...angs)-Math.min(...angs) : 0;
-  return {count:shots.length, angs, spread:+spread.toFixed(2),
-          fiveArrows: shots.length===5,
-          fansOut: new Set(angs).size===5 && spread>0.8,
-          ok: shots.length===5 && new Set(angs).size===5 && spread>0.8};
+  const drops=W.arts.filter(f=>f.kind==='arrow');
+  const shots=W.fx.filter(f=>f.t==='ashot'||f.t==='pshot').length;
+  const st=allyStats(a);
+  const far=Math.max(...drops.map(f=>Math.hypot(f.x-e.x, f.y-e.y)));
+  const uniq=new Set(drops.map(f=>f.x.toFixed(2)+','+f.y.toFixed(2))).size;
+  // 落ちる前は当たらない（予兆の時間がある）
+  const hp0=e.hp;
+  const beforeLanding = e.hp===hp0;
+  stepSim(2.0);
+  const dealt=hp0-e.hp;
+  return {count:drops.length, want:RAIN_ARROWS, shots, uniq,
+          far:+far.toFixed(2), reach:+Math.max(3.0, st.range).toFixed(2), dealt,
+          rightCount: drops.length===RAIN_ARROWS,
+          scattered: uniq===RAIN_ARROWS,
+          insideRange: far <= Math.max(3.0, st.range)+0.01,
+          spendsNoProjectiles: shots===0,
+          landsAndHurts: dealt>0,
+          ok: drops.length===RAIN_ARROWS && uniq===RAIN_ARROWS
+              && far <= Math.max(3.0, st.range)+0.01 && shots===0 && dealt>0};
 });
 
 // 2-d. 魔法使い 焦土: 燃え続ける地面。時間で消える。
