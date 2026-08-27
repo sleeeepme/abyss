@@ -8045,6 +8045,12 @@ const CharacterArt = (function(){
     warrior:'characters/allies/warrior-right-idle.png', knight:'characters/allies/knight-right-idle.png',
     rogue:'characters/allies/rogue-right-idle.png', priest:'characters/allies/priest-right-idle.png',
     hunter:'characters/allies/hunter-right-idle.png', mage:'characters/allies/mage-right-idle.png',
+    warrior_2:'characters/allies/warrior-right-idle_2.png', warrior_3:'characters/allies/warrior-right-idle_3.png',
+    knight_2:'characters/allies/knight-right-idle_2.png', knight_3:'characters/allies/knight-right-idle_3.png',
+    rogue_2:'characters/allies/rogue-right-idle_2.png', rogue_3:'characters/allies/rogue-right-idle_3.png',
+    priest_2:'characters/allies/priest-right-idle_2.png', priest_3:'characters/allies/priest-right-idle_3.png',
+    hunter_2:'characters/allies/hunter-right-idle_2.png', hunter_3:'characters/allies/hunter-right-idle_3.png',
+    mage_2:'characters/allies/mage-right-idle_2.png', mage_3:'characters/allies/mage-right-idle_3.png',
     paladin:'characters/allies/paladin-right-idle.png', summoner:'characters/allies/summoner-right-idle.png',
     archmage:'characters/allies/archmage-right-idle.png',
     'ash-hound':'enemies/ash-hound/right-idle-v5.png',
@@ -8056,6 +8062,17 @@ const CharacterArt = (function(){
   const img={};
   for(const [id,file] of Object.entries(FILES)){ const im=new Image(); im.src=DIR+file; img[id]=im; }
   const ready=id=>{ const im=img[id]; return !!(im&&im.complete&&im.naturalWidth>0); };
+  const VARIANT_JOBS=new Set(['warrior','knight','rogue','priest','hunter','mage']);
+  /* 同じ初期ジョブを2人・3人と連れる場合、パーティ内の加入順で色違いを使う。
+     酒場の候補など、まだパーティにいない個体は通常色のままにする。 */
+  function allyKey(a){
+    const base=a&&a.job;
+    if(!VARIANT_JOBS.has(base)) return base;
+    const same=party().filter(m=>m&&m.job===base);
+    const order=same.indexOf(a)+1;
+    const key=order===2||order===3 ? base+'_'+order : base;
+    return ready(key) ? key : base;
+  }
   function enemyKey(e){
     if(!e || e.moss) return null;
     if(e.uniqueBoss===5) return 'great-ash-frog';
@@ -8072,7 +8089,7 @@ const CharacterArt = (function(){
     ctx.restore();
     return true;
   }
-  return {enemyKey,put};
+  return {allyKey,enemyKey,put};
 })();
 
 /* ---------- 描画 ---------- */
@@ -8397,7 +8414,7 @@ function draw(){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
-    }else if(!CharacterArt.put(a.job,sx,sy,TS,a,a.dirx,a.diry)){
+    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
         const ang=i/6*Math.PI*2-Math.PI/2;

@@ -8,6 +8,22 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
+/* ================= 0. 同職仲間の色違い ================= */
+
+R.colorVariants = await pg.evaluate(async()=>{
+  const priorParty=S.hero.party;
+  const a={job:'warrior'}, b={job:'warrior'}, c={job:'warrior'};
+  S.hero.party=[a,b,c];
+  await new Promise(resolve=>setTimeout(resolve,100));
+  const keys=[CharacterArt.allyKey(a),CharacterArt.allyKey(b),CharacterArt.allyKey(c)];
+  const unaffected=CharacterArt.allyKey({job:'paladin'});
+  S.hero.party=priorParty;
+  return {keys, unaffected,
+          firstBase:keys[0]==='warrior', secondVariant:keys[1]==='warrior_2',
+          thirdVariant:keys[2]==='warrior_3', upperJobBase:unaffected==='paladin',
+          ok:keys.join(',')==='warrior,warrior_2,warrior_3' && unaffected==='paladin'};
+});
+
 /* ================= 1. 名前 ================= */
 
 // 1-a. ジョブ名ではない固有の名前が付き、十分に散らばる

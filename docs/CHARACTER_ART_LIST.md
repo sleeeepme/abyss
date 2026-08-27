@@ -9,12 +9,12 @@
 | 管理ID | ゲーム側ID | キャラクター | 区分 | プレビュー | 原寸画像 | 向き・状態 | アート状態 | ゲーム反映 | 備考 |
 |---|---|---|---|---|---|---|---|---|---|
 | `CHAR-HERO-001` | `hero` | 冒険者 | プレイヤー | ![冒険者候補B・遺跡の斥候](../proto/assets/sprites/hero/concepts/b-scout-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/b-scout-right-idle.png) | 右・待機1 | 候補選定中 | 未反映 | 候補Bをキープ。選択式キャラ絵を想定し、B・D・E・F・G・Hの6候補を保存。最終採用は未決定 |
-| `ALLY-WARRIOR-001` | `warrior` | 剣士 | 仲間 | ![剣士・右向き](../proto/assets/sprites/allies/swordsman/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/swordsman/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 茶髪、両目1px、剣、丸盾、鎖帷子 |
-| `ALLY-KNIGHT-001` | `knight` | 重騎士 | 仲間 | ![重騎士・右向きv2](../proto/assets/sprites/allies/heavy-knight/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/heavy-knight/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 全身を鋼色で統一。フルフェイス兜、幅広い板金鎧、大剣 |
-| `ALLY-ROGUE-001` | `rogue` | 盗賊 | 仲間 | ![盗賊・右向きv2](../proto/assets/sprites/allies/rogue/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/rogue/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 黄土色のフードとスカーフ、顔マスク、両手の短剣 |
-| `ALLY-PRIEST-001` | `priest` | 僧侶 | 仲間 | ![僧侶・右向きv2](../proto/assets/sprites/allies/priest/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/priest/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 白いウィンプル、濃紺のベールと長衣、典礼杖 |
-| `ALLY-HUNTER-001` | `hunter` | 狩人 | 仲間 | ![狩人・右向き](../proto/assets/sprites/allies/hunter/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/hunter/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 緑のフード、右手の弓、背中の矢筒 |
-| `ALLY-MAGE-001` | `mage` | 魔術師 | 仲間 | ![魔術師・右向きv3](../proto/assets/sprites/allies/mage/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/mage/right-idle-v3-draft.png) | 右・待機1 | v3・要確認 | 未反映 | 大きな紫の三角帽子、影の顔と水色の両目、魔力結晶付きの杖 |
+| `ALLY-WARRIOR-001` | `warrior` | 剣士 | 仲間 | ![剣士・右向き](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 茶髪、両目1px、剣、丸盾、鎖帷子。2人目・3人目用の色違いあり |
+| `ALLY-KNIGHT-001` | `knight` | 重騎士 | 仲間 | ![重騎士・右向き](../proto/assets/sprites/characters/allies/knight-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/knight-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 全身を鋼色で統一。フルフェイス兜、幅広い板金鎧、大剣。2人目・3人目用の色違いあり |
+| `ALLY-ROGUE-001` | `rogue` | 盗賊 | 仲間 | ![盗賊・右向き](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 黄土色のフードとスカーフ、顔マスク、両手の短剣。2人目・3人目用の色違いあり |
+| `ALLY-PRIEST-001` | `priest` | 僧侶 | 仲間 | ![僧侶・右向き](../proto/assets/sprites/characters/allies/priest-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/priest-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 白いウィンプル、濃紺のベールと長衣、典礼杖。2人目・3人目用の色違いあり |
+| `ALLY-HUNTER-001` | `hunter` | 狩人 | 仲間 | ![狩人・右向き](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 緑のフード、右手の弓、背中の矢筒。2人目・3人目用の色違いあり |
+| `ALLY-MAGE-001` | `mage` | 魔術師 | 仲間 | ![魔術師・右向き](../proto/assets/sprites/characters/allies/mage-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/mage-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 大きな紫の三角帽子、影の顔と水色の両目、魔力結晶付きの杖。2人目・3人目用の色違いあり |
 | `ALLY-PALADIN-001` | `paladin` | パラディン（聖騎士） | 上位仲間 | ![パラディン・右向きv4](../proto/assets/sprites/allies/paladin/right-idle-v4-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/paladin/right-idle-v4-draft.png) | 右・待機1 | 承認済み | 未反映 | 金髪の女性聖騎士。明るい左目側の顔影、青いタバード、象牙色の鎧、盾、頭高まで届く長剣（ゲーム側の武器設定は現時点でメイス） |
 | `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向き](../proto/assets/sprites/allies/summoner/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/summoner/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 青緑の重ねフードとローブ、護符付きの杖、左後方の使い魔 |
 | `ALLY-ARCHMAGE-001` | `archmage` | 大魔導士 | 上位仲間 | ![大魔導士・右向きv2](../proto/assets/sprites/allies/archmage/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/archmage/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 腰を深く曲げた老魔術師。白眉・白髪・長い白髭、魔力球付きの杖 |
@@ -24,6 +24,19 @@
 | `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv3](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 選択された参考案を基準に、高い灰色の肩、茶色い耳・短脚、淡い眼、箱型の鼻と大きな上向き牙を整理 |
 | `ENEMY-MOSS-BALL-001` | `moss-ball` | 苔玉 | 敵 | ![苔玉・正面v1](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1.png) | 正面・待機1 | 承認済み | ゲーム反映済み | ユーザー指定の最新v6を採用。段状の頭、1pxの両目、短い腕、左右非対称の足、必要箇所のみの濃紺アウトライン |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
+
+## 初期解放ジョブの色違い
+
+同じ初期解放ジョブをパーティへ複数加入させた場合、パーティ内で同職が何人目かに応じて通常色・`_2`・`_3`を自動で使い分ける。酒場など、まだパーティに加入していない候補は通常色で表示する。
+
+| ジョブ | 1人目 | 2人目 | 3人目 |
+|---|---|---|---|
+| 剣士 | ![剣士1人目](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | ![剣士2人目](../proto/assets/sprites/characters/allies/warrior-right-idle_2.png) | ![剣士3人目](../proto/assets/sprites/characters/allies/warrior-right-idle_3.png) |
+| 重騎士 | ![重騎士1人目](../proto/assets/sprites/characters/allies/knight-right-idle.png) | ![重騎士2人目](../proto/assets/sprites/characters/allies/knight-right-idle_2.png) | ![重騎士3人目](../proto/assets/sprites/characters/allies/knight-right-idle_3.png) |
+| 盗賊 | ![盗賊1人目](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | ![盗賊2人目](../proto/assets/sprites/characters/allies/rogue-right-idle_2.png) | ![盗賊3人目](../proto/assets/sprites/characters/allies/rogue-right-idle_3.png) |
+| 僧侶 | ![僧侶1人目](../proto/assets/sprites/characters/allies/priest-right-idle.png) | ![僧侶2人目](../proto/assets/sprites/characters/allies/priest-right-idle_2.png) | ![僧侶3人目](../proto/assets/sprites/characters/allies/priest-right-idle_3.png) |
+| 狩人 | ![狩人1人目](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | ![狩人2人目](../proto/assets/sprites/characters/allies/hunter-right-idle_2.png) | ![狩人3人目](../proto/assets/sprites/characters/allies/hunter-right-idle_3.png) |
+| 魔術師 | ![魔術師1人目](../proto/assets/sprites/characters/allies/mage-right-idle.png) | ![魔術師2人目](../proto/assets/sprites/characters/allies/mage-right-idle_2.png) | ![魔術師3人目](../proto/assets/sprites/characters/allies/mage-right-idle_3.png) |
 
 ## 冒険者デザイン候補
 
@@ -103,3 +116,4 @@
 - 2026-08-24: ダストスパイダーv2を承認済みに更新。アッシュハウンドを4段階陰影のv4へ改訂。アッシュトードをゼロベースのv3へ再設計。ユーザー選択の参考案を基準にストーンボアv3と灰の大蛙v3を原寸へ再構成。
 - 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
 - 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。
+- 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
