@@ -398,7 +398,7 @@ R.oreLostOnDeath = await pg.evaluate(()=>{
 // 6-b. 生きて帰れば口座に入る
 R.oreBankedOnReturn = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.ore={raw:2};
-  startRun(9);
+  startRun(10);                       // 帰還ポータル階（帰れるのは5階ごと）
   gainOre('raw', 4); gainOre('fine', 6);
   const before={...S.ore};
   returnToTown();

@@ -12,8 +12,13 @@ import { chromium, devices } from 'playwright';
 import path from 'path';
 
 /* ブラウザを開いて index.html を読む。errs には page error / console.error が溜まる。 */
+/* file:// のまま画像を読むと、canvas が「別オリジンの絵が乗った」と見なされて
+   getImageData が SecurityError で落ちる（キャラアートを実ファイルから読み始めた
+   時点でこうなった）。描かれた色を読む検証があるので、
+   ファイル同士を同一オリジンとして扱う指定を付けて開く。 */
+const LAUNCH = {args:['--allow-file-access-from-files']};
 export async function boot(){
-  const b   = await chromium.launch();
+  const b   = await chromium.launch(LAUNCH);
   const ctx = await b.newContext({...devices['iPhone 13'], hasTouch:true, isMobile:true});
   const pg  = await ctx.newPage();
   const errs=[];

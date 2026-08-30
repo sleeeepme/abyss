@@ -248,7 +248,10 @@ R.fallen = await pg.evaluate(()=>{
           revivedFlag:a.revived, deadAfter:a.dead, lvAfter:a.lv, gearAfter,
           keptBoons:a.boons.length,
           hpFull: Math.round(a.hpNow)===allyStats(a).maxHp,
-          resetToLv1: a.lv===1,
+          /* 蘇生してもレベルは**そのまま**。以前はここで Lv.1 に戻していたが、
+             弔い（欠片に変える道）はレベルを保ったまま数えるので、
+             広告を見て連れ戻すほうが常に損になっていた。 */
+          keepsLevel: a.lv===lvBefore,
           lostSomeGear: gearAfter<gearBefore,
           backAlive: !a.dead && livingParty().includes(a)};
 });

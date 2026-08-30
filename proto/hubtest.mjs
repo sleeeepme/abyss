@@ -47,9 +47,20 @@ await tap('[data-upg="hp"]');
 R.upgradeInUpgScreen = await pg.evaluate(()=>upgLv('hp')===1);
 await tap('#scr-upg [data-back]');
 
-// --- 3. ガチャ: 広告を見ないと受け取れない / その日の上限で打ち止め
+// --- 3. ガチャ: 1日1回は無料 / それ以降は広告 / その日の上限で打ち止め
 await tap('#btn-go-gacha');
 R.gachaStart = await pg.evaluate(()=>S.gachaLeft);
+/* 3-a. その日の最初の1回は**広告を見ずに引ける**。
+   街に来て何も起きない日を作らないための1回で、以降は今までどおり広告。 */
+await tap('#btn-gacha');
+R.freePull = await pg.evaluate(()=>({
+  adStayedClosed: !document.getElementById('m-ad').classList.contains('on'),
+  resultShown: document.getElementById('m-gres').classList.contains('on'),
+  freeLeft: S.gachaFree||0}));
+R.freePull.ok = R.freePull.adStayedClosed && R.freePull.resultShown
+             && R.freePull.freeLeft===0;
+await tap('#gres-ok');
+// 3-b. 2回目からは広告
 await tap('#btn-gacha');
 R.adOpened = await vis('#m-ad');
 R.okDisabledBeforeWatch = await pg.evaluate(()=>document.getElementById('ad-ok').disabled);

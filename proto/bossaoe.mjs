@@ -22,8 +22,10 @@ R.size = await pg.evaluate(()=>{
     const boss=spawnEnemies(fl,d).find(e=>e.boss);
     out[tier]={r:boss.r, cr:boss.cr, tier:boss.tier};
   });
+  /* 比べる相手は**普通の階**から取る。10階ごとは大広間＝ボス戦だけの階になり、
+     雑魚が1体も湧かない（比較用に湧かせ直すと、そのぶん主役がぼやける）。 */
   RNG=mulberry32(999);
-  const trash=spawnEnemies(genFloor(10),10).find(e=>!e.boss && !e.elite && !e.uniq);
+  const trash=spawnEnemies(genFloor(9),10).find(e=>!e.boss && !e.elite && !e.uniq);
   return {bosses:out, trashR:trash.r,
           midBigger:  out.mid.r   > trash.r*2,
           greatBigger:out.great.r > out.mid.r,
@@ -162,7 +164,10 @@ R.wave = await pg.evaluate(async ()=>{
   boss.cast={id:'wave', t:0, max:1, dir:0};
   resolveBossMove(boss); boss.cast=null;
   const spawned=W.fx.filter(f=>f.t==='wave').length;
-  boss.atkV=0; boss.moves=[];        // 以後の技を止めて波動だけ見る
+  /* 波動だけを見る。第50階層の主は出血の霧と周回刃を常に回しているので、
+     そのままだと「波動で減った」と「霧で減った」が混ざって数えられない。 */
+  boss.atkV=0; boss.moves=[]; boss.bleedAura=false; boss.blades=0;
+  S.run.bleedAuraT=0; S.run.pst={};
   let hitCount=0, prev=S.hero.hpNow;
   stepSim(3, {after:()=>{
     if(S.hero && S.hero.hpNow<prev){ hitCount++; prev=S.hero.hpNow; }

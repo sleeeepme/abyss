@@ -26,7 +26,7 @@
 | パス | 内容 |
 |---|---|
 | `proto/index.html` | **本体。** プレイ可能な単一HTMLプロトタイプ。外部依存なし（16px の絵は data URI で本文に埋めてある） |
-| `proto/*.mjs` | 回帰テスト47スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
+| `proto/*.mjs` | 回帰テスト49スイート（Playwright + iPhone 13 相当のタッチ経路。`arttest` だけ PC 文脈も開く）。`_` 始まりは掃引に入れない単発の計測用 |
 | `sweep.sh` | 全スイートを回して、false になった項目だけを並べる。`--since` で絞り込み |
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
 | `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある |
@@ -54,7 +54,7 @@ npm i -g playwright && npx playwright install chromium   # 初回のみ
 node proto/verify.mjs        # 個別に実行
 ```
 
-47スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
+49スイートを順に回す（`./sweep.sh` で一括実行と要約もできる）：
 
 ```bash
 ./sweep.sh                   # 全部回して false になった項目だけ並べる（約5分）
@@ -68,7 +68,7 @@ for f in verify touchtest scrolltest bagtest gravetest hubtest gearttest \
          bossaoe zonetest kitetest adtest basetest looptest forgetest movetest \
          ulttest allytest cursetest scaletest intrtest mournrest boontest \
          allyuptest allyidtest arttest nametest npctest tunetest titletest towntest hudtest masttest relictest ubosstest loretest dbgtest bladetest \
-         taverntest starttest mosstest; do
+         taverntest starttest mosstest layertest slottest; do
   echo "=== $f ==="; node proto/$f.mjs
 done
 ```
@@ -137,7 +137,7 @@ stepSim(7, {draw:true})                          // 描画も回す（例外が�
 既定は 0——**テストは塩を持たない。**
 
 ここを間違えると症状が出にくい。塩を宣言時や `startAdventure()` で引くと、
-`_h.mjs` を通さず自前で起動しているスイート（46本中25本）が
+`_h.mjs` を通さず自前で起動しているスイート（49本中25本）が
 **静かに毎回違う地形**を見るようになる。1回目の掃引はたまたま緑で通り、
 2回目で落ちる。落ちたときに「壊したのか、たまたまか」が区別できない。
 
@@ -192,7 +192,7 @@ for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,3); }
 | zonetest | `.banner.sameZone` / `.banner.stillSame` |
 | kitetest | `.hud.melee.shown` |
 | adtest | `.reviveDone.dead` |
-| basetest | `.durWarn.healthy.shown` / `.repairHint.clean.coloured` |
+| basetest | `.durWarn.healthy.shown` |
 
 **この一覧と名前が一致しても、同じ理由で false とは限らない。**
 実際に `verify.shop.upgraded` は「能力強化の対価を金→欠片に変えた」時点から
@@ -229,6 +229,13 @@ for(let _i=0;_i<40 && S.hero;_i++){ S.hero.hpNow=1; hitPlayer(null,99999,0,3); }
 - **正はプロトタイプと設計書。** `unity/` は「Unity でどう組むかの下書き」でしかない。
 - 機能を足すたびに、その機能を検証するスイートを1本足して全数を通す。
 - 設計判断は数値で確かめてから決める。設計書に「なぜそうしたか」を必ず残す。
+- **テストが「深い階の代表」に選ぶ数字は、5の倍数を避ける。**
+  節目の階（5の倍数＝ボス階、10の倍数＝大広間）は仕様が乗る場所なので、
+  ただの「深めの階」のつもりで選ぶと、その仕様が変わった日に一斉に落ちる。
+  実際、10階ごとを大広間にした回で9本が同時に落ちた。
+- **偽（false）は必ず肯定形で持つ。** 掃引は `R` の中の false を全部
+  「失敗」として読む。「健全なら色は付かない」を `coloured:false` のまま返すと、
+  正しい観測が毎回失敗として並ぶ。値そのものを返したいときは文字列にする。
 
 ## 次にやること（収益設計の結論から）
 

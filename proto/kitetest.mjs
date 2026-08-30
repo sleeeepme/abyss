@@ -231,11 +231,23 @@ R.viability = await pg.evaluate(async ()=>{
   const run=async (mode)=>{
     S.hero=newHero(); S.upg={hp:8,atk:6,aspd:4}; S.hero.lv=25;
     S.hero.str=29; S.hero.dex=29; S.hero.vit=29;
+    /* 種を固定する。ここまでのどの節が何回潜ったかで S.runs がずれ、
+       同じ「第12階層」でも間取りと敵の並びが毎回変わっていた。
+       測っているのは**足の使い方**なので、床は同じ物を2回使う。 */
+    S.runs = 40;
     startRun(12); S.hero.party=[];
+    /* 水の層の水を外す。**測りたいのは引き撃ちという動き方そのもの。**
+       水の上では足が鈍る（それが水の層の性格）ので、残したままだと
+       「引き撃ちが成立するか」ではなく「水の層で引き撃ちできるか」になる。 */
+    W.haz=null;
     S.hero.equip.weapon=genBaseItem('bow',25,2);
     S.hero.equip.armor =genBaseItem('leather',25,2);
     S.hero.hpNow=stats(S.hero).maxHp;
     const hp0=S.hero.hpNow;
+    /* 相手は**その階の普通の敵だけ**にする。規格外（紫）は1体で戦い方が変わる
+       相手で、湧くかどうかは抽選なので、種の並びが1つずれただけで
+       「引き撃ちが成立するか」の答えが引っくり返ってしまう。 */
+    W.enemies = W.enemies.filter(e=>!e.uniq && !e.boss && !e.intruder);
     // 敵をまとめて前方に置く
     W.enemies.forEach((e,i)=>{ e.x=P.x+4+((i%4)*0.8); e.y=P.y-1.5+((i%3)*1.2); });
     // 疑似入力。壁に突き当たって止まると比較にならないので、

@@ -342,10 +342,11 @@ R.shardSurvivesDeath = await pg.evaluate(()=>{
 
 // 4-c. 倒すと落とす（実際の killEnemy 経由）
 R.shardFromKill = await pg.evaluate(()=>{
-  S.hero=newHero(); S.upg={hp:8}; startRun(20); S.shards=0;
+  // 10階ごとは大広間＝ボス戦だけの階（雑魚が湧かない）。群れが要るので手前の階で見る。
+  S.hero=newHero(); S.upg={hp:8}; startRun(19); S.shards=0;
   W.drops.length=0;
   W.enemies.length=0;
-  W.enemies.push(...spawnEnemies(W.fl, 20));
+  W.enemies.push(...spawnEnemies(W.fl, 19));
   const kills=W.enemies.length;
   W.enemies.slice().forEach(e=>{ e.elite=true; killEnemy(e); });
   const dropped=W.drops.filter(d=>d.shard);

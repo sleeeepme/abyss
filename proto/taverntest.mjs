@@ -18,7 +18,7 @@ const R={};
        外したいときは酒場で預ける（1-c）。 */
 R.returnKeepsParty = await pg.evaluate(()=>{
   S.tavern=[]; S.hero=newHero();
-  TH.run(3,{seed:11});
+  TH.run(5,{seed:11});      // 帰還ポータル階から帰る
   const a=makeAlly(5,S.hero), c=makeAlly(5,S.hero);
   a.x=P.x; a.y=P.y; c.x=P.x; c.y=P.y;
   S.hero.party.push(a,c);
@@ -297,7 +297,7 @@ R.poolRerollsOnReturn = await pg.evaluate(()=>{
   S.run=null; S.tavern=[]; S.hero=newHero(); S.hero.party=[];
   S.tavernPool=null; rerollTavern();
   const before=tavernPool().map(a=>a.uidA).join(',');
-  TH.run(3,{seed:31});
+  TH.run(5,{seed:31});
   returnToTown();
   const after=tavernPool().map(a=>a.uidA).join(',');
   return {before, after, replaced: before!==after, ok: before!==after};
@@ -324,7 +324,7 @@ R.twoShelves = await pg.evaluate(()=>{
        流れ者には付かない（定価）。 */
 R.returnMarks = await pg.evaluate(()=>{
   S.run=null; S.tavern=[]; S.hero=newHero(); S.hero.party=[];
-  TH.run(3,{seed:32});
+  TH.run(5,{seed:32});
   const a=makeAlly(5,S.hero); a.x=P.x; a.y=P.y; a.returned=false;
   S.hero.party.push(a);
   returnToTown();

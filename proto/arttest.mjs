@@ -67,7 +67,7 @@ R.learnedByLevel = await pg.evaluate(()=>{
 /* 共通の舞台。的を1体だけ置き、Lv.50 の仲間を1人立たせる。
    リキャストの初回は散らしてあるので、確実に撃たせるため artCd を 0 にする。 */
 const stage = (job, fn)=>pg.evaluate(({job, fnSrc})=>{
-  TH.run(1,{seed:11}); TH.floor(20);
+  TH.run(1,{seed:11}); TH.floor(19);   // 大広間（10階ごと）には雑魚が湧かない
   TH.immortal();
   S.hero.lv=40; S.hero.str=44; S.hero.dex=44; S.hero.vit=44;
   const a=TH.ally(20, job, 50);
@@ -249,7 +249,7 @@ R.collapse = await stage('archmage', (a,e,def)=>{
 
 // 2-j. リキャストがあり、撃ちっぱなしにならない
 R.recast = await pg.evaluate(()=>{
-  TH.run(1,{seed:13}); TH.floor(20);
+  TH.run(1,{seed:13}); TH.floor(19);   // 大広間（10階ごと）には雑魚が湧かない
   TH.immortal();
   const a=TH.ally(20,'warrior',50);
   a.x=P.x; a.y=P.y; uniqueAllyName(a,party()); S.hero.party.push(a);
@@ -272,7 +272,7 @@ R.recast = await pg.evaluate(()=>{
 /* ================= 3. 大技のリキャスト短縮 ================= */
 
 R.ultCdr = await pg.evaluate(()=>{
-  TH.run(1,{seed:17}); TH.floor(20);
+  TH.run(1,{seed:17}); TH.floor(19);   // 大広間（10階ごと）には雑魚が湧かない
   S.greatKills=4;                            // 大技はここまで解放されている
   S.ultLv={quake:1}; S.ult='quake';
   const u=ultEquipped();

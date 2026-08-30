@@ -128,7 +128,9 @@ R.beyondTable = await pg.evaluate(()=>{
 /* 2-a. 8種すべてが、実際に溜めて・撃って・例外を出さない。
        描画まで通すのが肝で、予兆の絵で落ちるとそのフレームが丸ごと消える。 */
 R.allMovesFire = await pg.evaluate(()=>{
-  TH.run(1,{seed:7}); TH.floor(50); TH.immortal();
+  /* 第45階層で見る。第50階層の主は眷属と周回刃と出血の霧を連れた**設え**で、
+     技が出るかどうかを見るには余計な物が多い（そちらは bossaoe が見ている）。 */
+  TH.run(1,{seed:7}); TH.floor(45); TH.immortal();
   const boss=W.enemies.find(x=>x.boss);
   boss.maxHp=boss.hp=1e9; boss.atkV=0; boss.state='chase';
   const fired=new Set(); let threw=null;

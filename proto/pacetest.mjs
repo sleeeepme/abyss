@@ -122,14 +122,18 @@ R.ui = await pg.evaluate(()=>{
 
 // 2-a. 1階層に出る系統の数が深度で増える
 R.famSlots = await pg.evaluate(()=>{
+  /* 数えるのは**系統の札**なので、札を持たない相手は外す。
+     ・大広間（10階ごと）は雑魚が湧かないので、深い側は 39 階で見る
+     ・第1階層の「朽ちぬもの」は系統の抽選から外れた1体（倒せない相手） */
   const cnt=(d)=>{ RNG=mulberry32(d*7919+11); const fl=genFloor(d);
-    return new Set(spawnEnemies(fl,d).filter(e=>!e.boss).map(e=>e.fam.id)).size; };
+    return new Set(spawnEnemies(fl,d).filter(e=>!e.boss && !e.undying)
+                                     .map(e=>e.fam.id)).size; };
   const s={};
-  [1,2,3,6,9,12,18,27,40].forEach(d=>{ s['d'+d]=cnt(d); });
+  [1,2,3,6,9,12,18,27,39].forEach(d=>{ s['d'+d]=cnt(d); });
   return {counts:s, slots:{d1:famSlotsAt(1),d9:famSlotsAt(9),d18:famSlotsAt(18),
                            d27:famSlotsAt(27),d50:famSlotsAt(50)},
           startsWithOne: s.d1===1 && s.d2===1 && s.d3===1,
-          growsWithDepth: s.d40>=s.d1,
+          growsWithDepth: s.d39>=s.d1,
           capped: Object.values(s).every(v=>v<=4)};
 });
 
@@ -138,17 +142,17 @@ R.earlyFams = await pg.evaluate(()=>{
   const seen=new Set();
   for(let d=1;d<=3;d++) for(let s=0;s<60;s++){
     RNG=mulberry32(d*104729+s); const fl=genFloor(d);
-    spawnEnemies(fl,d).filter(e=>!e.boss).forEach(e=>seen.add(e.fam.id));
+    spawnEnemies(fl,d).filter(e=>!e.boss && !e.undying).forEach(e=>seen.add(e.fam.id));
   }
   const mid=new Set();
   for(let d=4;d<=6;d++) for(let s=0;s<60;s++){
     RNG=mulberry32(d*104729+s); const fl=genFloor(d);
-    spawnEnemies(fl,d).filter(e=>!e.boss).forEach(e=>mid.add(e.fam.id));
+    spawnEnemies(fl,d).filter(e=>!e.boss && !e.undying).forEach(e=>mid.add(e.fam.id));
   }
   const deep=new Set();
   for(let d=30;d<=34;d++) for(let s=0;s<40;s++){
     RNG=mulberry32(d*104729+s); const fl=genFloor(d);
-    spawnEnemies(fl,d).filter(e=>!e.boss).forEach(e=>deep.add(e.fam.id));
+    spawnEnemies(fl,d).filter(e=>!e.boss && !e.undying).forEach(e=>deep.add(e.fam.id));
   }
   return {shallow:[...seen], mid:[...mid], deep:[...deep],
           shallowOnlyBeast: seen.size===1 && seen.has('beast'),

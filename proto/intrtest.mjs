@@ -306,7 +306,7 @@ R.intrNoEscapeByDescent = await pg.evaluate(()=>{
 /* ---------- 10b. 帰還して潜り直すと消える（唯一の解除） ---------- */
 R.intrClearedByReturn = await pg.evaluate(()=>{
   S.runs=24; S.hero=newHero(); S.gold=0; S.stash=[]; S.ore={}; S.carry=[];
-  TH.run(1, {seed:24}); TH.floor(24);
+  TH.run(1, {seed:24}); TH.floor(25);   // 帰還ポータル階
   S.hero.party=[];
   S.run.elapsed = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 10; tickIntruder();
   const beforeAwake = intruderAwake();

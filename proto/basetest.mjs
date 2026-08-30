@@ -245,7 +245,7 @@ R.returnBonus = await pg.evaluate(()=>{
 // 4-b. 帰還画面に報酬と修理の案内が出る
 R.returnUI = await pg.evaluate(()=>{
   S.hero=newHero(); S.gold=0; S.stash=[]; S.bld={};
-  startRun(18); S.hero.party=[];
+  startRun(20); S.hero.party=[];   // 帰還ポータル階（帰れるのは5階ごと）
   const w=genBaseItem('sword',18,1); w.dur=3;
   S.hero.equip.weapon=w;
   S.run.gold=120; S.run.loot=[];
@@ -262,14 +262,17 @@ R.returnUI = await pg.evaluate(()=>{
 R.repairHint = await pg.evaluate(()=>{
   setScreen('town');
   const sub=document.getElementById('m-shop-sub');
-  const warned={text:sub.textContent, coloured:sub.style.color!==''};
+  /* 色の有無は**肯定形で持つ。** 掃引は false を全部「失敗」として読むので、
+     「健全なときは色が付かない」を coloured:false のまま返すと、
+     正しい観測が毎回失敗として並んでしまう。 */
+  const warned={text:sub.textContent, colour: sub.style.color || '無し'};
   // 直すと消える
   S.gold=99999; repairables().forEach(it=>{ it.dur=it.durMax; });
   renderTown();
-  const clean={text:sub.textContent, coloured:sub.style.color!==''};
+  const clean={text:sub.textContent, colour: sub.style.color || '無し'};
   return {warned, clean,
-          warnsWhenNeeded: /要修理/.test(warned.text) && warned.coloured,
-          quietWhenClean: !/要修理/.test(clean.text)};
+          warnsWhenNeeded: /要修理/.test(warned.text) && warned.colour!=='無し',
+          quietWhenClean: !/要修理/.test(clean.text) && clean.colour==='無し'};
 });
 
 /* ============ 5. 拠点開発 ============ */

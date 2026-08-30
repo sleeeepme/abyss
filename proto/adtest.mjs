@@ -79,8 +79,12 @@ R.reviveDone = await pg.evaluate(()=>{
           hpFull: !!a && Math.round(a.hpNow)===allyStats(a).maxHp};
 });
 R.reviveDone.tapOkError = tapOk;
+/* 蘇生してもレベルは**そのまま**。以前はここで Lv.1 に戻していたが、
+   弔い（欠片に変える道）はレベルを保ったまま数えるので、
+   広告を見て連れ戻すほうが常に損になっていた。連れ戻す側を軽くする。 */
+R.reviveDone.keepsLevel = R.reviveDone.lv===7;
 R.reviveDone.ok = tapOk===null && R.reviveDone.revived===true
-               && R.reviveDone.dead===false && R.reviveDone.lv===1;
+               && R.reviveDone.dead===false && R.reviveDone.lv===7;
 
 /* 1-b. 広告を中断したら、元の「仲間が倒れた」画面に戻る */
 await pg.evaluate(()=>{
@@ -193,10 +197,26 @@ R.resets = await pg.evaluate(()=>{
   return {spent, afterNewRun:S.run.healAds, resetsToMax:S.run.healAds===HEAL_ADS_PER_RUN};
 });
 
-/* ============ 3. ガチャの広告は今まで通り ============ */
-await pg.evaluate(()=>{ S.hero=null; S.run=null; S.gachaDay=today(); S.gachaLeft=GACHA_PER_DAY;
+/* ============ 3. ガチャ ============
+   1日1回は**広告なしで引ける**。無料ぶんを使い切ってから、今までどおり広告になる。
+   「まず1回引ける」が無いと、初日の街は見るだけの画面になってしまう。 */
+await pg.evaluate(()=>{ S.hero=null; S.run=null; S.gachaDay=today();
+                        S.gachaLeft=GACHA_PER_DAY; S.gachaFree=GACHA_FREE_PER_DAY;
                         setScreen('town'); setScreen('gacha'); });
 await pg.waitForTimeout(250);
+const tapFree = await tap('#btn-gacha');
+await pg.waitForTimeout(350);
+R.gachaFree = await pg.evaluate(()=>({
+  noAd: !document.getElementById('m-ad').classList.contains('on'),
+  resultShown: document.getElementById('m-gres').classList.contains('on'),
+  freeLeft: S.gachaFree||0, left:S.gachaLeft, perDay:GACHA_PER_DAY}));
+R.gachaFree.tapError = tapFree;
+R.gachaFree.ok = tapFree===null && R.gachaFree.noAd && R.gachaFree.resultShown
+              && R.gachaFree.freeLeft===0
+              && R.gachaFree.left===R.gachaFree.perDay-1;
+// 結果を閉じて、2回目。無料ぶんは尽きているので、ここからは広告。
+await pg.evaluate(()=>{ document.getElementById('m-gres').classList.remove('on'); });
+await pg.waitForTimeout(150);
 const tapGacha = await tap('#btn-gacha');
 await pg.waitForTimeout(300);
 R.gachaAd = {tapError:tapGacha, modals: await modals(), okReachable: await topAt('#ad-ok')};
@@ -209,7 +229,8 @@ R.gachaAd.result = await pg.evaluate(()=>({
 R.gachaAd.ok = tapGacha===null && tapGachaOk===null
             && R.gachaAd.okReachable==='self'
             && R.gachaAd.result.resultShown
-            && R.gachaAd.result.left===R.gachaAd.result.perRun-1;
+            // 無料の1回ぶんを先に使っているので、残りは2つ減っている
+            && R.gachaAd.result.left===R.gachaAd.result.perRun-2;
 
 /* ============ 4. 実プレイ中に仲間が倒れても操作を受け付ける ============ */
 R.live = await pg.evaluate(async ()=>{

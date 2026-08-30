@@ -155,8 +155,10 @@ R.kin = await pg.evaluate(()=>{
   S.hero.boons=[{id:'kin', rar:'epic'}];
   stepSim(KIN_CD*2.5);
   const withKin=hp0-e.hp;
-  const orb=!!(S.hero.kin && S.hero.kin.x!==undefined);
-  return {noKin, withKin, orb,
+  /* 眷属は**数えられる**ようになった（最大3つ）。1つの値を積み増す形だと、
+     2つめを取っても何も起きない（見た目も1つのまま）。持ち物は配列で見る。 */
+  const orb=!!(S.hero.kins && S.hero.kins[0] && S.hero.kins[0].x!==undefined);
+  return {noKin, withKin, orb, orbs:(S.hero.kins||[]).length,
           kinHits: withKin > noKin,
           orbExists: orb,
           ok: withKin>noKin && orb};
@@ -432,7 +434,7 @@ R.live = await pg.evaluate(()=>{
     stickDx=0; stickDy=0;
     updateHUD();
     return {failures:fails, alive:!!S.hero, kills:S.run?S.run.kills:0,
-            heroKin:!!(S.hero&&S.hero.kin), loopAlive:_tickCount>300,
+            heroKin:!!(S.hero&&S.hero.kins&&S.hero.kins.length), loopAlive:_tickCount>300,
             ok: !!S.hero && _tickCount>300};
   }catch(e){ fails.push(e.message+' @ '+(e.stack||'').split('\n')[1]); return {failures:fails, ok:false}; }
 });

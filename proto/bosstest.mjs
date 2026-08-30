@@ -21,13 +21,18 @@ R.schedule = await pg.evaluate(()=>{
   return {map:out, correctTiers:!bad, nonBossFloorsClean:nonBoss};
 });
 
-// --- 2. ボス階にボスが1体だけ湧き、階段の上にいる
+/* --- 2. ボス階にボスが湧き、穴のそばで待ち構えている
+   第20階層だけは**2体**。近くに置くのは、穴へ向かえば必ず出会うようにするため
+   （2体なので真上には置けない。左右に振ってある）。 */
 R.spawn = await pg.evaluate(()=>{
   const check=(d)=>{ RNG=mulberry32(d*7919); const fl=genFloor(d);
     const es=spawnEnemies(fl,d); const bs=es.filter(e=>e.boss);
-    return {count:bs.length, rar:bs[0]&&bs[0].rar,
-            atStairs: bs[0] ? Math.hypot(bs[0].x-fl.stair.x, bs[0].y-fl.stair.y)<0.01 : false,
+    const near = bs.length ? Math.max(...bs.map(x=>Math.hypot(x.x-fl.stair.x, x.y-fl.stair.y))) : 99;
+    const want = (d===TWIN_BOSS_DEPTH) ? 2 : 1;
+    return {count:bs.length, want, rar:bs[0]&&bs[0].rar,
+            atStairs: near < 4.0,          // 穴の目の前（双子は左右に3.2ずつ）
             trash: es.length-bs.length,
+            countOk: bs.length===want,
             name: bs[0]&&bs[0].name};
   };
   const d3=(()=>{ RNG=mulberry32(3*7919); const fl=genFloor(3);
@@ -39,7 +44,12 @@ R.spawn = await pg.evaluate(()=>{
 R.stats = await pg.evaluate(()=>{
   RNG=mulberry32(555); const fl=genFloor(10);
   const es=spawnEnemies(fl,10);
-  const boss=es.find(e=>e.boss), trash=es.find(e=>!e.boss);
+  const boss=es.find(e=>e.boss);
+  /* 大広間になったボス階には雑魚が湧かない。比べる相手は同じ深さの
+     **普通の階**から取る——見たいのは「第10階層の敵と比べて硬いか」であって、
+     「ボス階に雑魚が居るか」ではない。 */
+  RNG=mulberry32(556); const flT=genFloor(9);
+  const trash=spawnEnemies(flT,10).find(e=>!e.boss);
   RNG=mulberry32(555); const fl5=genFloor(5);
   const mid=spawnEnemies(fl5,5).find(e=>e.boss);
   return {greatHp:boss.maxHp, trashHp:trash.maxHp, ratio:+(boss.maxHp/trash.maxHp).toFixed(1),

@@ -10,7 +10,9 @@ const R={};
 const PARTY = `
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=22;
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
-  startRun(10); S.hero.party=[]; W.ores.length=0;
+  /* 10階ごとは大広間（ボス戦だけの階）。壁も通路も無い一部屋なので、
+     隊列の揺れはここでは測れない。普通の階で測る。 */
+  startRun(9); S.hero.party=[]; W.ores.length=0;
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
     a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99;
     /* ---------- 個体差を止める ----------
@@ -108,7 +110,7 @@ R.leashBand.settled = R.leashBand.flipRate < 0.05 && R.leashBand.keepSpread < 1.
 R.orbit = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=22;
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
-  startRun(10); S.hero.party=[]; W.ores.length=0;
+  startRun(9); S.hero.party=[]; W.ores.length=0;
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
     a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
   W.enemies.forEach(e=>{e.dead=true});
@@ -136,7 +138,7 @@ R.orbit = await pg.evaluate(async ()=>{
 R.modeStable = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=22;
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
-  startRun(10); S.hero.party=[]; W.ores.length=0;
+  startRun(9); S.hero.party=[]; W.ores.length=0;
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
     a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
   W.enemies.forEach(e=>{e.dead=true});
@@ -161,7 +163,7 @@ R.modeStable = await pg.evaluate(async ()=>{
 R.follow = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25;
   S.hero.str=29;S.hero.dex=29;S.hero.vit=29;
-  startRun(30); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
+  startRun(19); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
   for(let i=0;i<3;i++){ const a=makeAlly(30,S.hero); a.x=P.x; a.y=P.y;
     a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
   let worst=0;
@@ -187,7 +189,9 @@ R.corner = await pg.evaluate(async ()=>{
      視線が切れるところまで歩けた階が見つかるまで、階を引き直す。 */
   const setup = ()=>{
     S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; S.hero.str=29;S.hero.dex=29;S.hero.vit=29;
-    startRun(30); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
+    /* 第19階層。10階ごとは大広間＝一部屋しかなく、根の層（21〜30）は
+       **壁が無い**ので、どちらも「角で視線が切れる」が起きない。 */
+    startRun(19); S.hero.party=[]; W.enemies=[]; W.ores.length=0;
     for(let i=0;i<3;i++){ const a=makeAlly(30,S.hero); a.x=P.x; a.y=P.y;
       a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
     stepSim(0.8);
@@ -243,7 +247,7 @@ R.corner = await pg.evaluate(async ()=>{
 
 // 3-c. 足跡が壊れていても立ち尽くさない（最後の保険）
 R.strandedRecovers = await pg.evaluate(async ()=>{
-  S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; startRun(20);
+  S.hero=newHero(); S.upg={hp:8}; S.hero.lv=25; startRun(19);
   S.hero.party=[]; W.enemies=[]; W.ores.length=0;
   const a=makeAlly(20,S.hero); a.hpNow=allyStats(a).maxHp*99;
   S.hero.party.push(a);
