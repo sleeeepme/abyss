@@ -1,6 +1,6 @@
 # キャラクターアート対応表
 
-最終更新: 2026-08-27
+最終更新: 2026-08-31
 
 キャラクター設定とスプライト画像の対応、および制作・承認・ゲーム反映の進行状況を管理する。
 
@@ -16,7 +16,7 @@
 | `ALLY-HUNTER-001` | `hunter` | 狩人 | 仲間 | ![狩人・右向き](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 緑のフード、右手の弓、背中の矢筒。2人目・3人目用の色違いあり |
 | `ALLY-MAGE-001` | `mage` | 魔術師 | 仲間 | ![魔術師・右向き](../proto/assets/sprites/characters/allies/mage-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/mage-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 大きな紫の三角帽子、影の顔と水色の両目、魔力結晶付きの杖。2人目・3人目用の色違いあり |
 | `ALLY-PALADIN-001` | `paladin` | パラディン（聖騎士） | 上位仲間 | ![パラディン・右向きv4](../proto/assets/sprites/allies/paladin/right-idle-v4-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/paladin/right-idle-v4-draft.png) | 右・待機1 | 承認済み | 未反映 | 金髪の女性聖騎士。明るい左目側の顔影、青いタバード、象牙色の鎧、盾、頭高まで届く長剣（ゲーム側の武器設定は現時点でメイス） |
-| `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向き](../proto/assets/sprites/allies/summoner/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/summoner/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 青緑の重ねフードとローブ、護符付きの杖、左後方の使い魔 |
+| `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向きv6](../proto/assets/sprites/characters/allies/summoner-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/summoner-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | ユーザー修正版v6を採用。枝角、苔色のフード、銀髪、肌の顔・頬影、原寸1pxの両目、両手、木の杖、淡緑の精霊 |
 | `ALLY-ARCHMAGE-001` | `archmage` | 大魔導士 | 上位仲間 | ![大魔導士・右向きv2](../proto/assets/sprites/allies/archmage/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/archmage/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 腰を深く曲げた老魔術師。白眉・白髪・長い白髭、魔力球付きの杖 |
 | `ENEMY-BEAST-RUSH-001` | `beast / rush` | アッシュハウンド | 敵 | ![アッシュハウンド・右向きv5](../proto/assets/sprites/enemies/ash-hound/right-idle-v5-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-hound/right-idle-v5.png) | 右・待機1 | 承認済み | 未反映 | 別タスクでユーザーがレタッチし、最新版に指定した64×64画像を採用。透明画素を正規化して16×16へ復元し、可視画素は元画像と完全一致 |
 | `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | 承認済み | 未反映 | 胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
@@ -117,3 +117,4 @@
 - 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
 - 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。
 - 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
+- 2026-08-31: 召喚士の右向き・待機1をユーザー修正版v6へ差し替え、ゲームのスプライト参照へ反映。
