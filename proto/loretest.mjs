@@ -158,10 +158,11 @@ R.bossNamingTiers = await pg.evaluate(()=>{
 });
 
 // 4-b. 全員に一行が付いている（三段表示の三段目）
+// 5〜50階の10体＋唯一のラストボス（51階・アビスの口）で11体。
 R.bossesHaveALine = await pg.evaluate(()=>{
   const ds=Object.keys(UNIQUE_BOSSES).map(Number);
   const noLine=ds.filter(d=>!UNIQUE_BOSSES[d].line);
-  return {count:ds.length, noLine, ok: ds.length===10 && noLine.length===0};
+  return {count:ds.length, noLine, ok: ds.length===11 && noLine.length===0};
 });
 
 /* ================= 5. 用語 =================

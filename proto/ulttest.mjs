@@ -119,6 +119,26 @@ R.hurts = await pg.evaluate(async ()=>{
           hurtsPlayer:(hp0-S.hero.hpNow)>0, hurtsEnemies:(ehp0-e.hp)>0,
           status:Object.keys(S.run.pst)};
 });
+/* 炉の層の溶岩は「出血」ではなく専用の「高熱」を掛ける。
+   同じ継続ダメージの仕組みだが、火傷よりゆっくり削る（HEAT_DPS_MUL）。 */
+R.heatStatus = await pg.evaluate(()=>{
+  const nm = STATUS.heat && STATUS.heat.nm;
+  const lavaAppliesHeat = HAZARDS.lava.st==='heat';
+  // dotCap は maxHp 割合で頭を打つ。素の速さを比べたいので、
+  // S.hero を外して dotCap が効かない（無制限扱いの）状態にする。
+  S.hero=null; S.run=null;
+  const target1={isPlayer:true, st:{}}, target2={isPlayer:true, st:{}};
+  addStatus(target1, 'burn', 25);
+  addStatus(target2, 'heat', 25);
+  const burnDps = target1.st.burn.dps, heatDps = target2.st.heat.dps;
+  return {nm, lavaAppliesHeat, burnDps:+burnDps.toFixed(2), heatDps:+heatDps.toFixed(2),
+          ratio:+(heatDps/burnDps).toFixed(2),
+          namedHighHeat: nm==='高熱',
+          slowerThanBurn: heatDps < burnDps,
+          aboutOneThird: Math.abs(heatDps/burnDps - (1/3)) < 0.02,
+          ok: nm==='高熱' && lavaAppliesHeat && heatDps<burnDps && Math.abs(heatDps/burnDps-(1/3))<0.02};
+});
+
 R.draw = await pg.evaluate(()=>{
   const fails=[];
   Object.keys(HAZARDS).forEach(k=>{

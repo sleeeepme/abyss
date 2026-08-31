@@ -749,11 +749,32 @@
     <div><b>鞘無しを +1本</b><s>周回刃。恩寵を待たずに生やす（最大3本）</s></div>
     <button class="sw ghost" id="dbg-blade">実行</button>
   </div>
+  <div class="row">
+    <div><b>仲間を指定して追加</b><s>職を選んで1人加入させる。隊の枠も上限まで開く</s></div>
+    <button class="sw ghost" id="dbg-addally">開く</button>
+  </div>
+  <div class="row">
+    <div><b>恩寵をランダムに1つ得る</b><s>主人公に付与する</s></div>
+    <button class="sw ghost" id="dbg-boon">実行</button>
+  </div>
+  <div class="row">
+    <div><b>大技を1つ解放</b><s>大ボスを1体倒した扱いにする（上位職も一緒に解放）</s></div>
+    <button class="sw ghost" id="dbg-ult">実行</button>
+  </div>
   <div style="height:14px"></div>
   <button class="primary" id="dbg-close">閉じる</button>
 </div></div>
 
-<!-- ============ 第50階層 踏破 ============ -->
+<!-- ============ デバッグ：仲間を指定して追加 ============ -->
+<div class="modal" id="m-dbgally"><div class="box" style="text-align:left">
+  <h1>仲間を追加</h1>
+  <p class="sub">タップした職を1人追加する</p>
+  <div class="grid" id="dbgally-list"></div>
+  <div style="height:12px"></div>
+  <button class="ghost" id="dbgally-close">閉じる</button>
+</div></div>
+
+<!-- ============ 第51階層（アビスの口）撃破＝踏破 ============ -->
 <div class="modal" id="m-clear"><div class="box">
   <h1 style="color:#ffd06a">アビスを踏破した</h1>
   <p class="sub" id="clr-sub"></p>
@@ -859,6 +880,8 @@
       効果は<b>そのキャラが死ぬまで</b>続き、街に戻っても消えない。<br>
     ・同じ恩寵を選び直すと<b>重ねがけ</b>になる。<br>
     ・<b>第50階層</b>には<b style="color:#ff9a5a">初めの供物</b>がいる。倒しても階層は続く。<br>
+    ・<b>第51階層</b>には<b style="color:#c98adf">アビスの口</b>——唯一のラストボス。
+      これを倒したときだけ「アビスを踏破」になる。<br>
     ・恩寵は<b>誰に与えるかを選べる</b>（あなた／仲間）。
   </div>
 
@@ -1185,12 +1208,17 @@ const DTYPE_IDS = Object.keys(DTYPE);
 const STATUS={
   bleed:  {nm:'出血',     col:'#c4433f', dur:5.0, desc:'毎秒ダメージ（防御無視）'},
   burn:   {nm:'火傷',     col:'#ff8a4a', dur:4.0, desc:'毎秒ダメージ'},
+  /* 炉の層の溶岩だけが掛けてくる、専用の継続ダメージ。
+     火傷（flame 系統の攻撃が掛ける物）と同じ仕組みだが、部屋そのものの熱で
+     じわじわ効くだけなので、火傷より**ゆっくり**削る（addStatus 側で dps を1/3に）。 */
+  heat:   {nm:'高熱',     col:'#ff9a5a', dur:4.0, desc:'毎秒ダメージ（炉の層特有。ゆっくり効く）'},
   chill:  {nm:'凍傷',     col:'#7fd8ff', dur:4.0, desc:'移動・攻撃速度 -35%'},
   shock:  {nm:'感電',     col:'#ffe066', dur:5.0, desc:'被ダメージ +25%'},
   stagger:{nm:'よろめき', col:'#d8c0a0', dur:1.1, desc:'行動が止まる'},
 };
 const CHILL_SLOW = 0.35;     // 凍傷の減速率
 const SHOCK_AMP  = 0.25;     // 感電の被ダメージ増加
+const HEAT_DPS_MUL = 1/3;    // 高熱は火傷の1/3の速さでしか削らない
 
 /* ---------- 敵の系統 ----------
    形＝行動（アーキタイプ）、色＝属性（系統）で読ませる。
@@ -2062,7 +2090,7 @@ function pickSpot(fl, tries){
    避けるだけの作業になって判断にならない。敵を溶岩へ誘い込めるなら、
    ハザードは武器にもなる。 */
 const HAZARDS={
-  lava:  {nm:'溶岩',   col:'#e0552e', edge:'#ffb066', dt:'fire',   dps:12, st:'burn',
+  lava:  {nm:'溶岩',   col:'#e0552e', edge:'#ffb066', dt:'fire',   dps:12, st:'heat',
           slow:0,    glow:true,  desc:'焼かれる'},
   poison:{nm:'毒沼',   col:'#4f7a3a', edge:'#9fd06a', dt:'arcane', dps:6,  st:'bleed',
           slow:0.35, glow:false, desc:'蝕まれ、足を取られる'},
@@ -2102,10 +2130,20 @@ function spawnHazards(fl, depth){
      穴の周りだけは空けておく（降りられなくなると詰む）。 */
   if(depth===POISON_BOSS_DEPTH && fl.arena){
     const g = Array.from({length:fl.H}, ()=>new Uint8Array(fl.W));
+    /* 入口・穴の周りだけでは息継ぎが2ヶ所しかなく、広間の反対側で
+       固定砲台になりがち。楕円の**上・下・中央**にも、同じ大きさの
+       息継ぎ場所を空ける——どこに逃げても近くに1つはある形にする。 */
+    const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5, ry=fl.H/2-2.5;
+    const safeSpots = [
+      {x:fl.stair.x, y:fl.stair.y},
+      {x:fl.start.cx+0.5, y:fl.start.cy+0.5},
+      {x:cx, y:cy},                    // 中央
+      {x:cx, y:cy-ry+2.0},             // 上
+      {x:cx, y:cy+ry-2.0},             // 下
+    ];
     for(let y=1;y<fl.H-1;y++) for(let x=1;x<fl.W-1;x++){
       if(!tileWalk(fl,x,y)) continue;
-      if(Math.hypot(x+0.5-fl.stair.x, y+0.5-fl.stair.y) < 2.5) continue;
-      if(Math.hypot(x+0.5-(fl.start.cx+0.5), y+0.5-(fl.start.cy+0.5)) < 2.5) continue;
+      if(safeSpots.some(sp=>Math.hypot(x+0.5-sp.x, y+0.5-sp.y) < 2.5)) continue;
       g[y][x]=1;
     }
     return {kind:'poison', g};
@@ -2460,7 +2498,10 @@ function shopSlotBonus(){  return bldLv('market'); }
    ロストが「ただの罰」から「賭け」に変わる。 */
 const GRAVE_ITEMS_MIN = 4;   // 回収できる道具の数（装備していなかった物から抽選）
 const GRAVE_ITEMS_MAX = 6;
-const GRAVE_GOLD_RATE = 0.5; // 持っていた金の何割が残るか
+const GRAVE_GOLD_RATE = 0.5; // 持っていた金の何割が遺体に残るか（取りに戻れば回収できる）
+/* 遺体を待たず、死んだ瞬間に口座へ入る割合。全ロストだと、死んだ直後に
+   深い階を選び直しても丸腰のまま送り込まれるだけになる。 */
+const DEATH_GOLD_BANK_RATE = 0.5;
 /* 累計経験値の何割が遺体に残るか。3割にしてあるのは、
    「取りに行けばレベルが戻る」ではなく「取りに行けば少し楽になる」にしたいから。
    全部返すと死が無料になり、返さないと再走が苦行になる。その間を狙っている。 */
@@ -3405,9 +3446,10 @@ function pickJob(){
   return pool[0];
 }
 
-/* 主人公を基準に一段弱い仲間を作る。 */
-function makeAlly(depth, hero){
-  const job = pickJob();
+/* 主人公を基準に一段弱い仲間を作る。
+   forceJob を渡すと抽選せずその職で作る（デバッグの「仲間を指定して追加」用）。 */
+function makeAlly(depth, hero, forceJob){
+  const job = forceJob || pickJob();
   // 酒場のレベルぶん、主人公とのレベル差が縮まる
   const gap = Math.max(0, ri(ALLY_LV_GAP[0], ALLY_LV_GAP[1]) - allyLevelGapCut());
   const lv  = clamp(hero.lv - gap, 1, Math.max(1,hero.lv));
@@ -3729,14 +3771,24 @@ const ZONE_FAM = {stone:'beast', sump:'slime', root:'arcane',
                   ruin:'armor', furnace:'flame', pale:'frost'};
 function uniqueChanceAt(depth){ return clamp(0.22 + depth*0.006, 0.22, 0.42); }
 
-const FINAL_DEPTH = 50;      // ここに「初めの供物」がいる
+/* ---------- ラストボスは51階 ----------
+   以前はここが 50（5・10刻みの並びにそのまま乗る「50の倍数」）だった。
+   「50階に着いた」だけで踏破にしてしまうと、大ボス（初めの供物）を
+   倒さずに穴へ落ちても踏破扱いになりかねない、という抜け道が残る。
+
+   51は5の倍数ではないので、通常の「5階ごとに主・10階ごとに大ボス」の
+   並びには一切乗らない——**単発の特別な1階**として bossTierAt の中で
+   個別に判定する。50階の「初めの供物」はそのまま大ボス（great）として残り、
+   51階の「アビスの口」だけが唯一の final。 */
+const FINAL_DEPTH = 51;      // ここに「アビスの口」がいる。唯一のラストボス階
+const OFFERING_BOSS_DEPTH = 50;   // 「初めの供物」。50刻みの並びの最後の大ボス（ラストボスの前座）
 /* 恩寵をもう受け取った階か。**階層で覚える**（相手ではなく場所）——
    同じ階に何度潜り直しても、主は同じ1体という扱いにしたい。 */
 function bossBoonTaken(depth){ return !!(S.bossBoon && S.bossBoon[depth]); }
 function markBossBoon(depth){ S.bossBoon = S.bossBoon || {}; S.bossBoon[depth]=1; }
 function bossTierAt(depth){
+  if(depth===FINAL_DEPTH) return 'final';
   if(depth<=0 || depth%5!==0) return null;
-  if(depth%FINAL_DEPTH===0) return 'final';
   return depth%10===0 ? 'great' : 'mid';
 }
 /* ---------- 帰還ポータル ----------
@@ -3798,6 +3850,9 @@ const BOSS_MOVES={
   beam:  {nm:'貫き',     tele:0.72, len:12.0, wide:0.62, mult:1.25, cd:[4.0,5.6], min:1.5, max:99},
   // 招来。取り巻きを呼ぶ。数で押される前に本体を削る、という判断を作る。
   summon:{nm:'招来',     tele:0.70, n:3, cd:[9.0,12.0], min:0, max:99},
+  // 分身。本体そっくりの幻を数体だす。幻はHPが無いに等しく、削っても本体は減らない
+  // ——「本体を見失わない」ことそのものを体で覚えさせる、アビスの口だけの技。
+  clone: {nm:'分身',     tele:0.60, n:2, dur:4.5, cd:[10.0,14.0], min:0, max:99},
 };
 /* 既定のセット。UNIQUE_BOSSES に載っていない階（周回した61階以降）で使う。 */
 const BOSS_MOVESET={
@@ -3862,7 +3917,7 @@ const UNIQUE_BOSSES={
        moves:['charge','cleave','beam'],    rage:['wave'],
        line:'炉の熱はすべてこの口から出ている。胴の先を見た記録はない。'},
 
-  40: {nm:'動かぬ盾、オルト', reg:'登録：盾・一番',   fam:'armor',  dt:'blunt',
+  40: {nm:'凍てついた盾、オルト', reg:'登録：盾・一番',   fam:'armor',  dt:'blunt',
        moves:['burst','pillars','beam','wave'], rage:['charge'],
        line:'二百年、この階から動いていない。降りる者を止め、上がる者は通す。'},
 
@@ -3875,6 +3930,19 @@ const UNIQUE_BOSSES={
        moves:['slam','cleave','burst','wave','beam','pillars','charge','summon'],
        rage:['charge'],
        line:'「降りた。」——街に残る最も古い一文であり、最も古い嘘。'},
+
+  /* ---------- 51階＝アビスの口 ----------
+     現象体でも登録者でもない。番号どころか、名前を与えられたことさえ怪しい。
+     人型のサイズで現れる——ここまでの誰よりも小さく見えるのに、
+     一番深いところにいる、という落差そのものが正体。
+     分身で本体を隠し、定期的に跳んで距離を無効化し、
+     半分で全体を巻き込み、四分の一を切ると幻ごと群がり、
+     十分の一を切ると本体だけで逃げに回る——削るほど掴みにくくなる。 */
+  51: {nm:'アビスの口',    reg:'登録なし——記録の外',
+       fam:'arcane', dt:'arcane',
+       moves:['clone','beam','burst','pillars','wave','cleave'],
+       rage:['charge'],
+       line:'名前を呼んでも応えない。応える機能を、最初から持っていない。'},
 };
 function uniqueBossAt(depth){ return UNIQUE_BOSSES[depth] || null; }
 /* 激昂で解禁される技。第2段階が「速くなるだけ」にならないようにする。
@@ -3931,7 +3999,7 @@ const S={
   grave:null,            // {depth,x,y,items:[],gold,heroName,lv}
   carry:[], gachaLeft:GACHA_PER_DAY, gachaFree:GACHA_FREE_PER_DAY, gachaDay:'',   // 持ち込み枠（死ぬと失う）
   lastDepth:1,           // 直近の探索の到達最深度。ガチャの排出帯を決める
-  cleared:0,             // 第50階層の主を倒した回数
+  cleared:0,             // 第51階層の主（アビスの口）を倒した回数
   bld:{},                // 街開発の各施設のレベル
   tavern:[],             // 酒場で待っている連れ帰った者（口座側。キャラが死んでも残る）
   tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
@@ -3950,6 +4018,7 @@ const S={
   deathAdBonus:0,        // 死亡時に広告を見て増やした引き継ぎ枠（その死の間だけ）
   fallen:[],             // 慰霊碑。失った仲間（アカウント単位・キャラが死んでも残る）
   beacons:[],            // 大ボスを倒して開いた中継地点（倒した階の番号）
+  resumeDepth:null,      // 帰還ポータルから戻った階。一度だけそこへ再開できる（使うと消える）
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
@@ -4021,11 +4090,14 @@ function stashCap(){ return 20 + bldLv('stash')*6; }
 function beacons(){ return (S.beacons||[]).slice().sort((a,b)=>a-b); }
 function unlockedDepths(){
   /* デバッグの「階層全開放」。中継地点を無視して5階ごとに並べる。
-     全階を並べると横に50個のボタンが出て選べなくなるので、刻みは5。 */
+     全階を並べると横に50個のボタンが出て選べなくなるので、刻みは5。
+     ラストボス（51階）は5刻みに乗らない特別な1階なので、別途1つだけ足す
+     ——検証で「最後まで直接跳べる」を保証したい。 */
   if(dbg('allDepths')){
     const out=[1];
-    for(let d=5; d<=FINAL_DEPTH+10; d+=5) out.push(d);
-    return out;
+    for(let d=5; d<=FINAL_DEPTH+9; d+=5) out.push(d);
+    if(!out.includes(FINAL_DEPTH)) out.push(FINAL_DEPTH);
+    return out.sort((a,b)=>a-b);
   }
   return [1, ...beacons().map(d=>d+1)];
 }
@@ -4313,7 +4385,9 @@ function addStatus(target, id, srcLevel){
      仲間には敵と同じ式（毎秒 6+lv*2.2）が当たっていた——主人公の丁度2倍。
      加入したての仲間が溶けていたのは、ほぼこれ（利用者からの報告）。 */
   const ours = !!(target.isPlayer || target.ally);
-  const dps = ours ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
+  let dps = ours ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
+  // 高熱（炉の層の溶岩専用）。部屋の熱でじわじわ効くだけなので、火傷より遅く削る。
+  if(id==='heat') dps *= HEAT_DPS_MUL;
   target.st[id] = {t:def.dur, dps: ours ? dotCap(target, dps) : dps};
   if(target.isPlayer) log(def.nm+'！');
 }
@@ -4326,7 +4400,7 @@ function tickStatus(target, dt, onDamage){
     const s=target.st[id];
     if(s.t<=0) continue;
     s.t-=dt;
-    if(id==='burn'||id==='bleed'){
+    if(id==='burn'||id==='bleed'||id==='heat'){
       s.acc=(s.acc||0)+s.dps*dt;
       if(s.acc>=1){ const d=Math.floor(s.acc); s.acc-=d; onDamage(d, STATUS[id].col); }
     }
@@ -4398,6 +4472,9 @@ function statusSuppressed(target, sid){
    ・歩いて入れるのは落ちられる者だけ（主人公と仲間）。落ちれば痛い
    ・棲んでいる側（敵）は縁で止まる。落ちる側だけが落ちる、が要点 */
 const T={WALL:0,FLOOR:1,STAIR:2,PIT:3};
+/* 縁の色は壁と同じ暗さだと「黒い壁」にしか見えず、落とし穴だと伝わらない。
+   代わりに空の水色を沈めて塗る——「壁ではなく、下が抜けている」を色そのもので言う。 */
+const PIT_SKY_COL = '#57c2e8';
 /* マス目のうえで「立てる床か」。壁と縁の両方を弾く。
    生成・配置・経路はここを通す（solid は座標で見る実行時の判定）。 */
 function tileWalk(fl,x,y){ const t=fl.g[y][x]; return t!==T.WALL && t!==T.PIT; }
@@ -4827,6 +4904,12 @@ function countMossKill(e){
 const TWIN_BOSS_DEPTH   = 20;    // 2体で出てくる階
 const POISON_BOSS_DEPTH = 30;    // 床が一面の毒沼になる階
 const FREEZE_BOSS_DEPTH = 40;    // 全員をまとめて止めてくる階
+/* 双子の片方が落ちた後、残った方に掛かる攻撃速度バフ。
+   激昂（bossRage）の teleMul=0.65 と同じ流儀で、溜めを短くする。
+   激昂よりわずかに緩め（0.65 と 1.0 の中間）——「もう1段」ではなく
+   「相方を失って速くなった」という単発の変化に留める。 */
+const TWIN_ENRAGE_TELE_MUL = 0.75;
+const TWIN_ENRAGE_MS_MUL   = 1.15;
 const DEBUFF_FROM   = 20;        // ここから崩し役が混じる
 const DEBUFF_CHANCE = 0.45;      // 撃つ型のうち何割が崩し役になるか
 /* 系統に合った状態異常。属性と食い違うと、耐性を積む判断が濁る。 */
@@ -4969,10 +5052,19 @@ function spawnEnemies(fl, depth){
     }
     /* ---------- 第50階層の主は連れてくる ----------
        ここまでで手に入る仕掛け（眷属・周回刃）を、**主の側が使ってくる。**
-       自分が積み上げてきた物を相手が持っている、という形にしたい。 */
-      if(boss==='final') out.push(...bossEscort(fl, depth, b1));
+       自分が積み上げてきた物を相手が持っている、という形にしたい。
+       ラストボスが51階に移った後も、これは引き続き「50階の主」に紐づく
+       演出なので、tier ではなく depth そのもので判定する。 */
+      if(depth===OFFERING_BOSS_DEPTH) out.push(...bossEscort(fl, depth, b1));
     // 第40階層の主は、周期的に全員を止めてくる
     if(depth===FREEZE_BOSS_DEPTH) b1.freezer = true;
+    /* ---------- 51階の主は人型サイズ ----------
+       ここまでの「大きいほど深い」を最後にひっくり返す。一番深いのに、
+       一番小さく見える——その落差自体が正体（分身・逃走という手口とも合う）。 */
+    if(b1.uniqueBoss===FINAL_DEPTH){
+      b1.r = 0.42; b1.cr = Math.min(b1.r, BOSS_COLLIDE_MAX);
+      b1.warpCd = rf(5,8);
+    }
   }
   // ユニーク敵はボス階には出さない。ボス階の主役を2つにしない。
   else if(depth>=3 && rnd()<uniqueChanceAt(depth)) out.push(makeUnique(fl, depth, fams));
@@ -5452,6 +5544,8 @@ function startRun(depth){
   S.runs++;
   if(!S.hero) S.hero=newHero();
   const d = depth||S.startDepth||1;
+  // 帰還ポータルの一度きりの切符。この階から始めたら消える。
+  if(S.resumeDepth && d===S.resumeDepth) S.resumeDepth=null;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
            curses:refreshCurses().slice(),   // 潜った時点で確定。途中で掛け替えられない
            ft:0, hinted:false,          // 階層に入ってからの秒数と、気配を告げたか
@@ -5569,6 +5663,7 @@ function enterFloor(depth){
   // 同じ深さの階に入り直したとき、別の間取りの経路を使い回してしまう。
   _intrKey = '';
   P.invuln = 0; S.run.ward = null;    // 無敵と守護は階層をまたがない
+  P.fallAnim = null; P.fallBlink = 0; // 落下演出も同様（跨ぐと違う階で消え続ける）
   S.run.hinted = false;
 
   // 仲間は主人公の脇に付いてくる。壁に埋まらないよう床へスナップする。
@@ -6053,6 +6148,10 @@ function hazardSlowAt(x,y){
    落ちた者は「直前に立っていた床」へ戻す。落ちた場所の真横へ戻すと、
    吹き飛ばされたときに同じ縁へ何度も落ち続ける。 */
 const FALL_PCT = 0.14, FALL_MIN = 10, FALL_INV = 0.9;
+/* 落下演出。神々のトライフォースで穴に落ちたときと同じ形——
+   その場で縮みながら回って消え、直前に立っていた床で点滅しながら戻る。
+   FALL_ANIM_SEC が「消えるまで」、その後 FALL_INV ぶん点滅する（無敵と同じ長さを流用）。 */
+const FALL_ANIM_SEC = 0.55;
 function rememberFooting(e){
   if(pitAt(e.x,e.y)) return;
   e.safeX=e.x; e.safeY=e.y;
@@ -6065,8 +6164,16 @@ function fallBack(e){
 }
 function tickPits(dt){
   if(!W.fl || !W.fl.pit || !S.run || !S.hero) return;
-  // 主人公。瞬歩の最中は落ちない——跳んでいる途中なので渡り切れる。
-  if(!P.dash && pitAt(P.x, P.y)){
+  // 主人公。落下演出の最中はその場で沈むだけ——動かさない、操作も受け付けない。
+  if(P.fallAnim){
+    P.fallAnim.t += dt;
+    if(P.fallAnim.t >= P.fallAnim.dur){
+      P.fallAnim = null;
+      fallBack(P);
+      P.fallBlink = FALL_INV;    // 戻った直後、点滅している間に操作が戻る
+    }
+  }else if(!P.dash && pitAt(P.x, P.y)){
+    // 瞬歩の最中は落ちない——跳んでいる途中なので渡り切れる。
     if(!godMode() && (P.invuln||0)<=0){
       const dmg = Math.max(FALL_MIN, Math.round(stats(S.hero).maxHp*FALL_PCT));
       S.hero.hpNow -= dmg;
@@ -6075,19 +6182,30 @@ function tickPits(dt){
       P.invuln = FALL_INV;
       log('▼ 踏み外した');
     }
-    fallBack(P);
+    P.fallAnim = {t:0, dur:FALL_ANIM_SEC};
     if(S.hero.hpNow<=0){ die(); return; }
   }else rememberFooting(P);
+  P.fallBlink = Math.max(0, (P.fallBlink||0)-dt);
   if(!S.hero || !S.run) return;
   // 仲間。痛みは軽くしてある（操作していないぶん、事故で死なせない）
   livingParty().forEach(a=>{
+    a.fallBlink = Math.max(0, (a.fallBlink||0)-dt);
+    if(a.fallAnim){
+      a.fallAnim.t += dt;
+      if(a.fallAnim.t >= a.fallAnim.dur){
+        a.fallAnim = null;
+        fallBack(a);
+        a.fallBlink = FALL_INV;
+      }
+      return;
+    }
     if(!pitAt(a.x,a.y)){ rememberFooting(a); return; }
     if((a.iframe||0)<=0){
       a.hpNow -= Math.max(FALL_MIN, Math.round(allyStats(a).maxHp*FALL_PCT*0.6));
       pop(a.x, a.y-0.4, '落', '#c0e07f');
       a.iframe = FALL_INV;
     }
-    fallBack(a);
+    a.fallAnim = {t:0, dur:FALL_ANIM_SEC};
     if(a.hpNow<=0) downAlly(a);
   });
 }
@@ -6255,6 +6373,7 @@ function allyUpdate(a, dt){
   /* 第40階層の主の凍結。**再使用時間ごと止める**——解けた瞬間に
      全員の技が一斉に飛ぶなら、止められていた数秒はただの巻き戻しになる。 */
   if(frozenNow()) return;
+  if(a.fallAnim) return;             // 落下演出の最中は動かない
   const slow = hasStatus(a,'chill') ? (1-CHILL_SLOW) : 1;
 
   a.atkCd=Math.max(0,a.atkCd-dt);
@@ -7023,13 +7142,35 @@ function killEnemy(e, byAlly){
   countMossKill(e);                 // 苔玉は層ごとに数える（口座側）
   const st=stats(S.hero);
   const cfg = e.boss ? BOSS_STATS[e.tier] : null;
-  const xp = Math.round((6+e.lv*4.2)*(e.elite?2.5:1)*(cfg?cfg.xp:1));
+  /* ---------- 第50階層の主が呼ぶ雑魚は経験値3倍 ----------
+     「削って終わり」ではなく、**戦いながらレベルを上げる**階にしたい。
+     対象は主が最初から連れてくる眷属（escort）と、招来で呼んだ分（summoned）
+     ——どちらも「主が呼んだ」もので、道中の自然湧きとは区別する。 */
+  const offeringTrashMul = (!e.boss && S.run.depth===OFFERING_BOSS_DEPTH && (e.escort || e.summoned)) ? 3 : 1;
+  const xp = Math.round((6+e.lv*4.2)*(e.elite?2.5:1)*(cfg?cfg.xp:1)*offeringTrashMul);
   grantXp(xp);
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
                        *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
   S.run.gold+=g;
 
   if(e.boss){
+    /* ---------- 双子（第20階層）は先に倒した方では終わらない ----------
+       HPは既に「合算1体ぶんの1.3倍」を2体で分け合う設計（上のコメント参照）。
+       「共有」はこの分割の再確認であって、HPを1本の数値に束ねる話ではない
+       ——束ねると片方が死んだ瞬間に必ずもう片方も死に、
+       「片方を倒すと相方が速くなる」が起こり得なくなってしまう。
+       なので実装は「片割れが残っていたら、確定ドロップも恩寵も出さず、
+       相方に攻撃速度バフを掛けて終わる」。両方倒れたときだけ、
+       通常のボス撃破処理（ドロップ・撃破ログ・恩寵）を1回だけ流す。 */
+    const twinLeft = e.twin ? W.enemies.find(x=>x!==e && x.twin && !x.dead) : null;
+    if(twinLeft){
+      twinLeft.teleMul = Math.min(twinLeft.teleMul, TWIN_ENRAGE_TELE_MUL);
+      twinLeft.ms *= TWIN_ENRAGE_MS_MUL;
+      twinLeft.moveCd = Math.min(twinLeft.moveCd, 1.0);
+      log(e.name+'を撃破——相方が速度を上げた');
+      W.fx.push({t:'parry',x:e.x,y:e.y,life:0.6,max:0.6});
+      return;
+    }
     // 確定ドロップ。ボスに挑む理由は恩寵だけでなく物としても要る。
     for(let i=0;i<cfg.drops;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
@@ -7037,6 +7178,21 @@ function killEnemy(e, byAlly){
     S.run.bossAlive=false;
     log(e.name+'を撃破');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.9,max:0.9});
+    /* ---------- 第50階層の主を倒した褒賞 ----------
+       経験値稼ぎの相手だった眷属は、主が消えれば残っていても意味を失う
+       ——盤面に残ったままだと「勝ったのに囲まれている」になるので消す。
+       ここまで削られ続けた前提の階なので、party のHPも全回復させる。 */
+    if(S.run.depth===OFFERING_BOSS_DEPTH){
+      W.enemies.forEach(m=>{
+        if(m!==e && !m.dead && (m.escort || m.summoned)){
+          m.dead=true;
+          W.fx.push({t:'grave', x:m.x, y:m.y, life:0.35, max:0.35});
+        }
+      });
+      if(S.hero) S.hero.hpNow = stats(S.hero).maxHp;
+      livingParty().forEach(a=>{ a.hpNow = allyStats(a).maxHp; });
+      log('供物の眷属が消え、傷が癒えた');
+    }
     if(e.tier==='great' || e.tier==='final') onGreatBossDown(e);
     if(e.tier==='final'){ onFinalBossDown(e); return; }
     /* ---------- 二度目のボスは恩寵を出さない ----------
@@ -7110,6 +7266,12 @@ function killEnemy(e, byAlly){
 function enemyUpdate(e,dt){
   if(e.dead) return;
 
+  // アビスの口の分身（一時的なものだけ）。寿命が尽きたら跡形も残さず消える。
+  if(e.mirror && e.ttl!=null){
+    e.ttl -= dt;
+    if(e.ttl<=0){ e.dead=true; W.fx.push({t:'grave',x:e.x,y:e.y,life:0.3,max:0.3}); return; }
+  }
+
   // 状態異常: 出血・火傷は継続ダメージ、よろめきは行動停止、凍傷は減速
   tickStatus(e, dt, (d,col)=>{
     e.hp-=d; pop(e.x,e.y,d,col);
@@ -7125,15 +7287,20 @@ function enemyUpdate(e,dt){
   const tg = enemyTarget(e);
   const dx=tg.x-e.x, dy=tg.y-e.y, d=Math.hypot(dx,dy)||1e-6;
   e.artDx=dx; e.artDy=dy;
-  // 侵入者は視界を持たない。どこに隠れても真っ直ぐ歩いてくる（それが唯一の武器）。
-  const vis = e.intruder || d < a.aggro;
+  /* 侵入者は視界を持たない。どこに隠れても真っ直ぐ歩いてくる（それが唯一の武器）。
+
+     大広間のボスは、雑魚と同じ索敵距離（既定 aggro）のままだと部屋の半分以上を
+     ただ突っ立って過ごす——「入口から穴までの歩く距離そのものが間合いになる」
+     という広間の設計（genArena）と噛み合わない。歩いても歩いても反応が無いと
+     「攻撃してこない」に見える（報告：第10階層）。広間のボスは常に見えている扱いにする。 */
+  const vis = e.intruder || d < a.aggro || (e.boss && W.fl && W.fl.arena);
   e.hit=Math.max(0,e.hit-dt);
   if(!vis && e.state==='idle'){ e.cd-=dt*slow; return; }
   if(vis) e.state='chase';
   e.cd-=dt*slow;
 
   // ボスの範囲攻撃。溜め中は移動も通常攻撃も止まるので、避ける時間が必ずある。
-  if(e.boss){ bossRage(e); if(bossCast(e, dt, slow, tg)) return; }
+  if(e.boss){ bossRage(e); finalBossTick(e, dt); if(bossCast(e, dt, slow, tg)) return; }
 
   if(e.tele>0){
     e.tele-=dt*slow;
@@ -7154,7 +7321,10 @@ function enemyUpdate(e,dt){
   }
   // 移動
   let mvx=0,mvy=0;
-  if(a.ms>0){
+  /* HP10%を切ったアビスの口は、以後ずっと離れる方向にしか動かない。
+     「逃げながら遠距離が本命」を、系統ごとの間合い設定より優先する。 */
+  if(e.fleeing){ mvx=-dx/d; mvy=-dy/d; }
+  else if(a.ms>0){
     if(a.keep && d < a.keep-0.8){ mvx=-dx/d; mvy=-dy/d; }
     else if(d > (a.range*0.85)){ mvx=dx/d; mvy=dy/d; }
   }
@@ -7206,6 +7376,17 @@ function bossRage(e){
     e.moveCd = Math.min(e.moveCd, 1.2);
     if(e.revealed) log(e.name+'が激昂した');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.5,max:0.5});
+    /* ---------- アビスの口：HP半分で全体を巻き込む一撃 ----------
+       「激昂＝HP半分」という既存の節目にそのまま乗せる。
+       予兆は出さない代わり、単発の大きさに留めて即死にはしない。 */
+    if(e.uniqueBoss===FINAL_DEPTH){
+      if(e.revealed){
+        log(e.name+'——全体を巻き込む一撃');
+        showBanner('アビスの口', '一帯を巻き込む大技を放った', '#c98adf', 2.6);
+      }
+      W.fx.push({t:'shock', x:e.x, y:e.y, r:40, life:0.5, max:0.5, col:'#c98adf'});
+      aoeTargets().forEach(t=>aoeHit(e, t, 1.8));
+    }
   }
   return false;
 }
@@ -7267,6 +7448,89 @@ function aoeTargets(){
 function aoeHit(e, tgt, mult){
   if(tgt.ent) hitAlly(tgt.ent, e, e.atkV*mult);
   else hitPlayer(e, e.atkV*mult);
+}
+
+/* ---------- 広間のどこか、をランダムに1点選ぶ ----------
+   第30階層の主（呼び出しの瞬間）と第51階層の主（定期ワープ）が共有する。
+   楕円の広間の縁ぎりぎりは壁に埋まりやすいので、pad ぶん内側に絞って探す。 */
+function randomArenaPoint(pad){
+  const fl=W.fl; if(!fl || !fl.arena) return null;
+  const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5-(pad||0), ry=fl.H/2-2.5-(pad||0);
+  for(let tries=0; tries<24; tries++){
+    const ang=rnd()*Math.PI*2, rad=Math.sqrt(rnd());
+    const px=cx+Math.cos(ang)*rx*rad, py=cy+Math.sin(ang)*ry*rad;
+    if(standable(px,py)) return {x:px, y:py};
+  }
+  return null;
+}
+/* ボスを広間内のランダムな1点へ跳ばせる。演出は行き先・元の場所の両方に輪を出すだけ
+   （専用の瞬間移動エフェクトは無いので、既存の ultring を使い回す）。 */
+function warpBossRandom(e){
+  const pt = randomArenaPoint(1.0);
+  if(!pt) return false;
+  W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.2, life:0.4, maxLife:0.4, col:'#a97fe0'});
+  e.x=pt.x; e.y=pt.y;
+  W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.2, life:0.4, maxLife:0.4, col:'#a97fe0'});
+  return true;
+}
+
+/* ---------- アビスの口の分身 ----------
+   本体そっくりの幻を湧かせる。`ttl` を渡すと一定時間で自然消滅する
+   （「分身」技の一時的な分身）。渡さなければ、倒されるまで残る
+   （HP25%を切ったあとの「常に4人」——despawnFinalMirrors で明示的に消す）。 */
+function spawnFinalMirrors(e, n, ttl){
+  for(let i=0;i<n;i++){
+    const pt = randomArenaPoint(0.5) || {x:e.x+rf(-2,2), y:e.y+rf(-2,2)};
+    if(!standable(pt.x,pt.y)) continue;
+    const c={x:pt.x, y:pt.y, arch:e.arch, fam:e.fam, lv:e.lv, elite:false, aff:[],
+      maxHp:Math.max(8, Math.round(e.maxHp*0.05)), atkV:e.atkV*0.65, def:Math.round(e.def*0.4),
+      res:e.fam.res, dt:e.dt, st:{}, bu:{}, state:'chase', t:0, cd:rf(0,0.6),
+      vx:0, vy:0, hit:0, tele:0, dead:false, r:e.r, teleMul:1.15, ms:e.ms,
+      col:e.col, name:e.name+'（幻）', mirror:true, master:e, ttl: ttl||null,
+      uniqueBoss:0, boss:false};
+    c.hp=c.maxHp;
+    W.enemies.push(c);
+    W.fx.push({t:'grave', x:pt.x, y:pt.y, life:0.35, max:0.35});
+  }
+}
+function despawnFinalMirrors(e){
+  W.enemies.forEach(m=>{
+    if(m.mirror && m.master===e && !m.dead){
+      m.dead=true;
+      W.fx.push({t:'grave', x:m.x, y:m.y, life:0.3, max:0.3});
+    }
+  });
+}
+/* ---------- アビスの口専用の進行 ----------
+   毎フレーム呼ぶ。定期ワープと、HP割合で切り替わる2段階（4人化・逃走）を見る。
+   どちらも一度切り替わったら戻らない——削るほど掴みにくくなる、という
+   このボスの一貫した性質にする。 */
+function finalBossTick(e, dt){
+  if(!e.boss || e.uniqueBoss!==FINAL_DEPTH || !S.run) return;
+  e.warpCd = (e.warpCd==null ? rf(6,9) : e.warpCd) - dt;
+  if(e.warpCd<=0 && !e.cast){
+    if(warpBossRandom(e)) e.warpCd = rf(7,10);
+    else e.warpCd = 1.0;              // 場所が見つからなければ少し置いて再挑戦
+  }
+  if(!e.quadPhase && e.hp <= e.maxHp*0.25){
+    e.quadPhase = true;
+    spawnFinalMirrors(e, 3, null);
+    if(e.revealed){
+      log(e.name+'——常に4人になって攻撃してくる');
+      showBanner('アビスの口', '幻が本体から離れなくなった。全員が同じように攻撃してくる', '#c98adf', 3.0);
+    }
+  }
+  if(!e.fleePhase && e.hp <= e.maxHp*0.10){
+    e.fleePhase = true;
+    despawnFinalMirrors(e);
+    e.moves = e.moves.filter(m=>['beam','burst','pillars','clone'].includes(m));
+    if(!e.moves.length) e.moves=['beam'];
+    e.fleeing = true;
+    if(e.revealed){
+      log(e.name+'——本体だけが残り、逃げながら遠距離に切り替えた');
+      showBanner('アビスの口', '幻を捨てて逃げに転じた。近づけない相手になる', '#c98adf', 3.0);
+    }
+  }
 }
 
 function resolveBossMove(e){
@@ -7365,6 +7629,18 @@ function resolveBossMove(e){
     }
     W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:3.2, life:0.5, maxLife:0.5,
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    /* ---------- 第30階層の主は、呼び出した瞬間に広間のどこかへ跳ぶ ----------
+       「取り巻きを盾に本体へ張り付く」を崩すための一手。呼ぶたびに
+       立ち位置が変わるので、毒沼の息継ぎ場所（上下・中央）を
+       使い分けて追いかける動きが生まれる。 */
+    if(e.uniqueBoss===POISON_BOSS_DEPTH) warpBossRandom(e);
+
+  }else if(e.cast.id==='clone'){
+    /* 分身。本体そっくりの幻が湧いて一緒に攻撃してくる。幻はHPが無いに
+       等しく、削っても本体は減らない——見分けるのではなく、
+       「本体は逃げも隠れもしない」というこのボスの性質を体で覚えさせる技。 */
+    spawnFinalMirrors(e, m.n, m.dur);
+    W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.6, life:0.45, maxLife:0.45, col:'#c98adf'});
   }
   const cd=m.cd;
   e.moveCd = rf(cd[0],cd[1]) * (e.rage?0.65:1);
@@ -7503,6 +7779,11 @@ function die(){
   const pool = bag.slice(), kept=[];
   for(let i=0;i<take;i++) kept.push(pool.splice(Math.floor(rnd()*pool.length),1)[0]);
   const keptGold = Math.floor(S.run.gold * GRAVE_GOLD_RATE);
+  /* 死んでも所持金は全ロストにしない。半分は遺体を待たず即座に口座へ入る
+     ——全ロストだと、死んだ直後に選び直した深い階へ丸腰で送り込むことになる。
+     残り半分は上の keptGold として遺体に残るので、取り戻せば実質もっと戻る。 */
+  const bankedOnDeath = Math.floor(S.run.gold * DEATH_GOLD_BANK_RATE);
+  S.gold += bankedOnDeath;
   // 黒鉄も金と同じ割合だけ遺体に残る。取りに戻れば回収できる。
   const keptOre = {};
   let keptOreN = 0;
@@ -7557,6 +7838,13 @@ function die(){
       + '鍛えた <b>'+itemName(forged)+'</b> を失った<br>'
       + '<span style="color:var(--dim);font-size:11px">'
       + '黒鉄は口座に残っている — また別の1本を鍛えられる</span></div>';
+  }
+  if(S.run.gold>0){
+    html += '<div style="color:#d6b34a;margin-top:14px">'
+      + 'この探索の所持金 <b>'+S.run.gold+' G</b> のうち <b>'+bankedOnDeath+' G</b> を持ち帰った<br>'
+      + '<span style="color:var(--dim);font-size:11px">'
+      + (keptGold>0 ? '残り '+keptGold+' G は遺体にある。取りに戻れば回収できる' : '')
+      + '</span></div>';
   }
   /* 死んだ画面で唯一の前進を見せる。ここが空だと、死＝完全な無駄になる。 */
   if(S.shardsRun>0){
@@ -7818,6 +8106,10 @@ function finishReturn(overflow){
 
      連れ帰った印だけは付ける。次に雇い直すときに半額になる。 */
   livingParty().forEach(a=>{ a.returned = true; });
+  /* 帰還ポータルから戻った階には、一度だけ戻れる。
+     壁が無い層や高難度の層を、また1階から歩き直すのは苦痛でしかない。
+     次に潜るときに一度だけ使える切符——潜ればここは消える（下の startRun 参照）。 */
+  S.resumeDepth = depth;
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
   rerollTavern();                                   // 酒場の流れ者も同じ周期で入れ替わる
@@ -8224,8 +8516,16 @@ function tickTrial(dt){
     tr.t=0;
     const prize=rollNewRelic();
     if(prize && grantRelic(prize.id)){
-      log('🗿 '+prize.icon+' '+prize.nm+' を得た');
-      showBanner(prize.icon+' '+prize.nm, prize.desc, prize.col, 3.2);
+      /* 遺物の枠が埋まっていると grantRelic は「持ち物には入れるが装備はしない」。
+         **画面上は何も変わらない**——鞘無しの遺物を得たのに刃が増えないように見え、
+         「手に入れたのに追加されなかった」に見える。枠が空いていない場合は、
+         ここで理由をはっきり言う（着ければ効く。倉庫→遺物、で入れ替えられる）。 */
+      const equipped = relicOn(prize.id);
+      log('🗿 '+prize.icon+' '+prize.nm+' を得た'
+        + (equipped ? '' : '（遺物の枠が空いていないため未装備。倉庫の「遺物」で入れ替えられる）'));
+      showBanner(prize.icon+' '+prize.nm,
+        prize.desc + (equipped ? '' : '　※枠がいっぱいで未装備。入れ替えが必要'),
+        prize.col, 3.2);
       W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:5, life:0.9, maxLife:0.9, col:prize.col});
     }else{
       log('試練を越えた（もう得られる遺物は無い）');
@@ -8488,9 +8788,10 @@ function update(dt){
   tickMine(dt, m>0.15);
 
   /* 凍結中は歩けない・振れない。**入力そのものは捨てない**——
-     解けた瞬間に、押しっぱなしの向きへそのまま走り出せる。 */
+     解けた瞬間に、押しっぱなしの向きへそのまま走り出せる。
+     落下演出の最中（P.fallAnim）も同じく歩けない・振れない。 */
   const froz = frozenNow();
-  if(m>0.15 && !W.mine && !froz){
+  if(m>0.15 && !W.mine && !froz && !P.fallAnim){
     // ガード中は動きが鈍る。この game では移動＝回避なので、これがガードの代償になる。
     const known = windGrace() ? KNOWN_SPEED : 1;               // 疾風の加護
     const sp=st.ms*known*Math.min(1,m)*(P.guard && st.hasShield ? GUARD_MOVE_MUL : 1)*pChill
@@ -8507,7 +8808,7 @@ function update(dt){
   if(P.target){
     const dx=P.target.x-P.x, dy=P.target.y-P.y, d=Math.hypot(dx,dy)||1e-6;
     P.dirx=dx/d; P.diry=dy/d;
-    if(!froz) playerAttack();
+    if(!froz && !P.fallAnim) playerAttack();
   }else if(m>0.15){
     P.dirx=ix/m; P.diry=iy/m;
   }
@@ -8725,12 +9026,16 @@ const CharacterArt = (function(){
     if(!e.fam || e.fam.id!=='beast') return null;
     return {rush:'ash-hound',range:'dust-spider',turret:'ash-toad',swarm:'stone-boar'}[e.arch.id]||null;
   }
-  function put(id,x,y,size,ent,dx,dy,alpha=1){
+  /* scale・rot は落とし穴の演出用（第三層／生。縮みながら回って消える）。
+     どちらも既定値では効かないので、他の呼び出し元は変更なしで動く。 */
+  function put(id,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0){
     if(!ready(id)) return false;
     if(ent && Math.abs(dx||0)>Math.abs(dy||0)+0.02) ent._artFace=dx<0?-1:1;
     const face=(ent&&ent._artFace)||1, n=Math.max(2,Math.round(size));
     ctx.save(); ctx.imageSmoothingEnabled=false; ctx.globalAlpha*=alpha;
-    ctx.translate(Math.round(x),Math.round(y)); ctx.scale(face,1);
+    ctx.translate(Math.round(x),Math.round(y));
+    if(rot) ctx.rotate(rot);
+    ctx.scale(face*scale,scale);
     ctx.drawImage(img[id],-Math.round(n/2),-Math.round(n/2),n,n);
     ctx.restore();
     return true;
@@ -8767,9 +9072,9 @@ function draw(){
     const lit=clamp(1.3-dist/Z.lightR,0.34,1);
     const sx=x*TS-camX, sy=y*TS-camY;
     if(t===T.WALL){ ctx.fillStyle=shade(Z.wall,lit*dim); }
-    /* 縁の向こうは**明かりが返ってこない**。距離で明るくならない色を置く
-       ——近づいても底が見えない、が「落ちたら終わり」を一番短く伝える。 */
-    else if(t===T.PIT){ ctx.fillStyle=shade(Z.wall,0.40*dim); }
+    /* 縁の向こうは空が見えている、という扱いにする。壁と同じ暗さで塗ると
+       「黒い壁」にしか見えず、縁だと気付かれない——水色にして、そこだけ抜けていると分からせる。 */
+    else if(t===T.PIT){ ctx.fillStyle=shade(PIT_SKY_COL,0.62*dim); }
     else if(t===T.STAIR){ ctx.fillStyle=shade('#4a7f9a',lit); }
     else { ctx.fillStyle=shade(Z.floor,lit*dim); }
     ctx.fillRect(sx,sy,TS+1,TS+1);
@@ -9080,7 +9385,12 @@ function draw(){
   const drawMate=(a, isNpc)=>{
     const sx=a.x*TS-camX, sy=a.y*TS-camY;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
-    const j=jobDef(a.job), R=TS*0.30;
+    /* 落とし穴の演出（主人公と同じ規則）。点滅で消えているフレームは丸ごと描かない。 */
+    const aFallK = a.fallAnim ? clamp(a.fallAnim.t/a.fallAnim.dur,0,1) : 0;
+    const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
+    const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
+    if((a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0)) return;
+    const j=jobDef(a.job), R=TS*0.30*aScale;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
        同じ絵でも敵と混ざらない。 */
@@ -9091,10 +9401,10 @@ function draw(){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
-    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry)){
+    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
-        const ang=i/6*Math.PI*2-Math.PI/2;
+        const ang=i/6*Math.PI*2-Math.PI/2+aRot;
         const fx2=sx+Math.cos(ang)*R, fy2=sy+Math.sin(ang)*R;
         i?ctx.lineTo(fx2,fy2):ctx.moveTo(fx2,fy2);
       }
@@ -9569,10 +9879,21 @@ function draw(){
 
   ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
-  if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry)){
-    ctx.fillStyle='#ffffff';
-    ctx.beginPath(); ctx.arc(px,py,TS*0.28,0,7); ctx.fill();
-    ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
+  /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
+     戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
+  const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
+  const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
+  const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
+  const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
+  if(!heroBlinkOff){
+    if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
+      ctx.save();
+      ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(0,0,TS*0.28*heroScale,0,7); ctx.fill();
+      ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
+      ctx.restore();
+    }
   }
   ctx.globalAlpha=1;
   label('自分', px, py-TS*0.72, '#7fe0c0');
@@ -10992,12 +11313,23 @@ function renderTown(){
     + (S.grave ? `<br><span style="color:#7fe0c0">遺体は第${S.grave.depth}階層に残っている</span>` : '');
 
 const uds=unlockedDepths();
+  // 帰還ポータルの切符。中継地点（大ボス撃破）とは別枠で、使えば消える一度きりの選択肢。
+  const resumeUsable = S.resumeDepth && !uds.includes(S.resumeDepth);
   el('startdepth').innerHTML = uds.map(d=>
     `<button class="${S.startDepth===d?'primary':'ghost'}" data-depth="${d}" style="flex:0 0 auto;width:auto;padding:9px 15px">第${d}階層</button>`
   ).join('')
+    + (resumeUsable
+      ? `<button class="${S.startDepth===S.resumeDepth?'primary':'ghost'}" data-depth="${S.resumeDepth}" data-resume="1"
+           style="flex:0 0 auto;width:auto;padding:9px 15px;border-color:#7fd0e0">
+           第${S.resumeDepth}階層へ再開<span style="font-size:10px;color:#7fd0e0">（一度だけ）</span></button>`
+      : '')
     + (S.grave ? `<div class="empty" style="width:100%;color:#7fe0c0">
          遺体は第${S.grave.depth}階層。そこまで潜れば回収できる</div>` : '')
-    + (S.startDepth>1
+    + (S.startDepth===S.resumeDepth && resumeUsable
+    ? `<div class="empty" style="width:100%;color:#7fd0e0">
+         帰還ポータルから戻った階へ、そのまま再開する。歩き直さなくてよい一度きりの切符<br>
+         <span style="font-size:11px">潜ればここは使い切る。足りない分は中継地点と同じ支給が入る</span></div>`
+    : S.startDepth>1
     ? `<div class="empty" style="width:100%;color:#7fc3e0">
          中継地点から始めると <b>Lv.${beaconLevel(S.startDepth)}</b> まで引き上げ、
          足りない装備を支給する<br>
@@ -12951,7 +13283,7 @@ function reviveFallen(){
 bindTap(el('fal-revive'), reviveFallen);
 bindTap(el('fal-let'), letFallenGo);
 
-/* ---------- 第50階層 踏破 ---------- */
+/* ---------- 第51階層（アビスの口）撃破＝踏破 ---------- */
 function onFinalBossDown(e){
   S.cleared = (S.cleared||0)+1;
   S.screen='clear';
@@ -13013,6 +13345,7 @@ bindTap(el('btn-fixall'), ()=>{
 });
 bindTap(el('btn-reset'), ()=>{
   S.stash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.resumeDepth=null;
   S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
@@ -13198,6 +13531,54 @@ bindTap(el('dbg-rich'), ()=>{
   log('🐞 欠片・金・黒鉄を足した');
   renderDebug(); if(RENDERERS[S.screen]) RENDERERS[S.screen]();
 });
+bindTap(el('dbg-boon'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  const rolled = rollBoons('mid', 1)[0];
+  if(!rolled){ log('🐞 出せる恩寵がもう無い'); return; }
+  S.hero.boons.push(rolled);
+  const mx = stats(S.hero).maxHp;
+  S.hero.hpNow = Math.min(mx, S.hero.hpNow + mx*0.15);
+  log('🐞 恩寵「'+boonDef(rolled.id).nm+'」('+boonRarDef(rolled.rar).nm+')を得た');
+  updateHUD();
+});
+bindTap(el('dbg-ult'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  if(greatKills() >= ULTS.length){ log('🐞 大技はもう全部解放済み'); return; }
+  onGreatBossDown();
+  renderDebug();
+});
+/* ---------- デバッグ：仲間を指定して追加 ----------
+   通常の加入経路（道中のNPC・酒場）を経ずに、職を選んでその場で1人加える。
+   合わせて隊の枠も上限まで開いておかないと、3人の壁に当たってすぐ使えなくなる。 */
+function renderDbgAllyList(){
+  el('dbgally-list').innerHTML = ALL_JOBS.map(j=>{
+    const n = party().filter(a=>a.job===j.id).length;
+    return `<div class="item" data-addjob="${j.id}" style="border-left-color:${j.col}">
+      <div class="nm" style="color:${j.col}">${j.nm}</div>
+      <div class="af">今 ${n}人</div>
+    </div>`;
+  }).join('');
+}
+bindTap(el('dbg-addally'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  renderDbgAllyList();
+  el('m-debug').classList.remove('on');
+  el('m-dbgally').classList.add('on'); last=performance.now();
+});
+bindRowTap(el('m-dbgally'), '[data-addjob]', n=>{
+  if(!S.hero) return;
+  const job = jobDef(n.dataset.addjob);
+  S.upg = S.upg || {};
+  S.upg.party = PARTY_UP_MAX;               // 仲間の上限解放も合わせて
+  const depth = (S.run && S.run.depth) || Math.max(1, S.deepest||1);
+  const a = makeAlly(depth, S.hero, job);
+  a.slot = party().length;
+  S.hero.party.push(a);
+  log('🐞 仲間「'+a.name+'」('+job.nm+') を追加');
+  renderDbgAllyList();
+  if(RENDERERS[S.screen]) RENDERERS[S.screen]();
+});
+bindTap(el('dbgally-close'), ()=>{ el('m-dbgally').classList.remove('on'); last=performance.now(); });
 bindTap(el('nm-ok'),   confirmName);
 bindTap(el('nm-back'), closeNameEntry);
 bindTap(el('nm-roll'), ()=>{ el('nm-input').value = rollAllyName()+rollAllyName().slice(-1); });

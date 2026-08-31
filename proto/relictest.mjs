@@ -359,6 +359,34 @@ R.trialRewards = await pg.evaluate(()=>{
           ok: (S.relics||[]).length===before+1 && !trialActive() && relicSlots()>=1};
 });
 
+/* 3-g2. 遺物の枠が既に埋まっていると、報酬は**持ち物には入るが装備はされない**。
+         画面上は何も変わらないので、黙っていると「手に入れたのに追加されなかった」
+         に見える——ログとバナーで、枠が無いことをはっきり言う。 */
+R.trialRewardSlotsFull = await pg.evaluate(()=>{
+  const f=TH.findTrial();
+  if(!f) return {skipped:true, ok:false};
+  // 枠を先に3つとも別の遺物で埋めておく
+  const filler = RELICS.slice(0,3).map(r=>r.id);
+  S.upg.relic = RELIC_MAX_SLOTS;
+  S.relics = filler.slice();
+  S.relicEq = filler.slice();
+  P.x=W.trial.x; P.y=W.trial.y;
+  openTrial(); startTrial();
+  TH.immortal();
+  const before = S.relics.length;
+  logs.length = 0;
+  stepSim(TRIAL_SEC+2);
+  const gained = S.relics.length===before+1;
+  const newId = gained ? S.relics[S.relics.length-1] : null;
+  const equippedRaw = newId ? relicOn(newId) : null;
+  const said = logs[0]||'';
+  return {gained, newId, said,
+          staysOwned: gained,
+          notAutoEquipped: equippedRaw===false,
+          explainsWhy: said.includes('未装備'),
+          ok: gained && equippedRaw===false && said.includes('未装備')};
+});
+
 /* 3-h. 階を降りると中断される。
        持ち越せると「湧いた敵から逃げて階段へ」が正解になり、籠城戦の形が崩れる。 */
 R.trialEndsOnDescend = await pg.evaluate(()=>{

@@ -151,6 +151,109 @@ R.phases = await pg.evaluate(async ()=>{
           hasBurstMove: boss.moves.includes('burst')};
 });
 
+/* --- 11. 大広間のボスは、入口から穴までの距離ぶん常に見えている。
+   通常の索敵距離（aggro）のままだと、広い部屋の半分以上をただ突っ立って
+   過ごすことになり、それが「攻撃してこない」に見えていた（報告：第10階層）。
+   遠くに立たせたまま様子を見て、動き出す（chase に入る）ことを確かめる。 */
+R.arenaAware = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(10); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  // 広間の対角ぐらい離す。通常の索敵距離（10前後）よりずっと遠い。
+  P.x = boss.x - 20; P.y = boss.y;
+  const idleAtStart = boss.state;
+  stepSim(0.3);
+  const dist = Math.hypot(P.x-boss.x, P.y-boss.y);
+  return {arena: !!W.fl.arena, idleAtStart, chasesAfter: boss.state==='chase', dist:+dist.toFixed(1),
+          ok: !!W.fl.arena && boss.state==='chase'};
+});
+
+/* --- 12. 第20階層の双子は先に倒した方では終わらない。
+   片方を倒しても：確定ドロップは出ない・恩寵は出ない・階段は解禁されない。
+   代わりに残った方の攻撃が速くなる（teleMul低下・ms上昇）。
+   両方倒して初めて、通常のボス撃破処理が1回だけ流れる。 */
+R.twinSequential = await pg.evaluate(()=>{
+  S.upg={}; S.hero=newHero(); startRun(20); S.hero.party=[];
+  document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
+  const twins=W.enemies.filter(e=>e.boss&&e.twin);
+  const bothTwins = twins.length===2;
+  const [t1,t2]=twins;
+  const teleBefore=t2.teleMul, msBefore=t2.ms;
+  W.drops=[];
+  t1.hp=1; killEnemy(t1);
+  const afterFirst = {
+    drops:W.drops.length, bossStillAlive: S.run.bossAlive===true,
+    boonNotShownYet: !document.getElementById('m-boon').classList.contains('on'),
+    t1Dead:t1.dead, t2Alive:!t2.dead,
+    teleFaster: t2.teleMul<teleBefore, msFaster: t2.ms>msBefore};
+  t2.hp=1; killEnemy(t2);
+  const afterSecond = {
+    drops:W.drops.length, bossCleared: S.run.bossAlive===false,
+    boonShown: document.getElementById('m-boon').classList.contains('on')};
+  document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
+  return {bothTwins, afterFirst, afterSecond,
+          noRewardOnFirst: afterFirst.drops===0 && afterFirst.bossStillAlive && afterFirst.boonNotShownYet,
+          buffedOnFirst: afterFirst.teleFaster && afterFirst.msFaster,
+          rewardOnSecond: afterSecond.drops>0 && afterSecond.bossCleared && afterSecond.boonShown,
+          ok: bothTwins && afterFirst.drops===0 && afterFirst.bossStillAlive && afterFirst.boonNotShownYet
+              && afterFirst.teleFaster && afterFirst.msFaster
+              && afterSecond.drops>0 && afterSecond.bossCleared && afterSecond.boonShown};
+});
+
+/* --- 13. 第30階層：毒沼の広間にも息継ぎ場所が要る。
+   入口・穴の周りだけでなく、上・下・中央にも毒の無い場所を作った。
+   床全体はほぼ毒（大半は覆われている）ことも確認する。 */
+R.poisonSafeZones = await pg.evaluate(()=>{
+  RNG=mulberry32(30*7919);
+  const fl=genFloor(30);
+  const h=spawnHazards(fl,30);
+  const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5, ry=fl.H/2-2.5;
+  const spots={
+    center:[cx,cy], top:[cx,cy-ry+2.0], bottom:[cx,cy+ry-2.0],
+    stair:[fl.stair.x,fl.stair.y], start:[fl.start.cx+0.5,fl.start.cy+0.5]};
+  let poisonedTiles=0, totalFloor=0;
+  for(let y=1;y<fl.H-1;y++) for(let x=1;x<fl.W-1;x++){
+    if(!tileWalk(fl,x,y)) continue;
+    totalFloor++;
+    if(h.g[y]&&h.g[y][x]) poisonedTiles++;
+  }
+  const free={};
+  for(const k of Object.keys(spots)){
+    const [sx,sy]=spots[k]; const gx=Math.floor(sx), gy=Math.floor(sy);
+    free[k] = !(h.g[gy]&&h.g[gy][gx]);
+  }
+  return {kind:h.kind, free, poisonRatio:+(poisonedTiles/totalFloor).toFixed(2),
+          mostlyPoisoned: poisonedTiles/totalFloor>0.6,
+          ok: h.kind==='poison' && free.center && free.top && free.bottom
+              && free.stair && free.start && poisonedTiles/totalFloor>0.6};
+});
+
+/* --- 14. 第30階層の主は、雑魚を呼ぶたび広間のどこかへ跳ぶ。
+   他の「招来」持ちボス（第30階層以外）は跳ばないことも見ておく
+   ——1体だけの専用挙動であって、技そのものの仕様変更ではない。 */
+R.bossWarpsOnSummon = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(30); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  const isMallet = boss.uniqueBoss===POISON_BOSS_DEPTH;
+  const x0=boss.x, y0=boss.y;
+  boss.cast={id:'summon', t:0, max:BOSS_MOVES.summon.tele, dir:0};
+  resolveBossMove(boss); boss.cast=null;
+  const moved = Math.hypot(boss.x-x0, boss.y-y0) > 3;
+  const stillStandable = standable(boss.x, boss.y);
+  return {isMallet, moved, stillStandable, dist:+Math.hypot(boss.x-x0,boss.y-y0).toFixed(1),
+          ok: isMallet && moved && stillStandable};
+});
+R.otherSummonBossDoesNotWarp = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(15); S.hero.party=[];   // 15Fの主も summon を持つ
+  const boss=W.enemies.find(e=>e.boss);
+  const notMallet = boss.uniqueBoss!==POISON_BOSS_DEPTH;
+  const hasSummon = boss.moves.includes('summon');
+  const x0=boss.x, y0=boss.y;
+  boss.cast={id:'summon', t:0, max:BOSS_MOVES.summon.tele, dir:0};
+  resolveBossMove(boss); boss.cast=null;
+  const stayed = Math.hypot(boss.x-x0, boss.y-y0) < 0.01;
+  return {notMallet, hasSummon, stayed, ok: notMallet && hasSummon && stayed};
+});
+
 // --- 10. ボス撃破の確定ドロップ
 R.drops = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(10);
@@ -160,6 +263,166 @@ R.drops = await pg.evaluate(()=>{
   const n=W.drops.length;
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
   return {dropped:n, expected:BOSS_STATS.great.drops, ok:n>=BOSS_STATS.great.drops};
+});
+
+/* --- 15. ラストボスは51階。50階の主（初めの供物）はそのまま大ボスとして残る。
+   50に落ちても踏破にならず、50の倍数（100など）ももう final を返さない。 */
+R.finalDepthMoved = await pg.evaluate(()=>{
+  return {t50: bossTierAt(50), t51: bossTierAt(51), t100: bossTierAt(100), t60: bossTierAt(60),
+          ok: bossTierAt(50)==='great' && bossTierAt(51)==='final'
+              && bossTierAt(100)!=='final' && bossTierAt(60)!=='final'};
+});
+
+// --- 16. 51階の主：アビスの口。人型サイズで湧く。50階の主（引き連れ）はそのまま。
+R.finalSpawn = await pg.evaluate(()=>{
+  RNG=mulberry32(51*7919); const fl51=genFloor(51);
+  const es51=spawnEnemies(fl51,51);
+  const boss51=es51.find(e=>e.boss);
+  RNG=mulberry32(50*7919); const fl50=genFloor(50);
+  const es50=spawnEnemies(fl50,50);
+  const boss50=es50.find(e=>e.boss);
+  const escort50 = es50.some(e=>e.escort);
+  const noEscort51 = !es51.some(e=>e.escort);
+  return {name51:boss51&&boss51.name, tier51:boss51&&boss51.tier, r51:boss51&&boss51.r,
+          name50:boss50&&boss50.name, tier50:boss50&&boss50.tier,
+          humanSized: boss51 && boss51.r<0.6, escort50, noEscort51,
+          ok: boss51&&boss51.name==='アビスの口' && boss51.tier==='final' && boss51.r<0.6
+              && boss50&&boss50.name==='初めの供物' && boss50.tier==='great'
+              && escort50===true && noEscort51===true};
+});
+
+// --- 17. 51階の主を倒したときだけ「踏破」になる。50階の主を倒しても踏破にならない。
+R.finalClearGate = await pg.evaluate(()=>{
+  S.upg={}; S.hero=newHero(); startRun(50); S.hero.party=[];
+  const boss50=W.enemies.find(e=>e.boss);
+  boss50.hp=1; killEnemy(boss50);
+  const notClearedAt50 = S.screen!=='clear';
+  document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
+  const clearedBefore=S.cleared||0;
+
+  S.upg={}; S.hero=newHero(); startRun(51); S.hero.party=[];
+  const boss51=W.enemies.find(e=>e.boss);
+  boss51.hp=1; killEnemy(boss51);
+  const clearedAt51 = S.screen==='clear';
+  const clearedAfter=S.cleared||0;
+  document.getElementById('m-clear').classList.remove('on'); document.getElementById('m-boon').classList.remove('on');
+  S.screen='game'; _boonPending=null;
+  return {notClearedAt50, clearedAt51, clearedBefore, clearedAfter,
+          ok: notClearedAt50 && clearedAt51===true && clearedAfter===clearedBefore+1};
+});
+
+// --- 18. 定期ワープ：溜め中でなければワープする
+R.finalWarp = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  const x0=boss.x, y0=boss.y;
+  boss.cast=null; boss.warpCd=0;
+  finalBossTick(boss, 0.016);
+  const moved = Math.hypot(boss.x-x0, boss.y-y0) > 1.0;
+  const stillStandable = standable(boss.x, boss.y);
+  return {moved, stillStandable, warpCdReset: boss.warpCd>0, ok: moved && stillStandable};
+});
+
+// --- 19. HP半分で全体を巻き込む一撃（激昂の節目に相乗り）
+R.finalHalfNova = await pg.evaluate(async ()=>{
+  S.upg={hp:8}; S.hero=newHero(); S.hero.lv=30; S.hero.str=30;S.hero.dex=30;S.hero.vit=30;
+  startRun(51); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  const hpBefore=S.hero.hpNow;
+  boss.hp = boss.maxHp*0.49;   // 激昂の閾値をまたがせる
+  bossRage(boss);
+  const hurt = hpBefore - S.hero.hpNow;
+  return {raged:boss.rage, hurt, hurtByNova: hurt>0, ok: boss.rage===true && hurt>0};
+});
+
+/* --- 20. HP25%未満：常に4人（本体+幻3体）になって攻撃してくる。
+   幻はHPが無いに等しく（削っても本体の残量には影響しない）、
+   fleePhase に入るまで自然には消えない。 */
+R.finalQuadPhase = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  const beforeCount=W.enemies.filter(e=>!e.dead).length;
+  boss.hp = boss.maxHp*0.24;
+  finalBossTick(boss, 0.016);
+  const mirrors=W.enemies.filter(e=>e.mirror && e.master===boss && !e.dead);
+  const bossHpUnaffected = boss.hp === boss.maxHp*0.24;
+  return {quadPhase:boss.quadPhase, mirrorCount:mirrors.length, bossHpUnaffected,
+          ok: boss.quadPhase===true && mirrors.length===3 && bossHpUnaffected};
+});
+
+/* --- 21. HP10%未満：幻を消して1体に戻り、逃走＋遠距離主体に切り替わる。
+   一度この段階に入ったら、離れる方向にしか動かない（fleeing）。 */
+R.finalFleePhase = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  boss.hp = boss.maxHp*0.24;
+  finalBossTick(boss, 0.016);                 // まず4人化させる
+  const mirrorsBefore=W.enemies.filter(e=>e.mirror && e.master===boss && !e.dead).length;
+  boss.hp = boss.maxHp*0.09;
+  finalBossTick(boss, 0.016);
+  const mirrorsAfter=W.enemies.filter(e=>e.mirror && e.master===boss && !e.dead).length;
+  const onlyRanged = boss.moves.every(m=>['beam','burst','pillars','clone'].includes(m));
+  return {mirrorsBefore, mirrorsAfter, fleeing:boss.fleeing, onlyRanged, moves:boss.moves,
+          ok: mirrorsBefore===3 && mirrorsAfter===0 && boss.fleeing===true && onlyRanged};
+});
+
+// --- 22. 分身技：一時的な幻を出す。時間が経つと自然に消える（寿命つき）
+R.finalCloneMove = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[];
+  const boss=W.enemies.find(e=>e.boss);
+  const before=W.enemies.filter(e=>!e.dead).length;
+  boss.cast={id:'clone', t:0, max:BOSS_MOVES.clone.tele, dir:0};
+  resolveBossMove(boss); boss.cast=null;
+  const mirrors=W.enemies.filter(e=>e.mirror && e.master===boss && !e.dead);
+  const hasTtl = mirrors.every(m=>m.ttl>0);
+  // 寿命を使い切らせて消えることを確かめる
+  mirrors.forEach(m=>{ enemyUpdate(m, m.ttl+0.1); });
+  const goneAfterTtl = W.enemies.filter(e=>e.mirror && e.master===boss && !e.dead).length===0;
+  return {spawned:mirrors.length, hasTtl, goneAfterTtl,
+          ok: mirrors.length===BOSS_MOVES.clone.n && hasTtl && goneAfterTtl};
+});
+
+/* --- 23. 第50階層の主が呼ぶ雑魚（眷属・招来）は経験値3倍。
+   「戦いながらレベルを上げる」ための倍率なので、対象は escort / summoned だけ
+   ——同じ階の自然湧きの雑魚は変わらない。 */
+R.offeringTrashXp3x = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
+  const mk=(extra)=>Object.assign({x:P.x,y:P.y,arch:ARCH[0],fam:FAMILY[0],lv:20,elite:false,aff:[],
+    maxHp:999,hp:999,atkV:0,def:0,res:{},dt:'blunt',st:{},bu:{},state:'chase',t:0,cd:99,
+    vx:0,vy:0,hit:0,tele:0,dead:false,r:0.34,ms:0,teleMul:1,col:'#fff',name:'的'}, extra);
+  const gain=(extra)=>{
+    S.hero.xp=0; S.hero.lv=20;
+    const before=totalXpOf(S.hero);
+    killEnemy(mk(extra));
+    return totalXpOf(S.hero)-before;
+  };
+  const plainXp = gain({});
+  const escortXp = gain({escort:true});
+  const summonedXp = gain({summoned:true});
+  const ratioEscort=+(escortXp/plainXp).toFixed(2), ratioSummoned=+(summonedXp/plainXp).toFixed(2);
+  return {plainXp, escortXp, summonedXp, ratioEscort, ratioSummoned,
+          escortIsTriple: Math.abs(ratioEscort-3)<0.05,
+          summonedIsTriple: Math.abs(ratioSummoned-3)<0.05,
+          ok: Math.abs(ratioEscort-3)<0.05 && Math.abs(ratioSummoned-3)<0.05};
+});
+
+/* --- 24. 主を倒すと：残っていた眷属は消え、パーティは全回復する */
+R.offeringDefeatCleanup = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
+  const ally=makeAlly(50, S.hero);
+  ally.x=P.x+0.5; ally.y=P.y;
+  S.hero.party.push(ally);
+  const boss=W.enemies.find(e=>e.boss);
+  const escortsBefore=W.enemies.filter(e=>e.escort && !e.dead).length;
+  S.hero.hpNow=1; ally.hpNow=1;
+  boss.hp=1; killEnemy(boss);
+  const escortsAfter=W.enemies.filter(e=>e.escort && !e.dead).length;
+  const heroFull = S.hero.hpNow===stats(S.hero).maxHp;
+  const allyFull = ally.hpNow===allyStats(ally).maxHp;
+  document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
+  return {escortsBefore, escortsAfter, heroFull, allyFull,
+          ok: escortsBefore===KIN_MAX && escortsAfter===0 && heroFull && allyFull};
 });
 
 await b.close();

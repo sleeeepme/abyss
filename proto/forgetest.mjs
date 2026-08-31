@@ -379,7 +379,10 @@ R.inCombat = await pg.evaluate(()=>{
 
 /* ================= 6. 鉱石は持ち帰らないと自分の物にならない ================= */
 
-// 6-a. 探索中は口座に入らない。死ねば半分が遺体、残りは消える。
+/* 6-a. 探索中は口座に入らない。死ねば鉱石は半分が遺体、残りは消える。
+   金は鉱石とは別の規則——半分だけが即座に持ち帰られ（口座）、
+   残り半分だけ遺体に残る（DEATH_GOLD_BANK_RATE）。ここで見たいのは
+   鉱石側の規則なので、金は「半分だけ即座に口座へ入る」ことを確認する。 */
 R.oreLostOnDeath = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.ore={};
   startRun(9);
@@ -388,11 +391,11 @@ R.oreLostOnDeath = await pg.evaluate(()=>{
   const duringRun={bag:{...S.run.ore}, acct:{...S.ore}, total:oreRunTotal()};
   S.hero.hpNow=0; die();
   return {duringRun, acctAfter:{...S.ore}, grave:S.grave&&{...S.grave.ore},
-          graveRate:GRAVE_GOLD_RATE,
+          goldAfter:S.gold, graveRate:GRAVE_GOLD_RATE, bankRate:DEATH_GOLD_BANK_RATE,
           notBankedDuringRun: Object.keys(duringRun.acct).length===0 && duringRun.total===11,
           nothingInAccount: (S.ore.raw||0)===0,
           halfLeftInGrave: (S.grave&&S.grave.ore&&S.grave.ore.raw)===5,
-          runGoldStillLost: S.gold===0};
+          runGoldHalfBanked: S.gold===Math.floor(800*DEATH_GOLD_BANK_RATE)};
 });
 
 // 6-b. 生きて帰れば口座に入る

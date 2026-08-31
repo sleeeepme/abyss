@@ -54,7 +54,7 @@ R.elementsMatchSelf = await pg.evaluate(depths=>{
     25:['pierce','slash'],     // 根の大蜘蛛 — 脚
     30:['arcane'],             // 施しのマレット — 薬
     35:['fire'],               // 炉の大蛇 — 熱そのもの
-    40:['blunt'],              // 動かぬ盾、オルト — 盾
+    40:['blunt'],              // 凍てついた盾、オルト — 盾
     45:['frost','arcane'],     // 白の大眼 — 欠
     50:['arcane'],             // 初めの供物
   };
@@ -125,7 +125,7 @@ R.beyondTable = await pg.evaluate(()=>{
 
 /* ================= 2. 新しい技が動く ================= */
 
-/* 2-a. 8種すべてが、実際に溜めて・撃って・例外を出さない。
+/* 2-a. 9種すべてが、実際に溜めて・撃って・例外を出さない（分身を足して9つに）。
        描画まで通すのが肝で、予兆の絵で落ちるとそのフレームが丸ごと消える。 */
 R.allMovesFire = await pg.evaluate(()=>{
   /* 第45階層で見る。第50階層の主は眷属と周回刃と出血の霧を連れた**設え**で、
@@ -144,7 +144,7 @@ R.allMovesFire = await pg.evaluate(()=>{
   const all=Object.keys(BOSS_MOVES);
   const missing=all.filter(id=>!fired.has(id));
   return {all, missing, threw, count:all.length,
-          ok: threw===null && missing.length===0 && all.length===8};
+          ok: threw===null && missing.length===0 && all.length===9};
 });
 
 /* 2-b. 落石は**溜めの時点で**落ちる場所が決まっている。

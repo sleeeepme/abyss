@@ -143,7 +143,10 @@ R.guardCharm = await pg.evaluate(()=>{
           reduced:+(1-guarded/plain).toFixed(2)};
 });
 
-// --- 8. 死亡時にロスト内容が出ない
+/* --- 8. 死亡時にロスト内容が出ない
+   ただし金だけは例外——死亡時ロストが全ロストから半分ロストに変わった後、
+   「持ち帰った額」を前向きに見せるようになった（ロスト内容の開示ではなく、
+   持ち帰りの確認）。道具側の規則（何を失ったか見せない）は変わっていない。 */
 R.deathHidesLoss = await pg.evaluate(()=>{
   S.hero=newHero(); S.grave=null; startRun(5);
   RNG=mulberry32(31);
@@ -156,7 +159,8 @@ R.deathHidesLoss = await pg.evaluate(()=>{
   const html=document.getElementById('d-lost').innerHTML;
   return {
     noItemNames: !names.some(n=>html.includes(n)),
-    noCounts: !/道具\s*\d+\s*点/.test(html) && !/\d+\s*G/.test(html),
+    noItemCounts: !/道具\s*\d+\s*点/.test(html),
+    goldShownPositively: html.includes('持ち帰った'),
     noLostLabel: !html.includes('ロスト：'),
     mentionsGrave: html.includes('遺体'),
     graveStillExists: !!S.grave

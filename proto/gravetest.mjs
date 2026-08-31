@@ -12,7 +12,7 @@ await pg.waitForTimeout(350);
 await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); } });
 const R={};
 
-// --- 1. 死亡すると遺体ができ、装備品は含まれず、金は半分
+// --- 1. 死亡すると遺体ができ、装備品は含まれず、金は半分（遺体に）／半分（即座に口座へ）
 R.onDeath = await pg.evaluate(()=>{
   S.upg={}; S.stash=[]; S.gold=0; S.grave=null; S.hero=newHero();
   startRun(3);
@@ -37,6 +37,10 @@ R.onDeath = await pg.evaluate(()=>{
     allFromBag: g && g.items.every(i=>bag.some(x=>x.uid===i.uid)),
     noDupes: g && new Set(g.items.map(i=>i.uid)).size===g.items.length,
     pos: g && [Math.round(g.x*10)/10, Math.round(g.y*10)/10],
+    // 全ロストにしない。半分は遺体を待たず即座に口座へ入る
+    bankedGold: S.gold,
+    bankedHalf: S.gold===Math.floor(317*DEATH_GOLD_BANK_RATE),
+    notFullLoss: S.gold>0,
   };
 });
 

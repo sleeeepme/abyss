@@ -115,15 +115,18 @@ R.depthsGatedByDefault = await pg.evaluate(()=>{
   return {list:u, ok: u.length===1 && u[0]===1};
 });
 
-// 3-b. 開放すると5階刻みで並ぶ。全階並べると横に50個出て選べない
+/* 3-b. 開放すると5階刻みで並ぶ。全階並べると横に50個出て選べない。
+   ラストボス（51階）だけは5刻みに乗らない特別な1階なので、
+   その前後の2ヶ所だけ5以外の間隔になる（50→51→55）。それ以外は全部5刻み。 */
 R.allDepthsOpens = await pg.evaluate(()=>{
   S.debug.allDepths=true;
   const u=unlockedDepths();
   const gaps=u.slice(2).map((d,i)=>d-u[i+1]);
+  const nonFive=gaps.filter(g=>g!==5);
   return {count:u.length, first:u.slice(0,4), last:u[u.length-1],
-          everyFive: gaps.every(g=>g===5),
+          mostlyFive: nonFive.length<=2,
           reachesFinal: u.includes(FINAL_DEPTH),
-          ok: u.length>5 && gaps.every(g=>g===5) && u.includes(FINAL_DEPTH)};
+          ok: u.length>5 && nonFive.length<=2 && u.includes(FINAL_DEPTH)};
 });
 
 // 3-c. 開放した階から実際に潜れる
@@ -154,6 +157,76 @@ R.notVisibleInPlay = await pg.evaluate(()=>{
   const btn=el('dbgbtn').classList.contains('on');
   return {openModals:shown, btnHidden: !btn,
           ok: !shown.includes('m-debug') && !btn};
+});
+
+/* ================= 5. 新規デバッグ機能（仲間追加・恩寵・大技） ================= */
+
+// 5-a. 恩寵をランダムに1つ得るボタン。押すたび主人公の恩寵が1つ増える
+R.dbgBoonGrants = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.party=[];
+  const before = S.hero.boons.length;
+  el('dbg-boon').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const after = S.hero.boons.length;
+  const added = S.hero.boons[after-1];
+  const validId = !!added && !!boonDef(added.id);
+  return {before, after, added, ok: after===before+1 && validId};
+});
+
+/* 5-b. 大技解放ボタン。押すたび大ボスを1体倒した扱いになり、
+       ULTS.length 回で全部揃う。それ以上押しても増えない（打ち止め）。 */
+R.dbgUltUnlocksAll = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.party=[];
+  S.greatKills=0; S.ult=null; S.ultLv={};
+  for(let i=0;i<ULTS.length;i++){
+    el('dbg-ult').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  }
+  const allUnlocked = unlockedUlts().length===ULTS.length;
+  const ultSet = !!S.ult;
+  const greatKillsAtFive = S.greatKills===ULTS.length;
+  el('dbg-ult').dispatchEvent(new MouseEvent('click',{bubbles:true}));  // 打ち止めの確認
+  const staysAtFive = S.greatKills===ULTS.length;
+  return {greatKills:S.greatKills, allUnlocked, ultSet, staysAtFive,
+          ok: allUnlocked && ultSet && greatKillsAtFive && staysAtFive};
+});
+
+/* 5-c. 仲間を指定して追加。押すと即座にその職の仲間が1人加わり、
+       隊の枠も上限まで開く（3人の壁ですぐ使えなくなるのを防ぐ）。 */
+R.dbgAddAllyByJob = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.party=[]; S.upg=S.upg||{}; S.upg.party=0;
+  const before = party().length;
+  el('dbg-addally').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const modalOpen = el('m-dbgally').classList.contains('on');
+  const listCount = document.querySelectorAll('#dbgally-list [data-addjob]').length;
+  document.querySelector('[data-addjob="mage"]').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const after = party().length;
+  const added = party()[after-1];
+  const partyCapMaxed = S.upg.party===PARTY_UP_MAX;
+  return {before, after, addedJob: added && added.job, modalOpen, listCount,
+          partyCapMaxed, allJobsListed: listCount===ALL_JOBS.length,
+          ok: after===before+1 && added && added.job==='mage' && modalOpen
+              && partyCapMaxed && listCount===ALL_JOBS.length};
+});
+
+/* 5-d. 通常の加入制限（同じ職は3人まで）を無視して追加できる。
+       検証用の道具なので、通常プレイでは組めない編成もその場で試せることを優先する。 */
+R.dbgAddAllyBypassesLimits = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.party=[];
+  for(let i=0;i<4;i++){
+    document.querySelector('[data-addjob="mage"]').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  }
+  const mageCount = party().filter(a=>a.job==='mage').length;
+  const overNormalJobLimit = mageCount > JOB_LIMIT_BASE;
+  return {mageCount, jobLimitBase:JOB_LIMIT_BASE, overNormalJobLimit,
+          ok: mageCount===4 && overNormalJobLimit};
+});
+
+// 5-e. 閉じるボタンでモーダルが閉じる
+R.dbgAddAllyCloses = await pg.evaluate(()=>{
+  el('dbg-addally').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const openedFirst = el('m-dbgally').classList.contains('on');
+  el('dbgally-close').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const closedAfter = !el('m-dbgally').classList.contains('on');
+  return {openedFirst, closedAfter, ok: openedFirst && closedAfter};
 });
 
 await done(b, errs, R);

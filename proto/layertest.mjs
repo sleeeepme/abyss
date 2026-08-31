@@ -83,12 +83,16 @@ R.ledges = await pg.evaluate(()=>{
     return {pit, wall, floor, marked: fl.pit ? 'あり' : 'なし'};
   };
   const root=look(25), stone=look(5);
-  return {root, stone,
+  /* 縁は「黒い壁」に見えないよう、壁の色ではなく空の水色で塗る。 */
+  const pitColour = typeof PIT_SKY_COL==='string' ? PIT_SKY_COL : null;
+  const rootWallColour = ZONES.find(z=>z.id==='root').wall;
+  return {root, stone, pitColour, rootWallColour,
           rootHasPits: root.pit>0 && root.marked==='あり',
           rootHasNoWalls: root.wall===0,
           othersUnchanged: stone.pit===0 && stone.wall>0 && stone.marked==='なし',
           roomsRemain: root.floor>0,
-          ok: root.pit>0 && root.wall===0 && stone.pit===0};
+          pitIsSkyBlue: !!pitColour && pitColour.toLowerCase()!==rootWallColour.toLowerCase(),
+          ok: root.pit>0 && root.wall===0 && stone.pit===0 && !!pitColour && pitColour.toLowerCase()!==rootWallColour.toLowerCase()};
 });
 
 /* 2-b. 落ちるのは**落ちられる者だけ**。棲んでいる側は縁で止まる。
@@ -117,11 +121,13 @@ R.whoFalls = await pg.evaluate(()=>{
 });
 
 /* 2-c. 落ちたら削られ、**直前に立っていた床へ戻る**。
-       落ちた場所の真横へ戻すと、押し出されたときに同じ縁へ落ち続ける。 */
+       落ちた場所の真横へ戻すと、押し出されたときに同じ縁へ落ち続ける。
+       戻るまでは即座ではなく、縮んで消える演出（fallAnim）を挟んでから戻り、
+       戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
 R.falling = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(25); S.hero.party=[];
   const fl=W.fl;
-  P.invuln=0;
+  P.invuln=0; P.fallAnim=null; P.fallBlink=0;
   stepSim(0.2);                       // 足場を1度覚えさせる
   const safe={x:P.x, y:P.y};
   let pit=null;
@@ -129,15 +135,20 @@ R.falling = await pg.evaluate(()=>{
     if(fl.g[y][x]===T.PIT){ pit={x:x+0.5,y:y+0.5}; break; }
   const hp0=S.hero.hpNow;
   P.x=pit.x; P.y=pit.y;
-  tickPits(0.016);
+  tickPits(0.016);                    // 踏み外した瞬間。ダメージが入り、演出が始まる
   const hurt=hp0-S.hero.hpNow;
+  const animStarted = !!P.fallAnim;
+  const stillOverPitDuringAnim = pitAt(P.x,P.y);
+  for(let i=0;i<80 && P.fallAnim;i++) tickPits(0.016);   // 演出が終わるまで進める
   return {hp0, hurt, back:{x:+P.x.toFixed(1), y:+P.y.toFixed(1)},
           tookDamage: hurt>0,
           // 即死にはしない（即死だと誰も縁に近寄らず、壁が無い意味が消える）
           survivable: hurt < hp0*0.5,
+          playsShrinkAnim: animStarted && stillOverPitDuringAnim,
           returnedToFooting: Math.hypot(P.x-safe.x, P.y-safe.y) < 0.01,
           offThePit: !pitAt(P.x,P.y),
-          ok: hurt>0 && hurt<hp0*0.5 && !pitAt(P.x,P.y)};
+          blinksOnReturn: P.fallBlink>0,
+          ok: hurt>0 && hurt<hp0*0.5 && animStarted && !pitAt(P.x,P.y) && P.fallBlink>0};
 });
 
 /* 2-d. 押してくる。**押した先は見ない**——縁があれば落ちる。
@@ -405,6 +416,33 @@ R.portal = await pg.evaluate(()=>{
           worksOnPortal:    d10.went==='帰った' && d15.went==='帰った' && d10.gold>0,
           tellsWhereNext: nextPortalDepth(7)===10 && nextPortalDepth(10)===15,
           ok: d7.went==='潜ったまま' && d10.went==='帰った'};
+});
+
+/* 7-b. 帰還ポータルから戻った階には、一度だけそのまま再開できる。
+       中継地点（大ボス撃破）とは別枠の切符で、潜れば消える。 */
+R.resumeTicket = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.stash=[]; S.resumeDepth=null; S.beacons=[];
+  startRun(15); S.hero.party=[];
+  S.run.gold=50; S.run.loot=[];
+  returnToTown();
+  TH.close('m-ret');
+  const grantedAfterReturn = S.resumeDepth===15;
+  // 中継地点は第10階層しか無い想定。切符はそれとは別に一覧へ出る。
+  S.beacons=[10];
+  const uds = unlockedDepths();
+  const offeredSeparately = grantedAfterReturn && !uds.includes(15);
+  renderTown();
+  const html = document.getElementById('startdepth').innerHTML;
+  const shownInTown = html.includes('data-resume="1"') && html.includes('data-depth="15"');
+  // 選んで潜ると、その階から始まり、支給も中継地点と同じだけ入り、切符は消える
+  S.startDepth = S.resumeDepth;
+  startRun();
+  const startedThere = S.run.depth===15;
+  const consumed = S.resumeDepth===null;
+  const gotOutfit = S.hero.lv >= beaconLevel(15);
+  TH.close('m-stairs');
+  return {grantedAfterReturn, offeredSeparately, shownInTown, startedThere, consumed, gotOutfit,
+          ok: grantedAfterReturn && offeredSeparately && shownInTown && startedThere && consumed && gotOutfit};
 });
 
 await done(b, errs, R);

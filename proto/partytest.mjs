@@ -388,18 +388,21 @@ R.boonTarget = await pg.evaluate(()=>{
           ok: soloWentToPlayer && targetModal && rows===2 && allyGotIt && after.atk>before.atk};
 });
 
-/* ============ 8. 第50階層のラスボス ============ */
+/* ============ 8. 第51階層のラスボス ============
+   50階の「初めの供物」は大ボス（great）のまま残り、51階の「アビスの口」だけが
+   唯一の final。50に落ちても踏破にはならない（finalgametest 側で個別に検証）。 */
 R.finalBoss = await pg.evaluate(()=>{
   const tiers={};
-  [5,10,15,20,25,30,35,40,45,50,55,60,100].forEach(d=>{ tiers[d]=bossTierAt(d); });
-  RNG=mulberry32(50*7919);
-  const fl=genFloor(50);
-  const es=spawnEnemies(fl,50);
+  [5,10,15,20,25,30,35,40,45,50,51,55,60,100].forEach(d=>{ tiers[d]=bossTierAt(d); });
+  RNG=mulberry32(51*7919);
+  const fl=genFloor(51);
+  const es=spawnEnemies(fl,51);
   const boss=es.find(e=>e.boss);
   RNG=mulberry32(40*7919);
   const g=spawnEnemies(genFloor(40),40).find(e=>e.boss);
-  return {tiers, tierAt50:tiers[50], tierAt40:tiers[40],
-          onlyAt50: tiers[50]==='final' && tiers[40]==='great' && tiers[45]==='mid',
+  return {tiers, tierAt51:tiers[51], tierAt50:tiers[50], tierAt40:tiers[40],
+          onlyAt51: tiers[51]==='final' && tiers[50]==='great' && tiers[45]==='mid'
+                     && tiers[100]!=='final' && tiers[60]!=='final',
           bossName:boss&&boss.name, bossHp:boss&&boss.maxHp, greatHp:g&&g.maxHp,
           hidden: boss && boss.revealed===false,
           atStairs: boss && Math.hypot(boss.x-fl.stair.x,boss.y-fl.stair.y)<0.01,
@@ -408,7 +411,7 @@ R.finalBoss = await pg.evaluate(()=>{
 
 // 8-b. 撃破すると踏破画面 → final ティアの潜在（値が great より大きい）
 R.finalKill = await pg.evaluate(()=>{
-  S.hero=newHero(); S.upg={hp:8}; startRun(50);
+  S.hero=newHero(); S.upg={hp:8}; startRun(51);
   const boss=W.enemies.find(e=>e.boss);
   const clearedBefore=S.cleared;
   W.drops=[];
