@@ -8,7 +8,7 @@
 
 | 管理ID | ゲーム側ID | キャラクター | 区分 | プレビュー | 原寸画像 | 向き・状態 | アート状態 | ゲーム反映 | 備考 |
 |---|---|---|---|---|---|---|---|---|---|
-| `CHAR-HERO-001` | `hero` | 冒険者 | プレイヤー | ![冒険者候補B・遺跡の斥候](../proto/assets/sprites/hero/concepts/b-scout-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/b-scout-right-idle.png) | 右・待機1 | 候補選定中 | 未反映 | 候補Bをキープ。選択式キャラ絵を想定し、B・D・E・F・G・Hの6候補を保存。最終採用は未決定 |
+| `CHAR-HERO-001` | `hero` | 冒険者 | プレイヤー | ![冒険者候補B・遺跡の斥候](../proto/assets/sprites/characters/hero/scout-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/scout-right-idle.png) | 右・待機1 | 承認済み（6候補） | ゲーム反映済み | B・D・E・F・G・Hの6候補から、作成時と死亡後の新キャラ作成時に抽選。死亡後は前代と異なる候補を選ぶ |
 | `ALLY-WARRIOR-001` | `warrior` | 剣士 | 仲間 | ![剣士・右向き](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 茶髪、両目1px、剣、丸盾、鎖帷子。2人目・3人目用の色違いあり |
 | `ALLY-KNIGHT-001` | `knight` | 重騎士 | 仲間 | ![重騎士・右向き](../proto/assets/sprites/characters/allies/knight-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/knight-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 全身を鋼色で統一。フルフェイス兜、幅広い板金鎧、大剣。2人目・3人目用の色違いあり |
 | `ALLY-ROGUE-001` | `rogue` | 盗賊 | 仲間 | ![盗賊・右向き](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 黄土色のフードとスカーフ、顔マスク、両手の短剣。2人目・3人目用の色違いあり |
@@ -44,12 +44,12 @@
 
 | 候補 | デザイン | プレビュー | 原寸画像 | 状態 | 識別要素 |
 |---|---|---|---|---|---|
-| B | 遺跡の斥候 | ![候補B](../proto/assets/sprites/hero/concepts/b-scout-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/b-scout-right-idle.png) | キープ | 赤茶の束ね髪、苔緑の肩マント、ロープ束 |
-| D | 蒼衣の地図師 | ![候補D v3](../proto/assets/sprites/hero/concepts/d-cartographer-right-idle-v3-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/d-cartographer-right-idle-v3.png) | v3・要確認 | 両目を共通座標へ修正し、Hと同じ位置に3pxのあご影を追加。青みの濃い髪、暖色の明るい肌、青ジャケット、生成りシャツ、巻物筒 |
-| E | 金髪の回収屋 | ![候補E v3](../proto/assets/sprites/hero/concepts/e-salvager-right-idle-v3-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/e-salvager-right-idle-v3.png) | v3・要確認 | 両目を共通座標へ修正し、Hと同じ位置に3pxのあご影を追加。金髪ボブ、朱色スカーフ、深緑ベスト、小型背嚢 |
-| F | 赤髪の坑道歩き | ![候補F](../proto/assets/sprites/hero/concepts/f-minewalker-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/f-minewalker-right-idle.png) | 新規・要確認 | 短い赤髪、灰色ベスト、濃青シャツ、携行品なし |
-| G | 黒髪の薬草採り | ![候補G](../proto/assets/sprites/hero/concepts/g-herbalist-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/g-herbalist-right-idle.png) | 新規・要確認 | 黒髪ポニー、象牙ケープ、青緑服、薬草ポーチ |
-| H | 褐色肌の放浪者 | ![候補H v2](../proto/assets/sprites/hero/concepts/h-wanderer-right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/h-wanderer-right-idle-v2.png) | v2・要確認 | 右目右上の輪郭を補完し、両足を1px左へ修正。短い縮れ髪、褐色肌、黄土スカーフ、えんじコート、寝具 |
+| B | 遺跡の斥候 | ![候補B](../proto/assets/sprites/characters/hero/scout-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/scout-right-idle.png) | 登録済み | 赤茶の束ね髪、苔緑の肩マント、ロープ束 |
+| D | 蒼衣の地図師 | ![候補D](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | 登録済み | 青みの濃い髪、暖色の明るい肌、青ジャケット、生成りシャツ、巻物筒 |
+| E | 金髪の回収屋 | ![候補E](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | 登録済み | 金髪ボブ、朱色スカーフ、深緑ベスト、小型背嚢 |
+| F | 赤髪の坑道歩き | ![候補F](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | 登録済み | 短い赤髪、灰色ベスト、濃青シャツ、携行品なし |
+| G | 黒髪の薬草採り | ![候補G](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | 登録済み | 黒髪ポニー、象牙ケープ、青緑服、薬草ポーチ |
+| H | 褐色肌の放浪者 | ![候補H](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | 登録済み | 短い縮れ髪、褐色肌、黄土スカーフ、えんじコート、寝具 |
 
 ## 方向・アニメーション進行表
 

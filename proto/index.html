@@ -4022,6 +4022,7 @@ const S={
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
+  lastHeroArt:null,      // 前代の見た目。次の主人公は必ず別の候補を引く
   hero:null, run:null, screen:'title', prevScreen:'town'
 };
 
@@ -4173,6 +4174,7 @@ function newHero(){
           // 恩寵は死ぬまで残る（街に戻っても消えない）。
           // 祭壇があれば、前のキャラの恩寵をいくつか引き継いで生まれる。
           boons:(S.legacyBoons||[]).slice(),
+          art:randomHeroArt(S.lastHeroArt),
           party:[]};   // 仲間も同じ。主人公が死ねば一緒に失われる
 }
 function xpNeed(lv){ return Math.round(18*Math.pow(lv,1.55)); }
@@ -7898,6 +7900,7 @@ function die(){
   el('d-lost').innerHTML = html;
   _deathHtml = html;
 
+  S.lastHeroArt=S.hero.art;  // 次の代が同じ姿を引かないために残す
   S.hero=null; S.run=null; S.carry=[];
   renderDeathLegacy();
   setScreen('none'); el('m-death').classList.add('on');
@@ -9045,6 +9048,42 @@ const CharacterArt = (function(){
   return {allyKey,enemyKey,put};
 })();
 
+/* 主人公は「今いる1人」ではなく、代替わりごとに登録済みの冒険者候補から選ぶ。
+   直前と同じ姿は外すので、死後の新しいキャラが見た目でも切り替わる。 */
+const HERO_ART = {
+  scout:       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIElEQVR42u3YPQrCQBCG4dzENq1iIQgWiqVgrXZ2FoKFYOEt7GJl4xUET6AX8AzeQltnigxDom523w++apOQeYrNT5YRQgghhNSUVj56ffY87ZT2vh2L6vMBAACAsAfc9HJRC0APrKuPDw4EAAASA7AGtm74+biK1r0OAAAAhL3p3YqdqB7IWwAAAKDZL0ZekOg+jgAAIHKAyaIrut4PRb0vOtb5AAAAwG8HvByXotYNWQMdTjNRve49vnYgAABIHEAPbK17N8XVoF1afby+3tc3RQAASBzAuwnqWgMW876oXreupz+u/v4UAACAyACqglkAFoh1veB+oAAAAAClN+z9ePKeH9wfIgAAiBzAu+lVBQgOBAAAEgcghBBCSGPzBqBLOSQ/yzQ7AAAAAElFTkSuQmCC',
+  cartographer:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzVlYTQxNWYtZTg4YS00YzNjLWFhNTktZjZmNGFlOGJlNjQ4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZmM5NDY4ZjctNmQzYi00NTk3LTlkYTUtNzZkNmIxMmM2NzljIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjUwOjAzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI3OjIxKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz42QYXJAAACBklEQVR4nO3bv0pcQRQG8G8+h7yDNiaFREFchTRiTAIKvsK2CmGXILZBSCFi8gABYUUSy2hpJYJCIohdVkkgCRb+CegbBAmEK5ZnihmGu3GL7/66szNzZmCZ2Tvnsq4oCigjxBHiCHGEOEIcIY4Q51MdnHNZCfsHp8yDRY/7mzX+X/HAxBc/97MWkPtcQ4gjxBHifNkEqT0/NvE8Or59+MXET56Oh12KMmdCCiGOEEeI87kDcn/nP8yPmHh8YcnEXz8tRdtPNm1cq3f2TCDEEeIIcf5/T3DV/m7io/d2T4dS7Z1GiCPEEeJc6v6cqgekngvC+/3O64lovr6xYRPX6msmPv+x52Lrq+oBmQhxhDiX2jMPh6ZNh2bvmWlvXT+y/Wdemvh8dz2a/2SzEd3zqXzhXaA6AzIR4ghxPnfAszlb42u9vYzu0XAPb726MfEN/kT7p/KFNcO7cw0ZCHGEOEKc7/YCjr/9Dj4ZiPbfnrXfWW233PyEOEIcIc7nDjj4aN/lAfYukLLRXI53GHmH+0SII8QR4lxuTTCsAebe50cf95n4+NdVdP5UPaGqB5REiCPE+dwB4Z4L39eHFidPTdx4E6/phWfM2sqLYPxndBIhjhBHiPOdThi+N2ivnpW6O7RXN4L8tr0Fe2ZUNcFMhDhCnKv+NyiOEEeII8QR4ghx7PYCuu0WfnWVT3MwfiMAAAAASUVORK5CYII=',
+  salvager:    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4aU6IgAAACFUlEQVR4nO3bPUtcQRQG4Hderm0CkkiqaJHCENitxDbgkhT6B7SxESsrK/ML0lmIBBQbCZg/oOSDFQIWQVKEXQhukUKtgjEWsbRY63OEGYbZxcB7n+7sfN3mnDsz3A39fh/KCHGEOEJcleoQQihaYHxyJqvInPUOyxZ0UjWOEEeII8SFVI7k1gCf8529iazxzYXTgdaEugYkEOIIcaG0BqRy/ni/W/J8WN57EG1P1Yi6BiQQ4ghxIbcG5OZ88/WqiVfaj0y82brMau98Xo/WCF8T6hqQQIgjxFXDXuBP79zEm614f5/zw0aII8QR4qphLzD39ouJ99+8ivZ/PPk0671/etIOJfcXhDhCHCEupPbKE89bpsOHF7b92+9/Jt74Gz+/e8e7SyaeXtxBbL35nzau7wMKEeIIcSG3BsyOXUX7H1yMRtt9Tqf4nN9efWbi5fVfJq7vAzIR4ghxVekEY41x+0P72oSjUyMm3mrYvf7CQ/saXzs6cyvcmKjZfOnabQ3IRYgjxBHiqtIJLro+Z+P7gP8NIY4QR4irUh383voAM1lng48ri9HzftftExpun9DFeXT83fsE+M1/9L6AEEeII8RVuQN8TXjXQ/z7gc7X6Hw/3n8y81258XfO/9/t3v/J9HzRd4SEOEIcIS4M+jvB3DtDX1MGPV99J5hAiCPEhfp/g+IIcYQ4QhwhjhDH+36A+3YLI1u1G6K/klgAAAAASUVORK5CYII=',
+  minewalker:  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA/0lEQVR42u3YIQ7CMBjF8d0ECZYAFkNIcAtXQCCWEBLUsgsgMATJCbgAhhNwArgCtxiO8D3R0gzRbv+XPNV1tD+xtGQZIYQQQsif0hvM6u9Wo76z1+XEVOcDAAAAaW9YN6h9VgvT5EAAAAAAs0DdwOtxM9Xnm44DAAAAcX8E7+fSVDcUWgAAACDtg1EoSOsuRwAA0DIAXeA435n6Dja+DfveBwAAAMS94fVqY3rYH53V56MDAQAAAAAAAAAAPr2Uc1MdL6ZDZ3W+jof+HgAAABDX3UCbb0/O+uYndxsEAICOA/gWnNw/QAAA0HGA0INOKEDT9wEAAACEEEIIIT/lDTJmB/U0xkSlAAAAAElFTkSuQmCC',
+  herbalist:   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIklEQVR42u3YLQ7CQBCG4d4ECYqEBIMAgyQoEASFQCFQCILgCgRbSTgFEtUTcASC4grFdiZkJ5t2m/68X/KpbifsI5pdoogQQgghpKB0etM02/5w7uxssRfV7wMAAAD12qD1XG9Y15oHAAAAVPujptd/Xg/Rop8DAAAA5QJYBxcNksRHUb0h3wIAAAD1Phj5gjTucgQAAA0HSJ430e87EbUOOhaANQ8AAACo1oZ1i14PAAAAlAuwmwzSbH1Buqut6Oh0dlavt4CCgwAAQMMB9IDNYeysXq9rbXgdX0UtAD1fr9eXLW8QAAAAwAlwuS9F8wJYIL4Auf9QAQCAlgNYINZA6weGfj/47Q8AAFoG4AukL0vW5Sn0PAAAAIAQQggh5G9+mDaJotsX3/IAAAAASUVORK5CYII=',
+  wanderer:    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABBklEQVR42u3YMQrCQBCF4dzCRrASLE0nIiKojY0IChaeIKWVCN7AE1h5By08idfReqbIOOxGdsn/4FXr4s5XhE2KghBCCCEkUnqD+SdmAQAAgLwG7nRL0fHsIGqtZwcCAAAAiAPqgV6nnaj+feg6AAAAkPZDUA8QWgAAACCve8F1PXE1u4EBAKDlAPqA78eqttZFR9faDwAAAPx3wOft6Krefx4ua3tf7EX1OgAAANAsgP6DS7UV1QNW01LUAtj0R6JekMY/mAAAQMsBvCBWYwPodQAAACCt7wfWxcc6YOj+5N4OAQCg5QD6oecF8O4HAAAA0gLQL0u6sfcDAAAAhBBCCCE/5Qu+1FiW2xr12gAAAABJRU5ErkJggg==',
+};
+const HERO_ART_IDS=Object.keys(HERO_ART);
+const HERO_ART_IMG={};
+for(const [id,src] of Object.entries(HERO_ART)){ const im=new Image(); im.src=src; HERO_ART_IMG[id]=im; }
+function randomHeroArt(previous){
+  const choices=HERO_ART_IDS.filter(id=>id!==previous);
+  return pick(choices.length ? choices : HERO_ART_IDS);
+}
+function heroArtKey(h){
+  if(!h) return HERO_ART_IDS[0];
+  if(!HERO_ART_IMG[h.art]) h.art=randomHeroArt(S.lastHeroArt);
+  return h.art;
+}
+function drawHeroArt(h,x,y,size,dx,dy,alpha=1,scale=1,rot=0){
+  const im=HERO_ART_IMG[heroArtKey(h)];
+  if(!im || !im.complete || !im.naturalWidth) return false;
+  if(Math.abs(dx||0)>Math.abs(dy||0)+0.02) h._artFace=dx<0?-1:1;
+  const face=h._artFace||1, n=Math.max(2,Math.round(size));
+  ctx.save(); ctx.imageSmoothingEnabled=false; ctx.globalAlpha*=alpha;
+  ctx.translate(Math.round(x),Math.round(y));
+  if(rot) ctx.rotate(rot);
+  ctx.scale(face*scale,scale);
+  ctx.drawImage(im,-Math.round(n/2),-Math.round(n/2),n,n);
+  ctx.restore();
+  return true;
+}
+
 /* ---------- 描画 ---------- */
 let TS=26;
 function resize(){
@@ -9880,7 +9919,7 @@ function draw(){
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
   if(!heroBlinkOff){
-    if(!CharacterArt.put('hero',px,py,TS*CHARACTER_ART_SCALE,P,P.dirx,P.diry,1,heroScale,heroRot)){
+    if(!drawHeroArt(S.hero,px,py,TS*CHARACTER_ART_SCALE,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
