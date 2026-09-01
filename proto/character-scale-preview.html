@@ -32,7 +32,9 @@
   const raw=Number(new URLSearchParams(location.search).get('scale'));
   const percent=allowed.has(raw)?raw:125, scale=percent/100;
   document.querySelectorAll('.choices a').forEach(a=>a.classList.toggle('on',a.href.endsWith('scale='+percent)));
-  const c=document.querySelector('#scene'),x=c.getContext('2d');
+  const c=document.querySelector('#scene'),mobile=innerWidth<=600;
+  if(mobile){c.width=390;c.height=720}
+  const x=c.getContext('2d');
   x.imageSmoothingEnabled=false;
   const load=src=>new Promise(resolve=>{const i=new Image();i.onload=()=>resolve(i);i.src=src});
   const assets=Promise.all([
@@ -48,7 +50,28 @@
   function sprite(im,cx,cy,base,flip=false){
     const n=px(base*scale);x.save();x.translate(px(cx),px(cy));x.scale(flip?-1:1,1);x.drawImage(im,-px(n/2),-px(n/2),n,n);x.restore();
   }
+  function drawMobile(hero,summoner,hound){
+    // スマホでは横長の縮小画面にせず、実ゲームに近い縦画面の盤面で比較する。
+    x.fillStyle='#0d1119';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='#161e2e';x.fillRect(20,85,350,520);
+    x.strokeStyle='#344055';x.lineWidth=1;
+    for(let gx=20;gx<=370;gx+=35){x.beginPath();x.moveTo(gx,85);x.lineTo(gx,605);x.stroke()}
+    for(let gy=85;gy<=605;gy+=35){x.beginPath();x.moveTo(20,gy);x.lineTo(370,gy);x.stroke()}
+    x.fillStyle='#c95861';x.fillRect(15,14,180,9);x.fillStyle='#7e2733';x.fillRect(15,23,180,3);
+    text('Lv.12  HP 240/240  ATK 34',15,42,10,'#b9c4d5');
+    text('第12階層',374,24,15,'#e4eaf5','right');text('煤けた層',374,45,11,'#84a5c8','right');
+    x.strokeStyle='rgba(228,207,114,.7)';x.lineWidth=2;x.setLineDash([4,4]);x.beginPath();x.arc(278,315,38,0,Math.PI*2);x.stroke();x.setLineDash([]);
+    x.fillStyle='#2b1820';x.fillRect(227,257,102,6);x.fillStyle='#d25e62';x.fillRect(227,257,82,6);
+    text('灰の猟犬　Lv.12',278,245,11,'#f0b2a9','center');
+    x.strokeStyle='rgba(127,195,224,.55)';x.lineWidth=2;x.setLineDash([4,4]);x.beginPath();x.arc(132,411,51,0,Math.PI*2);x.stroke();x.setLineDash([]);
+    sprite(hero,132,411,48);sprite(summoner,81,448,48);sprite(hound,278,315,48,true);
+    text('自分',132,368,14,'#9ce9ea','center');text('サナ　召喚士 Lv.12',81,488,10,'#a9d7f0','center');
+    x.fillStyle='rgba(8,11,17,.88)';x.fillRect(17,631,356,51);x.strokeStyle='#3d4b66';x.strokeRect(17.5,631.5,355,50);
+    text(`キャラクター画像　+${percent-100}%（${scale.toFixed(2)}倍）`,31,649,15,'#f0f5ff');
+    text('※ 当たり判定・HPバー・攻撃距離は従来サイズ',31,669,10,'#9ba9bd');
+  }
   assets.then(([hero,summoner,hound])=>{
+    if(mobile){drawMobile(hero,summoner,hound);return}
     // 実ゲームの探索盤面と同じく、背景は暗く、マス目は控えめにする。
     x.fillStyle='#0d1119';x.fillRect(0,0,c.width,c.height);
     x.fillStyle='#161e2e';x.fillRect(153,66,738,486);
