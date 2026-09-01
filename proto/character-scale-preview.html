@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ABYSS RELIC — キャラクター表示倍率プレビュー</title>
+<style>
+  :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+  *{box-sizing:border-box} body{margin:0;min-height:100vh;background:#0b0e15;color:#e6edf6}
+  main{max-width:1100px;margin:auto;padding:20px 18px 28px}
+  header{display:flex;gap:14px;align-items:baseline;justify-content:space-between;margin:0 0 14px}
+  h1{font-size:18px;letter-spacing:.1em;margin:0}.note{font-size:12px;color:#9aa4bb;margin:0}
+  .choices{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.choices a{color:#c9d5e8;text-decoration:none;padding:7px 11px;border:1px solid #3d4b66;border-radius:6px;font-size:13px}.choices a.on{background:#2a4263;color:#fff;border-color:#77b8e8}
+  .frame{border:1px solid #293449;border-radius:10px;overflow:hidden;background:#101624;box-shadow:0 12px 36px rgba(0,0,0,.32)}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 13px;font-size:12px;color:#bbc7d8}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}.ally{background:#7fc3e0}.enemy{background:#e37b6c}.ring{background:#e4cf72}
+  @media(max-width:600px){main{padding:12px}.note{display:none}h1{font-size:15px}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>ABYSS RELIC　キャラクター表示倍率プレビュー</h1><p class="note">当たり判定・移動範囲・UIはそのまま。見た目だけを比較しています。</p></header>
+  <nav class="choices" aria-label="表示倍率">
+    <a href="?scale=110">+10%（1.10倍）</a><a href="?scale=125">+25%（1.25倍）</a><a href="?scale=150">+50%（1.50倍）</a>
+  </nav>
+  <div class="frame"><canvas id="scene" width="1080" height="608" aria-label="味方と敵の表示倍率プレビュー"></canvas></div>
+  <div class="legend"><span><i class="dot ally"></i>味方：冒険者・召喚士</span><span><i class="dot enemy"></i>敵：灰の猟犬</span><span><i class="dot ring"></i>黄色の円は従来どおりの当たり判定</span></div>
+</main>
+<script>
+(() => {
+  const allowed=new Set([110,125,150]);
+  const raw=Number(new URLSearchParams(location.search).get('scale'));
+  const percent=allowed.has(raw)?raw:125, scale=percent/100;
+  document.querySelectorAll('.choices a').forEach(a=>a.classList.toggle('on',a.href.endsWith('scale='+percent)));
+  const c=document.querySelector('#scene'),x=c.getContext('2d');
+  x.imageSmoothingEnabled=false;
+  const load=src=>new Promise(resolve=>{const i=new Image();i.onload=()=>resolve(i);i.src=src});
+  const assets=Promise.all([
+    load('assets/sprites/characters/hero/scout-right-idle.png'),
+    load('assets/sprites/characters/allies/summoner-right-idle.png'),
+    load('assets/sprites/enemies/ash-hound/right-idle-v5.png')
+  ]);
+  const px=n=>Math.round(n);
+  function text(s,xx,yy,size,col,align='left'){
+    x.font=`700 ${size}px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif`;
+    x.textAlign=align;x.textBaseline='middle';x.lineWidth=3;x.strokeStyle='#0b0e15';x.strokeText(s,xx,yy);x.fillStyle=col;x.fillText(s,xx,yy);
+  }
+  function sprite(im,cx,cy,base,flip=false){
+    const n=px(base*scale);x.save();x.translate(px(cx),px(cy));x.scale(flip?-1:1,1);x.drawImage(im,-px(n/2),-px(n/2),n,n);x.restore();
+  }
+  assets.then(([hero,summoner,hound])=>{
+    // 実ゲームの探索盤面と同じく、背景は暗く、マス目は控えめにする。
+    x.fillStyle='#0d1119';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='#161e2e';x.fillRect(153,66,738,486);
+    x.strokeStyle='#344055';x.lineWidth=1;
+    for(let gx=153;gx<=891;gx+=41){x.beginPath();x.moveTo(gx,66);x.lineTo(gx,552);x.stroke()}
+    for(let gy=66;gy<=552;gy+=41){x.beginPath();x.moveTo(153,gy);x.lineTo(891,gy);x.stroke()}
+    // HUD
+    x.fillStyle='#c95861';x.fillRect(18,16,218,10);x.fillStyle='#7e2733';x.fillRect(18,26,218,3);
+    text('Lv.12  HP 240/240  ATK 34  DEF 18  MF 9',18,42,11,'#b9c4d5');
+    text('第12階層',1042,22,17,'#e4eaf5','right');text('煤けた層',1042,44,12,'#84a5c8','right');
+    // 敵のHP表示と通常のリングを先に描く。画像の大きさだけが変わる。
+    x.strokeStyle='rgba(228,207,114,.7)';x.lineWidth=2;x.setLineDash([4,4]);x.beginPath();x.arc(713,314,45,0,Math.PI*2);x.stroke();x.setLineDash([]);
+    x.fillStyle='#2b1820';x.fillRect(654,249,118,7);x.fillStyle='#d25e62';x.fillRect(654,249,95,7);
+    text('灰の猟犬　Lv.12',713,236,12,'#f0b2a9','center');
+    x.strokeStyle='rgba(127,195,224,.55)';x.lineWidth=2;x.setLineDash([4,4]);x.beginPath();x.arc(462,353,59,0,Math.PI*2);x.stroke();x.setLineDash([]);
+    // 正確なゲーム用アートを、ゲームの基準 46px から同率で拡大。
+    sprite(hero,462,353,46);
+    sprite(summoner,405,382,46);
+    sprite(hound,713,314,46,true);
+    text('自分',462,304,15,'#9ce9ea','center');
+    text('サナ　召喚士 Lv.12',405,423,11,'#a9d7f0','center');
+    // 比較ラベル
+    x.fillStyle='rgba(8,11,17,.88)';x.fillRect(28,489,294,48);x.strokeStyle='#3d4b66';x.strokeRect(28.5,489.5,293,47);
+    text(`キャラクター画像　+${percent-100}%（${scale.toFixed(2)}倍）`,44,507,16,'#f0f5ff');
+    text('※ 円・HPバー・攻撃距離は従来サイズ',44,526,11,'#9ba9bd');
+  });
+})();
+</script>
+</body>
+</html>
