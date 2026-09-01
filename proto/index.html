@@ -6511,8 +6511,8 @@ function allyUpdate(a, dt){
     /* 角度の間隔は間合いで決める。近接は keep が 1.1 前後しかないので、
        固定 0.55rad だと弧の間隔が 0.6 マス＝ちょうど押し合う距離になり、
        敵を囲んだ全員が延々と押し合って震えていた。
-       弧の長さが 1.0 マスを下回らない角度まで開く。 */
-    const step = Math.max(0.55, 1.0/Math.max(0.6, keep));
+       画像を 25% 拡大したぶん、弧の長さが 1.16 マスを下回らない角度まで開く。 */
+    const step = Math.max(0.55, ALLY_PERSONAL/Math.max(0.6, keep));
     const ring = ((a.slot||0)-1) * step;           // 敵を中心に左右へ散る角度
     const wob  = Math.sin(nowSec()*0.9 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
     /* 基準の向きは「主人公から見た敵」。ここを「自分から見た敵」にすると、
@@ -6632,8 +6632,10 @@ function allyUpdate(a, dt){
    力で押し合うのをこれ以上強くすると、今度は震えが戻る。
    なので、全員が動き終わったあとに一度だけ「めり込んでいたら押し戻す」を掛ける。
    力ではなく位置の拘束なので、重なっていないときは何もせず、振動しようがない。 */
-const ALLY_MIN_GAP  = 0.46;     // 仲間どうしがこれより近づくことは無い
-const PLAYER_MIN_GAP= 0.40;     // 主人公の上にも乗らない（動かすのは仲間の側だけ）
+const ALLY_MIN_GAP  = 1.10;     // 25%拡大した仲間どうしが重ならない最終距離
+const PLAYER_MIN_GAP= 1.00;     // 主人公の上にも乗らない（動かすのは仲間の側だけ）
+// 盤面上のキャラクターだけを拡大する。攻撃範囲・当たり判定・移動は変えない。
+const CHARACTER_ART_SCALE = 1.25;
 function resolveAllyOverlap(){
   const p=livingParty();
   // 2 回だけ回す。1 回だと 3 人が数珠つなぎに重なったときに解ききれない。
@@ -6677,14 +6679,14 @@ function catchUp(a){
 
 /* 隊列のずらし。スロットごとに左右へ振り、揺らぎで硬直感を消す。 */
 function slotOffset(a){
-  /* レーン同士の距離は必ず ALLY_PERSONAL(0.62) より大きく取る。
+  /* レーン同士の距離は必ず ALLY_PERSONAL(1.16) より大きく取る。
      近すぎると、隊列が引き寄せる力と分離力が毎フレーム殴り合って震える。 */
-  const lane = [[-1.00,0.45],[1.00,0.45],[0,1.10],[0,-1.10]][(a.slot||0)%4];
+  const lane = [[-1.05,0.48],[1.05,0.48],[0,1.22],[0,-1.22]][(a.slot||0)%4];
   const w = Math.sin(nowSec()*0.7 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
   return {x:lane[0]+w, y:lane[1]-w*0.6};
 }
 /* 分離力。近すぎる相手（仲間・主人公）から押し離す向きを返す。 */
-const ALLY_PERSONAL = 0.62;      // これより近づいたら押し合う
+const ALLY_PERSONAL = 1.16;      // 拡大後の絵が触れない個人距離
 const ALLY_SEP_PUSH = 0.9;       // 押し返す強さ。1 を超えると寄る力に勝って震える
 const ALLY_ARRIVE   = 0.55;      // ここまで来たら「着いた」
 const ALLY_SLOWDOWN = 0.9;       // 着地の手前、これだけの距離をかけて減速する
@@ -6706,7 +6708,7 @@ function separation(a){
     sx+=dx/d*w; sy+=dy/d*w; n++;
   };
   livingParty().forEach(m=>{ if(m!==a) push(m.x, m.y, ALLY_PERSONAL); });
-  push(P.x, P.y, ALLY_PERSONAL*0.85);      // 主人公の上にも乗らない
+  push(P.x, P.y, PLAYER_MIN_GAP);           // 主人公の上にも乗らない
   if(!n) return null;
   /* 正規化しない。単位ベクトルにして返すと「1mm めり込んだだけ」でも
      全速力で押し返してしまい、目標へ寄る → 押し返される → また寄る、を
@@ -9258,9 +9260,7 @@ function draw(){
       e.spotted = true;
     }
     if(e.dead){ ctx.globalAlpha=Math.max(0,e.fade/0.3); }
-    // 見た目の大きさは被弾半径 e.r をそのまま使う。
-    // ボスだけ半径を大きくしても、描画がここで固定値のままだと
-    // 「当たり判定は大きいのに見た目は雑魚」という一番まずい状態になる。
+    // R は当たり判定と警告表示の基準。キャラクター画像だけはこの後で 25% 拡大する。
     const R = e.boss ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast) drawBossCast(e, sx, sy, R);
@@ -9278,35 +9278,35 @@ function draw(){
     let spriteDrawn=false;
     if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
-      drawSprite(spr, sx, sy, R*2.6);
+      drawSprite(spr, sx, sy, R*2.6*CHARACTER_ART_SCALE);
       spriteDrawn=true;
       if(e.hit>0){
         ctx.save();
         ctx.globalAlpha=Math.min(0.6, e.hit*4);
         ctx.fillStyle='#fff';
-        ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy, R*1.05*CHARACTER_ART_SCALE, 0, 7); ctx.fill();
         ctx.restore();
       }
     }else if(charKey){
-      const artSize=e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1);
+      const artSize=(e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1))*CHARACTER_ART_SCALE;
       spriteDrawn=CharacterArt.put(charKey,sx,sy,artSize,e,e.artDx,e.artDy,
                                    e.dead?Math.max(0,e.fade/0.3):1);
       if(!spriteDrawn){
         ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
-        shape(e.arch.id, sx, sy, R); ctx.fill(); ctx.stroke();
+        shape(e.arch.id, sx, sy, R*CHARACTER_ART_SCALE); ctx.fill(); ctx.stroke();
       }
     }else{
       ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
-      shape(e.arch.id, sx, sy, R);
+      shape(e.arch.id, sx, sy, R*CHARACTER_ART_SCALE);
       ctx.fill(); ctx.stroke();
     }
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
     if(e.boss && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
       ctx.fillStyle='#0d0f14';
-      shape(e.arch.id, sx, sy, R*0.55);
+      shape(e.arch.id, sx, sy, R*0.55*CHARACTER_ART_SCALE);
       ctx.fill();
       ctx.globalAlpha=1;
     }
@@ -9322,7 +9322,7 @@ function draw(){
       ctx.globalAlpha=1;
       if(!spriteDrawn){
         ctx.fillStyle='#0d0f14'; ctx.globalAlpha=0.4;
-        shape(e.arch.id, sx, sy, R*0.5); ctx.fill();
+        shape(e.arch.id, sx, sy, R*0.5*CHARACTER_ART_SCALE); ctx.fill();
         ctx.globalAlpha=1;
       }
     }
@@ -9390,10 +9390,9 @@ function draw(){
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
     const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
     if((a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0)) return;
-    const j=jobDef(a.job), R=TS*0.30*aScale;
+    const j=jobDef(a.job), R=TS*0.30*aScale*CHARACTER_ART_SCALE;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
-       **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
-       同じ絵でも敵と混ざらない。 */
+       位置・HPバー・パーティ表示で味方だと分かるので、足元の装飾リングは置かない。 */
     const mspr = isDurantree(a) ? 'moss-ball' : null;
     if(mspr && sprite(mspr)){
       drawSprite(mspr, sx, sy, R*2.6);
@@ -9401,7 +9400,7 @@ function draw(){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
-    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
+    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS*CHARACTER_ART_SCALE,a,a.dirx,a.diry,1,aScale,aRot)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
         const ang=i/6*Math.PI*2-Math.PI/2+aRot;
@@ -9413,9 +9412,6 @@ function draw(){
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
       ctx.fill(); ctx.stroke();
     }
-    // 味方の証として白い細リングを1本
-    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(sx,sy,R+3,0,7); ctx.stroke();
     if(isNpc){
       /* 未加入は「？」を浮かせて、話しかけられることを見せる。
          ただし戦いが始まったら「？」ではなく **HPバー**を出す。
@@ -9886,11 +9882,11 @@ function draw(){
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
   if(!heroBlinkOff){
-    if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
+    if(!CharacterArt.put('hero',px,py,TS*CHARACTER_ART_SCALE,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
-      ctx.beginPath(); ctx.arc(0,0,TS*0.28*heroScale,0,7); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,TS*0.28*heroScale*CHARACTER_ART_SCALE,0,7); ctx.fill();
       ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
       ctx.restore();
     }
