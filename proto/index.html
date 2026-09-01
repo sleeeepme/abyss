@@ -9873,8 +9873,6 @@ function draw(){
     ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
-  ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
   /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
      戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
   const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
