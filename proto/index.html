@@ -1524,6 +1524,11 @@ const DUR = {
   shieldPerBlock:  1,      // ガードで受けるごとに -1（パリイ成功は減らない）
   accessoryPerFloor: 1,    // 装飾品は階層を降りるごとに -1
 };
+/* 仲間の装備は主人公より壊れにくい。**主人公と同じ判定を1回減らしてから通す**——
+   減らす量を1/2.5にすると耐久が小数になり、表示のあちこち（耐久 39.6/40）が崩れる。
+   代わりに「1/2.5の確率でしか減らさない」形にすれば、耐久は常に整数のまま、
+   平均した壊れやすさだけが 2.5 倍遅くなる（damageAllyGear 側で1箇所にまとめる）。 */
+const ALLY_DUR_MUL = 2.5;
 // 接頭辞: 攻撃・生存の主効果
 const PREFIX=[
   {id:'sharp', nm:'鋭利な',   stat:'dmgPct',  r:[8,15]},
@@ -2322,6 +2327,26 @@ function nearTrial(){
           && Math.hypot(W.trial.x-P.x, W.trial.y-P.y) < 1.6) ? W.trial : null;
 }
 function trialActive(){ return !!(S.run && S.run.trial && S.run.trial.t>0); }
+/* ---------- ラスボス戦だけの、切り替わる枷 ----------
+   アビスの口と実際に殴り合っている間だけ、枷が一定時間ごとに
+   ランダムな別の枷へ切り替わる。白の層に足を踏み入れただけの固定の枷
+   （下の zoneBaneNow）とは別物——殴り合いの最中にも「同じ立ち回りが
+   ずっと続かない」を持ち込むための専用の周期。
+   戦っていない間（ボスに気づかれる前・倒したあと）は掛からない。 */
+const BOSS_BANE_SEC = 15;   // ラスボス戦中、1つの枷が効いている時間
+function tickFinalBossBane(dt){
+  if(!S.run) return;
+  const e = W.enemies.find(x=>x.boss && !x.dead && x.uniqueBoss===FINAL_DEPTH && x.revealed);
+  if(!e){ if(S.run.bossBane) S.run.bossBane=null; return; }
+  let fb=S.run.bossBane;
+  if(!fb){ S.run.bossBane = {id:pick(TRIAL_BANES).id, t:BOSS_BANE_SEC, max:BOSS_BANE_SEC}; return; }
+  fb.t -= dt;
+  if(fb.t<=0){
+    const next=pick(TRIAL_BANES).id;
+    S.run.bossBane = {id:next, t:BOSS_BANE_SEC, max:BOSS_BANE_SEC};
+    log('枷が切り替わった — '+trialBaneDef(next).nm);
+  }
+}
 /* ---------- 白の層の枷 ----------
    最終層は**階が変わるたびに枷が1つ掛かる。**
    ここまでの層は「地形が変わる」で性格を出してきたが、
@@ -2333,8 +2358,14 @@ function trialActive(){ return !!(S.run && S.run.trial && S.run.trial.t>0); }
 function zoneBaneNow(){
   return (S.run && S.run.zoneBane) ? trialBaneDef(S.run.zoneBane) : null;
 }
-/* 試練の枷が優先。籠城の最中は、そちらが今いちばん効いている枷だから。 */
-function trialBane(){ return trialActive() ? trialBaneDef(S.run.trial.bane) : zoneBaneNow(); }
+/* ラスボス戦中の切り替わる枷が最優先。次に試練。籠城や殴り合いの最中は、
+   そちらが今いちばん効いている枷だから。 */
+function finalBossBaneNow(){
+  return (S.run && S.run.bossBane) ? trialBaneDef(S.run.bossBane.id) : null;
+}
+function trialBane(){
+  return finalBossBaneNow() || (trialActive() ? trialBaneDef(S.run.trial.bane) : zoneBaneNow());
+}
 const ZONE_BANE_ZONE = 'pale';
 /* 枷の効き目を1箇所から引く。掛かっていなければ既定値を返す。 */
 function baneMul(key, dflt){
@@ -4022,7 +4053,6 @@ const S={
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
-  lastHeroArt:null,      // 前代の見た目。次の主人公は必ず別の候補を引く
   hero:null, run:null, screen:'title', prevScreen:'town'
 };
 
@@ -4174,7 +4204,6 @@ function newHero(){
           // 恩寵は死ぬまで残る（街に戻っても消えない）。
           // 祭壇があれば、前のキャラの恩寵をいくつか引き継いで生まれる。
           boons:(S.legacyBoons||[]).slice(),
-          art:randomHeroArt(S.lastHeroArt),
           party:[]};   // 仲間も同じ。主人公が死ねば一緒に失われる
 }
 function xpNeed(lv){ return Math.round(18*Math.pow(lv,1.55)); }
@@ -6108,6 +6137,22 @@ function playerAttack(){
   if(twin) P.follow={t:0.13, ang};
 }
 
+/* 中継地点を作る。**大ボス撃破の瞬間**と、**帰還ポータルからの生還**の
+   両方から呼ばれる共通の入口。同じ階を二重に足さない。
+
+   以前は大ボス（10階ごと）を倒したときだけ、その階が次からの入口になった。
+   だが5階ごとの帰還ポータルはそれより短い周期で通るのに、
+   そちらでは「一度だけ同じ階に戻れる」切符（S.resumeDepth）しか渡らず、
+   次に潜るとまた1階から歩き直しになっていた——帰還のたびに振り出しに戻る形は
+   「進んだ実感」を毎回消してしまう。帰還そのものを中継地点の発生源にする。 */
+function grantBeacon(depth, opt){
+  opt = opt || {};
+  if(depth<=0 || (S.beacons||[]).includes(depth)) return false;
+  S.beacons = (S.beacons||[]).concat([depth]);
+  log('⛺ 第'+(depth+1)+'階層に中継地点ができた');
+  if(!opt.silent) showBanner('中継地点', '次からは第'+(depth+1)+'階層から潜れる', '#7fc3e0', 3.0);
+  return true;
+}
 /* 大ボスを1体倒すごとに、大技が1つと上位ジョブが1つ解放される。
    アカウント単位で恒久なので、キャラが死んでも消えない——
    ここを消すと、大ボスを倒した意味が次のキャラに何も残らない。 */
@@ -6115,12 +6160,7 @@ function onGreatBossDown(e){
   const before = greatKills();
   S.greatKills = before + 1;
   // 中継地点。倒した階そのものが次からの入口になる（実際に入るのは +1 階）
-  const here = S.run ? S.run.depth : 0;
-  if(here>0 && !(S.beacons||[]).includes(here)){
-    S.beacons = (S.beacons||[]).concat([here]);
-    log('⛺ 第'+(here+1)+'階層に中継地点ができた');
-    showBanner('中継地点', '次からは第'+(here+1)+'階層から潜れる', '#7fc3e0', 3.0);
-  }
+  grantBeacon(S.run ? S.run.depth : 0);
   const gotUlt = ULTS.find(u=>u.at===S.greatKills);
   const gotJob = ELITE_JOBS.find(j=>j.at===S.greatKills);
   if(gotUlt){
@@ -6513,8 +6553,8 @@ function allyUpdate(a, dt){
     /* 角度の間隔は間合いで決める。近接は keep が 1.1 前後しかないので、
        固定 0.55rad だと弧の間隔が 0.6 マス＝ちょうど押し合う距離になり、
        敵を囲んだ全員が延々と押し合って震えていた。
-       画像を 25% 拡大したぶん、弧の長さが 1.16 マスを下回らない角度まで開く。 */
-    const step = Math.max(0.55, ALLY_PERSONAL/Math.max(0.6, keep));
+       弧の長さが 1.0 マスを下回らない角度まで開く。 */
+    const step = Math.max(0.55, 1.0/Math.max(0.6, keep));
     const ring = ((a.slot||0)-1) * step;           // 敵を中心に左右へ散る角度
     const wob  = Math.sin(nowSec()*0.9 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
     /* 基準の向きは「主人公から見た敵」。ここを「自分から見た敵」にすると、
@@ -6634,10 +6674,8 @@ function allyUpdate(a, dt){
    力で押し合うのをこれ以上強くすると、今度は震えが戻る。
    なので、全員が動き終わったあとに一度だけ「めり込んでいたら押し戻す」を掛ける。
    力ではなく位置の拘束なので、重なっていないときは何もせず、振動しようがない。 */
-const ALLY_MIN_GAP  = 1.10;     // 25%拡大した仲間どうしが重ならない最終距離
-const PLAYER_MIN_GAP= 1.00;     // 主人公の上にも乗らない（動かすのは仲間の側だけ）
-// 盤面上のキャラクターだけを拡大する。攻撃範囲・当たり判定・移動は変えない。
-const CHARACTER_ART_SCALE = 1.25;
+const ALLY_MIN_GAP  = 0.46;     // 仲間どうしがこれより近づくことは無い
+const PLAYER_MIN_GAP= 0.40;     // 主人公の上にも乗らない（動かすのは仲間の側だけ）
 function resolveAllyOverlap(){
   const p=livingParty();
   // 2 回だけ回す。1 回だと 3 人が数珠つなぎに重なったときに解ききれない。
@@ -6681,14 +6719,14 @@ function catchUp(a){
 
 /* 隊列のずらし。スロットごとに左右へ振り、揺らぎで硬直感を消す。 */
 function slotOffset(a){
-  /* レーン同士の距離は必ず ALLY_PERSONAL(1.16) より大きく取る。
+  /* レーン同士の距離は必ず ALLY_PERSONAL(0.62) より大きく取る。
      近すぎると、隊列が引き寄せる力と分離力が毎フレーム殴り合って震える。 */
-  const lane = [[-1.05,0.48],[1.05,0.48],[0,1.22],[0,-1.22]][(a.slot||0)%4];
+  const lane = [[-1.00,0.45],[1.00,0.45],[0,1.10],[0,-1.10]][(a.slot||0)%4];
   const w = Math.sin(nowSec()*0.7 + (a.seed||0)) * Math.min(0.18, a.wobble||0);
   return {x:lane[0]+w, y:lane[1]-w*0.6};
 }
 /* 分離力。近すぎる相手（仲間・主人公）から押し離す向きを返す。 */
-const ALLY_PERSONAL = 1.16;      // 拡大後の絵が触れない個人距離
+const ALLY_PERSONAL = 0.62;      // これより近づいたら押し合う
 const ALLY_SEP_PUSH = 0.9;       // 押し返す強さ。1 を超えると寄る力に勝って震える
 const ALLY_ARRIVE   = 0.55;      // ここまで来たら「着いた」
 const ALLY_SLOWDOWN = 0.9;       // 着地の手前、これだけの距離をかけて減速する
@@ -6710,7 +6748,7 @@ function separation(a){
     sx+=dx/d*w; sy+=dy/d*w; n++;
   };
   livingParty().forEach(m=>{ if(m!==a) push(m.x, m.y, ALLY_PERSONAL); });
-  push(P.x, P.y, PLAYER_MIN_GAP);           // 主人公の上にも乗らない
+  push(P.x, P.y, ALLY_PERSONAL*0.85);      // 主人公の上にも乗らない
   if(!n) return null;
   /* 正規化しない。単位ベクトルにして返すと「1mm めり込んだだけ」でも
      全速力で押し返してしまい、目標へ寄る → 押し返される → また寄る、を
@@ -7032,6 +7070,8 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
 function damageAllyGear(a, slot, amount){
   const it=a.equip[slot];
   if(!it || !it.durMax || it.dur<=0) return;
+  // 2.5倍壊れにくい。呼び出し側は主人公と同じ頻度で呼んでいるので、ここで間引く。
+  if(rnd() >= 1/ALLY_DUR_MUL) return;
   it.dur -= amount;
   if(it.dur<=0){ it.dur=0; log(a.name+'の'+it.nm+'が壊れた'); }
 }
@@ -7900,7 +7940,6 @@ function die(){
   el('d-lost').innerHTML = html;
   _deathHtml = html;
 
-  S.lastHeroArt=S.hero.art;  // 次の代が同じ姿を引かないために残す
   S.hero=null; S.run=null; S.carry=[];
   renderDeathLegacy();
   setScreen('none'); el('m-death').classList.add('on');
@@ -8115,6 +8154,12 @@ function finishReturn(overflow){
      壁が無い層や高難度の層を、また1階から歩き直すのは苦痛でしかない。
      次に潜るときに一度だけ使える切符——潜ればここは消える（下の startRun 参照）。 */
   S.resumeDepth = depth;
+  /* 生きて戻ってきたこと自体を、次からの標準の再開地点にする（中継地点と同じ扱い）。
+     大ボスの階（10階ごと）は既に onGreatBossDown で中継地点が付くので、
+     ここは主に5階ごとの中ボス階（5・15・25…）を拾う。
+     resumeDepth（同じ階へ一度だけ）とは別物——こちらは恒久で、+1階から続きになる。 */
+  grantBeacon(depth, {silent:true});
+  S.startDepth = depth+1;
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
   rerollTavern();                                   // 酒場の流れ者も同じ周期で入れ替わる
@@ -8245,7 +8290,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn')) continue;
+    if(t.target && t.target.closest && t.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     if(stickId===null){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
@@ -8284,7 +8329,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn')));
+      !(x.target && x.target.closest && x.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -8834,6 +8879,7 @@ function update(dt){
   tickBossFreeze(dt); // 第40階層の主。全員をまとめて止める
   if(S.run.frozen>0) S.run.frozen = Math.max(0, S.run.frozen-dt);
   tickTrial(dt);      // 試練の籠城戦
+  tickFinalBossBane(dt); // ラスボス戦中だけ切り替わる枷
   autoPickup();
   if(W.grave && Math.hypot(W.grave.x-P.x, W.grave.y-P.y) < 0.9) collectGrave();
   livingParty().forEach(a=>allyUpdate(a,dt));
@@ -8989,30 +9035,48 @@ function mossSpriteKey(e){ return (e && e.moss) ? (MOSS_SPRITE[e.moss]||null) : 
 
 /* 作成済みの右向きキャラクターアート。
    苔玉は上の正面絵を優先し、こちらは左向きのときだけ水平反転する。
-   上下向きでは直前の左右を保ち、未制作キャラは従来図形へ戻す。 */
+   上下向きでは直前の左右を保ち、未制作キャラは従来図形へ戻す。
+
+   本編は単一HTML・外部依存なしで配る決まり（8947行のSPRITESと同じ理由）。
+   以前はここだけ `assets/sprites/` を相対パスで読んでいて、
+   index.html を単体で渡す（プレビュー送付・配布）と絵が全部欠けていた。
+   PNG が小さいので、他のスプライトと同じく data URI で埋め直す。
+
+   絵の**正**は `proto/assets/sprites/` の PNG と `docs/CHARACTER_ART_LIST.md`。
+   ここに埋めてあるのはその写しなので、**絵を直すときは PNG を直して貼り直す。**
+   この文字列を直接いじらない。 */
 const CharacterArt = (function(){
-  const DIR='assets/sprites/';
   const FILES={
-    hero:'characters/hero/scout-right-idle.png',
-    warrior:'characters/allies/warrior-right-idle.png', knight:'characters/allies/knight-right-idle.png',
-    rogue:'characters/allies/rogue-right-idle.png', priest:'characters/allies/priest-right-idle.png',
-    hunter:'characters/allies/hunter-right-idle.png', mage:'characters/allies/mage-right-idle.png',
-    warrior_2:'characters/allies/warrior-right-idle_2.png', warrior_3:'characters/allies/warrior-right-idle_3.png',
-    knight_2:'characters/allies/knight-right-idle_2.png', knight_3:'characters/allies/knight-right-idle_3.png',
-    rogue_2:'characters/allies/rogue-right-idle_2.png', rogue_3:'characters/allies/rogue-right-idle_3.png',
-    priest_2:'characters/allies/priest-right-idle_2.png', priest_3:'characters/allies/priest-right-idle_3.png',
-    hunter_2:'characters/allies/hunter-right-idle_2.png', hunter_3:'characters/allies/hunter-right-idle_3.png',
-    mage_2:'characters/allies/mage-right-idle_2.png', mage_3:'characters/allies/mage-right-idle_3.png',
-    paladin:'characters/allies/paladin-right-idle.png', summoner:'characters/allies/summoner-right-idle.png',
-    archmage:'characters/allies/archmage-right-idle.png',
-    'ash-hound':'enemies/ash-hound/right-idle-v5.png',
-    'dust-spider':'enemies/dust-spider/right-idle-v2-draft.png',
-    'ash-toad':'enemies/ash-toad/right-idle-v3-draft.png',
-    'stone-boar':'enemies/stone-boar/right-idle-v3-draft.png',
-    'great-ash-frog':'enemies/great-ash-frog/right-idle-v4-draft.png'
+    'hero': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIElEQVR42u3YPQrCQBCG4dzENq1iIQgWiqVgrXZ2FoKFYOEt7GJl4xUET6AX8AzeQltnigxDom523w++apOQeYrNT5YRQgghhNSUVj56ffY87ZT2vh2L6vMBAACAsAfc9HJRC0APrKuPDw4EAAASA7AGtm74+biK1r0OAAAAhL3p3YqdqB7IWwAAAKDZL0ZekOg+jgAAIHKAyaIrut4PRb0vOtb5AAAAwG8HvByXotYNWQMdTjNRve49vnYgAABIHEAPbK17N8XVoF1afby+3tc3RQAASBzAuwnqWgMW876oXreupz+u/v4UAACAyACqglkAFoh1veB+oAAAAAClN+z9ePKeH9wfIgAAiBzAu+lVBQgOBAAAEgcghBBCSGPzBqBLOSQ/yzQ7AAAAAElFTkSuQmCC',
+    'warrior': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABvklEQVR4nO3bsUoDQRAG4P9+trOyEYMWJjYqqQQRUoiIkMIuD6GWpkoXsItvEK3MC6QLGLCyiIhtUKvEQrDTyjrWO8Idy96Z4s/XTXZvdpvZTPZIMpvNoIwQR4gjxBHiCHGEOEKcyzvhxvZxVGPx/nqfhMx/m3x4621V1oOeJ8QR4ghxLu+aP1n58sYPyukl+TCdpeazZ4IdvxvcBj1vEeIIcYQ4V/QCh61O+riJB40rhNR8LEIcIY4Q5/JO2O76Nbxvavqp34oazxshjhBHiHOxCbJ6dVvT1n/XvEWII8QR4pKsd4Ohd3z90x8vvh7vefFw9IKYfI2bpag7RIsQR4gjxLmsmg+taVuj9Zqff2215MXVynJqPuu8NE3db+iZQIgjxBHiXNYEW/Ox2pcXXtzv9YKe736WvXjRB0QixBHiXNELjCff/gem5s+qz148HPl9xG7z0ftef2/muz9CHCGOEOdC7/jqtZ2gBWyvn91nhN0XxCLEEeIIcS5rQlavbc8I+3u9O0rPb+cDfq9fNEIcIY4Q52IT/K3hsDOkc7SZeoYUjRBHiCPEJYv/DYojxBHiCHGEOEIc572BefsFAXiDJzkpj8MAAAAASUVORK5CYII=',
+    'knight': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo0MzowNiswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo0MzowNiswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4gt9/mAAAB4ElEQVR4nO3bsUvDQBQG8C8fB45Sd1GcVBAEdekiqEPFWVwLLW4iRXDsILgIIuImCq5FoZPooIJLFxVcRDfrX9DZqS4O3kNyHIkU+frbHrl7lwzvcrkkSbfbhTJCHCGOEOdCDZIkwX8yMr7oTWofb7feBdg5jxBHiCPEub+uwbzZmrbjXV+eee1LK2V7Pl5/QhwhjhDnsiawNVicL3rH52ZnUvtPTY5FjVet1FJr/uruKSofIY4QR4hzeSds3be8+KrZ8OLG86MXr07Pph5fM8cHh4aRJ0IcIY4Q5/JOGFoHvFzeeXF9d8+L+d724vPmhRdXK7WczvR7PIgjxBHiCHGEOEIcIc5lff4/OT1IvU/bZ4PNrY2o8UL3ffv8f7h/lLqHaBHiCHGEuCT0fcDoxFKmPT9bk7HsnLG84I+3s3fsxfXtdS8urZS9uP16038v8BMhjhDn8k4YqvnQHGL7Pzw+pcZ2nVEycX8dEECII8S5vBPa+3bWdYDViqzxEEIcIY4Q50INfqmxbkyNxgrtF2TNbxHiCHGEOBfbITQnxK71bU3H7jdkRYgjxBHiktCeYOh/AfueoFAYSG3f6XxGffubNZ/V/1/AIMQR4pL+f4PiCHGEOEIcIY4Qx16fQK99AbfolKhkEfUXAAAAAElFTkSuQmCC',
+    'rogue': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABsklEQVR4nO3bTyhEURgF8POOW/YWYzNFsqCUrCwokZRmIwtLZUfWmu1szWwoipW9veRPVshGsjEWiBoxyuwVjfV31ZPmvhl13m935s7c+zb3m+++3ovq9TqUEeIIcYQ4QhwhjhBHiHOhJ+zun2yosXgsH0doIkIcIY4Q50Lv+f1Se9D5kq4JhDhCHCEu+uv9AH+PFmfeY78/Nl+MHa/dr8WOT698IMmaQIgjxBHiXOgJ/T0/OJU3+fpw1eTxpZfYccDPYRHiCHGEuCh0H7B+MYCQnl9tjUj7gMAIcYQ4F7r39/fsb/cH/F6/2QhxhDhCnEt6gY2SrQm+XCb+93tvHSZXy0emJu0sL5rxocKuyV3ZTpP7erLmfgIhjhBHiIv8s8DtQ8V88FSpmvGrwpzJC5tbJg/P2vN7LlMz+bN3NPaC3N1pbA1IzwKBEeIIcVGjzwn6ZwV/zzcqrQEJI8QR4lzSC/j/+xNfZyaftI3E9gFJI8QR4ghxLukFDs5vTN4uX5rzeP5HH4GmIsQR4ghx7r/1/j5//tDPERLiCHGEuCh9b1AcIY4QR4gjxBHi2OoLaLVvU2l9w/Fwmb0AAAAASUVORK5CYII=',
+    'priest': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAFxGlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMzoyNjoxMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMzoyNjoxMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6Y2E2NjU3NjYtMDk2MS00NGMyLWE2ODgtOWIwZTA1ZjYzMWRhIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzAyYzFhMGMtZGM0MS00NmI5LTg0OTQtNzM4MDA0NmJhNTc3IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6Y2E2NjU3NjYtMDk2MS00NGMyLWE2ODgtOWIwZTA1ZjYzMWRhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI2OjExKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4hjhY5AAABl0lEQVR4nO3boUsEQRQG8G8/5m8wi3CCwaJBbAaD+TQbDCLXxGAQrlwyHDYxGUwWNx9oEATlghbDgYdy5YImg4JtzTPCLMPM7Qnf/tpwM2+2vMeb2dusKAooI8QR4ghxhDhCHCGOEGdSB5xdWI9qLEaDmwwVIsQR4ghxWexZwM35+blGVLyXt2FUTXg6WbWeZ2n/wbueEEeII8RloTWgLOevzveQ0uLagbcmuDnfWJ6x5g8fP+CrCYQ4Qhwhzkx6g6/XO2u8ddS3xvnptjVuti6scT8/9Nag0cDO6boPCESII8SZqjd0cz7099QIcYQ4QlyW+j7A9Xzbjer9Xe5ZwN0/3/225td9QAlCHCHOpL7nD70T3Nw5C5r/PrgufGeFca8dFI8QR4gjxJnQBbH3/qHx3fcEK81jb18w7rWDahYhjhBHiDOT3qD785k0Xur/DxDiCHGEOFP1hvety6i+4O97gbiaQIgjxBHiCHGEOEIcIc6ELnDP56XzNzr4zwhxhDhCXFZ/NyiOEEeII8QR4ghxnPYDTNsv4N5xIth2nf4AAAAASUVORK5CYII=',
+    'hunter': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo1MjoxNyswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo1MjoxNyswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NmY5Yjk1ODMtYjc0OC00NzA3LTljNzItYzFiYzk3YjlhYTUxIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NmY5Yjk1ODMtYjc0OC00NzA3LTljNzItYzFiYzk3YjlhYTUxIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz41AD1KAAAB9UlEQVR4nO3bv0uVURgH8O/79WwFDg5BDkFxdRAbDEKLpMAQwSFBEXERrDVoUYn+gLsFrelsTTUI0ZSTXhQbDBoUh7sIDg6Kg4ve5ucZzuFw39sVvvezPZyfy3N43nPuLRqNBpQR4ghxhDhCHCGOEEeIC7kDDo83TOFQuTtZxPrfe/DQ9H+yOBSdf2vtt4nrR/vR+ZtFiCPEEeJCbs5/eLVs2r/uTGblfP/Tgeh6vt3PV/aZQIgjxBHiQqrD2LP3Jh7uQak5X7afKy/Mfsarv6JnBiGOEEeIC61eYPr80sQv334x8d76OxM/mvsYbU/l/P35paz9EeIIcYS4kOrga+/ZxwNNPSSkctq3j8x/cvt5jTIR4ghxhLgi923Q1/7DPVemvXbahf+pfrRv4sM/P0xcGZzofAvEEOIIcSF3gK8L/JmwMnLb9D95MxWd787nbyaubl8gdr8w+vcAZSLEEeIIcQE3jD9Dqu6tcGHGXkoe11btBLd6s9YjxBHiCHFF2b8TTNUFmwdnJn7e151VB3gL53XE7gQ73wIJhDhCXGj1Aj7n/X1BzeW8d/19Nzre1wW5CHGEOEJcaPcGUvcLKf79378VVqoT0fGEOEIcIa5o9beAl/qdX7PjcxHiCHGEuKLzv0FxhDhCHCGOEEeIY7s30G7/ACvDjPQ6EkEjAAAAAElFTkSuQmCC',
+    'mage': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABe0lEQVR4nO3bIUsEQRjG8f8+TLRYtFww3opJbAY5uCDYxWIyiFgFP8N9ABGb0Q9xIIIaDCbxxGS44qc4806YZZhb7+C5Xxve3Xm3vO/OzLLVbDbDmTAnzAlzwpwwJ8wJc6F0gq16mFxI/EzGFUtMmBPmhLlQWvPrrDXix4PT5PVd94TcfMKcMCfMVaXnAbk9oc3d4y05NRznf5iMG/GTepicT5gT5oS5UFrj8bjU+eAimb+tJzxffWflE+aEOWGumvc64Hf6VTTfZq9Pyd7h8mC38Tw3T++rvUCKMCfMha4TXH+8NMajnf1k/P7wjP8kzAlzwlzoOkFc823xeB3QNWFOmBPmQu5aP96vx/q9vca47m03xpPpZzL+On3L2mvEPeNogyzCnDAnzIXSCeKeEJ/rt9V8HI+Vnge0EeaEOWFOmBPmhDlhLrRdEL+Hc/cGy06YE+aEuWre3wZLe0ru/bHVt8FMwpwwV63+GzQnzAlzwpwwJ8xp0Q+waH/Uq3RvSPF/QQAAAABJRU5ErkJggg==',
+    'warrior_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxMjo1OSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxMjo1OSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6N2FkOTUzODUtYzE2Yi00ZDFkLWI5MzYtZjM3YzNjZDJjMzhlIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjYyZjE2YTdjLTAwMjItNDlkNS1hNjYzLTQwODYxNGEyNTA5OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjYyZjE2YTdjLTAwMjItNDlkNS1hNjYzLTQwODYxNGEyNTA5OCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NjJmMTZhN2MtMDAyMi00OWQ1LWE2NjMtNDA4NjE0YTI1MDk4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NmIyMThlYTctOGJhZC00ZDYzLWEzYjUtMmE5MjNjMjkxZTFjIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI2VDIzOjU4OjQwKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6N2FkOTUzODUtYzE2Yi00ZDFkLWI5MzYtZjM3YzNjZDJjMzhlIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjEyOjU5KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7ML1k5AAABzElEQVR4nO3bvUoDQRQF4LOHAYtUIohiIzaiBAtBxBRiIUawyxMIgulEK7ugnT6CVuYF0gUMWFkkiG3wpwkWVoJapbBa67nFLsNuDHL2625mZ2aLnNnJJIniOIYyQhwhjhDn8M/NL217i9jb810U0p8QR4gjxEV57wNsJkOFZvhl8O7Nt7u3HzQeIY4QR4hzeWd+b+XLa9+sJEf6vhsHPddt+237BlkQ4ghxhDg36gm2di5S2v26XbtEUuarleUc7w7FO4AQR4hzeQ/YOPMzvG4y/dA6zdSeN0IcIY4Q57IOkLZXt5m2/jrzFiGOEEeIi0LPBNPO/FqHQ6++6q95daf7FDSfHa92XUpst1ZPesWZYBJCHCHOhWY+LZO2rlb88eZmZr26vDAZtEZMfPTMfBteXXw3GIgQR4hzoR3scx0Ie643zo+9utVsBvX/mc6WeYsQR4gjxLlRT9AffPsvmMzXy49e3ekm7yuyZt4ixBHiCHEu7QKbufrBUdABgt3rh+4r8s68RYgjxBHioqy/E7TnBfbzut27W2nXF2vAiBHiCHFR1jVgcaqUOMDr5zAaZf+sCHGEOEJcVPxvUBwhjhBHiCPEEeI47hsYt19Vr5H91xoK3gAAAABJRU5ErkJggg==',
+    'warrior_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxMzo0OSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxMzo0OSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6N2VkYmU0NmItNzJlMi00OTE5LTk2YTUtMTZlYzZhN2Y1MGM0IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjYyZjE2YTdjLTAwMjItNDlkNS1hNjYzLTQwODYxNGEyNTA5OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjYyZjE2YTdjLTAwMjItNDlkNS1hNjYzLTQwODYxNGEyNTA5OCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NjJmMTZhN2MtMDAyMi00OWQ1LWE2NjMtNDA4NjE0YTI1MDk4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NmIyMThlYTctOGJhZC00ZDYzLWEzYjUtMmE5MjNjMjkxZTFjIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI2VDIzOjU4OjQwKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6N2VkYmU0NmItNzJlMi00OTE5LTk2YTUtMTZlYzZhN2Y1MGM0IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjEzOjQ5KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4gUrrIAAAByUlEQVR4nO3bsUsDMRgF8HfPLOKkk+IiOlilkyBCB6dCBRftXyAIdhMdxE1w0z9BJwu6dhMsdHKoiGvRTsXB3clRzjnfkCPcVZF3v+1rLslR+tI0bZM0TaGMEEeII8Q5/HMLK3VvEXt/6yUx/QlxhDhCXFL0PsBmMlZshoejD2++re29qPEIcYQ4QpwrOvOVyWWvvZpsBvsP0sfgeDbDtv3h/gZ5EOIIcYQ4N+4JTm5nMq7Y8aqN5iVCmW/UVou7OZSvAJRPAMS5ogds34Uz/dw5zdVeNEIcIY4Q5/IOkLVXt5m2fjvzFiGOEEeIS2LPBLPO/DoHX159NVj36m7/NWo+O17zeirYbq0dP5VngiGEOEKci818ViZt3aj5483Pznl1dXE6ao2YqNTNfD2vLr8bjESII8S52A72fR2Ie18/Oz/y6k67HdX/e5gv8xYhjhBHiHPjnmAw+vQfMJlvVV+8utsP7yvyZt4ixBHiCHEu6wKbudb+YdQBgt3rx+4ris68RYgjxBHikry/E7TnBfbzut27W1nXl2vAmBHiCHEu7wA2w1ZWhpd2L4JryLgR4ghxhLik/N+gOEIcIY4QR4gjxPGvb+Cv/QCwj4s8uG3YKAAAAABJRU5ErkJggg==',
+    'knight_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNTo0MiswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNTo0MiswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6M2UxNmYzZDgtMTU4Yy00YTE1LWI0OGMtYzNkZTY2ODhmOTA4IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MzEwNzU5MDUtYTFkOC00M2FhLTgyNTgtNmM5MjJmMzg3MzBkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjAwOjIzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6M2UxNmYzZDgtMTU4Yy00YTE1LWI0OGMtYzNkZTY2ODhmOTA4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjA1OjQyKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5EvpxaAAABvUlEQVR4nO3bsUoDQRAG4P9+FlKKrSCIYGmVpImthVZWoqCChY1FkPgIPoCiFoJYCGKR0koLW69JUlkK4htYp4qtO8Uuy16M8N/XDXu7m2bmZu8uxWQygTJCHCGOEOemvcH62lJWkXl9+ypy9ovNJ8QR4ghxruoFbQ522h1vvNlqe/HyympWTtvx+4eXpPmEOEIcIa7IPQuk5rwVqwFW7/QIoZwflc/B+Vv7vboG/EaII8S5qhcsB6UX95/8nBw+9r24tbsdHt/b8eLFhTlUiRBHiCPEFbPuA1L7gtQ+4Prm0ovrs4BBiCPEudxnehfnd8EctX1Bbo2wDg82vLh7fJI0nxBHiCPEudQJNoc/P96DOWjvw9ZoOAj2AbamWLH96vcCEYQ4Qpz76w1tXxAbtzne7Gx68e3VmRfX7wUSEeIIca7qBWP3/dhZwM63fYKNbc0ozdmg7gMiCHGEOFf1gqlngVQ251O/IbIIcYQ4QpzDPxN7phc7S6QixBHiCHEudkHsu7zc8/603xvEEOIIcYS4ourvAxqN+eD14/F3Uo3JXS+GEEeII8QV9f8GxRHiCHGEOEIcIY6z/gGz9gOpGKXsigGhgAAAAABJRU5ErkJggg==',
+    'knight_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNjoyMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNjoyMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MDdjNmRhZmQtNDBkNC00Yzg4LWI4NzctODVkZTVkZTRlYTMwIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MzEwNzU5MDUtYTFkOC00M2FhLTgyNTgtNmM5MjJmMzg3MzBkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjAwOjIzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MDdjNmRhZmQtNDBkNC00Yzg4LWI4NzctODVkZTVkZTRlYTMwIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjA2OjIxKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4D/tmrAAABv0lEQVR4nO3boUsEQRQG8G8/Bi6KWQQRqxj0ggc2w4nBJILhMFgMIof/gV1ELghiENs1i5zBJpzhvCBWEf8D86WzOi/MMMyeJ3z7a4/Zmbny3r7Z3SvG4zGUEeIIcYQ4N+kNNhY2s4rM89dTkbNfbD4hjhBHiHNlL2hzsN5oeONr9VUvXlpezMppO373eJs0nxBHiCPEFblngdSct2I1wDo9bCOU8y+9YXD+fnunqgG/EeIIca7sBQf9vhff97pe/NZ98OKV3e3w+J4/PjczjzIR4ghxhLhi2n1Aal+Q2gdcXXa8uDoLGIQ4QpzLfaZ3fnMRzFHbF+TWCKvVPPDio5PjpPmEOEIcIc6lTrA5/PH+GcxBex+2XgfDYB9ga4oV2696LxBBiCPEub/e0PYFsXGb4+tbft/QObv24uq9QCJCHCHOlb1g7L4fOwvY+bZPsLGtGa2mH1d9QAQhjhDnyl4w9SyQyuZ86jdEFiGOEEeIc/hnYs/0YmeJVIQ4QhwhzsUuiH2Xl3ven/R7gxhCHCGOEFeU/X1AbbYWvH70PUqqMbnrxRDiCHGEuKL636A4QhwhjhBHiCPEcdo/YNp+AJkZpe8ntmEQAAAAAElFTkSuQmCC',
+    'rogue_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAFxGlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxNDo0OSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxNDo0OSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NjNmOTlhYjItNjEyMS00YjYxLWFiOTktY2RmOWI1NWYzZDVkIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjIwM2I0YmY1LWVhZGEtNGRjYy05ZDBiLWExNThlYmNlYzNiZiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjIwM2I0YmY1LWVhZGEtNGRjYy05ZDBiLWExNThlYmNlYzNiZiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MjAzYjRiZjUtZWFkYS00ZGNjLTlkMGItYTE1OGViY2VjM2JmIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NjNmOTlhYjItNjEyMS00YjYxLWFiOTktY2RmOWI1NWYzZDVkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjE0OjQ5KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5nkNI1AAABsklEQVR4nO3br0uDQRgH8O/79cBFTYJMlCW1GA02EUFss2my2GTgD4ZJTDIEYYjBZDNpMog/sGkzaNhMY+L8sf9Ag8x8F26M3Tnhu0979rzcXXnunhvvmzQaDSgjxBHiCHGEOEIcIY4QZ0IPODI201ZjUS3fJPhDhDhCHCHOhK75s8xB0PFi7wmEOEIcIS5p9f8At0ZzqRXv84sn/d58bSPtzS9UVhFzTyDEEeIIcSb0gG7NT8zmrfjxqmDF809L3jyyiIoQR4gjxCWh+4DTvnOE9Pb5YcXdPiAwQhwhzoTu/d2avdjr9T4/t/mNTiLEEeIIcSb2BOuH/mN7fCTlzZeqX1ZcL19be9LyWtHK57Z2rHg4PWDFo5m0tSBCHCGOEJe4d4HnSs364aVWt/LF3W0rPt7PWfFktuCt8aHBjHdBr+8V7x7QvQsERogjxCXtvifo3hWaneut6u4BkRHiCHEm9gTuuT/9c2fFtz1T3j4gNkIcIY4QZ2JPcHlfsuKj8oN1jucj9xHNEOIIcYQ48996f5c7fuj3CAlxhDhCXNL9blAcIY4QR4gjxBHi2OkFdNov0tR3dJp44mIAAAAASUVORK5CYII=',
+    'rogue_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxNDozMCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxNDozMCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MTZmN2M0NWQtZWM4Yy00MDMzLWJjOGYtZjJhOThhYjMxMjBhIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjIwM2I0YmY1LWVhZGEtNGRjYy05ZDBiLWExNThlYmNlYzNiZiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjIwM2I0YmY1LWVhZGEtNGRjYy05ZDBiLWExNThlYmNlYzNiZiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MjAzYjRiZjUtZWFkYS00ZGNjLTlkMGItYTE1OGViY2VjM2JmIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NGQzNThiNDEtM2FiMi00ODVjLTgwNDktYTRjOWRhZTFjMTQ2IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjAzOjAyKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTZmN2M0NWQtZWM4Yy00MDMzLWJjOGYtZjJhOThhYjMxMjBhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjE0OjMwKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz6lJla9AAABtElEQVR4nO3bPyxDURgF8POOJxKTTpYWkUiIwdjBhkiMrLZGLIJJLAaDRUxqkoiluw4Gf2MjMRgMVCIRgmCzikjN3x2uSO9VyelvO/1e733Lve+7zWtSrVahjBBHiCPEEeIIcYQ4QlwaesCuvpGaGov7ynGCP0SII8QR4tLQa75/fCPoeLH3BEIcIY4Ql/z29wB3jWaGp73X789kvPVCKeutX5VnEXNPIMQR4ghxaegB3TU/MLpo8uXhqskXpUlvPV9GVIQ4QhwhLgndB7Re7SKk59cXkxt9QGCEOEJcGrr3d9fs3lqL9/qxhQ/UEyGOEEeIS2NPsFzs8NbzOf/3zx9vTX6rHJk9aW5+x9QLS1Mmd2bbTe7tzpo+ghBHiCPEJe5Z4ObuyXzw8PRm6tsrWyYX1ydMzk845/lcj8ltuWbvDb0/fnr3gMZZIDBCHCEuqfU9Qfes4K75WjX2gMgIcYS4NPYE7nN/6OvU5JOmQW8fEBshjhBHiEtjT3Bwdm3yZuXCPMcXI/cRPyHEEeIIcel/6/1d7vih3yMkxBHiCHFJ43+D4ghxhDhCHCGOEMd630C9fQOV1Hh/8GOQMQAAAABJRU5ErkJggg==',
+    'priest_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxMTowNCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxMTowNCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6YWY0ODNkNTctMzE4MS00YTFlLThmMTMtMmQ5NDQ0NzgyMThjIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzAyYzFhMGMtZGM0MS00NmI5LTg0OTQtNzM4MDA0NmJhNTc3IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6Y2E2NjU3NjYtMDk2MS00NGMyLWE2ODgtOWIwZTA1ZjYzMWRhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI2OjExKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6YWY0ODNkNTctMzE4MS00YTFlLThmMTMtMmQ5NDQ0NzgyMThjIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjExOjA0KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz6ytpNeAAABkklEQVR4nO3bsUsDMRQG8C8f+RucXeogCOIg6NzBwdFRBKmDs4pu3QXdHVpEcXcVLDgIig4iFETsYJcOdXDS+ZwTIUdIeh2++22hycst7/GS65miKKCMEEeII8QR4ghxhDhCnM0dcGG2mdRY9Ic9gwoR4ghxhDiTehbwc35+rpEU7+1jkFQTXg5WnOdZOnkMrifEEeIIcSa2BpTlfOdqFzmtLu8Ha4Kf843FGWf+4PULoZpAiCPEEeLspDf4+bx3xq29J2d83t1yxtutS2fcuzkK1qD+0M3pug+IRIgjxNmqN/RzPvb33AhxhDhCnMl9H+B7eD5N6v19/lnA3/9i49eZX/cBJQhxhDib+54/9k5wZ/Msav74/bYInRVGnXZUPEIcIY4QZ2MXpN77x8b33xM0146DfcEI7aiaRYgjxBHi7KQ3+O5eZ42X+/8DhDhCHCHOVr3h4d04qS/4/14grSYQ4ghxhDhCHCGOEEeIs7EL/PN5mfXI+VUjxBHiCHGm/m5QHCGOEEeII8QR4jjtB5i2P4sqcMLJ+V5pAAAAAElFTkSuQmCC',
+    'priest_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDoxMDoyMyswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDoxMDoyMyswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ZThhNjI0MTUtMWIzZi00OTQwLWExNjEtMWUxYzAxMzhlYjBkIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjcwMmMxYTBjLWRjNDEtNDZiOS04NDk0LTczODAwNDZiYTU3NyI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzAyYzFhMGMtZGM0MS00NmI5LTg0OTQtNzM4MDA0NmJhNTc3IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6Y2E2NjU3NjYtMDk2MS00NGMyLWE2ODgtOWIwZTA1ZjYzMWRhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI2OjExKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZThhNjI0MTUtMWIzZi00OTQwLWExNjEtMWUxYzAxMzhlYjBkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjEwOjIzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4eqtqAAAABhklEQVR4nO3bsUoDQRDG8f997AP4BGkMCIJgndbWTlC7WNhoZalFQEjjE0QQfQAVsbHSUgipRBBEISKks7c/69viwpJNInz5dUNuZtLs3tzmUpRliTNhTpgT5oQ5YU6YE+ZC7oLLzeZEg8XXcFgwQ8KcMCfMhdxrfmV1LWu91D2h2+1W8judTm2+MCfMCXNF6nnAuDV/fXlKTuutLer2hHjNNxqNyvWj0Yi6PUGYE+aEuTDtBr/fz5V49+S+Et/0jivx9uFZJe4/nCfNCYs5IJEwJ8yFWTeM13zq57kJc8KcMBdSE+L7bnxfjmf31/5dUv04P7X/Xrud1E+YE+aEuZD7nD/1THBnP+384Ofjqax7Vri4HSTVE+aEOWEupCZMeu6fWv/z/a0StzYPqP/dYJC0ZwlzwpwwF6bd4Kq3lLVe7vcHhDlhTpgLs274+HI00Vww6fsDMWFOmBPmhDlhTpgT5kJqQvx8Pv76Df4zYU6YE+aKxf8GzQlzwpwwJ8wJc5r3F5i3P9wOaSwu7wvOAAAAAElFTkSuQmCC',
+    'hunter_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNzowNiswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNzowNiswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ODAxNTViNWYtZGMwOC00NWQzLTg2MjItMDM2ODNkNzUxMmViIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NmY5Yjk1ODMtYjc0OC00NzA3LTljNzItYzFiYzk3YjlhYTUxIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTA5Zjc3YTEtMDI2Mi00NmQ3LTg1OTUtOWU4NGY2MThkNGNjIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjAxOjEwKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ODAxNTViNWYtZGMwOC00NWQzLTg2MjItMDM2ODNkNzUxMmViIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjA3OjA2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz6tlOy+AAAB70lEQVR4nO3bv0tbURQH8G++3rEgJVsWwaJCxXYQSqQIFbRZHFxCKVkLpUuhiw3SPyC6FNzsLurm4KIUFBwU0UFLHRQLWbp1aOha0vmc4T4uNyGFr5/tcH+cu5z7bm7eK3W7XSgjxBHiCHGEOEIcIY4QF1IH3P7cMweHscpiKdZ/5NET0/9tbTI6/8b+dxO3766i8+cixBHiCHEhteY/LX007Ttni0k1//zpRDSfb/fz9XpPIMQR4ghxoajD/OyKiatl9LTmc+0350z+WuswaY8gxBHiCHGh3wnKlSETL7zfNvHF1gcTT7/+HG33RhvLWXsCIY4QR4gLRR382fvVs8msPxKKatq3zzTW3XreoJcIcYQ4QlxIHXD6yz7Xq+W/0Ts9H+fyvz2+7q5mzUeII8QR4kLqAH8u8DXZnHlg+j+efRmd7/r4wMStkz+I3S887LTRS4Q4QhwhLuA/4/eQljtHfKm7S0lnaqmRlI8QR4gjxIXcCQrPBbDP+aOb3yZ+MT6cdA646Nj8o24933Y3TVypxu8PCHGEOEJc6HcCX/P+PuHU1bx3eX4VHV9/l7c+QhwhjhAXBr2AonNEkR+baya+fz8gESGOEBf6ncA/t1Pf88sdX4QQR4gjxJXuvxsUR4gjxBHiCHGEOA56AYP2D69Lhk/J3V8wAAAAAElFTkSuQmCC',
+    'hunter_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNzoyOCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNzoyOCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6YzBhNGYzNzItZTgyZi00YTU1LTg4NTItZDZlZmEwYmJjNzE3IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjZmOWI5NTgzLWI3NDgtNDcwNy05YzcyLWMxYmM5N2I5YWE1MSI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NmY5Yjk1ODMtYjc0OC00NzA3LTljNzItYzFiYzk3YjlhYTUxIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MTA5Zjc3YTEtMDI2Mi00NmQ3LTg1OTUtOWU4NGY2MThkNGNjIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjAxOjEwKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6YzBhNGYzNzItZTgyZi00YTU1LTg4NTItZDZlZmEwYmJjNzE3IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjA3OjI4KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz6tRlVKAAAB8ElEQVR4nO3bv0tbURQH8G++3lFwcBBcCpXaoVgQUWKLBUHpUIcMkaZkcehccLEqnbo0ugj9C7oEFRwcXMRCxUFFcGm3lgouhQ4OQtca53OG+7jchAhfP9vh/lzOfSc375VarRaUEeIIcYQ4QhwhjhBHiAupA3792TOFw6PBuVKs/4Ohp6b/s1otOv/x1paJL39/j86fixBHiCPEhdSc/1B5b9q3z+aScv7x+PPoer7dz9fuM4EQR4gjxIWiDjNTqyYu96OtOZ9rf3narP+y8S3pjCDEEeIIcaHTC1R7jkw8+87W+uebiyYee7MRbfce1peyzgRCHCGOEBeKOvja+/XEk6w/Eopy2rdP1j+7/bxFOxHiCHGEuJA64PSqx8Tl/v/RO71XNszmf3t83V3Lmo8QR4gjxIXUAb4u8Dm5PNlr+v+tforON7CzYuLGyT/E7hdeXO6hnQhxhDhCXMAd48+QhqsrFubdpaQzUqknrUeII8QR4kLuBIV1Aexz/vDntYkHhvuS6oAvbv2PLv6x2zTxYDl+f0CII8QR4kKnF/A57+8TTl3OezcHzeh41Eaz9keII8QR4kK3N1BURxS5aK6b+P79gESEOEJc6PQC/rmd+p5f7vgihDhCHCGudP/doDhCHCGOEEeII8Sx2xvotluPwYRRYwdhfAAAAABJRU5ErkJggg==',
+    'mage_2': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNDoxMCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNDoxMCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6MmVlNjBmOWItZWFhZS00Mjk4LWEyZjgtNmRiMzk3MWRlNTBhIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjJlZTYwZjliLWVhYWUtNDI5OC1hMmY4LTZkYjM5NzFkZTUwYSIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjJlZTYwZjliLWVhYWUtNDI5OC1hMmY4LTZkYjM5NzFkZTUwYSI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MmVlNjBmOWItZWFhZS00Mjk4LWEyZjgtNmRiMzk3MWRlNTBhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7LdZz0AAABf0lEQVR4nO3bMUoDQRTG8f9+TJtWmxRWklgFsQ+BWHkBESwEIYilXsNSJOABvIMBEYKFhaUJVhax8BSx3il2GSZrAl9+3fAm86Z5LzO7bLFcLnEmzAlzwpwwJ8wJc8JcyF1grzusPEh8zyYFG0yYE+aEuZBb873WTyl+fjaonN90T0jNJ8wJc8Jckfs8ILUn1LkZf5FSw3H+p9mkFD/tDivXE+aEOWEu5NZ4r7XaDd2N9ivz1/WE6W25h9QR5oQ5Ya5Y9TngdzHPWm+33SHn7nDdPyzt5/71Y3sXqCLMCXOh6QTz58vSuHP8WBnvX0z5T8KcMCfMhaYTxDVfF4/PAU0T5oQ5YS6knvVHg6vK+Z32UWncbR+UxrPFZ2X8bfGedNeIe8bJDkmEOWFOmAu5C8Q9YfzykFTzcTyW+zygjjAnzAlzwpwwJ8wJc6FuQvw/nHo32HTCnDAnzBWrfjeY21NSfx/bvhtMJMwJc8X2u0FzwpwwJ8wJc8Kc1r2BdfsDiHR32ADStMAAAAAASUVORK5CYII=',
+    'mage_3': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAFxGlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yN1QwMDowNToxMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yN1QwMDowNToxMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6N2JkMDdhZmEtY2Q5My00ZjE3LTkwMTQtOTljZWYwMGNjODBhIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjJlZTYwZjliLWVhYWUtNDI5OC1hMmY4LTZkYjM5NzFkZTUwYSIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjJlZTYwZjliLWVhYWUtNDI5OC1hMmY4LTZkYjM5NzFkZTUwYSI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MmVlNjBmOWItZWFhZS00Mjk4LWEyZjgtNmRiMzk3MWRlNTBhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6N2JkMDdhZmEtY2Q5My00ZjE3LTkwMTQtOTljZWYwMGNjODBhIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI3VDAwOjA1OjExKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5Jt1bEAAABf0lEQVR4nO3bMUoDQRTG8f9+zBm0CcHKJJZiHwLpvICN2AgitjaCpeAJggg2dh4iIEKwsLA0wcoiFp4i1jvFLMMkRvjy64Y3mTfNe5nZZavFYoEzYU6YE+aEOWFOmBPmQukCO71h8iDxNR1X/GPCnDAnzIXSmm93vmvxwfEgOX/VPSE3nzAnzAlzVenzgNye0OTx+pOcGo7zP03HtfhRb5hcT5gT5oS5UFrj7c5yN3Rys5vM39QTJpf1HtJEmBPmhLlq2eeAn/msaL3tVpeSu8NFf7+2n9HL++YukCLMCXNh1Qlmt6e1cffqIRnvjyb8JWFOmBPmwqoTxDXfFI/PAasmzAlzwlzIPeufDc6T87utg9q419qrjafzj2T8df6WddeIe8bhFlmEOWFOmAulC8Q94f75Lqvm43is9HlAE2FOmBPmhDlhTpgT5kLThPh/OPdu8N8Jc8KcMFct+91gaU/J/X1s824wkzAnzFWb7wbNCXPCnDAnzAlzWvcG1u0Xxl94LsDLj+gAAAAASUVORK5CYII=',
+    'paladin': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMzoyNjo0MSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMzoyNjo0MSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OWFhMmEwYjktOTJkMy00ZTNhLTlmY2YtNzEzODQ2ODE0ZmY1IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjFiNjUwMmY4LTU4ZmMtNDAwZi1iZjJhLWZhMGYyNTI2NDBkZCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjFiNjUwMmY4LTU4ZmMtNDAwZi1iZjJhLWZhMGYyNTI2NDBkZCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6MWI2NTAyZjgtNThmYy00MDBmLWJmMmEtZmEwZjI1MjY0MGRkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzMzNmUwODQtMjdiOS00NzdiLTk0YmQtZGYzMjU3YjRjMjAxIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjQ3OjMyKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6OWFhMmEwYjktOTJkMy00ZTNhLTlmY2YtNzEzODQ2ODE0ZmY1IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI2OjQxKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4fbYIVAAACTUlEQVR4nO3bP2gUQRQG8G8/phA7bWz8c50eEVIGPMHCgIJFEISAIDYSBEEECRyCIAQkaCPCpRJBhZxiIQmITWyCFwgGNIVEu9NIsBCtLKxOAiK+h8xk2E3C8fnr3u3smwncm52Z2xS9Xg/KCHGEOEJc2OoOa/XhrEmnuzJXlMmfup8QR4gjxIVUg6LYeAmuryl8DTYbn02b5emjWQP0+T6+f1nE+nvzejZrTiD6VFULOKIPVbl6JfpM1Uv3UDbBgUPH/4yoVh/G8nTNtbBxu/UqK3+zgWhNP3ncgtQ3oGqEOEJcKFPz63zN+xo/PXbDxA+7P0387OYp2/7a8+j1yc49VIkQR4gjxIXN7uDbp3fRmvZS16tGiCPEEeJC7nN/ceacuT448ii632+3npr42Embf/f+gWj/Q+ftc//v84DfSu2OCHGEOEJcKJtg9sIPEw+e7UbnhJEHh018d98dE19evRLt78ti257xoRxCHCGOEBeqTpiaE2onbPv7O2+5DGtZ6wLf3+qcH098vIQ4QhwhLuTeML/01cQHsbV8zS+sfDfxZGdvdO/Qu2rzEeIIcYS4kGrga2h8wu6/b18/Y9qPT7xA7PxgdMrmf/thLbo32DNz0cRD7vyh2bBzQC5CHCGOEBdyb0jNCal1A2Cf054/D7i0ZN8x8o7Ud9kPOshCiCPEEeKK1EtHOe8JbuR3BP8cT0nd/4/fCaL830uII8QR4sJmdzA6tSN63dewn0NS95dFiCPEEeKK//83KI4QR4gjxBHiCHHc7gFst1/YoLSb/HXNCAAAAABJRU5ErkJggg==',
+    'summoner': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACMklEQVR4nO3aMUgcQRQG4H9/FgOxsNKkO1JIxEaEiLWkEBNIH7CwMUXAQrCIQipFm0ACAZtrUhyk0TI5AsoFrCRKSHMoFnJdMJWBBCyMaX1PmHHYSyz++bp3s+/tcdybnZ1dIMsyZUW3C9aGHl5cjjsH28X/zE9FiCPEEeLKqgV8z649sb/pIsI9XTU/5vBX0+Tf750y+YQ4Qhwhrqxa4HbtxH1yN3i87/nk+gdpPR9DiCPEEeLKqgV+dwZMvIzvJm7UX5v4zafVYL1NnAfrx/jrfGxOIMQR4ghxZWqCv47vvnpkxo/6Rkw8ePrNxO0vP0zcmpsx8cTbd8E5ZHoWwXuD51MPgmt/jxBHiCPElakJvufGF2xPNup2Duh8PQr2vOfHbfZ17i1OkYIQR4gjxBWpCb7nGvVFMz49u4bQeM/nDVtvdDB4vvGFj0i57q8395LGCXGEOEJckZqws7NleurZyrwZHx7rD679X47YPcPNnvPg8X4/wN97+Dni8T27DvA97xHiCHGEuKLqOuDqcwEkzQl+3IvNCbF1wYfjvuDxhDhCHCGuqLoH6PfwYj0/wVsmbv05S3oOULXnPUIcIY4QV1bdAwRsz7ZxEpwTnk4u2didzz873Nv4p68JQv4fQIgjxJWpCbH3/Lw7+z/tB5M2fL/6wsRtty7wc0y3EeIIcYS4stv7AX6t79fm/rrvx/2eXsvVr7l3h9ebkecEkfcKCXGEON70F8iyLMuyLMMN+Qsr58oewm3PaQAAAABJRU5ErkJggg==',
+    'archmage': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABsElEQVR4nO3awSsFURQG8G++7sbCUnmliHqlkIUFkg0b/ANiS0pZ2dnIUo2VspKl/AVWLEhIkjylXhGlHllasHvW96j7mmbmvZ7Pb3eaO+fezTlz585E1WoVyghxhDhCHCGOEEeII8Q5/DGr5Yq3sdkqFqLQeEIcIY4QFzX7u4Ct+YViwbu+W64g1BMIcYQ4QlyUdw/o6p30Jrg720l0/8DYshc/PxwFn+v/+4CECHGEOFfvmr+4fPXiwbY3L779aEfofpvf9oTvxRl/QSc3wfUS4ghxhDhX7wnX4j0vPtycTnQ9a4Q4QhwhzqVNYJ/L1tfjdaKazrvmLUIcIY4Q59LWfF9rd3B8S88QsuXvE9IixBHiCHEubc1P9I978XHpNJjPngeMDHcgjferfW99o53J2hohjhBHiHNZJ7Q9YW4q9uKV9dlcvwucv8ReT5ivkZ8QR4gjxLlaA2zN/Xr/L4V7QFJJaz4tQhwhjhDn8p7A9oTtjQMvXvp8qmvNW4Q4QhwhzmWd0J4H3Jsat+z5Qq3v/1kjxBHiCHFRs/8rnBYhjhBHiCPEEeIIcWz0AhrtBxP1dFP9PHCHAAAAAElFTkSuQmCC',
+    'ash-hound': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAr0lEQVR4nGNgGDJAXsP5PzZxJkKaggPj/4PomCB7rIYwEbJBQ1OZAaQZBLAZwoTMqa5qwmrIjet3GaItT2B1JSO6k2FsE00ZsO0gzSAaBpasOwimv724yvD6wwtGDANgzsUHQIaeuf6E4eGNvagGEDIEZjsIgDTjjIUb1+/CNYDYMI0gbyFrBgEWbAaA/AzSBFL48AYibGDOJjodEAOYsAnCvEBIDKcB2JyKTWxwAAChiltnYGe2hwAAAABJRU5ErkJggg==',
+    'dust-spider': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbklEQVR42mNgGAUoQF7D+T/NDcEpjywBYmdW9MExTA5dDVZDYJqXzO4AYxDbyS/1P0yOoCuRbQdphGkG8V8+3AZmdzdk/8frFWTNyAbAvAMzCGc4gGhkzTA+sjcIBiI+w0nWTNAQUg2gWqKjCgAAB6p3LfvIm9wAAAAASUVORK5CYII=',
+    'ash-toad': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA50lEQVR42tWSPQ4BQRTHfzZEInMA1VIKDrCdxDYrewGNROkCdG5BrXAKhSuoENWGiWJLxSaisQp57BqEjtfMvMn/4817D/4+Mp8CSxU3lvtuM898LCDE2bTHOZzQ6p9SItY7YqnixtVaBMA5nNDoLADw/Luw9c5dyJ4Prf6JQrFmYLKv/un5oLdgl9Utl9DbCFB3ASEKKAmQfL1SCStlVpB0EJK4X8+IbtsBYDBcPm/i1Rl0kMcuK5pOPSWmwz063KeMrG8XZzQ+PF8kGZkO8gBEx5wxkfVKpZbImEKyUY9AcGPz7RfiAjl9Wv550uqjAAAAAElFTkSuQmCC',
+    'stone-boar': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA9UlEQVR42mNgGAUUA0Z8kvIazv9h7Ic39mJVy4JPo6utHlxsNwPDf2yGMKFrktdw/p+V6I+i+fmLVww6qhIoLkIxAF0zDKiqKMLZL1+9Zrh6eCqDqIDEf4wwkNdw/q+jKsHAwMDAICkhxqCqoshw+859FENWr9vCIC4mysDAwMAQrvydgYGBgSFuwjpGJlgAXbn9guHK7RcMDAwMcM0wNjJ/5bxaBgYGBobaHR9RwwAWQLsPX2LgeXyCYffhSwy7D1+ChwHMdgYGBoag6jbMaJTXcP4fqPCNYf0DLhQDYeK3WZXgLkS2FCUa0TWjir/AmRYGFgAAY6xlhz+f4O4AAAAASUVORK5CYII=',
+    'great-ash-frog': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC/0lEQVR4nO1WPWgTYRh+r5wWIeBSKSRDBKXGrU0LoiBSg61SzFDxB+zkIDg4KCguLirUzaGI4ODUQQU7KEUphCKCImisQ2kqCs2QQMdAF+0Qeb675/O98y65REGQPnD3fffzfc/7Pu/PncgWtrCFfwyn24XZXKHJebVS6noft1vyyZMFGdibNdd370mTRtCwpEY5nRJzfiC/34yjRw76RjwK3H9fXklkhNsJMbxeWHgpfX27ZH29Lv39afN88fU72Z3Z2dboKIN6JCFuXLlgJJ++XpS1WsMcMALkRD4/Eks+c/N44Jpw2hFjEbw7d+aUvZdJ1eXy7VdWchgC8lqtbuYw7s3DoCKHLzaMEwiVVsJtRYwR5JBaexqGp0jJGoRrYLj4Vj4+P2Tfe/z0Wec5sFZr2FgvL38248b37SYfLMorATVawcuVgq2anjjvsRlIcCCjASQfDmDuRcmO2JTZr0OlvdfP8D4VduLINTKZtMn+sbETnsPlD1ZmGIhrJuCv3uCVJYH4Ewgny9SNUkCXGOZ4OdXrEeusXlzaNHOQ4xk9/PK1anNHk8KRxDmQyaQDhIj7hu81yIFLZ3Py4EklsjoAqmThhxJgDjhRLTawRsmd6v1h+gCQ27dHKqvfPO+WNmV0cJskRfH8NcvraHLKFpYKiQZyAHnAOMPjMGBYKwyMTDq/hSCryBFz9ve42keMDXxDiMLwjo7IrQEAE4ajJQkBUkNydD0cNBZqVFbjyWfnq8bR8PfA5YQNBBkNcrZVgvUPaGKohLlOvjCorl/eASMcXfuMvc5+JKD+0ukcYS6gxaIEGbKpCe8+jAqvDX+mXZz8G82ZiaytbW09jEASohSxCRSgElQpXOcg9/YNVtan6dMyNC7RrXh2vmpirBsIPMMGIMcitmVAz2lQ+POLNWzbwND4LdMV2YpdPqAK2FTLhpaq2yjf0yFC+Cg7nJDBrBl1zOf8NZjrXzhHEvzFtPvP43N2SGOEjztXj8qxqfuxax35i4j64/nTv2b57/ET0wOw/d7+FycAAAAASUVORK5CYII=',
   };
   const img={};
-  for(const [id,file] of Object.entries(FILES)){ const im=new Image(); im.src=DIR+file; img[id]=im; }
+  for(const [id,src] of Object.entries(FILES)){ const im=new Image(); im.src=src; img[id]=im; }
   const ready=id=>{ const im=img[id]; return !!(im&&im.complete&&im.naturalWidth>0); };
   const VARIANT_JOBS=new Set(['warrior','knight','rogue','priest','hunter','mage']);
   /* 同じ初期ジョブを2人・3人と連れる場合、パーティ内の加入順で色違いを使う。
@@ -9047,42 +9111,6 @@ const CharacterArt = (function(){
   }
   return {allyKey,enemyKey,put};
 })();
-
-/* 主人公は「今いる1人」ではなく、代替わりごとに登録済みの冒険者候補から選ぶ。
-   直前と同じ姿は外すので、死後の新しいキャラが見た目でも切り替わる。 */
-const HERO_ART = {
-  scout:       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIElEQVR42u3YPQrCQBCG4dzENq1iIQgWiqVgrXZ2FoKFYOEt7GJl4xUET6AX8AzeQltnigxDom523w++apOQeYrNT5YRQgghhNSUVj56ffY87ZT2vh2L6vMBAACAsAfc9HJRC0APrKuPDw4EAAASA7AGtm74+biK1r0OAAAAhL3p3YqdqB7IWwAAAKDZL0ZekOg+jgAAIHKAyaIrut4PRb0vOtb5AAAAwG8HvByXotYNWQMdTjNRve49vnYgAABIHEAPbK17N8XVoF1afby+3tc3RQAASBzAuwnqWgMW876oXreupz+u/v4UAACAyACqglkAFoh1veB+oAAAAAClN+z9ePKeH9wfIgAAiBzAu+lVBQgOBAAAEgcghBBCSGPzBqBLOSQ/yzQ7AAAAAElFTkSuQmCC',
-  cartographer:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzVlYTQxNWYtZTg4YS00YzNjLWFhNTktZjZmNGFlOGJlNjQ4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZmM5NDY4ZjctNmQzYi00NTk3LTlkYTUtNzZkNmIxMmM2NzljIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjUwOjAzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI3OjIxKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz42QYXJAAACBklEQVR4nO3bv0pcQRQG8G8+h7yDNiaFREFchTRiTAIKvsK2CmGXILZBSCFi8gABYUUSy2hpJYJCIohdVkkgCRb+CegbBAmEK5ZnihmGu3GL7/66szNzZmCZ2Tvnsq4oCigjxBHiCHGEOEIcIY4Q51MdnHNZCfsHp8yDRY/7mzX+X/HAxBc/97MWkPtcQ4gjxBHifNkEqT0/NvE8Or59+MXET56Oh12KMmdCCiGOEEeI87kDcn/nP8yPmHh8YcnEXz8tRdtPNm1cq3f2TCDEEeIIcf5/T3DV/m7io/d2T4dS7Z1GiCPEEeJc6v6cqgekngvC+/3O64lovr6xYRPX6msmPv+x52Lrq+oBmQhxhDiX2jMPh6ZNh2bvmWlvXT+y/Wdemvh8dz2a/2SzEd3zqXzhXaA6AzIR4ghxPnfAszlb42u9vYzu0XAPb726MfEN/kT7p/KFNcO7cw0ZCHGEOEKc7/YCjr/9Dj4ZiPbfnrXfWW233PyEOEIcIc7nDjj4aN/lAfYukLLRXI53GHmH+0SII8QR4lxuTTCsAebe50cf95n4+NdVdP5UPaGqB5REiCPE+dwB4Z4L39eHFidPTdx4E6/phWfM2sqLYPxndBIhjhBHiPOdThi+N2ivnpW6O7RXN4L8tr0Fe2ZUNcFMhDhCnKv+NyiOEEeII8QR4ghx7PYCuu0WfnWVT3MwfiMAAAAASUVORK5CYII=',
-  salvager:    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4aU6IgAAACFUlEQVR4nO3bPUtcQRQG4Hderm0CkkiqaJHCENitxDbgkhT6B7SxESsrK/ML0lmIBBQbCZg/oOSDFQIWQVKEXQhukUKtgjEWsbRY63OEGYbZxcB7n+7sfN3mnDsz3A39fh/KCHGEOEJcleoQQihaYHxyJqvInPUOyxZ0UjWOEEeII8SFVI7k1gCf8529iazxzYXTgdaEugYkEOIIcaG0BqRy/ni/W/J8WN57EG1P1Yi6BiQQ4ghxIbcG5OZ88/WqiVfaj0y82brMau98Xo/WCF8T6hqQQIgjxFXDXuBP79zEm614f5/zw0aII8QR4qphLzD39ouJ99+8ivZ/PPk0671/etIOJfcXhDhCHCEupPbKE89bpsOHF7b92+9/Jt74Gz+/e8e7SyaeXtxBbL35nzau7wMKEeIIcSG3BsyOXUX7H1yMRtt9Tqf4nN9efWbi5fVfJq7vAzIR4ghxVekEY41x+0P72oSjUyMm3mrYvf7CQ/saXzs6cyvcmKjZfOnabQ3IRYgjxBHiqtIJLro+Z+P7gP8NIY4QR4irUh383voAM1lng48ri9HzftftExpun9DFeXT83fsE+M1/9L6AEEeII8RVuQN8TXjXQ/z7gc7X6Hw/3n8y81258XfO/9/t3v/J9HzRd4SEOEIcIS4M+jvB3DtDX1MGPV99J5hAiCPEhfp/g+IIcYQ4QhwhjhDH+36A+3YLI1u1G6K/klgAAAAASUVORK5CYII=',
-  minewalker:  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA/0lEQVR42u3YIQ7CMBjF8d0ECZYAFkNIcAtXQCCWEBLUsgsgMATJCbgAhhNwArgCtxiO8D3R0gzRbv+XPNV1tD+xtGQZIYQQQsif0hvM6u9Wo76z1+XEVOcDAAAAaW9YN6h9VgvT5EAAAAAAs0DdwOtxM9Xnm44DAAAAcX8E7+fSVDcUWgAAACDtg1EoSOsuRwAA0DIAXeA435n6Dja+DfveBwAAAMS94fVqY3rYH53V56MDAQAAAAAAAAAAPr2Uc1MdL6ZDZ3W+jof+HgAAABDX3UCbb0/O+uYndxsEAICOA/gWnNw/QAAA0HGA0INOKEDT9wEAAACEEEIIIT/lDTJmB/U0xkSlAAAAAElFTkSuQmCC',
-  herbalist:   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIklEQVR42u3YLQ7CQBCG4d4ECYqEBIMAgyQoEASFQCFQCILgCgRbSTgFEtUTcASC4grFdiZkJ5t2m/68X/KpbifsI5pdoogQQgghpKB0etM02/5w7uxssRfV7wMAAAD12qD1XG9Y15oHAAAAVPujptd/Xg/Rop8DAAAA5QJYBxcNksRHUb0h3wIAAAD1Phj5gjTucgQAAA0HSJ430e87EbUOOhaANQ8AAACo1oZ1i14PAAAAlAuwmwzSbH1Buqut6Oh0dlavt4CCgwAAQMMB9IDNYeysXq9rbXgdX0UtAD1fr9eXLW8QAAAAwAlwuS9F8wJYIL4Auf9QAQCAlgNYINZA6weGfj/47Q8AAFoG4AukL0vW5Sn0PAAAAIAQQggh5G9+mDaJotsX3/IAAAAASUVORK5CYII=',
-  wanderer:    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABBklEQVR42u3YMQrCQBCF4dzCRrASLE0nIiKojY0IChaeIKWVCN7AE1h5By08idfReqbIOOxGdsn/4FXr4s5XhE2KghBCCCEkUnqD+SdmAQAAgLwG7nRL0fHsIGqtZwcCAAAAiAPqgV6nnaj+feg6AAAAkPZDUA8QWgAAACCve8F1PXE1u4EBAKDlAPqA78eqttZFR9faDwAAAPx3wOft6Krefx4ua3tf7EX1OgAAANAsgP6DS7UV1QNW01LUAtj0R6JekMY/mAAAQMsBvCBWYwPodQAAACCt7wfWxcc6YOj+5N4OAQCg5QD6oecF8O4HAAAA0gLQL0u6sfcDAAAAhBBCCCE/5Qu+1FiW2xr12gAAAABJRU5ErkJggg==',
-};
-const HERO_ART_IDS=Object.keys(HERO_ART);
-const HERO_ART_IMG={};
-for(const [id,src] of Object.entries(HERO_ART)){ const im=new Image(); im.src=src; HERO_ART_IMG[id]=im; }
-function randomHeroArt(previous){
-  const choices=HERO_ART_IDS.filter(id=>id!==previous);
-  return pick(choices.length ? choices : HERO_ART_IDS);
-}
-function heroArtKey(h){
-  if(!h) return HERO_ART_IDS[0];
-  if(!HERO_ART_IMG[h.art]) h.art=randomHeroArt(S.lastHeroArt);
-  return h.art;
-}
-function drawHeroArt(h,x,y,size,dx,dy,alpha=1,scale=1,rot=0){
-  const im=HERO_ART_IMG[heroArtKey(h)];
-  if(!im || !im.complete || !im.naturalWidth) return false;
-  if(Math.abs(dx||0)>Math.abs(dy||0)+0.02) h._artFace=dx<0?-1:1;
-  const face=h._artFace||1, n=Math.max(2,Math.round(size));
-  ctx.save(); ctx.imageSmoothingEnabled=false; ctx.globalAlpha*=alpha;
-  ctx.translate(Math.round(x),Math.round(y));
-  if(rot) ctx.rotate(rot);
-  ctx.scale(face*scale,scale);
-  ctx.drawImage(im,-Math.round(n/2),-Math.round(n/2),n,n);
-  ctx.restore();
-  return true;
-}
 
 /* ---------- 描画 ---------- */
 let TS=26;
@@ -9299,7 +9327,9 @@ function draw(){
       e.spotted = true;
     }
     if(e.dead){ ctx.globalAlpha=Math.max(0,e.fade/0.3); }
-    // R は当たり判定と警告表示の基準。キャラクター画像だけはこの後で 25% 拡大する。
+    // 見た目の大きさは被弾半径 e.r をそのまま使う。
+    // ボスだけ半径を大きくしても、描画がここで固定値のままだと
+    // 「当たり判定は大きいのに見た目は雑魚」という一番まずい状態になる。
     const R = e.boss ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast) drawBossCast(e, sx, sy, R);
@@ -9317,35 +9347,35 @@ function draw(){
     let spriteDrawn=false;
     if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
-      drawSprite(spr, sx, sy, R*2.6*CHARACTER_ART_SCALE);
+      drawSprite(spr, sx, sy, R*2.6);
       spriteDrawn=true;
       if(e.hit>0){
         ctx.save();
         ctx.globalAlpha=Math.min(0.6, e.hit*4);
         ctx.fillStyle='#fff';
-        ctx.beginPath(); ctx.arc(sx, sy, R*1.05*CHARACTER_ART_SCALE, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill();
         ctx.restore();
       }
     }else if(charKey){
-      const artSize=(e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1))*CHARACTER_ART_SCALE;
+      const artSize=e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1);
       spriteDrawn=CharacterArt.put(charKey,sx,sy,artSize,e,e.artDx,e.artDy,
                                    e.dead?Math.max(0,e.fade/0.3):1);
       if(!spriteDrawn){
         ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
-        shape(e.arch.id, sx, sy, R*CHARACTER_ART_SCALE); ctx.fill(); ctx.stroke();
+        shape(e.arch.id, sx, sy, R); ctx.fill(); ctx.stroke();
       }
     }else{
       ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
-      shape(e.arch.id, sx, sy, R*CHARACTER_ART_SCALE);
+      shape(e.arch.id, sx, sy, R);
       ctx.fill(); ctx.stroke();
     }
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
     if(e.boss && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
       ctx.fillStyle='#0d0f14';
-      shape(e.arch.id, sx, sy, R*0.55*CHARACTER_ART_SCALE);
+      shape(e.arch.id, sx, sy, R*0.55);
       ctx.fill();
       ctx.globalAlpha=1;
     }
@@ -9361,7 +9391,7 @@ function draw(){
       ctx.globalAlpha=1;
       if(!spriteDrawn){
         ctx.fillStyle='#0d0f14'; ctx.globalAlpha=0.4;
-        shape(e.arch.id, sx, sy, R*0.5*CHARACTER_ART_SCALE); ctx.fill();
+        shape(e.arch.id, sx, sy, R*0.5); ctx.fill();
         ctx.globalAlpha=1;
       }
     }
@@ -9421,6 +9451,12 @@ function draw(){
   // --- 仲間と仲間候補 ---
   // 仲間は「六角形＋ジョブ色」。敵（三角・四角・ひし形・円）とは形が被らないので、
   // 混戦でも一目で味方だと分かる。
+  /* 加入済みの仲間のHPバーは、ここでは描かずに貯めておいて後で描く。
+     主人公はこの仲間ループより後に描かれる（自分を最後に上へ出すため）ので、
+     ここでバーまで描いてしまうと、寄り添った主人公の絵に踏まれて見えなくなる瞬間ができる。
+     「誰のキャラ絵より上」を保証するには、全員のキャラ絵を描き終えたあとに
+     まとめて描く1パスにするしかない。 */
+  const allyBars=[];
   const drawMate=(a, isNpc)=>{
     const sx=a.x*TS-camX, sy=a.y*TS-camY;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
@@ -9429,9 +9465,10 @@ function draw(){
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
     const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
     if((a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0)) return;
-    const j=jobDef(a.job), R=TS*0.30*aScale*CHARACTER_ART_SCALE;
+    const j=jobDef(a.job), R=TS*0.30*aScale;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
-       位置・HPバー・パーティ表示で味方だと分かるので、足元の装飾リングは置かない。 */
+       **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
+       同じ絵でも敵と混ざらない。 */
     const mspr = isDurantree(a) ? 'moss-ball' : null;
     if(mspr && sprite(mspr)){
       drawSprite(mspr, sx, sy, R*2.6);
@@ -9439,7 +9476,7 @@ function draw(){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
-    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS*CHARACTER_ART_SCALE,a,a.dirx,a.diry,1,aScale,aRot)){
+    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
         const ang=i/6*Math.PI*2-Math.PI/2+aRot;
@@ -9451,6 +9488,9 @@ function draw(){
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
       ctx.fill(); ctx.stroke();
     }
+    // 味方の証として白い細リングを1本
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(sx,sy,R+3,0,7); ctx.stroke();
     if(isNpc){
       /* 未加入は「？」を浮かせて、話しかけられることを見せる。
          ただし戦いが始まったら「？」ではなく **HPバー**を出す。
@@ -9475,8 +9515,8 @@ function draw(){
       label(allyLabel(a), sx, sy+R+TS*0.40, j.col, 1);
     }else{
       const mx=allyStats(a).maxHp;
-      ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
-      ctx.fillStyle=j.col; ctx.fillRect(sx-R,sy-R-9,R*2*clamp(a.hpNow/mx,0,1),3.5);
+      // 描くのは後回し（誰のキャラ絵にも踏まれない位置＝全員描き終えたあと）
+      allyBars.push({sx, sy, R, col:j.col, pct:clamp(a.hpNow/mx,0,1)});
       /* **加入済みの名前は出さない。**
          上のパーティ帯とステータス画面に同じ物が出ているので、
          足元の文字は情報を増やさずに盤面だけを埋めていた。
@@ -9912,6 +9952,8 @@ function draw(){
     ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
+  ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
   /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
      戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
   const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
@@ -9919,17 +9961,25 @@ function draw(){
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
   if(!heroBlinkOff){
-    if(!drawHeroArt(S.hero,px,py,TS*CHARACTER_ART_SCALE,P.dirx,P.diry,1,heroScale,heroRot)){
+    if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
-      ctx.beginPath(); ctx.arc(0,0,TS*0.28*heroScale*CHARACTER_ART_SCALE,0,7); ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,TS*0.28*heroScale,0,7); ctx.fill();
       ctx.strokeStyle='#0d0f14'; ctx.lineWidth=2; ctx.stroke();
       ctx.restore();
     }
   }
   ctx.globalAlpha=1;
   label('自分', px, py-TS*0.72, '#7fe0c0');
+  /* 貯めておいた仲間のHPバーをここでまとめて描く。
+     主人公（直前に描いた「自分」の文字を含め）より後＝誰のキャラ絵よりも上になる。
+     文字のほうを先に描いておかないと、ぴったり重なったときに「自分」の字が
+     バーの上端を数ピクセルだけ踏むことがある。 */
+  allyBars.forEach(bar=>{
+    ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2,3.5);
+    ctx.fillStyle=bar.col; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2*bar.pct,3.5);
+  });
   // 攻撃エフェクト（属性ごとに形が変わる）
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
   // ダメージ数値
@@ -10513,20 +10563,30 @@ function updateHUD(){
     el('bossfill').style.width = clamp(boss.hp/boss.maxHp*100,0,100)+'%';
     el('bossname').textContent = boss.name + (boss.rage?'（激昂）':'');
   }else bb.style.display='none';
-  // 試練の残り時間。枷の名前も一緒に出す（何が掛かっているか忘れさせない）
-  const tb=el('trialbar'), tr=S.run && S.run.trial;
-  if(tr && tr.t>0){
+  /* デバフ（枷）の帯。
+     ・ラスボスと実際に戦っている間（S.run.bossBane）は、次々切り替わる枷の
+       残り時間を本物のゲージで見せる——ボスのHPバーと同じ場所を取り合っていた
+       元凶なので、CSSの座標ではなくボスバーの実測の下へ動的に積む。
+     ・試練の籠城戦は今までどおり残り時間ゲージ。
+     ・白の層に居るだけ（ラスボス以外）は効果はちゃんと掛かるが、ゲージは出さない。
+       時間で切れない効果に「満タンのまま出しっぱなし」のゲージを添えるのが、
+       そもそもボスバーと重なる帯を常設していた原因だった。 */
+  const tb=el('trialbar'), tr=S.run && S.run.trial, fbane=S.run && S.run.bossBane;
+  if(fbane){
+    tb.style.display='block';
+    el('trialfill').style.width = clamp(fbane.t/fbane.max*100,0,100)+'%';
+    el('trialname').textContent = '⛓ '+trialBaneDef(fbane.id).nm+'　あと '+Math.ceil(fbane.t)+'秒';
+  }else if(tr && tr.t>0){
     tb.style.display='block';
     el('trialfill').style.width = clamp(tr.t/tr.max*100,0,100)+'%';
     el('trialname').textContent = '🗿 試練　'+trialBaneDef(tr.bane).nm+'　あと '+Math.ceil(tr.t)+'秒';
-  }else if(zoneBaneNow()){
-    /* 白の層の枷は時間で切れないので、帯は満タンのまま出しっぱなしにする。
-       「あと何秒」が無い＝この階にいる限り続く、が形で伝わる。 */
-    const zb=zoneBaneNow();
-    tb.style.display='block';
-    el('trialfill').style.width='100%';
-    el('trialname').textContent = '❖ 白の層　'+zb.nm+'　'+zb.desc;
   }else tb.style.display='none';
+  // ボスバーが出ているときだけ、その実測の下へデバフ帯を落とす（重ならないように）
+  if(bb.style.display!=='none' && tb.style.display!=='none'){
+    const base=el('hud').getBoundingClientRect().top;
+    const r=bb.getBoundingClientRect();
+    if(r.height>0) tb.style.top=Math.round(r.bottom-base+8)+'px';
+  }else tb.style.top='';
   /* 耐久の警告。壊れると性能を完全に失うのに、ログは流れて消えてしまう。
      壊れそう／壊れているあいだは出しっぱなしにして、見落としようがなくする。 */
   const alerts=gearAlerts(), dtag=el('durtag');
@@ -10548,7 +10608,7 @@ function updateHUD(){
     pb.innerHTML = mates.map(a=>{
       const j=jobDef(a.job), mx=allyStats(a).maxHp;
       const pct=clamp(a.hpNow/mx*100,0,100);
-      return `<div class="mate"><div class="mn" style="color:${j.col}">${a.name} <span style="color:var(--dim);font-weight:400">${j.nm} Lv.${a.lv}</span></div>`+
+      return `<div class="mate" data-ally="${a.uidA}"><div class="mn" style="color:${j.col}">${a.name} <span style="color:var(--dim);font-weight:400">${j.nm} Lv.${a.lv}</span></div>`+
              `<div class="mb"><i style="width:${pct}%;background:${j.col}"></i></div></div>`;
     }).join('');
   }else pb.style.display='none';
@@ -11495,7 +11555,12 @@ function closeAllyEquip(){
   _aeAlly=null;
   if(_aePrev==='bag'){ S.screen='bag'; el('m-bag').classList.add('on'); renderBag(); }
   else if(_aePrev==='stat'){ S.screen='stat'; el('m-stat').classList.add('on'); renderBag(); }
-  else { setScreen(_aePrev==='allyeq' ? 'town' : _aePrev); }
+  else {
+    setScreen(_aePrev==='allyeq' ? 'town' : _aePrev);
+    // ゲーム画面へ戻るときは、モーダルを見ていた時間ぶん経過時間が飛ばないように基準を引き直す
+    // （他の全モーダルの「閉じる」と同じ作法。ここだけ抜けると、閉じた瞬間だけ大きく時間が進む）
+    if(S.screen==='game') last=performance.now();
+  }
 }
 function renderAllyEquip(){
   const a=_aeAlly; if(!a) return;
@@ -13318,6 +13383,7 @@ bindTap(el('fal-let'), letFallenGo);
 
 /* ---------- 第51階層（アビスの口）撃破＝踏破 ---------- */
 function onFinalBossDown(e){
+  if(S.run) S.run.bossBane=null;   // 倒した以上、切り替わる枷はもう要らない
   S.cleared = (S.cleared||0)+1;
   S.screen='clear';
   el('hud').classList.remove('on');
@@ -13341,6 +13407,13 @@ bindTap(el('bagbtn'), openBag);
 bindTap(el('bag-ok'), closeBag);
 bindTap(el('statbtn'), openStat);
 bindTap(el('stat-ok'), closeStat);
+/* 探索中、足元のHPバーだけでなく上のパーティ帯からもタップでステータスを見られる。
+   一覧の行の作法（bindRowTap）に合わせ、描き直しても付け直さなくてよいようにする。 */
+bindRowTap(el('partybar'), '[data-ally]', t=>{
+  if(S.screen!=='game') return;
+  const a=livingParty().find(m=>m.uidA===+t.dataset.ally);
+  if(a) openAllyEquip(a, 'game');
+});
 /* 説明はタイトルの「？」からいつでも開ける。
    潜った直後に自動で割り込ませていたのをやめた理由:
    ・遊びたい瞬間に長文を挟まれるのが一番だるい

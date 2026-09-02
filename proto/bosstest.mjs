@@ -425,5 +425,88 @@ R.offeringDefeatCleanup = await pg.evaluate(()=>{
           ok: escortsBefore===KIN_MAX && escortsAfter===0 && heroFull && allyFull};
 });
 
+/* ================= 25. ラスボス戦だけ、枷が周期的に切り替わる =================
+   白の層の固定の枷（zoneBane）とは別に、アビスの口と実際に殴り合っている
+   間だけ、一定時間ごとに別の枷へランダムに切り替わるゲージを持つ。 */
+
+// 25-a. 気づかれる前は掛からない。一撃入れて revealed になった瞬間に1つ目が立つ
+R.finalBossBaneStarts = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=false;
+  stepSim(0.5);
+  const noneBefore = !S.run.bossBane;
+  boss.revealed=true;
+  stepSim(0.05);
+  const started = !!S.run.bossBane;
+  const validId = started && !!trialBaneDef(S.run.bossBane.id);
+  const fullGauge = started && S.run.bossBane.t > BOSS_BANE_SEC-1;
+  return {noneBefore, started, validId, fullGauge,
+          ok: noneBefore && started && validId && fullGauge};
+});
+
+// 25-b. ゲージは実際に減っていき、尽きると別の枷へ切り替わる。切れたらまた次へ、を繰り返す
+R.finalBossBaneCycles = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  stepSim(0.05);
+  const first=S.run.bossBane.id, tAtStart=S.run.bossBane.t;
+  stepSim(BOSS_BANE_SEC*0.5);
+  const tMid=S.run.bossBane.t;
+  const draining = tMid < tAtStart - BOSS_BANE_SEC*0.3;
+  stepSim(BOSS_BANE_SEC*0.5+0.1);       // 残り半分を使い切って、切り替わった直後まで進める
+  const second=S.run.bossBane.id;
+  const secondFresh = S.run.bossBane.t > BOSS_BANE_SEC-0.5;
+  stepSim(BOSS_BANE_SEC+0.1);           // もう1周（今度は満タンから丸ごと）
+  const third=S.run.bossBane.id;
+  const allValid = [first,second,third].every(id=>!!trialBaneDef(id));
+  return {first, second, third, tAtStart:+tAtStart.toFixed(1), tMid:+tMid.toFixed(1),
+          draining, secondFresh, allValid,
+          ok: draining && secondFresh && allValid};
+});
+
+// 25-c. 白の層の枷・試練の枷より、ラスボス戦中の枷が優先して効く
+R.finalBossBaneTakesPriority = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  // 優先順位だけを見たいので、本来は同時に起きない状態をあえて重ねる
+  S.run.zoneBane='heavy';
+  S.run.trial={t:10, max:45, bane:'dull', wave:1};
+  boss.revealed=true;
+  stepSim(0.05);
+  const activeId=S.run.bossBane.id;
+  const wins = trialBane().id===activeId;
+  S.run.trial=null; S.run.zoneBane=null;
+  return {activeId, wins, ok: wins};
+});
+
+// 25-d. ボスを倒すと、切り替わる枷はその場で消える（もう戦っていないので）
+R.finalBossBaneClearsOnVictory = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  stepSim(0.05);
+  const hadBane = !!S.run.bossBane;
+  boss.hp=1; killEnemy(boss);
+  const clearedBane = !S.run.bossBane;
+  document.getElementById('m-boon').classList.remove('on');
+  document.getElementById('m-clear').classList.remove('on');
+  S.screen='game'; _boonPending=null;
+  return {hadBane, clearedBane, ok: hadBane && clearedBane};
+});
+
+/* 25-e. 「主」なら誰でもではなく、本物のアビスの口（51階・uniqueBoss===FINAL_DEPTH）
+   だけが対象。50階の主（初めの供物）は見つかった状態でも切り替わらない。 */
+R.onlyRealFinalBossCycles = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[]; P.invuln=1e9;
+  const boss50=W.enemies.find(e=>e.boss);
+  boss50.revealed=true;
+  stepSim(0.5);
+  const noBaneAt50 = !S.run.bossBane;
+  const notFinalUnique = boss50.uniqueBoss!==FINAL_DEPTH;
+  return {noBaneAt50, notFinalUnique, ok: noBaneAt50 && notFinalUnique};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

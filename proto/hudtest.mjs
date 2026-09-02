@@ -236,4 +236,121 @@ R.logBelowLeftColumn = await pg.evaluate(()=>{
           ok: lg.top >= gh.bottom};
 });
 
+/* ================= 6. 探索中に仲間をタップしてステータスを見る ================= */
+
+/* 6-a. パーティ帯の名前をタップすると、その仲間の装備・ステータス画面が開く。
+   閉じれば探索へ戻り、HUD も出直す（他のモーダルと同じ作法）。 */
+R.partybarOpensAllyStats = await pg.evaluate(()=>{
+  TH.busyFloor();
+  const a=livingParty()[0];
+  document.querySelector(`#partybar [data-ally="${a.uidA}"]`)
+    .dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const opened = S.screen==='allyeq';
+  const showsRightAlly = el('ae-name').textContent===a.name;
+  closeAllyEquip();
+  const back=S.screen;
+  const hudOn = el('hud').classList.contains('on');
+  return {opened, showsRightAlly, back, hudOn,
+          ok: opened && showsRightAlly && back==='game' && hudOn};
+});
+
+/* 6-b. 閉じたあとに時間が飛ばない。モーダルを見ていた間ぶんの dt を
+   まとめて食わせると、戻った瞬間だけ仲間や敵が大きく進んでしまう。 */
+R.partybarCloseDoesNotJumpTime = await pg.evaluate(()=>{
+  TH.busyFloor();
+  const a=livingParty()[0];
+  document.querySelector(`#partybar [data-ally="${a.uidA}"]`)
+    .dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const before=last;
+  // モーダルを開いたまま少し待ってから閉じる想定（実時間が経っている状況を作る）
+  last = performance.now() - 5000;
+  closeAllyEquip();
+  const jumpAvoided = (performance.now()-last) < 200;
+  return {jumpAvoided, ok: jumpAvoided};
+});
+
+/* 6-c. パーティ帯の上から始めた指は、移動スティックとしては拾わない。
+   拾ってしまうと、仲間をタップしたつもりが歩き出す事故になる。 */
+R.partybarDoesNotStartStick = await pg.evaluate(()=>{
+  TH.busyFloor();
+  stickId=null; stickDx=0; stickDy=0;
+  const a=livingParty()[0];
+  const node=document.querySelector(`#partybar [data-ally="${a.uidA}"]`);
+  const rect=node.getBoundingClientRect();
+  touchStart({changedTouches:[{target:node, identifier:1,
+    clientX:rect.left+rect.width/2, clientY:rect.top+rect.height/2}]});
+  return {stickId, ok: stickId===null};
+});
+
+/* 6-d. 味方のHPゲージは、重なった相手（主人公を含む）のキャラ絵より必ず上に出る。
+   ちょうど同じマスに立たせて描かせ、実際に描かれた色を読む——
+   コードの並び順ではなく画面に出た結果で見ないと、あとで並びを変えたときに気付けない。
+   漂う塵（drawAir）はエンティティの上に薄く重なる演出で、狙いどおりランダムに
+   1ピクセルへ乗ることがあるので、この検証のあいだだけ止めておく。 */
+R.allyBarAboveOverlappingHero = await pg.evaluate(()=>{
+  TH.run(1,{seed:5}); TH.floor(10); TH.immortal(); TH.clearEnemies();
+  S.hero.party=[];
+  const a=TH.ally(10,'knight',20); a.x=P.x; a.y=P.y;      // 主人公とぴったり重ねる
+  const mx=allyStats(a).maxHp; a.hpNow=mx*0.5;              // 半分だけ塗られたバーにする
+  uniqueAllyName(a,party()); S.hero.party.push(a);
+
+  const origAir=window.drawAir;
+  window.drawAir=()=>{};
+  draw();
+  window.drawAir=origAir;
+
+  const col=jobDef(a.job).col;
+  const hex=n=>parseInt(col.slice(n,n+2),16);
+  const want=[hex(1),hex(3),hex(5)];
+
+  const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
+  const sx=Math.round(a.x*TS-camX), sy=Math.round(a.y*TS-camY);
+  const R=TS*0.30;
+  // getImageData はCSS座標ではなく物理ピクセル（devicePixelRatio ぶん拡大された裏バッファ）を読むので、揃える
+  const dpr=Math.min(2,devicePixelRatio||1);
+  const close=(p,w)=>Math.abs(p[0]-w[0])<=12 && Math.abs(p[1]-w[1])<=12 && Math.abs(p[2]-w[2])<=12;
+  // バーの塗られている側（左半分）を、複数点で読む。1点だけだと縁の丸めで外れうる
+  const hits=[];
+  for(let fx=0.15; fx<=0.85; fx+=0.1){
+    const px=Math.round((sx-R+2*R*0.5*fx)*dpr), py=Math.round((sy-R-9+1.75)*dpr);
+    const pix=ctx.getImageData(px,py,1,1).data;
+    hits.push(close([pix[0],pix[1],pix[2]], want));
+  }
+  const hitCount=hits.filter(Boolean).length;
+  return {want, hitCount, sampled:hits.length, ok: hitCount>=Math.ceil(hits.length*0.6)};
+});
+
+/* ================= 7. ラスボス戦：HPバーとデバフ帯の重なり ================= */
+
+/* 7-a. ボスのHPバーと切り替わる枷の帯は、同時に出ていても重ならない。
+   どちらも中央寄せ・同じ横幅で、以前は座標を決め打ちしていたために
+   完全に同じ場所へ重なっていた。 */
+R.bossBarClearOfBaneBar = await pg.evaluate(()=>{
+  TH.run(51,{seed:9}); TH.immortal();
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  TH.step(0.2);
+  const bossShown = el('bossbar').style.display!=='none';
+  const baneShown = el('trialbar').style.display!=='none';
+  const rb=el('bossbar').getBoundingClientRect();
+  const rt=el('trialbar').getBoundingClientRect();
+  const noOverlap = !(rb.bottom > rt.top && rt.bottom > rb.top);
+  const baneBelow = rt.top >= rb.bottom;
+  return {bossShown, baneShown, noOverlap, baneBelow,
+          ok: bossShown && baneShown && noOverlap && baneBelow};
+});
+
+// 7-b. 白の層に居るだけ（ラスボス以外）では、効果は掛かっていてもゲージは出さない
+R.zoneBaneHasNoGauge = await pg.evaluate(()=>{
+  TH.run(55,{seed:9}); TH.immortal();   // 55階も白の層。ボスはいるが「アビスの口」ではない
+  const boss=W.enemies.find(e=>e.boss);
+  if(boss) boss.revealed=true;
+  TH.step(0.2);
+  const zoneBaneActive = !!zoneBaneNow();
+  const noGauge = el('trialbar').style.display==='none';
+  const effectStillApplies = !!trialBane();
+  return {zoneBaneActive, noGauge, effectStillApplies,
+          ok: zoneBaneActive && noGauge && effectStillApplies};
+});
+
 await done(b, errs, R);

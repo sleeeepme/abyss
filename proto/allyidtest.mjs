@@ -344,11 +344,14 @@ R.allyAccessory = await pg.evaluate(()=>{
   const after=+allyStats(a).atk.toFixed(2);
   const hpAfter=allyStats(a).maxHp;
 
-  // 階を降りると擦り減る（主人公だけの規則にしない）
+  /* 階を降りると擦り減る（主人公だけの規則にしない）。
+     ただし仲間の装備は主人公の2.5倍壊れにくく、階ごとの減りが確率制になった
+     （1/2.5 の確率でしか減らない）ので、「1階降りたら必ず減る」ではなく
+     「潜り続ければ確実に減る」で見る。p=0.4 なら15階も見れば外れない。 */
   const dur0=ring.dur;
-  TH.floor(19);
-  const worn=ring.dur<dur0;
-  return {ring:ring.nm, can, before, after, hpAfter, dur0, dur:ring.dur, worn,
+  let worn=false, depth=18;
+  for(let i=0;i<15 && !worn;i++){ depth++; TH.floor(depth); worn = ring.dur<dur0; }
+  return {ring:ring.nm, can, before, after, hpAfter, dur0, dur:ring.dur, worn, floorsTried:depth-18,
           equippable: can,
           // 効果が数字に出る（攻撃力か最大HPのどちらかは必ず動く装飾品を選んでいる訳ではないので緩め）
           ok: can && worn};
@@ -456,6 +459,58 @@ R.merchantBuy = await pg.evaluate(()=>{
 R.merchantNoSell = await pg.evaluate(()=>{
   const fns=Object.keys(window).filter(k=>/sellToMerchant|merchantSell/i.test(k));
   return {sellFns:fns, noSellPath: fns.length===0, ok: fns.length===0};
+});
+
+/* ================= 9. 仲間の装備耐久（主人公の2.5倍） ================= */
+
+/* 9-a. 小数にすると耐久表示（39.6/40 など）が崩れるので、
+   「1/2.5の確率でしか減らさない」形で間引いてある。
+   damageAllyGear を4000回叩いて、減った量が 4000/2.5 に近いか＝
+   常に整数のまま、平均の減りだけ2.5倍遅くなっているかを見る。 */
+R.allyGearWearsSlower = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.party=[];
+  const a=TH.ally(1,'knight',10); uniqueAllyName(a,party()); S.hero.party.push(a);
+  const it=genBaseItem('plate',10,1);
+  it.durMax=100000; it.dur=100000;
+  a.equip.armor=it;
+  const N=4000;
+  for(let i=0;i<N;i++) damageAllyGear(a,'armor',1);
+  const worn=it.durMax-it.dur;
+  const expected=N/ALLY_DUR_MUL;
+  const ratio=worn/expected;
+  return {N, worn, expected:Math.round(expected), ratio:+ratio.toFixed(2),
+          durIsInteger: Number.isInteger(it.dur),
+          closeToExpected: ratio>0.85 && ratio<1.15,
+          ok: Number.isInteger(it.dur) && ratio>0.85 && ratio<1.15};
+});
+
+// 9-b. 街の鍛冶屋（拠点＝mid:false）でも仲間の装備を選んでまとめて直せる。使うのは持ち帰った黒鉄
+R.allyGearRepairableInTown = await pg.evaluate(()=>{
+  S.hero=newHero(); S.hero.party=[]; S.run=null;
+  S.gold=99999999; S.ore={raw:999,fine:999,deep:999};
+  const a=makeAlly(20,S.hero); a.job='knight'; a.hpNow=allyStats(a).maxHp;
+  uniqueAllyName(a,party()); S.hero.party.push(a);
+  a.equip.weapon=genBaseItem('great',20,2); a.equip.weapon.ident=true;
+  a.equip.armor=genBaseItem('plate',20,2); a.equip.armor.ident=true;
+  a.equip.weapon.dur=0; a.equip.armor.dur=Math.floor(a.equip.armor.durMax*0.3);
+
+  openForge(false);                              // 街の鍛冶屋（道中の鍛冶場ではない）
+  const opened=TH.open('m-forge');
+  el('fg-who').querySelector(`[data-fgwho="${a.uidA}"]`)
+    .dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const onAlly=forgeHolder()===a;
+
+  const oreBefore=S.ore.raw;
+  el('fg-fix').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const oreAfter=S.ore.raw;
+  const fixed = a.equip.weapon.dur===a.equip.weapon.durMax
+             && a.equip.armor.dur===a.equip.armor.durMax;
+  const paidTownOre = oreAfter<oreBefore;
+  const heroUntouched = !S.hero.equip.weapon;      // 自分は何も装備していないまま
+  closeForge();
+  return {opened, onAlly, fixed, paidTownOre, heroUntouched,
+          oreBefore, oreAfter,
+          ok: opened && onAlly && fixed && paidTownOre && heroUntouched};
 });
 
 /* 表示名に職業が入ること。

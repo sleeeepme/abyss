@@ -418,8 +418,10 @@ R.portal = await pg.evaluate(()=>{
           ok: d7.went==='潜ったまま' && d10.went==='帰った'};
 });
 
-/* 7-b. 帰還ポータルから戻った階には、一度だけそのまま再開できる。
-       中継地点（大ボス撃破）とは別枠の切符で、潜れば消える。 */
+/* 7-b. 帰還ポータルから戻った階には、一度だけそのまま再開できる（切符）。
+       それとは別に、戻った階そのものが恒久の中継地点になり、
+       次に潜る既定地点は自動で「戻った階 + 1」になる
+       ——帰還のたびに1階から歩き直させないため。 */
 R.resumeTicket = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.stash=[]; S.resumeDepth=null; S.beacons=[];
   startRun(15); S.hero.party=[];
@@ -427,22 +429,29 @@ R.resumeTicket = await pg.evaluate(()=>{
   returnToTown();
   TH.close('m-ret');
   const grantedAfterReturn = S.resumeDepth===15;
-  // 中継地点は第10階層しか無い想定。切符はそれとは別に一覧へ出る。
-  S.beacons=[10];
+  // 戻った階そのものが恒久の中継地点になる（大ボス撃破と同じ扱い）
+  const beaconGranted = (S.beacons||[]).includes(15);
   const uds = unlockedDepths();
-  const offeredSeparately = grantedAfterReturn && !uds.includes(15);
+  // 一覧に出るのは常に「戻った階+1」。戻った階そのもの(15)は
+  // 切符（一度だけ）としてのみ出て、通常の解放済み一覧には並ばない。
+  const nextOffered = uds.includes(16) && !uds.includes(15);
+  // 何も選ばずに次へ潜れば、既定で16階（続き）から始まる
+  const defaultsToNext = S.startDepth===16;
   renderTown();
   const html = document.getElementById('startdepth').innerHTML;
-  const shownInTown = html.includes('data-resume="1"') && html.includes('data-depth="15"');
-  // 選んで潜ると、その階から始まり、支給も中継地点と同じだけ入り、切符は消える
+  const shownInTown = html.includes('data-resume="1"') && html.includes('data-depth="15"')
+                       && html.includes('data-depth="16"');
+  // 切符を選んで潜ると、その階から始まり、支給も中継地点と同じだけ入り、切符は消える
   S.startDepth = S.resumeDepth;
   startRun();
   const startedThere = S.run.depth===15;
   const consumed = S.resumeDepth===null;
   const gotOutfit = S.hero.lv >= beaconLevel(15);
   TH.close('m-stairs');
-  return {grantedAfterReturn, offeredSeparately, shownInTown, startedThere, consumed, gotOutfit,
-          ok: grantedAfterReturn && offeredSeparately && shownInTown && startedThere && consumed && gotOutfit};
+  return {grantedAfterReturn, beaconGranted, nextOffered, defaultsToNext, shownInTown,
+          startedThere, consumed, gotOutfit,
+          ok: grantedAfterReturn && beaconGranted && nextOffered && defaultsToNext && shownInTown
+              && startedThere && consumed && gotOutfit};
 });
 
 await done(b, errs, R);
