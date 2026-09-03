@@ -1461,37 +1461,58 @@ function consumNeedsTarget(it){
   const c=consumDef(it && it.consum);
   return !!c && !c.all && livingParty().length>0;
 }
+/* 装備の強さは数値を読まないと分からなかった。レア度が上がるほど
+   「土台の名前」自体が変わるようにして、一覧をぱっと見ただけで
+   強さの見当がつくようにする（nmByRar[rar.id]、0=白～4=赤）。
+   接頭辞・接尾辞（冴えた、など）は今まで通りこの前後に付く。 */
 const BASES=[
   // --- 武器 ---
   /* 短剣は**避けて生きる**武器。手数だけだと「弱い剣」でしかなかったので、
      持っているあいだ回避が乗る。盗賊の evade と同じ枠に足される。 */
-  {id:'dagger', nm:'短剣',   slot:SLOT.W, dt:'pierce', atk:[4,6],   spd:1.45, reach:1.15, arc:55,  hands:1, dur:60, ilvl:1, evade:7},
-  {id:'sword',  nm:'剣',     slot:SLOT.W, dt:'slash',  atk:[7,10],  spd:1.00, reach:1.45, arc:75,  hands:1, dur:80, ilvl:1},
-  {id:'axe',    nm:'戦斧',   slot:SLOT.W, dt:'blunt',  atk:[10,14], spd:0.78, reach:1.35, arc:105, hands:1, dur:70, ilvl:6},
-  {id:'mace',   nm:'戦槌',   slot:SLOT.W, dt:'blunt',  atk:[12,16], spd:0.62, reach:1.30, arc:95,  hands:1, dur:105,ilvl:8},
-  {id:'spear',  nm:'槍',     slot:SLOT.W, dt:'pierce', atk:[8,11],  spd:0.88, reach:2.30, arc:30,  hands:2, dur:75, ilvl:5},
+  {id:'dagger', nm:'短剣',   slot:SLOT.W, dt:'pierce', atk:[4,6],   spd:1.45, reach:1.15, arc:55,  hands:1, dur:60, ilvl:1, evade:7,
+    nmByRar:['短剣','スティレット','ミスリルスティレット','双牙の短剣','神速の短剣']},
+  {id:'sword',  nm:'剣',     slot:SLOT.W, dt:'slash',  atk:[7,10],  spd:1.00, reach:1.45, arc:75,  hands:1, dur:80, ilvl:1,
+    nmByRar:['剣','ロングソード','ミスリルソード','魔剣','聖剣']},
+  {id:'axe',    nm:'戦斧',   slot:SLOT.W, dt:'blunt',  atk:[10,14], spd:0.78, reach:1.35, arc:105, hands:1, dur:70, ilvl:6,
+    nmByRar:['戦斧','バトルアクス','ミスリルアクス','魔斧','巨神の斧']},
+  {id:'mace',   nm:'戦槌',   slot:SLOT.W, dt:'blunt',  atk:[12,16], spd:0.62, reach:1.30, arc:95,  hands:1, dur:105,ilvl:8,
+    nmByRar:['戦槌','ウォーハンマー','ミスリルメイス','破魂の槌','聖なる鉄槌']},
+  {id:'spear',  nm:'槍',     slot:SLOT.W, dt:'pierce', atk:[8,11],  spd:0.88, reach:2.30, arc:30,  hands:2, dur:75, ilvl:5,
+    nmByRar:['槍','ランス','ミスリルスピア','貫竜の槍','聖槍']},
   /* 大剣。**遅さの代償が足りていなかった**——攻撃速度 0.58 は槌より遅いのに、
      火力も範囲も戦斧と大差がなかった。振り一回の重みで釣り合わせる。 */
-  {id:'great',  nm:'大剣',   slot:SLOT.W, dt:'slash',  atk:[17,23], spd:0.58, reach:2.35, arc:135, hands:2, dur:95, ilvl:4},
+  {id:'great',  nm:'大剣',   slot:SLOT.W, dt:'slash',  atk:[17,23], spd:0.58, reach:2.35, arc:135, hands:2, dur:95, ilvl:4,
+    nmByRar:['大剣','クレイモア','ミスリル大剣','魔導大剣','天空大剣']},
   // 飛び道具は「射程 = 安全」なので、射程そのものが火力より効く。
   // 弓 6.5 は敵の索敵 8 に近く、後ろに歩くだけで永久に届かない距離だった。
   // 少し縮めて「敵に近づかれてから撃つ」を強いる（威力も気持ち下げる）。
   /* 飛び道具は**射程がそのまま安全**なので、手数まで近接並みにあると近接を選ぶ理由が消える。
      一段落として「足を止めて撃つ」の重みを上げる。 */
-  {id:'bow',    nm:'弓',     slot:SLOT.W, dt:'pierce', atk:[5,7],   spd:0.80, reach:5.8,  arc:14,  hands:2, dur:65, proj:'arrow', ilvl:3},
-  {id:'staff',  nm:'杖',     slot:SLOT.W, dt:'arcane', atk:[6,8],   spd:0.70, reach:4.2,  arc:20,  hands:1, dur:70, proj:'bolt',  ilvl:3},
+  {id:'bow',    nm:'弓',     slot:SLOT.W, dt:'pierce', atk:[5,7],   spd:0.80, reach:5.8,  arc:14,  hands:2, dur:65, proj:'arrow', ilvl:3,
+    nmByRar:['弓','ロングボウ','ミスリルボウ','風切りの弓','聖弓']},
+  {id:'staff',  nm:'杖',     slot:SLOT.W, dt:'arcane', atk:[6,8],   spd:0.70, reach:4.2,  arc:20,  hands:1, dur:70, proj:'bolt',  ilvl:3,
+    nmByRar:['杖','メイジスタッフ','ミスリルロッド','魔導の杖','星辰の杖']},
   // --- 盾（block=軽減率%, parry=パリイ受付秒） ---
-  {id:'buckler',nm:'小盾',   slot:SLOT.S, def:[1,2], block:[16,20], parry:0.28, dur:80,  ilvl:1},
-  {id:'round',  nm:'円盾',   slot:SLOT.S, def:[2,4], block:[27,33], parry:0.22, dur:110, ilvl:5},
-  {id:'tower',  nm:'大盾',   slot:SLOT.S, def:[4,7], block:[41,49], parry:0.15, dur:150, ilvl:12},
+  {id:'buckler',nm:'小盾',   slot:SLOT.S, def:[1,2], block:[16,20], parry:0.28, dur:80,  ilvl:1,
+    nmByRar:['小盾','バックラー','ミスリルバックラー','竜鱗の盾','聖なる小盾']},
+  {id:'round',  nm:'円盾',   slot:SLOT.S, def:[2,4], block:[27,33], parry:0.22, dur:110, ilvl:5,
+    nmByRar:['円盾','ラウンドシールド','ミスリル円盾','魔導の円盾','聖円盾']},
+  {id:'tower',  nm:'大盾',   slot:SLOT.S, def:[4,7], block:[41,49], parry:0.15, dur:150, ilvl:12,
+    nmByRar:['大盾','タワーシールド','ミスリル大盾','守護の大盾','聖なる大盾']},
   // --- 防具 ---
-  {id:'leather',nm:'革鎧',     slot:SLOT.A, def:[3,5],  dur:70,  ilvl:1},
-  {id:'chain',  nm:'鎖帷子',   slot:SLOT.A, def:[6,9],  dur:100, ilvl:5},
-  {id:'plate',  nm:'重装鎧',   slot:SLOT.A, def:[10,14],dur:140, ilvl:10},
-  {id:'robe',   nm:'術士のローブ',slot:SLOT.A,def:[2,4],dur:55,  ilvl:2},
+  {id:'leather',nm:'革鎧',     slot:SLOT.A, def:[3,5],  dur:70,  ilvl:1,
+    nmByRar:['革鎧','スタッズレザー','ミスリル革鎧','魔革の鎧','聖なる革鎧']},
+  {id:'chain',  nm:'鎖帷子',   slot:SLOT.A, def:[6,9],  dur:100, ilvl:5,
+    nmByRar:['鎖帷子','チェインメイル','ミスリル鎖帷子','魔鎖の鎧','聖なる鎖帷子']},
+  {id:'plate',  nm:'重装鎧',   slot:SLOT.A, def:[10,14],dur:140, ilvl:10,
+    nmByRar:['重装鎧','プレートアーマー','ミスリルプレート','魔導甲冑','聖なる重鎧']},
+  {id:'robe',   nm:'術士のローブ',slot:SLOT.A,def:[2,4],dur:55,  ilvl:2,
+    nmByRar:['服','ローブ','絹のローブ','術師のローブ','大賢者のローブ']},
   // --- 装飾品（戦闘では減らず、階層を降りるごとに擦り減る） ---
-  {id:'ring',   nm:'指輪',     slot:SLOT.C, dur:25, ilvl:1},
-  {id:'amulet', nm:'護符',     slot:SLOT.C, dur:25, ilvl:3},
+  {id:'ring',   nm:'指輪',     slot:SLOT.C, dur:25, ilvl:1,
+    nmByRar:['指輪','銀の指輪','ミスリルの指輪','魔導の指輪','聖なる指輪']},
+  {id:'amulet', nm:'護符',     slot:SLOT.C, dur:25, ilvl:3,
+    nmByRar:['護符','銀の護符','ミスリルの護符','魔導の護符','聖なる護符']},
 ];
 /* ---------- 杖の弾の形 ----------
    杖は「球を1つ飛ばす」だけで、弓との違いが射程と貫通しか無かった。
@@ -1684,15 +1705,32 @@ const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
 const BASE_MOVE_SPEED = 4.125;
 const EVADE_CAP = 60;      // 回避率の上限。ここを超えると当たらない相手になる
+/* 重装鎧は防御力が頭一つ抜けている代わりに、着ているあいだ動きが重くなる。
+   移動速度と攻撃速度の両方に掛かる減少倍率（0.90 = -10%）。 */
+const PLATE_MS_MUL = 0.90;
+const PLATE_ASPD_MUL = 0.92;
 const SLOTNM = {weapon:'武器', shield:'盾', armor:'防具', accessory:'装飾品'};
 const baseOf = it => BASES.find(b=>b.id===it.base) || {};
 
 /* ilvl による値スケール: 設計書どおり平方根（線形インフレを避ける） */
 const scaleOf = ilvl => 1 + Math.sqrt(Math.max(0,ilvl-1)) * 0.42;
 
-function rollRarity(ilvl, mf){
+/* 序盤（10階まで）は青(Magic)を出にくくし、黄(Rare)以上は封じる。
+   depth は「実際に今いる階層」——ilvl はオフセット込みで先の階の値を
+   使う呼び出しが多く、そのままでは境界がぶれるので別引数にしてある。
+   depth が渡されない呼び出し（店・ガチャ・鍛冶の練り直し等）は今まで通り無制限。 */
+const LOWDEPTH_RARITY_CAP = 10;
+function rollRarity(ilvl, mf, depth){
   const boost = 1 + mf/100 + ilvl*0.004;
-  const w = RARITY.map(r => r.id===0 ? r.w : r.w*boost);
+  const gated = depth!==undefined && depth<=LOWDEPTH_RARITY_CAP;
+  const w = RARITY.map(r => {
+    let x = r.id===0 ? r.w : r.w*boost;
+    if(gated){
+      if(r.id===1) x *= 0.5;
+      if(r.id>=2) x = 0;
+    }
+    return x;
+  });
   const tot = w.reduce((a,b)=>a+b,0);
   let x = rnd()*tot;
   for(let i=0;i<w.length;i++){ x-=w[i]; if(x<=0) return RARITY[i]; }
@@ -1739,7 +1777,8 @@ function buildItem(base, rar, ilvl){
   // Common / Magic は鑑定済みで落ちる。Rare 以上だけが未鑑定。
   // 全部未鑑定にすると、探索中に装備を入れ替えられるのが白装備だけになり、
   // せっかくのインベントリがほぼ機能しなくなる。
-  const it   = {uid:(genItem._n=(genItem._n||0)+1), base:base.id, nm:base.nm, slot:base.slot,
+  const tierNm = (base.nmByRar && base.nmByRar[rar.id]) || base.nm;
+  const it   = {uid:(genItem._n=(genItem._n||0)+1), base:base.id, nm:tierNm, slot:base.slot,
                 ilvl, rar:rar.id, ident:rar.id<=RAR_IDENT_MAX, aff:[]};
   if(base.atk) it.atk = Math.round(rf(base.atk[0],base.atk[1])*s);
   if(base.def) it.def = Math.round(rf(base.def[0],base.def[1])*s);
@@ -1772,12 +1811,12 @@ function buildItem(base, rar, ilvl){
   if(isCharmSlot(it)) it.aff.push(...rollCharmAffs(rar.id, ilvl));
   return it;
 }
-function genItem(ilvl, mf=0){
+function genItem(ilvl, mf=0, depth){
   const base = pickBase(ilvl);
   /* 求道が指した種は**レア度も上がる**。
      出やすくなるだけだと「同じ白い剣が増える」で終わってしまう。 */
   const plus = (base.hoard===undefined && hoardBases().includes(base.id)) ? HOARD_MF : 0;
-  return buildItem(base, rollRarity(ilvl, mf+plus), Math.max(1,ilvl));
+  return buildItem(base, rollRarity(ilvl, mf+plus, depth), Math.max(1,ilvl));
 }
 /* ベースを指定して作る。ジョブごとに武器種が固定されている仲間の装備に使う。 */
 function genBaseItem(baseId, ilvl, maxRar=1){
@@ -4392,7 +4431,6 @@ const S={
   deathAdBonus:0,        // 死亡時に広告を見て増やした引き継ぎ枠（その死の間だけ）
   fallen:[],             // 慰霊碑。失った仲間（アカウント単位・キャラが死んでも残る）
   beacons:[],            // 大ボスを倒して開いた中継地点（倒した階の番号）
-  resumeDepth:null,      // 帰還ポータルから戻った階。一度だけそこへ再開できる（使うと消える）
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
@@ -4575,6 +4613,7 @@ function stats(h){
   let wReach=FIST.reach, wArc=FIST.arc, wHands=FIST.hands, wProj=FIST.proj, wDt=FIST.dt;
   let wUp=0, wItem=null, wBase=null;
   let block=0, parryWin=0, hasShield=false;
+  let aBase=null;   // 装備している防具のベースID（重装鎧の速度ペナルティ判定用）
   eq.forEach(it=>{
     // レジェンドは射程も属性も飛び道具もベースを上書きするので、素の BASES では見ない
     const b=weaponShape(it);
@@ -4587,6 +4626,7 @@ function stats(h){
       wHands=b.hands||1; wProj=b.proj||null; wDt=b.dt||FIST.dt;
     }
     if(it.slot===SLOT.S){ hasShield=true; block=it.block||0; parryWin=b.parry||0.2; }
+    if(it.slot===SLOT.A){ aBase=it.base; }
     if(it.def){ bDef+=it.def; }
     // ベース種そのものが持つ回避（今は短剣だけ）。接頭辞の「疾き」と同じ枠に足す
     if(b.evade) a.evade += b.evade;
@@ -4643,7 +4683,8 @@ function stats(h){
     aspd:  wSpd * (1 + (dex*0.9 + a.aspdPct)/100) * (1 + U('aspd')*0.07)
            * (1 + C('aspd')/100) * (1 + B('aspd')/100) * AV * SA
            * (1 + (h===S.hero ? baneMul('aspd',0) : 0)/100)
-           * (1 + DN.aspd/100),
+           * (1 + DN.aspd/100)
+           * (aBase==='plate' ? PLATE_ASPD_MUL : 1),
     def:   (bDef + a.def + vit*0.6) * (1 + B('def')/100) * SA * (1 + DN.def/100),
     crit:  clamp(4 + dex*0.5 + a.critPct + U('crit')*4 + B('crit'), 0, 75),
     // 遺物は主人公本人にだけ乗る（口座に残る物なので、渡す概念が無い）
@@ -4651,7 +4692,8 @@ function stats(h){
            * (1 + C('ms')/100) * (1 + B('ms')/100)
            * (1 + (h===S.hero ? relicSum('ms') : 0)/100) * SA
            // 試練の枷。主人公だけに掛かる（仲間まで縛ると難度が跳ね上がりすぎる）
-           * (1 + (h===S.hero ? baneMul('ms',0) : 0)/100),
+           * (1 + (h===S.hero ? baneMul('ms',0) : 0)/100)
+           * (aBase==='plate' ? PLATE_MS_MUL : 1),
     // 射程は武器の素の射程から。強化・護符・恩寵はそこに乗る
     range: wReach * (1 + a.rangePct/100) * (1 + U('range')*0.10)
            * (1 + C('range')/100) * (1 + B('range')/100) * (1 + DN.range/100),
@@ -5994,8 +6036,6 @@ function startRun(depth){
   S.runs++;
   if(!S.hero) S.hero=newHero();
   const d = depth||S.startDepth||1;
-  // 帰還ポータルの一度きりの切符。この階から始めたら消える。
-  if(S.resumeDepth && d===S.resumeDepth) S.resumeDepth=null;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
            curses:refreshCurses().slice(),   // 潜った時点で確定。途中で掛け替えられない
            ft:0, hinted:false,          // 階層に入ってからの秒数と、気配を告げたか
@@ -6078,7 +6118,7 @@ function enterFloor(depth){
        一番投げられやすい場所を運に預けることになる。 */
     const it = (i===0 && earlyArming())
       ? genBaseItem(pick(BASES.filter(b=>b.slot===SLOT.W && b.ilvl<=1)).id, 1, 0)
-      : genItem(depth+2, st.mf);
+      : genItem(depth+2, st.mf, depth);
     W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it, chest:true});
   }
   W.seen = Array.from({length:fl.H},()=>new Uint8Array(fl.W));
@@ -6680,14 +6720,10 @@ function playerAttack(){
   if(twin) P.follow={t:0.13, ang};
 }
 
-/* 中継地点を作る。**大ボス撃破の瞬間**と、**帰還ポータルからの生還**の
-   両方から呼ばれる共通の入口。同じ階を二重に足さない。
-
-   以前は大ボス（10階ごと）を倒したときだけ、その階が次からの入口になった。
-   だが5階ごとの帰還ポータルはそれより短い周期で通るのに、
-   そちらでは「一度だけ同じ階に戻れる」切符（S.resumeDepth）しか渡らず、
-   次に潜るとまた1階から歩き直しになっていた——帰還のたびに振り出しに戻る形は
-   「進んだ実感」を毎回消してしまう。帰還そのものを中継地点の発生源にする。 */
+/* 中継地点を作る。**大ボス撃破の瞬間**だけから呼ばれる入口。同じ階を二重に足さない。
+   以前は通常の帰還（5階ごとの帰還ポータル）でも中継地点や一度きりの再開切符
+   （S.resumeDepth）が付いていたが、歩き直しの手応え自体を無くしてしまうため撤廃した。
+   恒久の中継地点は、いまは大ボス（10階ごと）撃破だけが発生源になる。 */
 function grantBeacon(depth, opt){
   opt = opt || {};
   if(depth<=0 || (S.beacons||[]).includes(depth)) return false;
@@ -7768,7 +7804,7 @@ function killEnemy(e, byAlly){
     // 確定ドロップ。ボスに挑む理由は恩寵だけでなく物としても要る。
     for(let i=0;i<cfg.drops;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
-                    it:genItem(S.run.depth+cfg.ilvl, st.mf+40)});
+                    it:genItem(S.run.depth+cfg.ilvl, st.mf+40, S.run.depth)});
     S.run.bossAlive=false;
     log(e.name+'を撃破');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.9,max:0.9});
@@ -7821,7 +7857,7 @@ function killEnemy(e, byAlly){
     W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3), shard:INTRUDER_SHARDS});
     for(let i=0;i<3;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
-                    it:genItem(S.run.depth+5, st.mf+30)});
+                    it:genItem(S.run.depth+5, st.mf+30, S.run.depth)});
     openBoonPick('unique', e.name);
     return;
   }
@@ -7833,7 +7869,7 @@ function killEnemy(e, byAlly){
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.7,max:0.7});
     for(let i=0;i<2;i++)
       W.drops.push({x:e.x+rf(-0.6,0.6), y:e.y+rf(-0.6,0.6),
-                    it:genItem(S.run.depth+4, st.mf+25)});
+                    it:genItem(S.run.depth+4, st.mf+25, S.run.depth)});
     openBoonPick('unique', e.name);
     return;
   }
@@ -7853,8 +7889,8 @@ function killEnemy(e, byAlly){
   let rate = 0.075 + (e.elite?0.12:0);
   // 盗賊の「物色」: 仲間がとどめを刺したときに追加のドロップ
   if(byAlly && jobDef(byAlly.job).sk.id==='scavenge' && rnd()<0.18)
-    W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40)});
-  if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf)});
+    W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40, S.run.depth)});
+  if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf, S.run.depth)});
 
   /* ---------- レジェンド ----------
      40階以降の黄色個体だけが落とす。1%。**掘って出す物ではなく、出会う物**。
@@ -8858,17 +8894,9 @@ function finishReturn(overflow){
 
      連れ帰った印だけは付ける。次に雇い直すときに半額になる。 */
   livingParty().forEach(a=>{ a.returned = true; });
-  /* 帰還ポータルから戻った階には、一度だけ戻れる。
-     壁が無い層や高難度の層を、また1階から歩き直すのは苦痛でしかない。
-     次に潜るときに一度だけ使える切符——潜ればここは消える（下の startRun 参照）。 */
-  S.resumeDepth = depth;
-  /* 生きて戻ってきたこと自体を、次からの標準の再開地点にする（中継地点と同じ扱い）。
-     大ボスの階（10階ごと）は既に onGreatBossDown で中継地点が付くので、
-     ここは主に5階ごとの中ボス階（5・15・25…）を拾う。
-     resumeDepth（同じ階へ一度だけ）とは別物——こちらは恒久で、+1階から続きになる。 */
-  grantBeacon(depth, {silent:true});
-  // 51階から戻ったときの「続き」は52階ではない。最深部より先は無い。
-  S.startDepth = Math.min(depth+1, FINAL_DEPTH);
+  /* 帰還による自動再開（次から+1階／同じ階へ一度だけ）は撤廃。
+     恒久の中継地点は大ボス撃破（onGreatBossDown）だけが発生源になる——
+     帰還そのものは次の開始階に一切影響しない。 */
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
   rerollTavern();                                   // 酒場の流れ者も同じ周期で入れ替わる
@@ -8995,12 +9023,34 @@ function tapHitsNpc(cx, cy){
   const sx=W.npc.x*TS-camX, sy=W.npc.y*TS-camY;
   return Math.hypot(cx-sx, cy-sy) < Math.max(34, TS*0.9);   // 指の大きさぶん広めに取る
 }
+/* 加入済みの味方をフィールドで直接タップ → そのままステータス/装備画面。
+   HUD の partybar からも同じ画面へ行けるが、フィールド上でも見られると
+   「今誰が近くにいるか」を見ながらすぐ装備を触れる。 */
+function tapHitsAlly(cx, cy){
+  if(S.screen!=='game') return null;
+  const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
+  for(const a of livingParty()){
+    if(a.x===undefined) continue;
+    const sx=a.x*TS-camX, sy=a.y*TS-camY;
+    if(Math.hypot(cx-sx, cy-sy) < Math.max(30, TS*0.8)) return a;
+  }
+  return null;
+}
+/* 主人公自身は常に画面中央に描かれるので、中央付近のタップをそれとみなす。 */
+function tapHitsHero(cx, cy){
+  if(S.screen!=='game' || !S.run || !S.hero) return false;
+  const px=innerWidth/2, py=innerHeight/2;
+  return Math.hypot(cx-px, cy-py) < Math.max(30, TS*0.6);
+}
 function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
     if(t.target && t.target.closest && t.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
+    { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
+      if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
+    if(tapHitsHero(t.clientX, t.clientY)){ openStat(); continue; }
     if(stickId===null){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -10273,9 +10323,6 @@ function draw(){
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
       ctx.fill(); ctx.stroke();
     }
-    // 味方の証として白い細リングを1本
-    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(sx,sy,R+3,0,7); ctx.stroke();
     if(isNpc){
       /* 未加入は「？」を浮かせて、話しかけられることを見せる。
          ただし戦いが始まったら「？」ではなく **HPバー**を出す。
@@ -10738,7 +10785,7 @@ function draw(){
     }
   });
 
-  // 主人公（候補B・遺跡の斥候）。緑のリングは自分の識別用に残す。
+  // 主人公（候補B・遺跡の斥候）。
   const px=innerWidth/2, py=innerHeight/2;
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -10768,8 +10815,6 @@ function draw(){
     ctx.beginPath(); ctx.arc(px,py,Math.max(0,TS*(0.5+p*1.9)),0,7); ctx.stroke();
   }
 
-  ctx.strokeStyle='#7fe0c0'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(px,py,TS*0.46,0,7); ctx.stroke();
   /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
      戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
   const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
@@ -12220,23 +12265,12 @@ function renderTown(){
     + (S.grave ? `<br><span style="color:#7fe0c0">遺体は第${S.grave.depth}階層に残っている</span>` : '');
 
 const uds=unlockedDepths();
-  // 帰還ポータルの切符。中継地点（大ボス撃破）とは別枠で、使えば消える一度きりの選択肢。
-  const resumeUsable = S.resumeDepth && !uds.includes(S.resumeDepth);
   el('startdepth').innerHTML = uds.map(d=>
     `<button class="${S.startDepth===d?'primary':'ghost'}" data-depth="${d}" style="flex:0 0 auto;width:auto;padding:9px 15px">第${d}階層</button>`
   ).join('')
-    + (resumeUsable
-      ? `<button class="${S.startDepth===S.resumeDepth?'primary':'ghost'}" data-depth="${S.resumeDepth}" data-resume="1"
-           style="flex:0 0 auto;width:auto;padding:9px 15px;border-color:#7fd0e0">
-           第${S.resumeDepth}階層へ再開<span style="font-size:10px;color:#7fd0e0">（一度だけ）</span></button>`
-      : '')
     + (S.grave ? `<div class="empty" style="width:100%;color:#7fe0c0">
          遺体は第${S.grave.depth}階層。そこまで潜れば回収できる</div>` : '')
-    + (S.startDepth===S.resumeDepth && resumeUsable
-    ? `<div class="empty" style="width:100%;color:#7fd0e0">
-         帰還ポータルから戻った階へ、そのまま再開する。歩き直さなくてよい一度きりの切符<br>
-         <span style="font-size:11px">潜ればここは使い切る。足りない分は中継地点と同じ支給が入る</span></div>`
-    : S.startDepth>1
+    + (S.startDepth>1
     ? `<div class="empty" style="width:100%;color:#7fc3e0">
          中継地点から始めると <b>Lv.${beaconLevel(S.startDepth)}</b> まで引き上げ、
          足りない装備を支給する<br>
@@ -13896,7 +13930,7 @@ function resolveEvent(){
   if(ev.id==='cache'){
     for(let i=0;i<3;i++)
       W.drops.push({x:ev.x+rf(-0.9,0.9), y:ev.y+rf(-0.9,0.9),
-                    it:genItem(S.run.depth+ri(0,5), st.mf+30)});
+                    it:genItem(S.run.depth+ri(0,5), st.mf+30, S.run.depth)});
     // 代償。音を聞きつけた敵が周りに湧く。
     const fams=floorFamilies(S.run.depth);
     const lv=S.run.depth+Math.floor(S.run.depth/8);
@@ -14308,7 +14342,6 @@ bindTap(el('btn-fixall'), ()=>{
 });
 bindTap(el('btn-reset'), ()=>{
   S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
-  S.resumeDepth=null;
   S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;

@@ -481,4 +481,52 @@ R.blindGradient = await pg.evaluate(()=>{
           ok: Math.abs(dark[0]-open[0])<2 && dark[1]<open[1]-8 && dark[2]<=1};
 });
 
+// 8-f. 主人公・味方の足元の識別リングは削除済み（攻撃範囲リングなど他の輪は残る）
+R.noFeetRings = await pg.evaluate(()=>{
+  TH.run(3,{seed:11}); TH.immortal(); TH.clearEnemies();
+  const a=TH.ally(3,'warrior',5); a.x=P.x+1; a.y=P.y; S.hero.party.push(a);
+  const heroR = TS*0.46, allyR = TS*0.30+3;
+  const calls=[];
+  const orig = CanvasRenderingContext2D.prototype.arc;
+  CanvasRenderingContext2D.prototype.arc = function(x,y,r,...rest){ calls.push(r); return orig.call(this,x,y,r,...rest); };
+  draw();
+  CanvasRenderingContext2D.prototype.arc = orig;
+  const closeTo=(target)=>calls.some(r=>Math.abs(r-target)<0.01);
+  return {allyCount: livingParty().length, callCount: calls.length,
+          heroRingGone: !closeTo(heroR),
+          allyRingGone: !closeTo(allyR),
+          ok: livingParty().length>0 && !closeTo(heroR) && !closeTo(allyR)};
+});
+
+// 8-g. フィールド上のキャラを直接タップ→ステータス/装備画面が開く
+//      （HUD の partybar タップとは別の入口。ジョイスティックの起動は奪わない）
+R.tapCharacterOpensEquip = await pg.evaluate(()=>{
+  TH.run(3,{seed:11}); TH.immortal(); TH.clearEnemies(); W.npc=null;
+  // 主人公のタップ判定円（半径30px前後）と重ならないよう、十分離しておく
+  const a=TH.ally(3,'warrior',5); a.x=P.x+3; a.y=P.y; S.hero.party.push(a);
+  const fireTouch=(cx,cy)=>{
+    stickId=null; stickDx=stickDy=0;
+    touchStart({changedTouches:[{clientX:cx, clientY:cy, identifier:1, target:document.body}]});
+  };
+  // 主人公は常に画面中央
+  S.screen='game';
+  fireTouch(innerWidth/2, innerHeight/2);
+  const heroOpened = S.screen==='stat';
+  closeStat(); S.screen='game';
+  const stickNotGrabbedOnHero = stickId===null;
+  // 味方の画面座標を計算して、そこをタップ
+  const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
+  const asx=a.x*TS-camX, asy=a.y*TS-camY;
+  fireTouch(asx, asy);
+  const allyOpened = S.screen==='allyeq' && _aeAlly===a;
+  closeAllyEquip(); S.screen='game';
+  const stickNotGrabbedOnAlly = stickId===null;
+  // 何もない場所をタップすれば、これまで通りジョイスティックが立つ
+  fireTouch(60, 60);
+  const stickStillWorksElsewhere = stickId===1;
+  stickId=null;
+  return {heroOpened, stickNotGrabbedOnHero, allyOpened, stickNotGrabbedOnAlly, stickStillWorksElsewhere,
+          ok: heroOpened && stickNotGrabbedOnHero && allyOpened && stickNotGrabbedOnAlly && stickStillWorksElsewhere};
+});
+
 await done(b, errs, R);

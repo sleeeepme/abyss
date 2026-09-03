@@ -224,5 +224,106 @@ R.upgradeRepairsAndGrows = await pg.evaluate(()=>{
               && gearDurMul({rar:0,up:UP_MAX}) > 2};
 });
 
+// --- 12. 装備の強さは名前そのもので分かる。レア度ごとに土台の名前が変わる
+//         （冴えた、などの接頭辞・接尾辞は今まで通りその前後に付く）
+R.tieredNaming = await pg.evaluate(()=>{
+  const missing = BASES.filter(b=>!b.nmByRar || b.nmByRar.length!==5);
+  const notAllUnique = BASES.filter(b=>b.nmByRar && new Set(b.nmByRar).size!==5);
+  // sword を各レア度で強制生成し、土台名がラダー通りに変わることを見る
+  const sword = BASES.find(b=>b.id==='sword');
+  const names = [0,1,2,3,4].map(rid=>{
+    const it = buildItem(sword, RARITY[rid], 10);
+    return it.nm;
+  });
+  const matchesLadder = names.every((nm,i)=>nm===sword.nmByRar[i]);
+  const commonUnchanged = names[0]==='剣';         // 白は今まで通りの表記
+  const risesInGrandeur = names[2]==='ミスリルソード' && names[4]==='聖剣';
+  // 接頭辞・接尾辞は相変わらず nm の前後に巻く（itemName 側の仕組みは触っていない）
+  let prefixed=null;
+  for(let i=0;i<4000 && !prefixed;i++){
+    const it=buildItem(sword, RARITY[3], 30);
+    it.ident=true;
+    const p=it.aff.find(a=>a.t==='p');
+    if(p) prefixed = itemName(it).includes(p.nm) && itemName(it).includes(it.nm);
+  }
+  // レジェンドは既存の固有名のまま、ラダーの影響を受けない
+  const lg = makeLegend('levantine');
+  const legendUnaffected = lg && lg.nm === legendDef(lg).nm && lg.nm === 'レヴァンテイン';
+  return {names, missingCount:missing.length, notAllUniqueCount:notAllUnique.length,
+          allBasesHaveLadder: missing.length===0,
+          allLaddersDistinct: notAllUnique.length===0,
+          matchesLadder, commonUnchanged, risesInGrandeur,
+          affixStillWraps: !!prefixed,
+          legendUnaffected: !!legendUnaffected,
+          ok: missing.length===0 && notAllUnique.length===0 && matchesLadder
+              && commonUnchanged && risesInGrandeur && !!prefixed && !!legendUnaffected};
+});
+
+// --- 13. 10層まではドロップの色が制限される（青は半分、黄以上は封印）
+R.lowDepthRarityCap = await pg.evaluate(()=>{
+  const N=6000;
+  const sample=(ilvl,depth)=>{
+    const counts={0:0,1:0,2:0,3:0,4:0};
+    for(let i=0;i<N;i++){ const r=rollRarity(ilvl, 0, depth); counts[r.id]++; }
+    return counts;
+  };
+  RNG=mulberry32(42);
+  const gated = sample(10, 8);          // 8層（<=10）
+  RNG=mulberry32(42);
+  const ungated = sample(10, undefined); // depth省略＝今まで通り
+  RNG=mulberry32(42);
+  const beyond = sample(10, 11);         // 11層（>10）は制限なし
+  const gatedRarePlus = gated[2]+gated[3]+gated[4];
+  const ungatedRarePlus = ungated[2]+ungated[3]+ungated[4];
+  const beyondRarePlus = beyond[2]+beyond[3]+beyond[4];
+  const gatedMagicShare = gated[1]/N, ungatedMagicShare = ungated[1]/N;
+  // 生の重みは「青半分・黄以上ゼロ」だが、母数が縮む分だけ正規化後の割合は
+  // 単純な半分にはならない——実装と同じ式で解析的に期待値を出して比べる。
+  const boost = 1 + 0/100 + 10*0.004;
+  const wCommon=60, wMagic=28*boost, wRare=10*boost, wUniq=1.8*boost, wRelic=0.2*boost;
+  const ungatedTot = wCommon+wMagic+wRare+wUniq+wRelic;
+  const gatedTot = wCommon + wMagic*0.5;
+  const expectedGatedMagicShare = (wMagic*0.5)/gatedTot;
+  const expectedUngatedMagicShare = wMagic/ungatedTot;
+  const closeEnough=(got,expect)=>Math.abs(got-expect)<0.03;   // N=6000での統計誤差ぶんの余裕
+  return {gated, ungated, beyond,
+          gatedRarePlus, ungatedRarePlus, beyondRarePlus,
+          gatedMagicShare:+gatedMagicShare.toFixed(3), ungatedMagicShare:+ungatedMagicShare.toFixed(3),
+          expectedGatedMagicShare:+expectedGatedMagicShare.toFixed(3),
+          expectedUngatedMagicShare:+expectedUngatedMagicShare.toFixed(3),
+          noRarePlusUnderCap: gatedRarePlus===0,
+          rarePlusExistsNormally: ungatedRarePlus>0,
+          rarePlusExistsBeyondCap: beyondRarePlus>0,
+          gatedMagicMatchesFormula: closeEnough(gatedMagicShare, expectedGatedMagicShare),
+          ungatedMagicMatchesFormula: closeEnough(ungatedMagicShare, expectedUngatedMagicShare),
+          ok: gatedRarePlus===0 && ungatedRarePlus>0 && beyondRarePlus>0
+              && closeEnough(gatedMagicShare, expectedGatedMagicShare)
+              && closeEnough(ungatedMagicShare, expectedUngatedMagicShare)};
+});
+
+// --- 14. 重装鎧は移動速度・攻撃速度の両方が下がる
+R.plateSpeedPenalty = await pg.evaluate(()=>{
+  S.upg={}; S.hero=newHero();
+  const bare = stats(S.hero);
+  // Common(rar 0, aff:[0,0]) で強制生成——接頭辞・接尾辞の速度系affixが
+  // 紛れ込むと、防具種そのものの効果を測れなくなる
+  const plate = buildItem(BASES.find(b=>b.id==='plate'), RARITY[0], 10); plate.ident=true;
+  S.hero.equip.armor = plate;
+  const withPlate = stats(S.hero);
+  const leather = buildItem(BASES.find(b=>b.id==='leather'), RARITY[0], 10); leather.ident=true;
+  S.hero.equip.armor = leather;
+  const withLeather = stats(S.hero);
+  return {bareMs:+bare.ms.toFixed(3), plateMs:+withPlate.ms.toFixed(3), leatherMs:+withLeather.ms.toFixed(3),
+          bareAspd:+bare.aspd.toFixed(3), plateAspd:+withPlate.aspd.toFixed(3), leatherAspd:+withLeather.aspd.toFixed(3),
+          msLowerThanBare: withPlate.ms < bare.ms,
+          aspdLowerThanBare: withPlate.aspd < bare.aspd,
+          msLowerThanOtherArmor: withPlate.ms < withLeather.ms,
+          aspdLowerThanOtherArmor: withPlate.aspd < withLeather.aspd,
+          otherArmorUnaffected: Math.abs(withLeather.ms - bare.ms) < 0.001,
+          ok: withPlate.ms < bare.ms && withPlate.aspd < bare.aspd
+              && withPlate.ms < withLeather.ms && withPlate.aspd < withLeather.aspd
+              && Math.abs(withLeather.ms - bare.ms) < 0.001};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

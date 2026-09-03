@@ -585,17 +585,19 @@ R.bottomStopsDescent = await pg.evaluate(()=>{
               && at50.downShown && returnPortalAt(51) && !canDescendFrom(51)};
 });
 
-// 26-d. 帰還しても「52階から再開」にはならない。中継地点も51階で止まる。
+// 26-d. 帰還による自動再開は撤廃済み——51階から帰っても開始階は動かず、
+//       解放済み一覧が52階以降へはみ出すこともない。
 R.bottomCapsResume = await pg.evaluate(()=>{
-  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  S.hero=newHero(); S.upg={}; S.startDepth=1; startRun(51); S.hero.party=[]; P.invuln=1e9;
   returnToTown();
   const start=S.startDepth;
   const u=unlockedDepths();
   document.getElementById('m-ret').classList.remove('on');
   return {startDepth:start, unlocked:u, deepestUnlocked:Math.max(...u),
+          startDepthUntouched: start===1,
           resumeCapped: start<=FINAL_DEPTH,
           noFloorsBeyond: u.every(d=>d<=FINAL_DEPTH),
-          ok: start<=FINAL_DEPTH && u.every(d=>d<=FINAL_DEPTH)};
+          ok: start===1 && start<=FINAL_DEPTH && u.every(d=>d<=FINAL_DEPTH)};
 });
 
 await b.close();

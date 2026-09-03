@@ -418,40 +418,32 @@ R.portal = await pg.evaluate(()=>{
           ok: d7.went==='潜ったまま' && d10.went==='帰った'};
 });
 
-/* 7-b. 帰還ポータルから戻った階には、一度だけそのまま再開できる（切符）。
-       それとは別に、戻った階そのものが恒久の中継地点になり、
-       次に潜る既定地点は自動で「戻った階 + 1」になる
-       ——帰還のたびに1階から歩き直させないため。 */
-R.resumeTicket = await pg.evaluate(()=>{
-  S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.stash=[]; S.resumeDepth=null; S.beacons=[];
+/* 7-b. 帰還による自動再開（一度きりの切符／戻った階+1への恒久ショートカット）は撤廃。
+       通常の帰還は次に潜る開始階に一切影響せず、恒久の中継地点は
+       大ボス撃破（onGreatBossDown）だけが発生源のまま残る。 */
+R.returnNoAutoResume = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.stash=[]; S.beacons=[]; S.startDepth=1;
   startRun(15); S.hero.party=[];
   S.run.gold=50; S.run.loot=[];
   returnToTown();
   TH.close('m-ret');
-  const grantedAfterReturn = S.resumeDepth===15;
-  // 戻った階そのものが恒久の中継地点になる（大ボス撃破と同じ扱い）
-  const beaconGranted = (S.beacons||[]).includes(15);
+  const noResumeField = S.resumeDepth===undefined;
+  // 通常の帰還だけでは恒久の中継地点も付かない（大ボス撃破専用のまま）
+  const noAutoBeacon = !(S.beacons||[]).includes(15);
   const uds = unlockedDepths();
-  // 一覧に出るのは常に「戻った階+1」。戻った階そのもの(15)は
-  // 切符（一度だけ）としてのみ出て、通常の解放済み一覧には並ばない。
-  const nextOffered = uds.includes(16) && !uds.includes(15);
-  // 何も選ばずに次へ潜れば、既定で16階（続き）から始まる
-  const defaultsToNext = S.startDepth===16;
+  const stillOnlyFloor1 = uds.length===1 && uds[0]===1;
+  // 開始階も帰還前のまま変わらない（+1階へ自動で進まない）
+  const startDepthUnchanged = S.startDepth===1;
   renderTown();
   const html = document.getElementById('startdepth').innerHTML;
-  const shownInTown = html.includes('data-resume="1"') && html.includes('data-depth="15"')
-                       && html.includes('data-depth="16"');
-  // 切符を選んで潜ると、その階から始まり、支給も中継地点と同じだけ入り、切符は消える
-  S.startDepth = S.resumeDepth;
-  startRun();
-  const startedThere = S.run.depth===15;
-  const consumed = S.resumeDepth===null;
-  const gotOutfit = S.hero.lv >= beaconLevel(15);
-  TH.close('m-stairs');
-  return {grantedAfterReturn, beaconGranted, nextOffered, defaultsToNext, shownInTown,
-          startedThere, consumed, gotOutfit,
-          ok: grantedAfterReturn && beaconGranted && nextOffered && defaultsToNext && shownInTown
-              && startedThere && consumed && gotOutfit};
+  const noResumeButtonInUi = !html.includes('data-resume="1"') && !html.includes('data-depth="16"');
+  // 大ボス撃破の恒久中継地点は引き続き機能する（撤廃したのは通常帰還の分だけ）
+  grantBeacon(15);
+  const greatBossBeaconStillWorks = unlockedDepths().includes(16);
+  return {noResumeField, noAutoBeacon, stillOnlyFloor1, startDepthUnchanged, noResumeButtonInUi,
+          greatBossBeaconStillWorks,
+          ok: noResumeField && noAutoBeacon && stillOnlyFloor1 && startDepthUnchanged
+              && noResumeButtonInUi && greatBossBeaconStillWorks};
 });
 
 await done(b, errs, R);

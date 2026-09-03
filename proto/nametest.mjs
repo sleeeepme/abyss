@@ -13,6 +13,7 @@ R.order = await pg.evaluate(()=>{
   S.hero=newHero();
   const it=genBaseItem('sword',20,1);
   it.ident=true; it.up=0;
+  it.nm=BASES.find(b=>b.id==='sword').nm;   // 語順の検証なので、階級別の土台名は固定しておく
   it.aff=[{t:'p',id:'sharp',nm:'鋭利な',stat:'dmgPct',v:10},
           {t:'s',id:'guard',nm:'守護',  stat:'def',   v:3}];
   const nm=itemName(it);
@@ -28,7 +29,9 @@ R.order = await pg.evaluate(()=>{
 // 1-b. 接頭辞だけ／接尾辞だけ／どちらも無いとき
 R.partial = await pg.evaluate(()=>{
   const mk = aff => { const it=genBaseItem('axe',12,1);
-                      it.ident=true; it.up=0; it.aff=aff; return itemName(it).replace(BASE_IC.axe,'').trim(); };
+                      it.ident=true; it.up=0; it.aff=aff;
+                      it.nm=BASES.find(b=>b.id==='axe').nm;   // 階級別の土台名は固定しておく
+                      return itemName(it).replace(BASE_IC.axe,'').trim(); };
   const p = mk([{t:'p',id:'stout',nm:'頑健な',stat:'hp',v:12}]);
   const s = mk([{t:'s',id:'flame',nm:'業火', stat:'fire',v:6}]);
   const n = mk([]);
@@ -52,6 +55,7 @@ R.noDoubleNo = await pg.evaluate(()=>{
 // 1-d. +N と（破損）の位置は変わっていない
 R.decorations = await pg.evaluate(()=>{
   const it=genBaseItem('mace',20,1); it.ident=true; it.aff=[]; it.up=4;
+  it.nm=BASES.find(b=>b.id==='mace').nm;   // 階級別の土台名は固定しておく
   const plus=itemName(it);
   it.durMax=50; it.dur=0;
   const broken=itemName(it);
@@ -111,6 +115,7 @@ R.inBag = await pg.evaluate(()=>{
   TH.run(1,{seed:5});
   const it=genBaseItem('bow',14,1);
   it.ident=true; it.up=0;
+  it.nm=BASES.find(b=>b.id==='bow').nm;   // 階級別の土台名は固定しておく
   it.aff=[{t:'p',id:'keen',nm:'冴えた',stat:'critPct',v:5},
           {t:'s',id:'ice', nm:'氷結', stat:'frost',  v:7}];
   S.run.loot=[it];
@@ -126,6 +131,7 @@ R.inBag = await pg.evaluate(()=>{
 R.inLog = await pg.evaluate(()=>{
   logs.length=0;
   const it=genBaseItem('staff',10,1); it.ident=true; it.up=0; it.aff=[];
+  it.nm=BASES.find(b=>b.id==='staff').nm;   // 階級別の土台名は固定しておく
   log('拾った：'+itemName(it));
   return {line:logs[0], ok: logs[0]===('拾った：'+BASE_IC.staff+' 杖')};
 });
