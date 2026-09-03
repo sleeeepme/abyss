@@ -199,6 +199,9 @@ R.durWarn = await pg.evaluate(()=>{
 R.breakAlert = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(10); S.hero.party=[];
   const w=genBaseItem('sword',10,1);
+  // 見たいのは「壊れた瞬間の報せ」。レア度や強化段で減りが遅くなると
+  // 1回の damageGear では減らないことがあるので、素の Common に固定する。
+  w.rar=0; w.up=0; w._wear=0;
   S.hero.equip.weapon=w; w.dur=1;
   _banner=null; W.fx=[];
   damageGear('weapon', 1);
@@ -214,6 +217,7 @@ R.breakAlert = await pg.evaluate(()=>{
 R.warnOnce = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(10); S.hero.party=[];
   const w=genBaseItem('mace',10,1);
+  w.rar=0; w.up=0; w._wear=0;          // 1回叩けば必ず1減る状態にそろえる
   S.hero.equip.weapon=w;
   const warnAt=Math.ceil(w.durMax*DUR_WARN);
   logs=[];

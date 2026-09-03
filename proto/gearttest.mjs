@@ -82,7 +82,10 @@ R.shieldDrops = await pg.evaluate(()=>{
 R.guard = await pg.evaluate(()=>{
   S.upg={}; S.hero=newHero(); startRun(1);
   let sh=null; for(let i=0;i<6000&&!sh;i++){ const x=genItem(14,0); if(x.base==='round') sh=x; }
-  sh.ident=true; sh.aff=[]; S.hero.equip.shield=sh;
+  // 拾い物なのでレア度はまちまち。壊れにくさが混ざると耐久消費が読めないので、
+  // 付帯効果を外すのと同じ理由で素の Common にそろえる。
+  sh.ident=true; sh.aff=[]; sh.rar=0; sh.up=0; sh._wear=0;
+  S.hero.equip.shield=sh;
   const st=stats(S.hero);
   S.upg={hp:8};                       // 1発で死なないようHPを盛る（死ぬと S.hero が null になる）
   const sample=(guard)=>{ P.guard=guard; P.guardStart=-99;   // 押しっぱなし扱い
@@ -170,6 +173,55 @@ R.guardSlow = await pg.evaluate(async ()=>{
     return P.x-x0; };
   const free=await run(false), guarded=await run(true);
   return {free:+free.toFixed(2), guarded:+guarded.toFixed(2), slower: guarded < free*0.85};
+});
+
+/* ============ 壊れにくさ：レア度と強化段 ============
+   良い物を拾っても数階で砕けるなら、良い物を拾った意味が残らない。 */
+
+// レア度が上がるほど、同じ回数使ったときに減る量が少ない
+R.rarityToughens = await pg.evaluate(()=>{
+  const wearOf=(rar)=>{
+    const it=genBaseItem('sword',10,1);
+    it.rar=rar; it.up=0; it._wear=0; it.durMax=100000; it.dur=100000;
+    S.hero.equip.weapon=it;
+    for(let i=0;i<2000;i++) damageGear('weapon',1);
+    return {lost:it.durMax-it.dur, integer: Number.isInteger(it.dur)};
+  };
+  const w=[0,1,2,3,4].map(wearOf);
+  const lost=w.map(x=>x.lost);
+  return {lost, muls:[0,1,2,3,4].map(r=>gearDurMul({rar:r,up:0})),
+          allIntegers: w.every(x=>x.integer),
+          commonUnchanged: lost[0]===2000,          // 素の Common は今まで通り
+          eachTierTougher: lost.every((v,i)=>i===0 || v < lost[i-1]),
+          relicMuchTougher: lost[4] < lost[0]*0.4,
+          ok: lost[0]===2000 && lost.every((v,i)=>i===0 || v<lost[i-1])
+              && lost[4] < lost[0]*0.4 && w.every(x=>x.integer)};
+});
+
+// 鍛えるたびに耐久は満タンに戻り、上限の伸び幅そのものが段ごとに大きくなる
+R.upgradeRepairsAndGrows = await pg.evaluate(()=>{
+  S.gold=99999999; S.ore={raw:999,fine:999,deep:999};
+  const it=genBaseItem('sword',10,1);
+  it.rar=0; it.up=0; it._wear=0;
+  S.hero.equip.weapon=it;
+  const start=it.durMax;
+  it.dur=Math.floor(it.durMax*0.2);                 // 傷んだ状態から鍛える
+  const worn=it.dur;
+  doUpgrade(it,false);
+  const healedOnFirst = it.dur===it.durMax;
+  const caps=[it.durMax];
+  for(let k=2;k<=10;k++){ it.dur=1; doUpgrade(it,false); caps.push(it.durMax); }
+  const steps=caps.map((c,i)=> i===0 ? c-start : c-caps[i-1]);
+  return {start, worn, caps, steps, lv:it.up,
+          healedOnFirst,
+          healedEveryTime: it.dur===it.durMax,
+          reachedMax: it.up===UP_MAX,
+          grewOverall: it.durMax > start*2.5,
+          stepsAccelerate: steps[steps.length-1] > steps[0]*2,
+          maxIsTough: gearDurMul({rar:0,up:UP_MAX}) > 2,
+          ok: healedOnFirst && it.dur===it.durMax && it.up===UP_MAX
+              && it.durMax > start*2.5 && steps[steps.length-1] > steps[0]*2
+              && gearDurMul({rar:0,up:UP_MAX}) > 2};
 });
 
 await b.close();

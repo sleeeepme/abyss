@@ -273,7 +273,7 @@ R.finalDepthMoved = await pg.evaluate(()=>{
               && bossTierAt(100)!=='final' && bossTierAt(60)!=='final'};
 });
 
-// --- 16. 51階の主：アビスの口。人型サイズで湧く。50階の主（引き連れ）はそのまま。
+// --- 16. 51階の主：アビスの門番、アズレイア。人型サイズで湧く。50階の主（引き連れ）はそのまま。
 R.finalSpawn = await pg.evaluate(()=>{
   RNG=mulberry32(51*7919); const fl51=genFloor(51);
   const es51=spawnEnemies(fl51,51);
@@ -286,7 +286,7 @@ R.finalSpawn = await pg.evaluate(()=>{
   return {name51:boss51&&boss51.name, tier51:boss51&&boss51.tier, r51:boss51&&boss51.r,
           name50:boss50&&boss50.name, tier50:boss50&&boss50.tier,
           humanSized: boss51 && boss51.r<0.6, escort50, noEscort51,
-          ok: boss51&&boss51.name==='アビスの口' && boss51.tier==='final' && boss51.r<0.6
+          ok: boss51&&boss51.name==='アビスの門番、アズレイア' && boss51.tier==='final' && boss51.r<0.6
               && boss50&&boss50.name==='初めの供物' && boss50.tier==='great'
               && escort50===true && noEscort51===true};
 });
@@ -506,6 +506,96 @@ R.onlyRealFinalBossCycles = await pg.evaluate(()=>{
   const noBaneAt50 = !S.run.bossBane;
   const notFinalUnique = boss50.uniqueBoss!==FINAL_DEPTH;
   return {noBaneAt50, notFinalUnique, ok: noBaneAt50 && notFinalUnique};
+});
+
+/* 25-f. 1つの枷と付き合う時間を長く取る。
+   15秒で回していたころは、読んで立ち回りを変える前に次へ移っていた。 */
+R.finalBossBaneRunsLong = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  stepSim(0.05);
+  const id0=S.run.bossBane.id;
+  stepSim(14);                                  // 旧設定なら、ここで既に1周している
+  const sameAfter14 = S.run.bossBane.id===id0 && S.run.bossBane.t>0;
+  return {secs:BOSS_BANE_SEC, id0, tLeft:+S.run.bossBane.t.toFixed(1),
+          longEnough: BOSS_BANE_SEC>=30, sameAfter14,
+          ok: BOSS_BANE_SEC>=30 && sameAfter14};
+});
+
+/* ============ 26. 最深部：名前・地名・分身の偽装・行き止まり ============ */
+
+// 26-a. 主は「アビスの門番、アズレイア」。51階そのものの地名は「アビスの口」。
+R.finalNames = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  return {boss:boss.name, place:floorPlaceName(51), zone:zoneAt(51).nm,
+          place12:floorPlaceName(12),
+          bossIsGuardian: boss.name==='アビスの門番、アズレイア',
+          floorIsMouth:   floorPlaceName(51)==='アビスの口',
+          placeDiffersFromZone: floorPlaceName(51)!==zoneAt(51).nm,
+          otherFloorsUseZone:   floorPlaceName(12)===zoneAt(12).nm,
+          ok: boss.name==='アビスの門番、アズレイア' && floorPlaceName(51)==='アビスの口'
+              && floorPlaceName(12)===zoneAt(12).nm};
+});
+
+// 26-b. 分身は名前も大きさも本体と同じ。輪・王冠・HP帯は本体からも消える。
+R.mirrorsIndistinguishable = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  const boss=W.enemies.find(e=>e.boss);
+  boss.revealed=true;
+  boss.hp=Math.round(boss.maxHp*0.6);      // 本体は既に削れている＝帯が出る条件
+  const bareBoss = finalDisguised(boss);   // まだ幻はいない
+  spawnFinalMirrors(boss, 3, null);
+  const ms=W.enemies.filter(e=>e.mirror && !e.dead);
+  const named = ms.length>0 && ms.every(m=>m.name===boss.name);
+  const noPhantomTag = ms.every(m=>!/幻/.test(m.name));
+  const sameSize = ms.every(m=>m.r===boss.r && m.looksBoss===true);
+  const hidesBoss = finalDisguised(boss) && ms.every(m=>finalDisguised(m));
+  // 幻を片付ければ、本体の印は戻る
+  despawnFinalMirrors(boss);
+  const marksReturn = !finalDisguised(boss);
+  return {count:ms.length, bossName:boss.name, mirrorNames:ms.map(m=>m.name),
+          quietBeforeClones: !bareBoss,
+          named, noPhantomTag, sameSize, hidesBoss, marksReturn,
+          ok: named && noPhantomTag && sameSize && hidesBoss && marksReturn && !bareBoss};
+});
+
+// 26-c. 51階から先へは降りられない。帰る道だけが残る。
+R.bottomStopsDescent = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  openStairs();
+  const atBottom={title:el('st-title').textContent,
+                  downHidden: el('st-down').style.display==='none',
+                  retShown:   el('st-ret').style.display!=='none'};
+  // 押しても降りない（結線側にも歯止めがある）
+  const d0=S.run.depth;
+  el('st-down').click();
+  const stayed = S.run.depth===d0;
+  el('m-stairs').classList.remove('on'); setScreen('game');
+  // 50階では今まで通り降りられる
+  startRun(50); P.invuln=1e9;
+  openStairs();
+  const at50={downShown: el('st-down').style.display!=='none'};
+  el('m-stairs').classList.remove('on'); setScreen('game');
+  return {atBottom, at50, stayed, depth:d0,
+          canDescend50: canDescendFrom(50), stopsAt51: !canDescendFrom(51),
+          portalAt51: returnPortalAt(51),
+          ok: atBottom.downHidden && atBottom.retShown && stayed
+              && at50.downShown && returnPortalAt(51) && !canDescendFrom(51)};
+});
+
+// 26-d. 帰還しても「52階から再開」にはならない。中継地点も51階で止まる。
+R.bottomCapsResume = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
+  returnToTown();
+  const start=S.startDepth;
+  const u=unlockedDepths();
+  document.getElementById('m-ret').classList.remove('on');
+  return {startDepth:start, unlocked:u, deepestUnlocked:Math.max(...u),
+          resumeCapped: start<=FINAL_DEPTH,
+          noFloorsBeyond: u.every(d=>d<=FINAL_DEPTH),
+          ok: start<=FINAL_DEPTH && u.every(d=>d<=FINAL_DEPTH)};
 });
 
 await b.close();

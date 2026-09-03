@@ -353,4 +353,102 @@ R.zoneBaneHasNoGauge = await pg.evaluate(()=>{
           ok: zoneBaneActive && noGauge && effectStillApplies};
 });
 
+/* ============ 8. 枷「暗幕」が本当に見える範囲を狭める ============
+   以前は探索済み記録(W.seen)の半径だけを狭めていて、一度通った場所は
+   明るいまま——プレイ中は何も起きていないように見えた。 */
+
+// 8-a. 遠くの床が暗くなる
+R.blindDarkensView = await pg.evaluate(()=>{
+  TH.run(12,{seed:5}); TH.immortal(); TH.clearEnemies();
+  for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
+  S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
+  // 主人公から8〜10マス離れた床を1枚選ぶ。そこが暗くなるかどうかを見る。
+  let tgt=null;
+  for(let y=1;y<W.fl.H-1 && !tgt;y++) for(let x=1;x<W.fl.W-1;x++){
+    const d=Math.hypot(x+0.5-P.x, y+0.5-P.y);
+    if(d>8 && d<10 && W.fl.g[y][x]===T.FLOOR){ tgt={x,y}; break; }
+  }
+  if(!tgt) return {foundTile:false, ok:false};
+  const air=window.drawAir; window.drawAir=()=>{};   // 漂う塵が乗ると1枚の明るさが揺れる
+  const dpr=Math.min(2, devicePixelRatio||1);
+  // getImageData は変換行列を通らない＝物理ピクセルで数える
+  const px=Math.round(((tgt.x-P.x)*TS + innerWidth/2  + TS/2)*dpr);
+  const py=Math.round(((tgt.y-P.y)*TS + innerHeight/2 + TS/2)*dpr);
+  const lum=()=>{
+    draw();
+    const d=ctx.getImageData(px-3, py-3, 6, 6).data;
+    let s=0; for(let i=0;i<d.length;i+=4) s+=(d[i]+d[i+1]+d[i+2])/3;
+    return s/(d.length/4);
+  };
+  const bright=lum();
+  S.run.trial={bane:'blind', t:30, max:30};          // 暗幕を掛ける
+  const dark=lum();
+  window.drawAir=air;
+  return {foundTile:true, bright:+bright.toFixed(1), dark:+dark.toFixed(1),
+          baneIsBlind: trialBane().id==='blind',
+          darkerWhenBlind: dark < bright-4,
+          ok: dark < bright-4 && trialBane().id==='blind'};
+});
+
+// 8-b. 明かりの外にいる相手は見えなくなる（名前も出ない）
+R.blindHidesFarEnemy = await pg.evaluate(()=>{
+  TH.run(12,{seed:5}); TH.immortal();
+  for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
+  S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
+  /* 6.5マス先に1体だけ置く。狙っている相手なので、見えていれば名前が出る（7.5マス以内）。
+     暗幕が掛かると明かりは 13×0.55＝約7.2マス、その3/4＝約5.4マスまで縮むので隠れる。 */
+  const e=W.enemies.find(x=>!x.boss && !x.dead);
+  W.enemies=[e]; e.x=P.x+6.5; e.y=P.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
+  e.lurk=0; e.tele=0; e.dead=false; P.target=e;
+  const seen=()=>{
+    const hits=[]; const orig=window.label;
+    window.label=(t,x,y,c,s)=>{ hits.push(String(t)); return orig(t,x,y,c,s); };
+    draw();
+    window.label=orig;
+    return hits;
+  };
+  const openEyed=seen();
+  S.run.trial={bane:'blind', t:30, max:30};
+  const blinded=seen();
+  return {name:e.name, openEyed, blinded,
+          named:  openEyed.some(t=>t===e.name),
+          hidden: !blinded.some(t=>t===e.name),
+          ok: openEyed.some(t=>t===e.name) && !blinded.some(t=>t===e.name)};
+});
+
+// 8-c. 敵の名前の下に Lv が出る（上の情報パネルを畳んだぶんの代わり）
+R.enemyNameShowsLevel = await pg.evaluate(()=>{
+  TH.run(12,{seed:5}); TH.immortal();
+  for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
+  S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
+  const e=W.enemies.find(x=>!x.boss && !x.dead);
+  W.enemies=[e]; e.x=P.x+2; e.y=P.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
+  e.lurk=0; e.dead=false; P.target=e;
+  const hits=[]; const orig=window.label;
+  window.label=(t,x,y,c,s)=>{ hits.push({t:String(t), y}); return orig(t,x,y,c,s); };
+  draw();
+  window.label=orig;
+  const nameAt=hits.find(h=>h.t===e.name);
+  const lvAt  =hits.find(h=>h.t==='Lv.'+e.lv);
+  return {name:e.name, lv:e.lv, texts:hits.map(h=>h.t),
+          showsName: !!nameAt, showsLevel: !!lvAt,
+          levelSitsBelowName: !!(nameAt && lvAt && lvAt.y > nameAt.y),
+          ok: !!nameAt && !!lvAt && lvAt.y > nameAt.y};
+});
+
+// 8-d. 敵の情報パネルは、狙っている相手がいても出さない（デバフ帯と場所を奪い合わない）
+R.noTargetInfoPanel = await pg.evaluate(()=>{
+  TH.run(51,{seed:9}); TH.immortal();
+  const boss=W.enemies.find(x=>x.boss);
+  if(boss) boss.revealed=true;
+  TH.step(0.2);
+  // 狙いは自動で付け直されるので、時間を進めた**あと**に立てて描き直す
+  P.target = W.enemies.find(x=>!x.dead) || null;
+  updateHUD();
+  return {hasTarget: !!P.target,
+          panelHidden: el('targetinfo').style.display==='none',
+          baneGaugeShown: el('trialbar').style.display!=='none',
+          ok: !!P.target && el('targetinfo').style.display==='none'};
+});
+
 await done(b, errs, R);

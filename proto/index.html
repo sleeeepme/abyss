@@ -774,7 +774,7 @@
   <button class="ghost" id="dbgally-close">閉じる</button>
 </div></div>
 
-<!-- ============ 第51階層（アビスの口）撃破＝踏破 ============ -->
+<!-- ============ 第51階層（アビスの口）の門番を撃破＝踏破 ============ -->
 <div class="modal" id="m-clear"><div class="box">
   <h1 style="color:#ffd06a">アビスを踏破した</h1>
   <p class="sub" id="clr-sub"></p>
@@ -880,7 +880,7 @@
       効果は<b>そのキャラが死ぬまで</b>続き、街に戻っても消えない。<br>
     ・同じ恩寵を選び直すと<b>重ねがけ</b>になる。<br>
     ・<b>第50階層</b>には<b style="color:#ff9a5a">初めの供物</b>がいる。倒しても階層は続く。<br>
-    ・<b>第51階層</b>には<b style="color:#c98adf">アビスの口</b>——唯一のラストボス。
+    ・<b>第51階層「アビスの口」</b>には<b style="color:#c98adf">アビスの門番、アズレイア</b>——唯一のラストボス。
       これを倒したときだけ「アビスを踏破」になる。<br>
     ・恩寵は<b>誰に与えるかを選べる</b>（あなた／仲間）。
   </div>
@@ -1524,11 +1524,31 @@ const DUR = {
   shieldPerBlock:  1,      // ガードで受けるごとに -1（パリイ成功は減らない）
   accessoryPerFloor: 1,    // 装飾品は階層を降りるごとに -1
 };
-/* 仲間の装備は主人公より壊れにくい。**主人公と同じ判定を1回減らしてから通す**——
-   減らす量を1/2.5にすると耐久が小数になり、表示のあちこち（耐久 39.6/40）が崩れる。
-   代わりに「1/2.5の確率でしか減らさない」形にすれば、耐久は常に整数のまま、
-   平均した壊れやすさだけが 2.5 倍遅くなる（damageAllyGear 側で1箇所にまとめる）。 */
+/* 仲間の装備は主人公より壊れにくい。 */
 const ALLY_DUR_MUL = 2.5;
+/* ---------- 壊れにくさ ----------
+   レア度と強化段で「同じ回数使ったときに減る量」を割る。
+   良い物を拾っても数階で砕けるなら、良い物を拾った意味が残らない。
+
+   減らす量そのものを小数にすると耐久が 39.6/40 のように崩れるので、
+   端数は it._wear に持ち越し、1 を超えたぶんだけ整数で落とす（wearGear）。
+   **乱数は使わない**——同じ使い方をすれば必ず同じだけ減るほうが、
+   プレイヤーにも試験にも読める（以前の仲間側は確率で間引いていた）。 */
+const RAR_DUR_MUL  = [1, 1.35, 1.8, 2.4, 3.2];  // Common / Magic / Rare / Unique / Relic
+const UP_DUR_TOUGH = 0.12;   // 強化1段ごとに足される壊れにくさ（+10 で 2.2 倍）
+function gearDurMul(it){
+  const r = RAR_DUR_MUL[it.rar|0] || 1;
+  return r * (1 + (it.up||0)*UP_DUR_TOUGH);
+}
+/* 傷みを与えて、実際に落ちた整数ぶんを返す（0 なら今回は減っていない）。 */
+function wearGear(it, amount, extraMul){
+  const mul = gearDurMul(it) * (extraMul||1);
+  it._wear = (it._wear||0) + amount/mul;
+  const step = Math.floor(it._wear);
+  if(step<=0) return 0;
+  it._wear -= step;
+  return step;
+}
 // 接頭辞: 攻撃・生存の主効果
 const PREFIX=[
   {id:'sharp', nm:'鋭利な',   stat:'dmgPct',  r:[8,15]},
@@ -2305,7 +2325,7 @@ const TRIAL_BANES=[
   {id:'heavy',  nm:'重圧',   desc:'移動速度 -30%',        ms:-30},
   {id:'dull',   nm:'鈍化',   desc:'攻撃速度 -30%',        aspd:-30},
   {id:'frail',  nm:'脆弱',   desc:'被ダメージ +35%',      dmgTaken:35},
-  {id:'blind',  nm:'暗幕',   desc:'見える範囲 -45%（霧が開く速さが落ちる）', sight:0.55},
+  {id:'blind',  nm:'暗幕',   desc:'明かりが届く距離 -45%（遠くの敵は見えなくなる）', sight:0.55},
   {id:'silent', nm:'封技',   desc:'大技が使えない',       silence:true},
 ];
 function trialBaneDef(id){ return TRIAL_BANES.find(b=>b.id===id); }
@@ -2328,12 +2348,14 @@ function nearTrial(){
 }
 function trialActive(){ return !!(S.run && S.run.trial && S.run.trial.t>0); }
 /* ---------- ラスボス戦だけの、切り替わる枷 ----------
-   アビスの口と実際に殴り合っている間だけ、枷が一定時間ごとに
+   アビスの門番と実際に殴り合っている間だけ、枷が一定時間ごとに
    ランダムな別の枷へ切り替わる。白の層に足を踏み入れただけの固定の枷
    （下の zoneBaneNow）とは別物——殴り合いの最中にも「同じ立ち回りが
    ずっと続かない」を持ち込むための専用の周期。
    戦っていない間（ボスに気づかれる前・倒したあと）は掛からない。 */
-const BOSS_BANE_SEC = 15;   // ラスボス戦中、1つの枷が効いている時間
+/* 15秒で回していたころは、枷を読んで立ち回りを変えるより先に次へ移ってしまい、
+   「何か掛かっては消える」だけの帯になっていた。1つの枷と付き合う時間を倍に取る。 */
+const BOSS_BANE_SEC = 30;   // ラスボス戦中、1つの枷が効いている時間
 function tickFinalBossBane(dt){
   if(!S.run) return;
   const e = W.enemies.find(x=>x.boss && !x.dead && x.uniqueBoss===FINAL_DEPTH && x.revealed);
@@ -2385,7 +2407,14 @@ function baneMul(key, dflt){
 const UP_MAX = 10;
 const UP_SKILL_AT = [3,6,9];
 const UP_ATK_PER  = 0.07;      // 1段あたりの攻撃力（乗算）
-const UP_DUR_PER  = 0.05;      // 1段あたりの耐久上限
+/* 耐久上限の伸びは**段が上がるほど大きくなる**。
+   一律 +5% だと、伸びるのは序盤の安物ばかりで、終盤に育て切った一本ほど
+   「まだ壊れる」ままだった。上へ行くほど器そのものが太くなるようにして、
+   壊れにくさ（UP_DUR_TOUGH）と合わせて最大段で相当に持つようにする。
+   +10 まで積むと上限はおよそ 3 倍、減る速さは 2.2 分の1。 */
+const UP_DUR_PER   = 0.05;     // 1段目の耐久上限の伸び
+const UP_DUR_ACCEL = 0.30;     // 段が上がるごとに、その伸び幅自体を増やす
+function upDurStep(up){ return UP_DUR_PER * (1 + Math.max(0,(up||1)-1)*UP_DUR_ACCEL); }
 const UP_SKILLS=[
   {id:'swift', nm:'疾撃', col:'#7fc8e0', ok:()=>true,
    desc:()=>'攻撃速度 +12%',              ap:a=>{ a.aspdPct+=12; }},
@@ -2446,9 +2475,12 @@ function doUpgrade(it, mid){
   else   { S.ore[c.grade]-=c.need;      S.gold-=c.gold; }
   it.up=(it.up||0)+1;
   if(it.durMax){                       // 鍛えると器も丈夫になる
-    const before=it.durMax;
-    it.durMax=Math.round(it.durMax*(1+UP_DUR_PER));
-    it.dur=Math.min(it.durMax, it.dur+(it.durMax-before));
+    it.durMax=Math.max(it.durMax+1, Math.round(it.durMax*(1+upDurStep(it.up))));
+    /* 鍛え直した器は新品に戻る。前は増えた差分だけ足していたので、
+       傷んだ武器はいくら鍛えても傷んだままで、「直すために鍛える」が成立せず
+       結局これとは別に修理代を払わされていた。鍛冶は打ち直しでもある。 */
+    it.dur=it.durMax;
+    it._wear=0;
   }
   let got=null;
   if(UP_SKILL_AT.includes(it.up)){
@@ -3810,8 +3842,8 @@ function uniqueChanceAt(depth){ return clamp(0.22 + depth*0.006, 0.22, 0.42); }
    51は5の倍数ではないので、通常の「5階ごとに主・10階ごとに大ボス」の
    並びには一切乗らない——**単発の特別な1階**として bossTierAt の中で
    個別に判定する。50階の「初めの供物」はそのまま大ボス（great）として残り、
-   51階の「アビスの口」だけが唯一の final。 */
-const FINAL_DEPTH = 51;      // ここに「アビスの口」がいる。唯一のラストボス階
+   51階の「アビスの門番、アズレイア」だけが唯一の final。 */
+const FINAL_DEPTH = 51;      // ここに「アビスの門番、アズレイア」がいる。唯一のラストボス階
 const OFFERING_BOSS_DEPTH = 50;   // 「初めの供物」。50刻みの並びの最後の大ボス（ラストボスの前座）
 /* 恩寵をもう受け取った階か。**階層で覚える**（相手ではなく場所）——
    同じ階に何度潜り直しても、主は同じ1体という扱いにしたい。 */
@@ -3827,7 +3859,25 @@ function bossTierAt(depth){
    「あと1階だけ」の欲と「今のうちに引き返す」の怖さが釣り合わない。
    引き返せる場所を先に見せておくことで、5階ぶんの体力配分が計画になる。 */
 const PORTAL_EVERY = 5;
-function returnPortalAt(depth){ return depth>0 && depth%PORTAL_EVERY===0; }
+/* 最深部（51階）は5刻みに乗らないが、必ず帰れる。
+   ここから先が無い以上、帰り道を塞ぐと「行き止まりで死ぬまで戦う」しかなくなる。 */
+function returnPortalAt(depth){
+  return depth>0 && (depth%PORTAL_EVERY===0 || depth>=FINAL_DEPTH);
+}
+/* ---------- 階そのものに付いた名前 ----------
+   層（10階ごと）とは別に、その1階だけの地名を持つ場所がある。
+   51階は白の層の一部ではなく「アビスの口」という一つの場所として扱う。
+   ——主の名前ではない。**穴のほうの名前**で、門番はそこに立っている。 */
+const FLOOR_PLACES = {
+  51: {nm:'アビスの口', sub:'底。ここで道は終わる', accent:'#c98adf'},
+};
+function floorPlace(depth){ return FLOOR_PLACES[depth] || null; }
+function floorPlaceName(depth){
+  const p=floorPlace(depth);
+  return p ? p.nm : zoneAt(depth).nm;
+}
+/* これより深くへは行けない。51階は最後の1階で、抜けた先は街しかない。 */
+function canDescendFrom(depth){ return depth < FINAL_DEPTH; }
 function nextPortalDepth(depth){
   return (Math.floor(Math.max(0,depth)/PORTAL_EVERY)+1)*PORTAL_EVERY;
 }
@@ -3882,7 +3932,7 @@ const BOSS_MOVES={
   // 招来。取り巻きを呼ぶ。数で押される前に本体を削る、という判断を作る。
   summon:{nm:'招来',     tele:0.70, n:3, cd:[9.0,12.0], min:0, max:99},
   // 分身。本体そっくりの幻を数体だす。幻はHPが無いに等しく、削っても本体は減らない
-  // ——「本体を見失わない」ことそのものを体で覚えさせる、アビスの口だけの技。
+  // ——「本体を見失わない」ことそのものを体で覚えさせる、門番だけの技。
   clone: {nm:'分身',     tele:0.60, n:2, dur:4.5, cd:[10.0,14.0], min:0, max:99},
 };
 /* 既定のセット。UNIQUE_BOSSES に載っていない階（周回した61階以降）で使う。 */
@@ -3962,14 +4012,14 @@ const UNIQUE_BOSSES={
        rage:['charge'],
        line:'「降りた。」——街に残る最も古い一文であり、最も古い嘘。'},
 
-  /* ---------- 51階＝アビスの口 ----------
+  /* ---------- 51階（アビスの口）の主＝アビスの門番、アズレイア ----------
      現象体でも登録者でもない。番号どころか、名前を与えられたことさえ怪しい。
      人型のサイズで現れる——ここまでの誰よりも小さく見えるのに、
      一番深いところにいる、という落差そのものが正体。
      分身で本体を隠し、定期的に跳んで距離を無効化し、
      半分で全体を巻き込み、四分の一を切ると幻ごと群がり、
      十分の一を切ると本体だけで逃げに回る——削るほど掴みにくくなる。 */
-  51: {nm:'アビスの口',    reg:'登録なし——記録の外',
+  51: {nm:'アビスの門番、アズレイア', reg:'登録なし——記録の外',
        fam:'arcane', dt:'arcane',
        moves:['clone','beam','burst','pillars','wave','cleave'],
        rage:['charge'],
@@ -4030,7 +4080,7 @@ const S={
   grave:null,            // {depth,x,y,items:[],gold,heroName,lv}
   carry:[], gachaLeft:GACHA_PER_DAY, gachaFree:GACHA_FREE_PER_DAY, gachaDay:'',   // 持ち込み枠（死ぬと失う）
   lastDepth:1,           // 直近の探索の到達最深度。ガチャの排出帯を決める
-  cleared:0,             // 第51階層の主（アビスの口）を倒した回数
+  cleared:0,             // 第51階層の主（アビスの門番、アズレイア）を倒した回数
   bld:{},                // 街開発の各施設のレベル
   tavern:[],             // 酒場で待っている連れ帰った者（口座側。キャラが死んでも残る）
   tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
@@ -4126,11 +4176,13 @@ function unlockedDepths(){
      ——検証で「最後まで直接跳べる」を保証したい。 */
   if(dbg('allDepths')){
     const out=[1];
-    for(let d=5; d<=FINAL_DEPTH+9; d+=5) out.push(d);
+    for(let d=5; d<=FINAL_DEPTH; d+=5) out.push(d);
     if(!out.includes(FINAL_DEPTH)) out.push(FINAL_DEPTH);
     return out.sort((a,b)=>a-b);
   }
-  return [1, ...beacons().map(d=>d+1)];
+  // 51階の中継地点は「52階から」にはならない。最深部が終点。
+  return [...new Set([1, ...beacons().map(d=>d+1)])]
+           .filter(d=>d<=FINAL_DEPTH).sort((a,b)=>a-b);
 }
 
 /* ---------- デバッグ ----------
@@ -4331,8 +4383,10 @@ function damageGear(slot, amount){
   if(!S.hero) return;
   const it=S.hero.equip[slot];
   if(!it || !it.durMax || it.dur<=0) return;
+  const lost=wearGear(it, amount, 1);       // レア度と強化段のぶん、減りが遅くなる
+  if(lost<=0) return;
   const before=it.dur;
-  it.dur -= amount;
+  it.dur -= lost;
   if(it.dur<=0){
     it.dur=0;
     /* 破損は「気づかないうちに戦闘力が消えている」のが最悪なので、
@@ -5622,6 +5676,12 @@ function startRun(depth){
   enterFloor(d);
   setScreen('game');
 }
+/* ここでは深さを丸めない。**行けなくするのは導線であって、生成器ではない。**
+   一度 Math.min(depth, FINAL_DEPTH) を挟んだところ、白の層の52〜60階を
+   直接作って調べていた検証（苔の種類・層ごとの枷・表の外のボス）が
+   まとめて51階を見に行ってしまった。
+   降りられないことは openStairs / st-down / startDepth / unlockedDepths の
+   4箇所で閉じてある。 */
 function enterFloor(depth){
   RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
   const fl = genFloor(depth);
@@ -5735,9 +5795,16 @@ function enterFloor(depth){
   livingParty().forEach(a=>damageAllyGear(a, 'accessory', DUR.accessoryPerFloor));
   P.guard=false; P.parryFx=0;
 
-  // 層が切り替わったときだけ名前を大きく出す（10階層ごと）
+  /* 層が切り替わったときだけ名前を大きく出す（10階層ごと）。
+     地名を持つ階（51階＝アビスの口）は、層ではなくその1階の名前を出す——
+     ここは層の続きではなく、たどり着いた場所だから。 */
+  const pl = floorPlace(depth);
   const z = fl.zone;
-  if(z && z.id !== S.run.zoneId){
+  if(pl){
+    S.run.zoneId = z ? z.id : S.run.zoneId;
+    showBanner(pl.nm, pl.sub, pl.accent, 3.4);
+    log('── '+pl.nm+' ──');
+  }else if(z && z.id !== S.run.zoneId){
     S.run.zoneId = z.id;
     showZoneBanner(z);
     log('── '+z.nm+' ──');
@@ -7070,9 +7137,11 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
 function damageAllyGear(a, slot, amount){
   const it=a.equip[slot];
   if(!it || !it.durMax || it.dur<=0) return;
-  // 2.5倍壊れにくい。呼び出し側は主人公と同じ頻度で呼んでいるので、ここで間引く。
-  if(rnd() >= 1/ALLY_DUR_MUL) return;
-  it.dur -= amount;
+  /* 呼び出し側は主人公と同じ頻度で呼んでいる。仲間ぶんの 2.5 倍は、
+     レア度・強化段の壊れにくさに掛け合わせてここで一度に効かせる。 */
+  const lost=wearGear(it, amount, ALLY_DUR_MUL);
+  if(lost<=0) return;
+  it.dur -= lost;
   if(it.dur<=0){ it.dur=0; log(a.name+'の'+it.nm+'が壊れた'); }
 }
 
@@ -7310,7 +7379,7 @@ function killEnemy(e, byAlly){
 function enemyUpdate(e,dt){
   if(e.dead) return;
 
-  // アビスの口の分身（一時的なものだけ）。寿命が尽きたら跡形も残さず消える。
+  // 門番の分身（一時的なものだけ）。寿命が尽きたら跡形も残さず消える。
   if(e.mirror && e.ttl!=null){
     e.ttl -= dt;
     if(e.ttl<=0){ e.dead=true; W.fx.push({t:'grave',x:e.x,y:e.y,life:0.3,max:0.3}); return; }
@@ -7365,7 +7434,7 @@ function enemyUpdate(e,dt){
   }
   // 移動
   let mvx=0,mvy=0;
-  /* HP10%を切ったアビスの口は、以後ずっと離れる方向にしか動かない。
+  /* HP10%を切った門番は、以後ずっと離れる方向にしか動かない。
      「逃げながら遠距離が本命」を、系統ごとの間合い設定より優先する。 */
   if(e.fleeing){ mvx=-dx/d; mvy=-dy/d; }
   else if(a.ms>0){
@@ -7420,13 +7489,13 @@ function bossRage(e){
     e.moveCd = Math.min(e.moveCd, 1.2);
     if(e.revealed) log(e.name+'が激昂した');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.5,max:0.5});
-    /* ---------- アビスの口：HP半分で全体を巻き込む一撃 ----------
+    /* ---------- 門番：HP半分で全体を巻き込む一撃 ----------
        「激昂＝HP半分」という既存の節目にそのまま乗せる。
        予兆は出さない代わり、単発の大きさに留めて即死にはしない。 */
     if(e.uniqueBoss===FINAL_DEPTH){
       if(e.revealed){
         log(e.name+'——全体を巻き込む一撃');
-        showBanner('アビスの口', '一帯を巻き込む大技を放った', '#c98adf', 2.6);
+        showBanner(e.name, '一帯を巻き込む大技を放った', '#c98adf', 2.6);
       }
       W.fx.push({t:'shock', x:e.x, y:e.y, r:40, life:0.5, max:0.5, col:'#c98adf'});
       aoeTargets().forEach(t=>aoeHit(e, t, 1.8));
@@ -7518,7 +7587,7 @@ function warpBossRandom(e){
   return true;
 }
 
-/* ---------- アビスの口の分身 ----------
+/* ---------- 門番の分身 ----------
    本体そっくりの幻を湧かせる。`ttl` を渡すと一定時間で自然消滅する
    （「分身」技の一時的な分身）。渡さなければ、倒されるまで残る
    （HP25%を切ったあとの「常に4人」——despawnFinalMirrors で明示的に消す）。 */
@@ -7530,12 +7599,26 @@ function spawnFinalMirrors(e, n, ttl){
       maxHp:Math.max(8, Math.round(e.maxHp*0.05)), atkV:e.atkV*0.65, def:Math.round(e.def*0.4),
       res:e.fam.res, dt:e.dt, st:{}, bu:{}, state:'chase', t:0, cd:rf(0,0.6),
       vx:0, vy:0, hit:0, tele:0, dead:false, r:e.r, teleMul:1.15, ms:e.ms,
-      col:e.col, name:e.name+'（幻）', mirror:true, master:e, ttl: ttl||null,
-      uniqueBoss:0, boss:false};
+      /* **名前も見た目も本体と同じにする。**
+         「（幻）」と書いてあるうちは、分身は技ではなく的の水増しでしかない。
+         どれが本体か分からないからこそ、殴って確かめるしかなくなる。
+         boss は立てない（HP帯・撃破処理・枷は本体だけの物）が、
+         描くときだけ本体と同じ扱いにするために looksBoss を持たせる。 */
+      col:e.col, name:e.name, mirror:true, master:e, ttl: ttl||null,
+      uniqueBoss:0, boss:false, looksBoss:true, tier:e.tier};
     c.hp=c.maxHp;
     W.enemies.push(c);
     W.fx.push({t:'grave', x:pt.x, y:pt.y, life:0.35, max:0.35});
   }
+}
+/* 分身が1体でも生きているあいだは、本体も幻も見た目で区別が付かないようにする。
+   輪も王冠もHPの帯も、どれか1つでも残っていれば「こっちが本体だ」と教えてしまう。
+   幻を片付ければ輪が戻る——それが本体を見つけたことの合図になる。 */
+function finalDisguised(e){
+  if(!e || !W.enemies) return false;
+  const master = e.mirror ? e.master : e;
+  if(!master || master.uniqueBoss!==FINAL_DEPTH) return false;
+  return W.enemies.some(m=>m.mirror && m.master===master && !m.dead);
 }
 function despawnFinalMirrors(e){
   W.enemies.forEach(m=>{
@@ -7545,7 +7628,7 @@ function despawnFinalMirrors(e){
     }
   });
 }
-/* ---------- アビスの口専用の進行 ----------
+/* ---------- 門番専用の進行 ----------
    毎フレーム呼ぶ。定期ワープと、HP割合で切り替わる2段階（4人化・逃走）を見る。
    どちらも一度切り替わったら戻らない——削るほど掴みにくくなる、という
    このボスの一貫した性質にする。 */
@@ -7561,7 +7644,7 @@ function finalBossTick(e, dt){
     spawnFinalMirrors(e, 3, null);
     if(e.revealed){
       log(e.name+'——常に4人になって攻撃してくる');
-      showBanner('アビスの口', '幻が本体から離れなくなった。全員が同じように攻撃してくる', '#c98adf', 3.0);
+      showBanner(e.name, '幻が本体から離れなくなった。全員が同じように攻撃してくる', '#c98adf', 3.0);
     }
   }
   if(!e.fleePhase && e.hp <= e.maxHp*0.10){
@@ -7572,7 +7655,7 @@ function finalBossTick(e, dt){
     e.fleeing = true;
     if(e.revealed){
       log(e.name+'——本体だけが残り、逃げながら遠距離に切り替えた');
-      showBanner('アビスの口', '幻を捨てて逃げに転じた。近づけない相手になる', '#c98adf', 3.0);
+      showBanner(e.name, '幻を捨てて逃げに転じた。近づけない相手になる', '#c98adf', 3.0);
     }
   }
 }
@@ -8159,7 +8242,8 @@ function finishReturn(overflow){
      ここは主に5階ごとの中ボス階（5・15・25…）を拾う。
      resumeDepth（同じ階へ一度だけ）とは別物——こちらは恒久で、+1階から続きになる。 */
   grantBeacon(depth, {silent:true});
-  S.startDepth = depth+1;
+  // 51階から戻ったときの「続き」は52階ではない。最深部より先は無い。
+  S.startDepth = Math.min(depth+1, FINAL_DEPTH);
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
   rerollTavern();                                   // 酒場の流れ者も同じ周期で入れ替わる
@@ -8612,12 +8696,17 @@ function spawnTrialEnemy(){
 
 function openStairs(){
   const safe = returnPortalAt(S.run.depth);
-  el('st-title').textContent = safe?'帰還ポータル':'降りる穴';
+  /* 最深部には下が無い。ここは穴ではなく、引き返すためだけの場所。 */
+  const bottom = !canDescendFrom(S.run.depth);
+  el('st-title').textContent = bottom ? '底' : (safe?'帰還ポータル':'降りる穴');
   // 次の階で層が変わるなら予告する。「あと1階で景色が変わる」は降りる理由になる。
   const nz = zoneAt(S.run.depth+1), cz = zoneAt(S.run.depth);
-  const zoneLine = nz.id!==cz.id
+  const zoneLine = bottom
+    ? '<div style="margin-top:8px;color:#c98adf">ここが<b>'+floorPlaceName(S.run.depth)+'</b>——'
+      + 'これより深くへは行けない</div>'
+    : nz.id!==cz.id
     ? '<div style="margin-top:8px;color:'+nz.accent+'">この先は <b>'+nz.nm+'</b></div>'
-    : '<div style="margin-top:8px;color:var(--dim);font-size:11px">'+cz.nm+'</div>';
+    : '<div style="margin-top:8px;color:var(--dim);font-size:11px">'+floorPlaceName(S.run.depth)+'</div>';
   /* 巡回者が起きているなら、ここで必ず一度言う。
      この画面は「降りる／帰る」を選ぶ唯一の場所なので、
      帰る理由を渡すならここ以外に置き場所が無い。
@@ -8633,7 +8722,8 @@ function openStairs(){
       + '</div>';
   }
   el('st-body').innerHTML = '第'+S.run.depth+'階層<br>戦利品 '+S.run.loot.length+'点 / '+S.run.gold+'G<br>'+
-    (safe?'ここは安全地帯。帰還すれば戦利品は確定する。'
+    (bottom?'ここから先は無い。帰還すれば戦利品は確定する。'
+     :safe?'ここは安全地帯。帰還すれば戦利品は確定する。'
         :'深いほど良い物が出る。だが死ねば全て失う。<br>'
          +'<span style="color:var(--dim);font-size:11px">街へ帰れるのは第'
          +nextPortalDepth(S.run.depth)+'階層の帰還ポータル</span>')
@@ -8641,11 +8731,14 @@ function openStairs(){
   /* 帰れるのはポータル階だけ。**押せないボタンを残さずに、消す。**
      いつでも帰れるなら、どこまで潜るかは決断ではなくただの気分になる。 */
   el('st-ret').style.display = safe ? '' : 'none';
+  // 底では「さらに深く潜る」も同じ理由で消す。押せない選択肢を置き土産にしない。
+  el('st-down').style.display = bottom ? 'none' : '';
   /* 巡回者に見つかっているあいだは、緑（既定の選択肢）を「帰還」に付け替える。
      文章で「帰れ」と言いながら、押しやすい方が「さらに深く潜る」のままなのは
      ちぐはぐで、指はほぼ緑を押す。促したいのはこちらなので、色のほうを動かす。
      選択肢は減らさない——決めるのはあくまで主人公で、こちらは重心を寄せるだけ。 */
-  const urge = intruderAwake() && safe;   // 帰れない階で「帰れ」を強調しない
+  // 底では選ぶ余地が「帰る」しかないので、そちらを既定にする
+  const urge = bottom || (intruderAwake() && safe);   // 帰れない階で「帰れ」を強調しない
   el('st-down').className = urge ? '' : 'primary';
   el('st-ret').className  = urge ? 'primary' : '';
   renderStairHeal();
@@ -9129,6 +9222,18 @@ function draw(){
   // 層（10階層ごと）の見た目。色・装飾・明かりの届く距離がここで切り替わる。
   const Z = f.zone || ZONES[0];
   const dim = Math.pow(0.88, f.cycle||0);   // 一周するごとにもう一段暗くする
+  /* ---------- 枷「暗幕」 ----------
+     以前は探索済み記録（W.seen）の半径だけを狭めていた。だが seen は**一度開いたら
+     開きっぱなし**なので、通ったことのある場所は明るいまま、まだ見ぬ縁が少し遅く
+     開くだけ——プレイ中は何も起きていないように見えた（白の層は lightR:44 なので
+     完全に無効だった）。
+
+     見える範囲を狭めるなら、狭めるべきは**実際に描く明かりの距離**のほう。
+     併せて奥の下限も落とす。下限 0.34 のままだと、範囲を縮めても遠くが
+     「少し暗いがはっきり見える」ままで、やはり効いて見えない。 */
+  const sightMul = baneMul('sight',1);
+  const lightR   = Z.lightR * sightMul;
+  const litFloor = sightMul<1 ? 0.10 : 0.34;
   const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
   const x0=Math.max(0,Math.floor(camX/TS)-1), x1=Math.min(f.W-1,Math.ceil((camX+innerWidth)/TS));
   const y0=Math.max(0,Math.floor(camY/TS)-1), y1=Math.min(f.H-1,Math.ceil((camY+innerHeight)/TS));
@@ -9138,7 +9243,7 @@ function draw(){
     const dist=Math.hypot(x+0.5-P.x,y+0.5-P.y);
     // 明かりの届く距離も層ごと。白の層だけ極端に広い——手前と奥が同じ明るさになり、
     // 「距離が測れない」が色ではなく光で出る。
-    const lit=clamp(1.3-dist/Z.lightR,0.34,1);
+    const lit=clamp(1.3-dist/lightR,litFloor,1);
     const sx=x*TS-camX, sy=y*TS-camY;
     if(t===T.WALL){ ctx.fillStyle=shade(Z.wall,lit*dim); }
     /* 縁の向こうは空が見えている、という扱いにする。壁と同じ暗さで塗ると
@@ -9311,6 +9416,21 @@ function draw(){
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;
     // まだ開いていないタイルの上にいる相手は描かない（床と足並みを揃える）
     if(!tileSeen(e.x, e.y)) return;
+    /* 暗幕のあいだは、明かりの外にいる相手も見えない。
+       床だけ暗くして敵が暗闇に浮いたままだと、狭まったことが嘘に見えるし、
+       そもそも枷として何も要求してこない（見えているなら遠くから対処できる）。
+
+       ボスだけは残す——画面の主役が消えるのは事故と区別が付かない。
+       予兆リングは lurk と同じ扱いで、見えない相手のぶんも出す
+       （避けようのない攻撃にはしない）。 */
+    if(sightMul<1 && !e.boss && !e.dead && Math.hypot(e.x-P.x, e.y-P.y) > lightR*0.75){
+      if(e.tele>0){
+        const p=1-e.tele/e.arch.tele;
+        ctx.strokeStyle='rgba(255,110,80,'+(0.30+p*0.45)+')'; ctx.lineWidth=2+p*3;
+        ctx.beginPath(); ctx.arc(sx,sy,TS*(0.5+p*0.4),0,7); ctx.stroke();
+      }
+      return;
+    }
     /* 跡の層。**近寄るまで見えない。**
        一度見えた相手はそのまま見え続ける（消えたり出たりすると、
        追っているのか見失ったのかが分からなくなる）。
@@ -9330,7 +9450,9 @@ function draw(){
     // 見た目の大きさは被弾半径 e.r をそのまま使う。
     // ボスだけ半径を大きくしても、描画がここで固定値のままだと
     // 「当たり判定は大きいのに見た目は雑魚」という一番まずい状態になる。
-    const R = e.boss ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
+    // looksBoss は門番の幻。大きさまで本体と同じにしないと、輪を消しても一目で分かる。
+    const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
+    const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast) drawBossCast(e, sx, sy, R);
     // 予兆リング（攻撃が来る合図）
@@ -9372,7 +9494,7 @@ function draw(){
       ctx.fill(); ctx.stroke();
     }
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
-    if(e.boss && !e.dead && !spriteDrawn){
+    if((e.boss||e.looksBoss) && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
       ctx.fillStyle='#0d0f14';
       shape(e.arch.id, sx, sy, R*0.55);
@@ -9403,7 +9525,8 @@ function draw(){
       ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,R+10,0,7); ctx.stroke();
       ctx.globalAlpha=1;
     }
-    if(e.boss){
+    // 金の輪と王冠は「これが主だ」の印。幻が出ているあいだは本体からも外す。
+    if(e.boss && !disg){
       const gold = e.tier==='final' ? '#ff9a5a' : e.tier==='great' ? '#ffd06a' : '#d6b34a';
       ctx.strokeStyle=gold; ctx.lineWidth=3;
       ctx.beginPath(); ctx.arc(sx,sy,R+5,0,7); ctx.stroke();
@@ -9420,20 +9543,31 @@ function draw(){
       ctx.lineTo(sx+cw,cy2+TS*0.14); ctx.closePath(); ctx.fill();
     }
     if(!e.dead){
-      if(e.hp<e.maxHp){
+      /* 頭上のHP帯も伏せる。幻は湧いた直後が満タンなので、
+         既に削れている本体だけが帯を出していると、殴る前に本体が割れる。
+         本体のHPは上の #bossbar に出ているので、情報としては失われない。 */
+      if(e.hp<e.maxHp && !disg){
         ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
         ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy-R-9,R*2*(e.hp/e.maxHp),3.5);
       }
+      /* 名前と、そのすぐ下に Lv。
+         画面上部の情報パネルを畳んだので、相手の強さはここで読ませる。
+         視線を戦場から外さずに済むぶん、上に出していたころより速く読める。
+         Lv は名前より小さく鈍い色にする——同じ強さで置くと、乱戦で
+         名前と Lv がどちらも読めない二重の文字列になる。 */
+      const nameTag=(y,col,sc)=>{
+        label(e.name, sx, y, col, sc);
+        label('Lv.'+e.lv, sx, y+Math.max(9,TS*0.36*sc)*1.05, '#98a1b2', sc*0.82);
+      };
       if(e.intruder)
-        label(e.name, sx, sy+R+TS*0.42, '#ff6a5a', 1);
+        nameTag(sy+R+TS*0.42, '#ff6a5a', 1);
       else if(e.uniq)
-        label(e.name, sx, sy+R+TS*0.40, '#c07fe0', 1);
+        nameTag(sy+R+TS*0.40, '#c07fe0', 1);
       /* 名前を全部出すと、乱戦で足元が文字の山になって**逆に何も読めない**。
          精鋭は「見分けが付くこと」自体が情報なので出す。
-         ただの雑魚は今狙っている1体だけ——それ以外は名前を知る必要がない
-         （上の情報パネルが弱点まで出しているので、要るのは「どれか」だけ）。 */
+         ただの雑魚は今狙っている1体だけ——それ以外は名前を知る必要がない。 */
       else if(Math.hypot(e.x-P.x,e.y-P.y)<7.5 && (e.elite || P.target===e))
-        label(e.name, sx, sy+R+TS*0.36, e.elite?'#d6b34a':'#c3cad8', 0.8);
+        nameTag(sy+R+TS*0.36, e.elite?'#d6b34a':'#c3cad8', 0.8);
       // 状態異常アイコン（頭上の小さな点）
       if(e.st){
         const ids=Object.keys(e.st).filter(k=>e.st[k].t>0);
@@ -10489,20 +10623,15 @@ function updateHUD(){
   el('statusbar').innerHTML = wg + av + act.map(k=>
     `<span style="color:${STATUS[k].col}">${STATUS[k].nm} ${pst[k].t.toFixed(1)}</span>`).join('');
 
-  // 狙っている敵の弱点・耐性。属性を選ぶ意味は、これが見えて初めて伝わる。
-  const ti=el('targetinfo');
-  if(P.target && !P.target.dead){
-    const e=P.target, rl=resLine(e.res||{});
-    const myType=DTYPE[st.dmgType];
-    const myRes=resistOf(e, st.dmgType);
-    const verdict = myRes<=-15 ? `<b style="color:#7fe0c0">${myType.nm}が弱点</b>`
-                  : myRes>=30  ? `<b style="color:#c4433f">${myType.nm}は効きにくい</b>`
-                  : `<span style="color:var(--dim)">${myType.nm} 等倍</span>`;
-    ti.style.display='block';
-    ti.innerHTML = `<b style="color:${e.col}">${e.name}</b>　Lv.${e.lv}<br>${verdict}<br>`
-      + (rl.weak.length? `<span style="color:#7fe0c0">弱点 ${rl.weak.join('・')}</span>　`:'')
-      + (rl.strong.length? `<span style="color:#8b93a7">耐性 ${rl.strong.join('・')}</span>`:'');
-  }else ti.style.display='none';
+  /* ---------- 敵の情報パネルは廃止 ----------
+     画面上部中央に出していたが、そこはラスボス戦のデバフ帯と同じ場所で、
+     いちばん読みたい場面でいちばん重なった。**下へ逃がすのではなく畳む**——
+     逃がしたところで、狭い画面の上端に3段目が増えるだけ。
+
+     代わりに敵そのものへ寄せる。名前の下に Lv を出せば、視線を戦場から
+     外さずに強さが読める（描画は draw() の敵ラベル側）。
+     弱点・耐性は一旦しまう。属性の見せ方は図鑑で引ける形が残っている。 */
+  el('targetinfo').style.display='none';
   el('hpfill').style.width = clamp(S.hero.hpNow/st.maxHp*100,0,100)+'%';
   /* レベルアップ直後だけHPバーが光る。バーが一気に満ちる瞬間と重ねることで、
      「上がった」と「全快した」を1つの出来事として見せる。 */
@@ -10519,7 +10648,9 @@ function updateHUD(){
     '   ATK '+Math.round(st.atk)+'  DEF '+Math.round(st.def)+'  MF '+st.mf;
   el('dnum').textContent = S.run.depth;
   // 階層カウンタの脇に層の名前を出す。「今どこにいるか」を数字以外でも持たせる。
-  const z = W.fl && W.fl.zone;
+  // 地名を持つ階（51階＝アビスの口）は、層の名前ではなくそちらを出す
+  const pl = floorPlace(S.run.depth);
+  const z = pl || (W.fl && W.fl.zone);
   el('dsub').innerHTML = '階層'
     + (knownFloor(S.run.depth) ? ' <span style="color:#7fe0c0;font-size:9px">踏破済</span>' : '')
     + (z ? '<br><span class="zn" style="color:'+z.accent+'">'+z.nm+'</span>' : '')
@@ -13381,7 +13512,7 @@ function reviveFallen(){
 bindTap(el('fal-revive'), reviveFallen);
 bindTap(el('fal-let'), letFallenGo);
 
-/* ---------- 第51階層（アビスの口）撃破＝踏破 ---------- */
+/* ---------- 第51階層（アビスの口）の門番を撃破＝踏破 ---------- */
 function onFinalBossDown(e){
   if(S.run) S.run.bossBane=null;   // 倒した以上、切り替わる枷はもう要らない
   S.cleared = (S.cleared||0)+1;
@@ -13391,8 +13522,8 @@ function onFinalBossDown(e){
   el('clr-body').innerHTML =
     `<div class="row"><span class="k">到達</span><span>第${S.run.depth}階層</span></div>
      <div class="row"><span class="k">踏破回数</span><span>${S.cleared} 回目</span></div>
-     <div class="row"><span class="k">この先</span><span>階層はまだ続く<br>
-       <span style="color:var(--dim);font-size:11px">帰還ポータルは開いた。深さの上限はない</span></span></div>`;
+     <div class="row"><span class="k">この先</span><span>これより深くへは行けない<br>
+       <span style="color:var(--dim);font-size:11px">アビスの口が底。帰還ポータルは開いた</span></span></div>`;
   el('m-clear').classList.add('on');
 }
 bindTap(el('clr-ok'), ()=>{
@@ -13495,6 +13626,7 @@ bindTap(el('gres-ok'), ()=>{
   renderGacha();
 });
 bindTap(el('st-down'), ()=>{
+  if(!S.run || !canDescendFrom(S.run.depth)) return;   // 底から先は無い
   el('m-stairs').classList.remove('on');
   markFloorCleared(S.run.depth);      // この階は抜けた。次からは穴の位置を伏せない
   enterFloor(S.run.depth+1);
