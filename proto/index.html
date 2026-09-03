@@ -8,6 +8,7 @@
   :root{
     --bg:#0d0f14; --panel:#161a23; --line:#2a3040; --txt:#e6e9f0; --dim:#8b93a7;
     --c-common:#c8ced9; --c-magic:#5b8dd6; --c-rare:#d6b34a; --c-unique:#d97a2b; --c-relic:#c4433f;
+    --c-legend:#e8c95a;
     --hp:#c4433f; --xp:#4a9d6e;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -748,6 +749,10 @@
   <div class="row">
     <div><b>鞘無しを +1本</b><s>周回刃。恩寵を待たずに生やす（最大3本）</s></div>
     <button class="sw ghost" id="dbg-blade">実行</button>
+  </div>
+  <div class="row">
+    <div><b>レジェンド武器を全開放</b><s>24本すべてを倉庫の専用棚へ。玉鋼も999個入れる</s></div>
+    <button class="sw ghost" id="dbg-legend">実行</button>
   </div>
   <div class="row">
     <div><b>仲間を指定して追加</b><s>職を選んで1人加入させる。隊の枠も上限まで開く</s></div>
@@ -1534,7 +1539,8 @@ const ALLY_DUR_MUL = 2.5;
    端数は it._wear に持ち越し、1 を超えたぶんだけ整数で落とす（wearGear）。
    **乱数は使わない**——同じ使い方をすれば必ず同じだけ減るほうが、
    プレイヤーにも試験にも読める（以前の仲間側は確率で間引いていた）。 */
-const RAR_DUR_MUL  = [1, 1.35, 1.8, 2.4, 3.2];  // Common / Magic / Rare / Unique / Relic
+// Common / Magic / Rare / Unique / Relic / Legend（レジェンドはそもそも耐久を持たない）
+const RAR_DUR_MUL  = [1, 1.35, 1.8, 2.4, 3.2, 3.2];
 const UP_DUR_TOUGH = 0.12;   // 強化1段ごとに足される壊れにくさ（+10 で 2.2 倍）
 function gearDurMul(it){
   const r = RAR_DUR_MUL[it.rar|0] || 1;
@@ -1595,9 +1601,13 @@ const RARITY=[
   {id:2,nm:'Rare',  col:'--c-rare',  w:10, aff:[3,4], val:90},
   {id:3,nm:'Unique',col:'--c-unique',w:1.8,aff:[4,5], val:320},
   {id:4,nm:'Relic', col:'--c-relic', w:0.2,aff:[5,6], val:1200},
+  /* レジェンドは抽選に**乗せない**（w:0）。落ちる道は40階以降の黄色個体だけで、
+     普通のレア度の階段の先には置かない。同じ表に入れておくのは、
+     値段・色・並び順・売値がぜんぶ RARITY 経由で決まっているから。 */
+  {id:5,nm:'Legend',col:'--c-legend',w:0,  aff:[0,0], val:6000},
 ];
 
-const RARCOL = ['#c8ced9','#5b8dd6','#d6b34a','#d97a2b','#c4433f'];
+const RARCOL = ['#c8ced9','#5b8dd6','#d6b34a','#d97a2b','#c4433f','#e8c95a'];
 /* これ以下のレア度は鑑定済みで落ちる。Rare(2) 以上が未鑑定＝現地では装備できない。 */
 const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
@@ -1702,6 +1712,161 @@ function genBaseItem(baseId, ilvl, maxRar=1){
   it.ident = true;              // 仲間の装備は最初から見えている（加入判断の材料）
   return it;
 }
+
+/* ==================== レジェンド武器 ====================
+   武器種ごとに3本、固有名を持つ24本。拾えるのは40階以降の黄色個体からだけで、
+   確率は1%——**掘って出す物ではなく、出会う物**として置いている。
+
+   他の装備と決定的に違うのは3点。
+   ・**壊れない**（耐久を持たない）
+   ・**死んでも失わない**（倉庫のレジェンド専用の棚へ戻る）
+   ・**玉鋼でしか鍛えられない**（最深部の苔玉だけが落とす）
+   持ち替えの緊張から外に置いた1本、という位置づけ。だから数を絞ってあるし、
+   同じ物は二度は落ちない（既に持っている物は抽選から外す）。
+
+   性能は赤（Relic）の+10より上。そのうえで、24本それぞれが
+   「攻撃力が高い」以外の一手を持つ——同じ強さなら、選ぶ理由は効果のほうにある。
+
+   1本の定義:
+     shape  baseOf() の上書き。射程・扇・速度・属性・飛び道具をここで変える
+     ap     stats() の蓄積器へ流す（UP_SKILLS の ap とまったく同じ作法）
+     hits   1回の攻撃が何撃になるか（既定1）
+     spread 飛び道具の角度（ラジアン。既定は今までどおり1本）
+     wave   攻撃時に出す衝撃波 {shape:'cone'|'line'|'ring', dt, mult, r, arc}
+     onHit  命中するたび呼ばれる (st, e, r)
+     tick   毎フレーム呼ばれる (dt, st)
+     aura   近くの味方への効果 {atk, dr, heal}（heal は毎秒の割合）
+     blades 周回刃の本数 */
+const LEGEND_RAR      = 5;
+const LEGEND_ILVL     = 55;    // 赤の+10と並べるための基準の深さ
+const LEGEND_ATK_MUL  = 2.6;   // 赤+10（≒1.7倍）より確実に上へ置くための係数
+const LEGEND_DROP_FROM = 40;   // この階から落ち始める
+const LEGEND_DROP_RATE = 0.01; // 黄色個体1体につき1%
+const LEGEND_ORE       = 'tama';
+const TAMA_FROM        = 51;   // 玉鋼を落とす苔玉が出る深さ
+const TAMA_RATE        = 0.12; // 最深部の苔玉1体につき
+
+const LEGENDS=[
+  /* ---------- 剣 ---------- */
+  {id:'levantine', nm:'レヴァンテイン', base:'sword',
+   desc:'魔法属性。槍と同じ間合いで薙ぐ',
+   shape:{dt:'arcane', reach:2.30}},
+  {id:'kingsword', nm:'キングスソード', base:'sword',
+   desc:'斬撃の扇状の衝撃波を放つ',
+   wave:{shape:'cone', dt:'slash', mult:0.55, r:3.6, arc:70}},
+  {id:'bloodriver', nm:'血河', base:'sword',
+   desc:'30% で出血。与えた傷の 10% を吸う',
+   ap:a=>{ a.leech+=10; }, onHitBleed:0.30},
+
+  /* ---------- 大剣 ---------- */
+  {id:'savequeen', nm:'セイブザクイーン', base:'great',
+   desc:'近くの味方の防御力 +15%',
+   aura:{dr:15}},
+  {id:'ironprince', nm:'鉄の貴公子', base:'great',
+   desc:'魔法ダメージ -50%。魔を操る敵へ +100%',
+   ap:a=>{ a.resArcane+=50; }, vsCaster:1.0},
+  {id:'moonlight', nm:'ムーンライト', base:'great',
+   desc:'HPが回復し続ける。魔法属性の扇状の衝撃波',
+   regen:0.9, wave:{shape:'cone', dt:'arcane', mult:0.55, r:4.0, arc:80}},
+
+  /* ---------- 短剣 ---------- */
+  {id:'gengmu', nm:'幻夢', base:'dagger',
+   desc:'回避率 +30%',
+   ap:a=>{ a.evade+=30; }},
+  {id:'gladius', nm:'グラディウス', base:'dagger',
+   desc:'一度の attack が3撃になる。炎属性',
+   shape:{dt:'fire'}, hits:3},
+  {id:'dagger', nm:'ダガー', base:'dagger',
+   desc:'周回刃が3つ。攻撃速度 +15%',
+   ap:a=>{ a.aspdPct+=15; }, blades:3},
+
+  /* ---------- 槍 ---------- */
+  {id:'gaebolg', nm:'ゲイボルグ', base:'spear',
+   desc:'炎属性。線状の炎の衝撃波を放つ',
+   shape:{dt:'fire'}, wave:{shape:'line', dt:'fire', mult:0.60, r:6.5, wide:0.8}},
+  {id:'javelin', nm:'ジャベリン', base:'spear',
+   desc:'一度の攻撃が2撃になる',
+   hits:2},
+  {id:'longinus', nm:'ロンギヌス', base:'spear',
+   desc:'弓と同じ間合い。HPが回復し続ける',
+   shape:{reach:5.8}, regen:0.9},
+
+  /* ---------- 斧 ---------- */
+  {id:'hien', nm:'飛燕', base:'axe',
+   desc:'攻撃回数 +2',
+   hits:3},
+  {id:'bloodaxe', nm:'ブラッドアクス', base:'axe',
+   desc:'与えた傷の 30% を吸う',
+   ap:a=>{ a.leech+=30; }},
+  {id:'sawnata', nm:'ノコギリ鉈', base:'axe',
+   desc:'30% で出血',
+   onHitBleed:0.30},
+
+  /* ---------- 戦鎚 ---------- */
+  {id:'holyrod', nm:'ホーリーロッド', base:'mace',
+   desc:'近くの味方のHPを回復し続ける',
+   aura:{heal:1.1}},
+  {id:'gordion', nm:'ゴルディオン', base:'mace',
+   desc:'攻撃速度が半分。攻撃力 +25%。自分を中心に円の衝撃波',
+   shape:{spdMul:0.5}, ap:a=>{ a.dmgPct+=25; },
+   wave:{shape:'ring', dt:'blunt', mult:0.75, r:3.2, self:true}},
+  {id:'thorhammer', nm:'トールハンマー', base:'mace',
+   desc:'雷ダメージを足し、感電させて弾き飛ばす',
+   ap:a=>{ a.shock+=18; }, onHitShock:1.0, knock:0.75},
+
+  /* ---------- 弓 ---------- */
+  {id:'themis', nm:'テミスの弓', base:'bow',
+   desc:'魔法属性。3方向へ射る',
+   shape:{dt:'arcane'}, spread:[-0.26, 0, 0.26]},
+  {id:'yoichi', nm:'与一の弓', base:'bow',
+   desc:'射程と攻撃速度 +15%',
+   ap:a=>{ a.rangePct+=15; a.aspdPct+=15; }},
+  {id:'hyperion', nm:'ハイペリオン', base:'bow',
+   desc:'攻撃速度が半分。攻撃力 +25%。直線の衝撃波',
+   shape:{spdMul:0.5}, ap:a=>{ a.dmgPct+=25; },
+   wave:{shape:'line', dt:'pierce', mult:0.70, r:7.0, wide:0.7}},
+
+  /* ---------- 杖 ---------- */
+  {id:'cambantein', nm:'カンバンテイン', base:'staff',
+   desc:'3方向へ撃ち、それぞれ別の属性が乗る',
+   spread:[-0.30, 0, 0.30], randElem:14},
+  {id:'koumastaff', nm:'光魔の杖', base:'staff',
+   desc:'剣と同じ間合いと速さで振る。魔法属性。攻撃力 +25%',
+   shape:{reach:1.45, arc:75, spd:1.00, proj:null, dt:'arcane'},
+   ap:a=>{ a.dmgPct+=25; }},
+  {id:'sagestaff', nm:'賢者の杖', base:'staff',
+   desc:'近くの味方の攻撃力と防御力 +15%',
+   aura:{atk:15, dr:15}},
+];
+function legendDef(x){
+  const id = (x && typeof x==='object') ? x.legend : x;
+  return id ? (LEGENDS.find(L=>L.id===id) || null) : null;
+}
+function isLegend(it){ return !!(it && it.legend); }
+/* 1本仕立てる。名前つきの一点物なので、**引くたびに性能が変わらない**——
+   同じレヴァンテインは誰が拾っても同じレヴァンテインである。 */
+function makeLegend(id){
+  const L = legendDef(id);
+  if(!L) return null;
+  const base = BASES.find(b=>b.id===L.base) || BASES[1];
+  const it = {uid:(genItem._n=(genItem._n||0)+1), base:base.id, nm:L.nm, slot:base.slot,
+              ilvl:LEGEND_ILVL, rar:LEGEND_RAR, ident:true, aff:[], legend:L.id};
+  const mid = (base.atk[0]+base.atk[1])/2;
+  it.atk = Math.round(mid * scaleOf(LEGEND_ILVL) * LEGEND_ATK_MUL);
+  it.spd = (base.spd||1) * ((L.shape && L.shape.spdMul) || 1);
+  // 耐久を持たない＝壊れない。durMax が無ければ damageGear も修理も素通りする。
+  return it;
+}
+/* 見た目や当たり方の上書き。ここを通さないと、射程も属性も
+   BASES の値のまま出てしまう（stats も持ち物の行も baseOf を見ている）。 */
+function weaponShape(it){
+  const b = baseOf(it);
+  const L = legendDef(it);
+  if(!L || !L.shape) return b;
+  const o = Object.assign({}, b, L.shape);
+  delete o.spdMul;             // 速度は it.spd 側で済ませてある
+  return o;
+}
 /* ---------- 名前の絵文字 ----------
    持ち物の一覧は文字だけの行が縦に並ぶので、**何の種類かを読む前に見分けたい**。
    色はレア度に使い切っていて種別には回せないため、行頭のアイコンで担当する。
@@ -1773,7 +1938,7 @@ function repairOreCost(it){
 function oreBag(mid){ return mid ? (S.run && S.run.ore) : S.ore; }
 function oreAnyTotal(mid){
   const bag=oreBag(mid); let n=0;
-  if(bag) ORES.forEach(o=>{ n += bag[o.id]||0; });
+  if(bag) ironOres().forEach(o=>{ n += bag[o.id]||0; });
   return n;
 }
 /* 安い等級から順に n 個支払う。足りなければ何も減らさずに false。 */
@@ -1781,7 +1946,7 @@ function payOreAny(n, mid){
   const bag=oreBag(mid);
   if(!bag || oreAnyTotal(mid) < n) return false;
   let left=n;
-  for(const o of ORES){
+  for(const o of ironOres()){
     if(left<=0) break;
     const use=Math.min(left, bag[o.id]||0);
     if(use>0){ bag[o.id]=(bag[o.id]||0)-use; left-=use; }
@@ -1850,7 +2015,7 @@ function affLines(it){
             '<span style="color:var(--dim);font-size:11px">持ち物からタップで使用</span>'];
   }
   if(!it.ident) return ['？？？　　街に持ち帰ると鑑定される'];
-  const b=baseOf(it);
+  const b=weaponShape(it);      // レジェンドの上書き（射程・属性・飛び道具）を含んだ形
   const L=[];
   if(it.atk){
     const d=DTYPE[b.dt]||DTYPE.blunt;
@@ -1867,6 +2032,11 @@ function affLines(it){
     if(a.stat2 && STATNM[a.stat2]) L.push(STATNM[a.stat2].replace('%v',a.v2));
   });
   upSkills(it).forEach(k=>L.push(`<span style="color:${k.col}">⚒ ${k.nm} — ${k.desc(it)}</span>`));
+  const LG=legendDef(it);
+  if(LG){
+    L.push(`<span style="color:${RARCOL[LEGEND_RAR]}">★ ${LG.desc}</span>`);
+    L.push('<span style="color:var(--dim);font-size:11px">壊れない／死んでも失わない／玉鋼で鍛える</span>');
+  }
   if(it.durMax) L.push(durLine(it));
   return L;
 }
@@ -2221,8 +2391,15 @@ const ORES=[
   {id:'raw',  nm:'粗鉱', icon:'▰', col:'#9aa3b2', min:1,  max:16},
   {id:'fine', nm:'精鉱', icon:'▰', col:'#7fc8e0', min:12, max:34},
   {id:'deep', nm:'深鉱', icon:'▰', col:'#c98adf', min:28, max:999},
+  /* 玉鋼はレジェンド専用。鉱脈からは出ない——最深部の苔玉だけが落とす。
+     min/max は「その深さの鉱脈に現れる」表なので、範囲を空にして
+     oreGradesAt から外す（vein:false）。 */
+  {id:'tama', nm:'玉鋼', icon:'◆', col:'#e8c95a', min:999, max:0, vein:false},
 ];
 function oreDef(id){ return ORES.find(o=>o.id===id) || ORES[0]; }
+/* 鉱脈から出る「黒鉄」だけを指す。修理はどの等級でも払えるようにしてあるが、
+   玉鋼はレジェンドを鍛えるためだけの物なので、修理代に溶かさせない。 */
+function ironOres(){ return ORES.filter(o=>o.vein!==false); }
 function oreHave(id){ return (S.ore && S.ore[id]) || 0; }
 /* 鍛える場所によって、どちらの袋を見るかが変わる（金とまったく同じ扱い） */
 function orePurse(id, mid){ return mid ? oreRun(id) : oreHave(id); }
@@ -2444,9 +2621,18 @@ const UP_SKILLS=[
 function elemUpV(it){ return Math.max(3, Math.round((it&&it.ilvl||1)*0.8)); }
 function upSkillDef(id){ return UP_SKILLS.find(s=>s.id===id); }
 function upSkills(it){ return ((it&&it.ups)||[]).map(upSkillDef).filter(Boolean); }
-/* 次の1段に要る等級。深い段ほど深い場所の黒鉄を要求する＝浅い周回で最大化できない。 */
-function upGrade(lv){ return lv<3 ? 'raw' : lv<7 ? 'fine' : 'deep'; }
-function upOreCost(lv){ return Math.round(2 + lv*1.6); }
+/* 次の1段に要る等級。深い段ほど深い場所の黒鉄を要求する＝浅い周回で最大化できない。
+   レジェンドだけは等級の階段に乗らない——最初から最後まで玉鋼だけを飲む。 */
+function upGrade(lv, it){
+  if(isLegend(it)) return LEGEND_ORE;
+  return lv<3 ? 'raw' : lv<7 ? 'fine' : 'deep';
+}
+/* 玉鋼は最深部でしか出ないので、要求量は黒鉄よりずっと少なくする。
+   同じ本数を求めると、+10 までが現実的な周回数を超える。 */
+function upOreCost(lv, it){
+  if(isLegend(it)) return Math.round(1 + lv*0.6);
+  return Math.round(2 + lv*1.6);
+}
 /* 金は装備の価値に比例させる。良い武器ほど育てるのが重い（自動でバランスが取れる）。
    鍛冶屋（街開発）のレベルぶん安くなる。 */
 function upGoldCost(it, lv, mid){
@@ -2461,7 +2647,7 @@ function upCheck(it, mid){
   if(isBroken(it))          return {ok:false, why:'壊れている。先に修理する必要がある'};
   const lv=it.up||0;
   if(lv>=UP_MAX)            return {ok:false, why:'これ以上は鍛えられない（上限 +'+UP_MAX+'）'};
-  const g=upGrade(lv), need=upOreCost(lv), gold=upGoldCost(it,lv,mid);
+  const g=upGrade(lv,it), need=upOreCost(lv,it), gold=upGoldCost(it,lv,mid);
   const purse = mid ? (S.run?S.run.gold:0) : S.gold;
   if(orePurse(g,mid)<need)  return {ok:false, why:oreDef(g).nm+'が足りない', grade:g, need, gold};
   if(purse<gold)            return {ok:false, why:'資金が足りない', grade:g, need, gold};
@@ -2857,7 +3043,11 @@ function boonDef(id){ return BOONS.find(b=>b.id===id); }
 function bladeCount(){
   const fromBoons = S.hero ? boonCount(S.hero,'orbit') : 0;
   const fromRelic = (typeof relicSum==='function') ? relicSum('blade') : 0;
-  return Math.min(BLADE_MAX, fromBoons + fromRelic);
+  // ダガー（レジェンド）は、それ1本で上限ぶんの刃を連れてくる
+  const w = S.hero && S.hero.equip && S.hero.equip.weapon;
+  const LG = legendDef(w);
+  const fromLegend = (LG && LG.blades) || 0;
+  return Math.min(BLADE_MAX, fromBoons + fromRelic + fromLegend);
 }
 /* 上限に達した恩寵は抽選から外す。
    取っても何も起きない選択肢が3枠のうち1つを潰すのは、選ばせる意味を消す。 */
@@ -3478,6 +3668,11 @@ function partyAura(){
     // 聖騎士の固有スキル「聖盾」もここに乗せる（そばにいる間だけ）
     if(jobDef(m.job).sk.id==='aegis' && Math.hypot(m.x-P.x, m.y-P.y) < 4.0) o.dr += 15;
   });
+  /* 主人公の得物が配るぶん（セイブザクイーン・賢者の杖）。
+     ここまで装備が仲間に効く道は無かったが、隊の物として振る舞う武器を
+     入れる以上、配り口は既にあるこの1箇所にまとめるのが素直。 */
+  const LG = legendDef(S.hero && S.hero.equip && S.hero.equip.weapon);
+  if(LG && LG.aura){ o.atk += LG.aura.atk||0; o.hp += LG.aura.hp||0; o.dr += LG.aura.dr||0; }
   return o;
 }
 
@@ -4061,7 +4256,7 @@ function gachaNextBand(){
 
 /* ---------- ステート ---------- */
 const S={
-  stash:[], gold:0, deepest:1, deaths:0, runs:0,
+  stash:[], legendStash:[], gold:0, deepest:1, deaths:0, runs:0,
   /* ---------- 生成の塩 ----------
      階層の生成は S.runs と depth だけを種にしていた。決定的なのは良い
      （同じ探索で同じ階へ戻れば同じ地形になる）が、**初回だけは誰がやっても
@@ -4275,7 +4470,7 @@ function stats(h){
   const eq=Object.values(h.equip).filter(it=>it && !isBroken(it));
   let a={dmgPct:0,aspdPct:0,hp:0,msPct:0,leech:0,critPct:0,allStat:0,
          fire:0,shock:0,frost:0,mf:0,thorns:0,lowDR:0,def:0,
-         resFire:0,resShock:0,resFrost:0,ultCdr:0,evade:0,
+         resFire:0,resShock:0,resFrost:0,resArcane:0,ultCdr:0,evade:0,
          // 打ち直しで付く技の受け皿
          rangePct:0, multi:0, arcAdd:0, pierceAdd:0, durSave:0};
   let wAtk=FIST.atk, wSpd=FIST.spd, bDef=0;
@@ -4283,7 +4478,8 @@ function stats(h){
   let wUp=0, wItem=null, wBase=null;
   let block=0, parryWin=0, hasShield=false;
   eq.forEach(it=>{
-    const b=baseOf(it);
+    // レジェンドは射程も属性も飛び道具もベースを上書きするので、素の BASES では見ない
+    const b=weaponShape(it);
     if(it.slot===SLOT.W){
       // 打ち直しレベルは武器の素の攻撃力に乗る。接頭辞の %増加より先に掛かるので、
       // 「良い武器を鍛える」ほど伸びる（育て甲斐を接頭辞と喧嘩させない）。
@@ -4301,6 +4497,9 @@ function stats(h){
   });
   // 節目で付いた技。武器に紐づくので、武器を持ち替えれば当然消える。
   if(wItem) upSkills(wItem).forEach(sk=>sk.ap(a, wItem));
+  /* レジェンドの固有効果のうち、数値で片が付くぶん。技とまったく同じ作法で
+     蓄積器へ流すので、%増加も熟練も既存の順序どおりに掛かる。 */
+  if(wItem){ const LG=legendDef(wItem); if(LG && LG.ap) LG.ap(a, wItem); }
   /* 武器熟練度。**素の武器性能に掛ける**ので、接頭辞の %増加より先に乗る。
      仲間には掛けない（熟練は主人公の手癖であって、渡した装備の性能ではない）。 */
   const MM = (h===S.hero && wBase) ? masteryMul(wBase) : {atk:1, aspd:1, range:1};
@@ -4355,12 +4554,17 @@ function stats(h){
     range: wReach * (1 + a.rangePct/100) * (1 + U('range')*0.10)
            * (1 + C('range')/100) * (1 + B('range')/100) * (1 + DN.range/100),
     arc: wArc + a.arcAdd, hands: wHands, proj: wProj,
+    // 攻撃の作法そのものを変える効果（多段・散弾・衝撃波）は st 経由で読む
+    legend: wItem ? (wItem.legend||null) : null,
     // 打ち直しの技
     up: wUp, multi: a.multi, projPierce: a.pierceAdd, durSave: a.durSave,
     dmgType: wDt,
     // 追加属性ダメージ。武器の物理とは別枠で乗り、敵の防御を受けない。
     elem: {fire:a.fire+B('fire'), shock:a.shock+B('shock'), frost:a.frost+B('frost')},
-    res:  {fire:a.resFire, shock:a.resShock, frost:a.resFrost, arcane:0,
+    /* 魔法（arcane）は今まで軽減する手段が1つも無かった。
+       DTYPE.arcane は pen:1 で防御力を素通りするので、鉄の貴公子までは
+       「魔を操る相手には為す術がない」が仕様として残っていた。 */
+    res:  {fire:a.resFire, shock:a.resShock, frost:a.resFrost, arcane:a.resArcane,
            slash:0, pierce:0, blunt:0},
     hasShield, block, parryWin,
     /* 回避率。上限を置いてあるのは、装備を積むだけで無敵になる道を潰すため。
@@ -5853,6 +6057,7 @@ function snapToFloor(fl, x, y){
 /* ---------- ワールド / 主人公 ---------- */
 const P={x:0,y:0,vx:0,vy:0,dirx:1,diry:0,atkCd:0,swing:0,r:0.32,
          canFall:true,        // 縁に踏み込める＝落ちられる（根の層）
+         queue:[],            // 多段のレジェンドが積む、あとで振るぶん
          guard:false, guardStart:-99, parryFx:0};
 const W={fl:null,enemies:[],drops:[],fx:[],pops:[],seen:null,grave:null,npc:null,
          ev:null,     // その階層のイベント
@@ -6107,7 +6312,11 @@ function hitEnemy(e, st, mult, opt){
   const src = opt.src || S.hero;
   const crit = opt.forceCrit || rnd()*100 < st.crit;
   const back = backAttackMul(e, src===S.hero ? P.x : src.x, src===S.hero ? P.y : src.y);
-  const r = resolveDamage(e, playerParts(st,(crit?1.5:1.0)*(mult||1)*back), src.lv,
+  /* 鉄の貴公子。魔を操る相手にだけ倍。条件つきの倍率はここまで無かったので、
+     倍率の掛け算に1つ足すだけの形にして、resolveDamage の中は触らない。 */
+  const LG = legendOf(st);
+  const lm = (LG && LG.vsCaster && isCaster(e)) ? (1 + LG.vsCaster) : 1;
+  const r = resolveDamage(e, playerParts(st,(crit?1.5:1.0)*(mult||1)*back*lm), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
@@ -6121,6 +6330,13 @@ function hitEnemy(e, st, mult, opt){
   pop(e.x,e.y,r.total,col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')));
   r.procs.forEach(sid=>W.pops.push({x:e.x,y:e.y-0.5,txt:STATUS[sid].nm,c:STATUS[sid].col,life:0.8}));
   if(st.leech) healEnt(src, r.total*st.leech/100);
+  /* 命中したときだけ起きるぶん。血河・ノコギリ鉈の出血、トールハンマーの感電と
+     弾き飛ばし。**倒した相手には掛けない**——死体をノックバックさせない。 */
+  if(LG && !e.dead && e.hp>0){
+    if(LG.onHitBleed && rnd()<LG.onHitBleed) addStatus(e,'bleed',src.lv);
+    if(LG.onHitShock && rnd()<LG.onHitShock) addStatus(e,'shock',src.lv);
+    if(LG.knock && !e.boss) knockBack(e, {x:P.x, y:P.y}, LG.knock);
+  }
   if(e.hp<=0 && !e.dead) killEnemy(e, opt.src||null);
   return r;
 }
@@ -6146,6 +6362,71 @@ function meleeSwing(st, ang, mult){
     hitEnemy(e,st,mult);
     relicShockwave(st, e);          // 遺物「震撼」
   });
+  legendWave(st, ang);              // 得物そのものが放つ衝撃波
+}
+/* ==================== レジェンドの一手 ====================
+   数値で済む効果は stats() の蓄積器（LG.ap）に流してある。ここに置くのは
+   **攻撃の作法そのものを変える**ぶん——撃数・散り・衝撃波・命中時の追撃。
+
+   衝撃波はボスの技（cleave / beam / slam）と同じ形を使う。狙う相手を
+   入れ替えただけで、当たり方の理屈を2つに増やさない。 */
+function legendOf(st){ return legendDef(st && st.legend); }
+function legendHits(st){ const L=legendOf(st); return (L && L.hits) || 1; }
+function legendSpread(st){ const L=legendOf(st); return (L && L.spread) || null; }
+/* 魔を操る相手。専用の旗は立てず、既にある「何で殴ってくるか」で見分ける。 */
+function isCaster(e){
+  return !!(e && (e.dt==='arcane' || (e.fam && e.fam.id==='arcane')));
+}
+function legendWave(st, ang){
+  const L=legendOf(st);
+  if(!L || !L.wave || !S.hero) return 0;
+  const w=L.wave, dt=w.dt||st.dmgType;
+  const col=(DTYPE[dt]||DTYPE.blunt).col;
+  const wst=Object.assign({}, st, {dmgType:dt});
+  let n=0;
+  const hit=e=>{ if(!e.dead){ hitEnemy(e, wst, w.mult); n++; } };
+
+  if(w.shape==='ring'){                       // ゴルディオン：自分を中心に円
+    const r=w.r;
+    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:r, life:0.34, maxLife:0.34, col});
+    nearEnemies(P.x,P.y,r+1).forEach(e=>{ if(Math.hypot(e.x-P.x,e.y-P.y)<=r+e.r) hit(e); });
+
+  }else if(w.shape==='line'){                 // ゲイボルグ／ハイペリオン：前方へ一直線
+    const len=w.r, wide=w.wide||0.7;
+    W.fx.push({t:'ultbeam', x:P.x, y:P.y, a:ang, len, wide, life:0.30, maxLife:0.30, col});
+    nearEnemies(P.x, P.y, len+1).forEach(e=>{
+      if(e.dead) return;
+      const dx=e.x-P.x, dy=e.y-P.y;
+      const along=dx*Math.cos(ang)+dy*Math.sin(ang);
+      const side =Math.abs(-dx*Math.sin(ang)+dy*Math.cos(ang));
+      if(along>=-0.4 && along<=len && side<=wide+e.r) hit(e);
+    });
+
+  }else{                                      // cone：キングスソード／ムーンライト
+    const r=w.r, half=(w.arc||70)*Math.PI/180/2;
+    W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:0.22, max:0.22, r, arc:half,
+               dt, elem:dt, self:true});
+    nearEnemies(P.x,P.y,r+1).forEach(e=>{
+      if(e.dead) return;
+      const dx=e.x-P.x, dy=e.y-P.y;
+      if(Math.hypot(dx,dy)>r+e.r) return;
+      const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(da<=half) hit(e);
+    });
+  }
+  return n;
+}
+/* 毎フレーム。ムーンライト／ロンギヌスの再生と、ホーリーロッドの癒しの輪。 */
+function tickLegend(dt){
+  if(!S.hero || !S.run) return;
+  const L=legendDef(S.hero.equip && S.hero.equip.weapon);
+  if(!L) return;
+  if(L.regen) healEnt(S.hero, stats(S.hero).maxHp * L.regen/100 * dt);
+  if(L.aura && L.aura.heal){
+    livingParty().forEach(a=>{
+      if(Math.hypot(a.x-P.x, a.y-P.y) < 4.5) healEnt(a, allyStats(a).maxHp * L.aura.heal/100 * dt);
+    });
+  }
 }
 const MULTI_MULT = 0.85;        // 追撃の威力。等倍にすると「連撃」だけが正解になる
 function playerAttack(){
@@ -6176,11 +6457,23 @@ function playerAttack(){
                    : {k:'still', mul:1};
     P.foot = foot.k;                     // HUD 表示用
     const spd = isBow?13:8.5;
-    const shot=(off, mult)=>W.fx.push({t:'pshot', kind:st.proj, x:P.x, y:P.y,
+    const LG=legendOf(st);
+    const shot=(off, mult, addElem)=>W.fx.push({t:'pshot', kind:st.proj, x:P.x, y:P.y,
                vx:Math.cos(ang+off)*spd, vy:Math.sin(ang+off)*spd,
                life: st.range/spd+0.05,
                pierce: (isBow?1:2)+(st.projPierce||0),
-               hitIds:new Set(), mult:foot.mul*mult, foot:foot.k});
+               hitIds:new Set(), mult:foot.mul*mult, foot:foot.k, addElem:addElem||null});
+
+    /* レジェンドの散り。テミス（3方向）とカンバンテイン（3方向＋弾ごとに別属性）。
+       杖の形（STAFF_SHAPES）の抽選より先に置く——固有名の武器が
+       「引きによっては1本しか出ない」のでは、書いてある効果と食い違う。 */
+    const sp=legendSpread(st);
+    if(sp){
+      const els=['fire','shock','frost'];
+      sp.forEach(o=>shot(o, 1, (LG && LG.randElem) ? {type:pick(els), amount:LG.randElem} : null));
+      legendWave(st, ang);
+      return;
+    }
 
     /* 杖だけ、撃つたびに弾の形が変わる。
        弓は「1本を当てる」武器なので形を変えない——変えると弓と杖の差が消える。
@@ -6196,10 +6489,17 @@ function playerAttack(){
     }
     shot(0, 1);
     if(twin) shot(rf(-0.1,0.1)||0.08, MULTI_MULT);   // 追加の1射。わずかに散る
+    legendWave(st, ang);                             // ハイペリオンの直線
     return;
   }
   P.foot='melee';
   meleeSwing(st, ang, 1);
+  /* 多段のレジェンド（グラディウス3撃・ジャベリン2撃・飛燕3撃）。
+     同じフレームに重ねると1発にしか見えないので、連撃と同じ作法で少しずつ遅らせる。
+     2撃目以降も等倍にしてある——「3回攻撃になる」と書いてある物が
+     実は1.5回ぶんだった、では読んだとおりに動いていない。 */
+  const hits=legendHits(st);
+  for(let i=1;i<hits;i++) P.queue.push({t:0.09*i, ang, mult:1});
   // 追撃は同じフレームで重ねると1発に見えるので、少し遅らせて振る
   if(twin) P.follow={t:0.13, ang};
 }
@@ -7374,6 +7674,54 @@ function killEnemy(e, byAlly){
   if(byAlly && jobDef(byAlly.job).sk.id==='scavenge' && rnd()<0.18)
     W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40)});
   if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf)});
+
+  /* ---------- レジェンド ----------
+     40階以降の黄色個体だけが落とす。1%。**掘って出す物ではなく、出会う物**。
+     宝箱にも商店にも並ばないので、遭遇した回数がそのまま確率になる。
+     既に持っている物は抽選から外す——同じ名前の一点物が2本あると、
+     「固有」であること自体が嘘になる。 */
+  if(e.elite && S.run.depth>=LEGEND_DROP_FROM && rnd()<LEGEND_DROP_RATE){
+    const id=rollNewLegend();
+    if(id) W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3), it:makeLegend(id), legend:true});
+  }
+
+  /* ---------- 玉鋼 ----------
+     最深部の苔玉だけが落とす。レジェンドを鍛える唯一の道なので、
+     ここを塞ぐと「拾ったまま育たない武器」になる。 */
+  if(e.moss && S.run.depth>=TAMA_FROM && rnd()<TAMA_RATE)
+    gainOre(LEGEND_ORE, 1, e.x, e.y);
+}
+/* まだ持っていないレジェンドを1つ選ぶ。倉庫・持ち物・装備・遺体の全部を見る。 */
+/* ---------- レジェンド専用の棚 ----------
+   倉庫（S.stash）とは別の場所に置く。枠を数えないし、死んでも消えない。
+   一点物を「持ち物の枠が足りないから捨てた」で失わせないための隔離であって、
+   ここに入る物を増やすつもりはない（24本しか存在しない）。 */
+function legendShelf(){ return (S.legendStash = S.legendStash || []); }
+/* 渡した配列からレジェンドを抜いて棚へ移す（同じ物は二度入れない）。 */
+function bankLegends(list){
+  if(!list) return [];
+  const shelf=legendShelf(), moved=[];
+  for(let i=list.length-1;i>=0;i--){
+    const it=list[i];
+    if(!isLegend(it)) continue;
+    list.splice(i,1);
+    if(!shelf.some(x=>x.legend===it.legend)) { shelf.push(it); moved.push(it); }
+  }
+  return moved;
+}
+function ownedLegends(){
+  const out=new Set();
+  const scan=list=>{ (list||[]).forEach(it=>{ if(it && it.legend) out.add(it.legend); }); };
+  scan(S.stash); scan(S.legendStash);
+  scan(S.run && S.run.loot);
+  if(S.hero) scan(Object.values(S.hero.equip||{}));
+  scan(S.grave && S.grave.items);
+  return out;
+}
+function rollNewLegend(){
+  const have=ownedLegends();
+  const pool=LEGENDS.filter(L=>!have.has(L.id));
+  return pool.length ? pick(pool).id : null;
 }
 
 function enemyUpdate(e,dt){
@@ -7897,6 +8245,20 @@ function die(){
   if(tryPhoenix(S.hero, true)) return;
   S.deaths++;
 
+  /* ---------- レジェンドだけは戻ってくる ----------
+     装備していても、鞄の中でも、死とは無関係に専用の棚へ帰る。
+     24本しか存在しない一点物を1回の事故で永久に失わせると、
+     以後その武器は誰の手にも二度と渡らない（同じ物は再抽選されない）。
+     **持ち替えの緊張の外に置いた1本**、という位置づけをここで守る。 */
+  const rescued = [];
+  ['weapon','shield','armor','accessory'].forEach(slot=>{
+    const it=S.hero.equip[slot];
+    if(isLegend(it)){ S.hero.equip[slot]=null; rescued.push(it); }
+  });
+  rescued.forEach(it=>S.run.loot.push(it));
+  const back = bankLegends(S.run.loot);
+  if(back.length) log('★ '+back.map(itemName).join('・')+' は倉庫へ戻った');
+
   // 装備していた物は問答無用でロスト。遺体に残るのは「装備していなかった道具」だけ。
   const equipped = Object.values(S.hero.equip).filter(Boolean);
   const bag = S.run.loot.slice();
@@ -8169,7 +8531,10 @@ function returnToTown(){
      倉庫は拾った順に積まれていたので、良い物が下のほうに埋もれた。
      並べ替えは倉庫に入れる前にやる——**入ったあとに並べ直すと、
      持ち帰る物を選ぶ画面（m-keep）と順番が食い違う。** */
-  const loot=S.run.loot.filter(it=>!isConsum(it))
+  /* レジェンドは倉庫の枠を奪わない。専用の棚へ直行させるので、
+     「持ち帰る物を選ぶ」画面にも並ばない——選ばせる余地が無い物だから。 */
+  bankLegends(S.run.loot);
+  const loot=S.run.loot.filter(it=>!isConsum(it) && !isLegend(it))
     .sort((a,b)=> (b.rar-a.rar) || (itemValue(b)-itemValue(a)));
   const free=Math.max(0, stashCap()-S.stash.length);
   let overflow=0;
@@ -8963,6 +9328,16 @@ function update(dt){
     P.follow.t-=dt;
     if(P.follow.t<=0){ const f=P.follow; P.follow=null; meleeSwing(stats(S.hero), f.ang, MULTI_MULT); }
   }
+  /* 多段のレジェンドが積んだぶん。**後ろから消す**——前から splice すると
+     同じフレームで複数出たときに次の要素を飛ばす。 */
+  if(P.queue && P.queue.length){
+    for(let i=P.queue.length-1;i>=0;i--){
+      const q=P.queue[i];
+      q.t-=dt;
+      if(q.t<=0){ P.queue.splice(i,1); meleeSwing(stats(S.hero), q.ang, q.mult); }
+    }
+  }
+  tickLegend(dt);       // 得物そのものの再生・癒しの輪
 
   pushTrail();        // 仲間が辿る足跡を残す
   tickRelics(dt);     // 遺物の定期効果（脈動・伴影）
@@ -9003,7 +9378,13 @@ function update(dt){
       if(!S.hero || !S.run) return false;
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
-      const stNow=stats(S.hero);
+      let stNow=stats(S.hero);
+      /* カンバンテインは弾ごとに別の属性が乗る。撃った時点で焼き付けてあるので、
+         当たるまでに武器を持ち替えても、その弾の属性は変わらない。 */
+      if(f.addElem){
+        stNow=Object.assign({}, stNow, {elem:Object.assign({}, stNow.elem,
+          {[f.addElem.type]:(stNow.elem[f.addElem.type]||0)+f.addElem.amount})});
+      }
       // 総当たりではなく、弾のいるマスの近傍だけ見る
       for(const e of nearEnemies(f.x, f.y, 1.6)){
         if(e.dead || f.hitIds.has(e)) continue;
@@ -11955,7 +12336,7 @@ function renderForge(){
   if(lv>=UP_MAX){
     el('fg-cost').innerHTML = '<div style="color:#7fe0c0">上限 +'+UP_MAX+' に達している。</div>';
   }else{
-    const g=oreDef(upGrade(lv)), need=upOreCost(lv), gold=upGoldCost(it,lv,mid);
+    const g=oreDef(upGrade(lv,it)), need=upOreCost(lv,it), gold=upGoldCost(it,lv,mid);
     const okOre = orePurse(g.id,mid)>=need, okGold = purse>=gold;
     el('fg-cost').innerHTML =
       `<div class="row"><span class="k">+${lv} → +${lv+1} に必要</span><span></span></div>`
@@ -12089,8 +12470,17 @@ function renderStash(){
   el('stash-equip').innerHTML = eq.length? eq.map(it=>itemHTML(it,true)).join('')
     : '<div class="empty">何も装備していない</div>';
   el('stashcount').textContent='（'+S.stash.length+' / '+stashCap()+'）';
-  el('stash').innerHTML = S.stash.length? S.stash.map(it=>itemHTML(it,true,{compare:true})).join('')
-    : '<div class="empty">空</div>';
+  /* レジェンドは別の棚。枠を数えないので件数表示にも混ぜず、
+     先頭にまとめて出す（探すたびに倉庫を掘らせない）。 */
+  const shelf=legendShelf();
+  const head = shelf.length
+    ? `<div class="empty" style="color:${RARCOL[LEGEND_RAR]};text-align:left">`
+      + `★ レジェンド（${shelf.length} / ${LEGENDS.length}）　倉庫の枠を使わない・死んでも残る</div>`
+      + shelf.map(it=>itemHTML(it,true,{compare:true})).join('')
+    : '';
+  el('stash').innerHTML = (head + (S.stash.length
+      ? S.stash.map(it=>itemHTML(it,true,{compare:true})).join('')
+      : (shelf.length ? '' : '<div class="empty">空</div>')));
 }
 function renderUpg(){
   el('upg-gold').innerHTML = '<span style="color:#8fd8ff">◆ '+(S.shards||0)+' 欠片</span>';
@@ -12401,7 +12791,7 @@ function townTap(e){
   const n=e.target.closest('.item'); if(!n||!n.dataset.uid) return;
   if(!S.hero) return;
   const uid=+n.dataset.uid;
-  const inStash=S.stash.find(i=>i.uid===uid);
+  const inStash=findOwnedItem(uid);      // 倉庫とレジェンドの棚の両方
   if(inStash){
     /* 仲間がいるなら、誰に着せるかを聞く。
        仲間に装備を渡す道は仲間の画面にしか無かったので、
@@ -12411,17 +12801,38 @@ function townTap(e){
     wearOnHero(inStash); redraw(); return;
   }
   const eqi=Object.values(S.hero.equip).find(i=>i&&i.uid===uid);
-  if(eqi){ S.hero.equip[eqi.slot]=null; S.stash.push(eqi); redraw(); }
+  if(eqi){ S.hero.equip[eqi.slot]=null; shelveItem(eqi); redraw(); }
 }
 document.addEventListener('click', townTap, false);
 document.addEventListener('touchend', townTap, {passive:false});
 
 /* ---------- 倉庫から「誰に着せるか」 ---------- */
+/* 外した物の戻り先。レジェンドは倉庫ではなく専用の棚へ返す
+   （倉庫の枠を数えさせない＝満杯でも持ち替えが詰まらない）。 */
+function shelveItem(it){
+  if(!it) return;
+  if(isLegend(it)){
+    const shelf=legendShelf();
+    if(!shelf.some(x=>x.uid===it.uid)) shelf.push(it);
+    return;
+  }
+  S.stash.push(it);
+}
+/* 倉庫と棚の両方から取り出せるようにする。片方だけを見ていると、
+   棚の1本を着た瞬間に**同じ物が棚にも残る**（複製できてしまう）。 */
+function unshelveItem(it){
+  const i=S.stash.indexOf(it); if(i>=0){ S.stash.splice(i,1); return; }
+  const shelf=legendShelf();
+  const j=shelf.indexOf(it); if(j>=0) shelf.splice(j,1);
+}
+function findOwnedItem(uid){
+  return S.stash.find(i=>i.uid===uid) || legendShelf().find(i=>i.uid===uid) || null;
+}
 function wearOnHero(it){
   const cur=S.hero.equip[it.slot];
-  if(cur) S.stash.push(cur);
+  if(cur) shelveItem(cur);
   S.hero.equip[it.slot]=it;
-  const i=S.stash.indexOf(it); if(i>=0) S.stash.splice(i,1);
+  unshelveItem(it);
   S.hero.hpNow=Math.min(stats(S.hero).maxHp, S.hero.hpNow || stats(S.hero).maxHp);
 }
 function wearOnAlly(a, it){
@@ -13581,7 +13992,7 @@ bindTap(el('btn-fixall'), ()=>{
   renderShop();
 });
 bindTap(el('btn-reset'), ()=>{
-  S.stash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.resumeDepth=null;
   S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
@@ -13761,6 +14172,21 @@ bindTap(el('dbg-blade'), ()=>{
   if(bladeCount() >= BLADE_MAX){ log('🐞 鞘無しは上限（'+BLADE_MAX+'本）'); return; }
   S.hero.boons.push({id:'orbit', rar:'common'});
   log('🐞 鞘無し '+bladeCount()+' 本');
+  el('m-debug').classList.remove('on'); last=performance.now();
+});
+/* 24本を一度に並べる。1%を引き当てるまで潜らないと、
+   固有効果がどれも確かめられない——検証で一番困るのがそこなので。 */
+bindTap(el('dbg-legend'), ()=>{
+  const shelf=legendShelf();
+  let n=0;
+  LEGENDS.forEach(L=>{
+    if(shelf.some(x=>x.legend===L.id)) return;
+    shelf.push(makeLegend(L.id)); n++;
+  });
+  S.ore = S.ore || {};
+  S.ore[LEGEND_ORE] = Math.max(S.ore[LEGEND_ORE]||0, 999);
+  log('🐞 レジェンド '+n+'本を棚へ（計 '+shelf.length+' / '+LEGENDS.length+'）');
+  if(RENDERERS[S.screen]) RENDERERS[S.screen]();
   el('m-debug').classList.remove('on'); last=performance.now();
 });
 bindTap(el('dbg-rich'), ()=>{
