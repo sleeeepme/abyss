@@ -476,9 +476,13 @@ R.allyGearWearsSlower = await pg.evaluate(()=>{
   const N=4000;
   for(let i=0;i<N;i++) damageAllyGear(a,'armor',1);
   const worn=it.durMax-it.dur;
-  const expected=N/ALLY_DUR_MUL;
+  /* 仲間ぶんの 2.5 倍だけでなく、レア度と強化段の壊れにくさも掛かる。
+     genBaseItem は Common と Magic を引き分けるので、拾った1枚の
+     レア度をそのまま計算に入れないと、引きしだいで期待値がずれる。 */
+  const expected=N/(ALLY_DUR_MUL*gearDurMul(it));
   const ratio=worn/expected;
-  return {N, worn, expected:Math.round(expected), ratio:+ratio.toFixed(2),
+  return {N, worn, rar:it.rar, mul:+gearDurMul(it).toFixed(2),
+          expected:Math.round(expected), ratio:+ratio.toFixed(2),
           durIsInteger: Number.isInteger(it.dur),
           closeToExpected: ratio>0.85 && ratio<1.15,
           ok: Number.isInteger(it.dur) && ratio>0.85 && ratio<1.15};

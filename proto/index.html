@@ -1589,6 +1589,77 @@ const SUFFIX=[
      装備・恩寵・仲間の3方向から詰められるようにする。 */
   {id:'haste', nm:'早鐘',  stat:'ultCdr',  r:[5,12]},
 ];
+/* ==================== 指輪と護符の付帯 ====================
+   装飾品は今まで、他の装備と同じ接頭辞・接尾辞が付くだけだった。
+   数字が伸びるだけなので、同じ枠に同じ物が入り直すだけで**付け替える理由が無い。**
+
+   ここに置くのは戦い方が変わる物。付くのは装飾品だけで、
+   普通の接頭辞・接尾辞に**上乗せ**で1つ引く（レア度が上がるほど引ける）。
+
+   当たりの2つ——一度だけの復活と、隊全体の強化——は重みを大きく下げ、
+   さらに最低レア度を設けてある。安い指輪から出ると、
+   拾い直すより店を回すほうが速くなって、潜る理由が減る。 */
+const CHARM_AFFS=[
+  {id:'ember',  nm:'灼', w:20,  min:1, kind:'stat',  stat:'fire',   r:[5,14]},
+  {id:'volt',   nm:'雷', w:20,  min:1, kind:'stat',  stat:'shock',  r:[5,14]},
+  {id:'rime',   nm:'氷', w:20,  min:1, kind:'stat',  stat:'frost',  r:[5,14]},
+  {id:'might',  nm:'力', w:18,  min:0, kind:'stat',  stat:'dmgPct', r:[6,14]},
+  {id:'ward',   nm:'守', w:18,  min:0, kind:'stat',  stat:'def',    r:[3,9]},
+  {id:'vigor',  nm:'命', w:18,  min:0, kind:'stat',  stat:'hp',     r:[12,30]},
+  {id:'swiftc', nm:'疾', w:14,  min:1, kind:'stat',  stat:'evade',  r:[3,8]},
+  // 状態異常付与。命中したときだけ効く＝当てに行く理由になる
+  {id:'rend',   nm:'裂', w:13,  min:1, kind:'proc',  proc:'bleed',  r:[8,20]},
+  {id:'scorch', nm:'焦', w:13,  min:1, kind:'proc',  proc:'burn',   r:[8,20]},
+  {id:'numb',   nm:'痺', w:13,  min:1, kind:'proc',  proc:'shock',  r:[8,20]},
+  // --- レア付帯 ---
+  {id:'banner', nm:'旗', w:2.2, min:3, kind:'party', r:[6,14]},
+  {id:'rise',   nm:'不死', w:1.0, min:4, kind:'revive'},
+];
+function charmAffDef(id){ return CHARM_AFFS.find(c=>c.id===id) || null; }
+function isCharmSlot(it){ return !!(it && it.slot===SLOT.C); }
+/* レア度が上がるほど、引ける数も効き目も増える。 */
+function charmAffCount(rar){ return rar<=0 ? 0 : rar>=4 ? 3 : rar>=2 ? 2 : 1; }
+function rollCharmAffs(rar, ilvl){
+  const n=charmAffCount(rar);
+  if(n<=0) return [];
+  const pool=CHARM_AFFS.filter(c=>rar>=c.min);
+  const out=[];
+  for(let i=0;i<n && pool.length;i++){
+    const tot=pool.reduce((a,c)=>a+c.w,0);
+    let x=rnd()*tot, hit=pool[0];
+    for(const c of pool){ x-=c.w; if(x<=0){ hit=c; break; } }
+    pool.splice(pool.indexOf(hit),1);
+    const af={t:'c', id:hit.id, nm:hit.nm, kind:hit.kind};
+    if(hit.stat) af.stat=hit.stat;
+    if(hit.proc) af.proc=hit.proc;
+    if(hit.r){
+      // ilvl の伸びに、レア度ぶんの上積みを掛ける
+      af.v=Math.max(1, Math.round(rf(hit.r[0],hit.r[1]) * scaleOf(ilvl) * (1 + rar*0.30)));
+    }
+    out.push(af);
+  }
+  return out;
+}
+function charmAffs(it){ return ((it&&it.aff)||[]).filter(a=>a.t==='c'); }
+/* 装備しているぶんの付帯を集める。壊れた装備は効かない（他の効果と同じ扱い）。 */
+function charmAffsOn(h, kind){
+  const out=[];
+  if(!h || !h.equip) return out;
+  Object.values(h.equip).forEach(it=>{
+    if(!it || isBroken(it)) return;
+    charmAffs(it).forEach(a=>{ if(a.kind===kind) out.push(a); });
+  });
+  return out;
+}
+function charmProcs(h){ return charmAffsOn(h, 'proc'); }
+function charmPartyPct(h){ return charmAffsOn(h, 'party').reduce((n,a)=>n+(a.v||0), 0); }
+function hasCharmRevive(h){ return charmAffsOn(h, 'revive').length > 0; }
+function charmAffLine(a){
+  if(a.kind==='proc') return `<span style="color:${STATUS[a.proc].col}">${a.v}% で${STATUS[a.proc].nm}を与える</span>`;
+  if(a.kind==='party') return `<span style="color:#d6b34a">★ 仲間全員の攻撃力とHP +${a.v}%</span>`;
+  if(a.kind==='revive') return `<span style="color:#ff9a5a">★ 倒れても一度だけ立ち上がる</span>`;
+  return (STATNM[a.stat]||'%v').replace('%v', a.v);
+}
 const STATNM={dmgPct:'物理ダメージ +%v%',aspdPct:'攻撃速度 +%v%',hp:'最大HP +%v',msPct:'移動速度 +%v%',
   leech:'HP吸収 %v%',critPct:'クリティカル率 +%v%',allStat:'全ステータス +%v',
   fire:'追加 炎ダメージ %v', shock:'追加 雷ダメージ %v', frost:'追加 冷気ダメージ %v',
@@ -1694,6 +1765,10 @@ function buildItem(base, rar, ilvl){
     const a=ss.splice(Math.floor(rnd()*ss.length),1)[0];
     it.aff.push({t:'s',id:a.id,nm:a.nm,stat:a.stat,v:Math.max(1,Math.round(rf(a.r[0],a.r[1])*(1+ (s-1)*0.6)))});
   }
+  /* 装飾品だけの付帯。普通の接頭辞・接尾辞に**上乗せ**で引く。
+     指輪と護符は攻撃力も防御力も持たないので、ここが無いと
+     「同じ枠に同じ物が入り直すだけ」の装備のままになる。 */
+  if(isCharmSlot(it)) it.aff.push(...rollCharmAffs(rar.id, ilvl));
   return it;
 }
 function genItem(ilvl, mf=0){
@@ -1900,8 +1975,12 @@ function itemName(it){
   if(isConsum(it)) return head+it.nm;
   if(!it.ident) return head+'未鑑定の'+(SLOTNM[it.slot]||'装備');
   const p=it.aff.find(a=>a.t==='p'), s=it.aff.find(a=>a.t==='s');
+  /* 装飾品の付帯は一字で頭に並べる（灼裂の指輪）。中身を開かなくても
+     何が付いているかが分かる——装飾品は見た目の差が無いので、
+     名前が唯一の見分けになる。 */
+  const c=charmAffs(it).map(a=>a.nm).join('');
   return head+(it.up?'+'+it.up+' ':'')
-       + (p?p.nm:'') + (s?s.nm+'の':'') + it.nm
+       + c + (p?p.nm:'') + (s?s.nm+'の':'') + it.nm
        + (isBroken(it)?'（破損）':'');
 }
 function itemValue(it){
@@ -2027,6 +2106,8 @@ function affLines(it){
   if(it.block) L.push('ガード軽減 '+it.block+'%　パリイ受付 '+(b.parry||0.2).toFixed(2)+'秒');
   if(it.def) L.push('防御力 '+it.def);
   it.aff.forEach(a=>{
+    // 装飾品の付帯は専用の書き方をする（状態異常や隊の強化は %v では書けない）
+    if(a.t==='c'){ L.push(charmAffLine(a)); return; }
     L.push(STATNM[a.stat].replace('%v',a.v));
     // 2つめの効果を持つ接頭辞（疾き）。書かないと、付いていることが伝わらない。
     if(a.stat2 && STATNM[a.stat2]) L.push(STATNM[a.stat2].replace('%v',a.v2));
@@ -3673,6 +3754,10 @@ function partyAura(){
      入れる以上、配り口は既にあるこの1箇所にまとめるのが素直。 */
   const LG = legendDef(S.hero && S.hero.equip && S.hero.equip.weapon);
   if(LG && LG.aura){ o.atk += LG.aura.atk||0; o.hp += LG.aura.hp||0; o.dr += LG.aura.dr||0; }
+  /* 装飾品のレア付帯「旗」。旗印の恩寵と同じ枠に足す——
+     隊全体を強くする物は、出どころが違っても効き方は1つでいい。 */
+  const banner = charmPartyPct(S.hero);
+  if(banner>0){ o.atk += banner; o.hp += banner; }
   return o;
 }
 
@@ -4492,7 +4577,11 @@ function stats(h){
     if(it.def){ bDef+=it.def; }
     // ベース種そのものが持つ回避（今は短剣だけ）。接頭辞の「疾き」と同じ枠に足す
     if(b.evade) a.evade += b.evade;
-    it.aff.forEach(f=>{ a[f.stat]=(a[f.stat]||0)+f.v;
+    /* 装飾品の付帯のうち、状態異常付与・隊の強化・復活は数値の枠に入らない。
+       stat を持たない物を素通りさせると a[undefined] が育って、
+       どの数値にも化けないまま残る（読む側からは効いているように見えない）。 */
+    it.aff.forEach(f=>{ if(!f.stat) return;
+                        a[f.stat]=(a[f.stat]||0)+f.v;
                         if(f.stat2) a[f.stat2]=(a[f.stat2]||0)+(f.v2||0); });
   });
   // 節目で付いた技。武器に紐づくので、武器を持ち替えれば当然消える。
@@ -4902,11 +4991,58 @@ const KNOCK_POWER = 0.9;    // 押される距離（マス）
 const AQUA_MUL    = 1.40;   // 水の中でだけ乗る倍率
 const AQUA_SHARE  = 0.5;    // 水の層の敵のうち、水に馴染んでいる割合
 const LURK_R      = 3.4;    // ここまで近づくと姿が出る
+/* ==================== 雑魚の癖 ====================
+   道中が単調なのは、形式が4つしか無く、どの層でも同じ距離の詰め方をするから。
+   だが個体ごとに行動を書くと、階が増えるたびに表が二乗で膨らむ。
+
+   **層 × 形式**の格子で配る。6層 × 4形式 ＝ 24マスに1つずつ置けば、
+   同じ「回り」でも層が変われば別の相手になる。名前も色も属性も
+   系統（FAMILY）側が既に層ごとに変えているので、そこへ癖を1つ足すだけで、
+   絵も表も増やさずに「別の敵」として成立する。
+
+   渡すのは**間合いの取り方が変わる癖**だけで、火力はどれも据え置き。
+   ボスと同じ大技は渡さない——渡した瞬間、主の存在感がそのぶん薄まる。
+   跳ぶ距離もはじける半径も、ボスの技より一回り小さく取ってある。 */
+const ZAKO_TRAITS = {
+  blink:  {nm:'跳ぶ',   col:'#a97fe0', every:[3.2,5.0], dist:3.4},
+  recoil: {nm:'退く',   col:'#7fc8e0', back:1.9, hold:0.7},
+  burst:  {nm:'弾ける', col:'#e0705a', r:1.9, mult:0.85},
+};
+function zakoTraitDef(id){ return ZAKO_TRAITS[id] || null; }
+/* 格子。null は「その層のその形式には癖を足さない」——
+   全部のマスを埋めると、逆にどの階も同じだけ賑やかになって差が消える。 */
+const ZAKO_TRAIT_GRID = {
+  stone:   {rush:null,     range:'recoil', swarm:null,     turret:null},
+  sump:    {rush:null,     range:'recoil', swarm:null,     turret:'burst'},
+  root:    {rush:null,     range:'blink',  swarm:'burst',  turret:null},
+  ruin:    {rush:'burst',  range:null,     swarm:null,     turret:'recoil'},
+  furnace: {rush:'burst',  range:'burst',  swarm:'burst',  turret:null},
+  pale:    {rush:'blink',  range:'blink',  swarm:'recoil', turret:'burst'},
+};
+/* 癖を持つのは一部だけ。全員が跳んだり弾けたりすると、
+   それは癖ではなくその層の常識になり、また単調に戻る。 */
+const ZAKO_TRAIT_SHARE = 0.34;
+function zakoTraitFor(zoneId, archId){
+  const row = ZAKO_TRAIT_GRID[zoneId];
+  return (row && row[archId]) || null;
+}
 function applyZoneTraits(e, fl, depth){
   const z = fl.zone && fl.zone.id;
   if(z==='sump' && rnd()<AQUA_SHARE) e.aqua = true;
   if(z==='root') e.push = KNOCK_POWER;   // 触れた相手を押す。弾では押さない
   if(z==='ruin') e.lurk = LURK_R;
+
+  /* 精鋭・規格外・ボスには足さない。あちらは既に自前の性質を持っていて、
+     重ねると「何が起きているのか」が読めなくなる。 */
+  if(e.elite || e.uniq || e.boss || e.moss) return;
+  const id = zakoTraitFor(z, e.arch.id);
+  if(!id || rnd() >= ZAKO_TRAIT_SHARE) return;
+  const t = zakoTraitDef(id);
+  if(!t) return;
+  e.trait = id;
+  e.traitCd = rf(1.0, 2.4);
+  // 名前で予告する。精鋭の接頭辞と同じ作法——見てから備えられる形にする。
+  e.name = t.nm + e.name;
 }
 /* 水の中にいるか。層に置いた水そのものを見る（別々に持つと必ずずれる）。 */
 function inWater(x,y){ const h=hazardAt(x,y); return !!(h && h.nm==='水'); }
@@ -5405,9 +5541,17 @@ function makeUnique(fl, depth, fams){
   /* 規格外は「その層の雑魚が一箇所だけ壊れたもの」。
      だから形式も系統も、まず層に合わせて引く——
      どの層でも同じ顔ぶれが出ると、層ごとの事件にならない。 */
+  /* **形式は1回だけ引く。**
+     以前は ARCH.find(x=>x.id===pick(abKeys)) と書いてあった。find の述語は
+     要素ごとに呼ばれるので、**比べるたびに別の形式を引き直していた**——
+     たまたま一致すれば表の名前、しなければ pick(ARCH) に落ちて
+     その層に無い形式（水の層の「溜め」など）の規格外が生まれ、
+     名前だけ UNIQUE_NAMES から拾った別物になっていた。
+     引いてから探す、の順にすれば、表に載っている形式しか出ない。 */
   const abKeys = Object.keys(ABERRANT[zid] || {});
-  const a = abKeys.length ? (ARCH.find(x=>x.id===pick(abKeys)) || pick(ARCH))
-                          : pick(ARCH.filter(x=>x.id!=='swarm'));
+  const abPick = abKeys.length ? pick(abKeys) : null;
+  const a = abPick ? (ARCH.find(x=>x.id===abPick) || pick(ARCH))
+                   : pick(ARCH.filter(x=>x.id!=='swarm'));
   const wantFam = FAMILY.find(f=>f.id===ZONE_FAM[zid] && f.minDepth<=depth);
   const fam = wantFam || pick((fams&&fams.length)?fams:[FAMILY[0]]);
   const r = pick(fl.rooms.filter(r=>r!==fl.start)) || fl.rooms[0];
@@ -5896,6 +6040,7 @@ function enterFloor(depth){
   P.x = fl.start.cx+0.5; P.y = fl.start.cy+0.5;
   P.vx=P.vy=0; P.dirx=1; P.diry=0; P.atkCd=0; P.swing=0;
   W.fl=fl; W.enemies=spawnEnemies(fl,depth); W.drops=[]; W.fx=[]; W.pops=[];
+  W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
   /* 湧いた先が壁の中だと、動けもしないし殴りにも行けない置物になる。
@@ -6336,6 +6481,11 @@ function hitEnemy(e, st, mult, opt){
     if(LG.onHitBleed && rnd()<LG.onHitBleed) addStatus(e,'bleed',src.lv);
     if(LG.onHitShock && rnd()<LG.onHitShock) addStatus(e,'shock',src.lv);
     if(LG.knock && !e.boss) knockBack(e, {x:P.x, y:P.y}, LG.knock);
+  }
+  /* 装飾品の付帯による状態異常。**主人公の指輪が仲間の一撃で乗る**のは変なので、
+     殴った本人の装備だけを見る（仲間も自分の装飾品を着けている）。 */
+  if(!e.dead && e.hp>0){
+    charmProcs(src).forEach(c=>{ if(rnd()*100 < (c.v||0)) addStatus(e, c.proc, src.lv); });
   }
   if(e.hp<=0 && !e.dead) killEnemy(e, opt.src||null);
   return r;
@@ -7553,6 +7703,11 @@ function killEnemy(e, byAlly){
   }
   e.dead=true; S.run.kills++;
   countMossKill(e);                 // 苔玉は層ごとに数える（口座側）
+  scheduleRise(e);                  // 亡者は倒しても起き上がる
+  /* 起き上がった亡者は二度目の実入りを出さない。出すと、同じ1体を
+     殴り続けるのが最も効率のいい稼ぎ方になってしまう。
+     経験値も金も落とし物も、**最初の1回だけ**。 */
+  if(e.noXp && e.noDrop) return;
   const st=stats(S.hero);
   const cfg = e.boss ? BOSS_STATS[e.tier] : null;
   /* ---------- 第50階層の主が呼ぶ雑魚は経験値3倍 ----------
@@ -7763,11 +7918,18 @@ function enemyUpdate(e,dt){
   // ボスの範囲攻撃。溜め中は移動も通常攻撃も止まるので、避ける時間が必ずある。
   if(e.boss){ bossRage(e); finalBossTick(e, dt); if(bossCast(e, dt, slow, tg)) return; }
 
+  // 癖「跳ぶ」。溜めている最中には跳ばない（避けた側が損をするので）。
+  if(e.trait==='blink' && vis && e.tele<=0) zakoBlink(e, dt, tg, d);
+
   if(e.tele>0){
     e.tele-=dt*slow;
     if(e.tele<=0){
       // 攻撃発生。属性はその敵の系統が決める。大きい敵は体の分だけ間合いが伸びる。
-      if(d < a.range+0.6+(e.boss?e.r*0.8:0) || a.range>3){
+      /* 癖「弾ける」だけは、当たり方が間合いではなく**自分の周り**になる。
+         予兆（e.tele）はそのまま使うので、避ける時間は他と同じだけある。 */
+      if(e.trait==='burst'){
+        zakoBurst(e);
+      }else if(d < a.range+0.6+(e.boss?e.r*0.8:0) || a.range>3){
         if(a.range>3){ // 遠距離: 弾
           W.fx.push({t:'bolt',x:e.x,y:e.y,vx:dx/d*7.5,vy:dy/d*7.5,life:1.6,
                      dmg:e.atkV, lv:e.lv, dt:e.dt});
@@ -7777,6 +7939,8 @@ function enemyUpdate(e,dt){
           hitPlayer(e);
         }
       }
+      // 癖「退く」。振り終わりに離れる＝追う側が一度立ち止まらされる。
+      if(e.trait==='recoil') e.recoil = zakoTraitDef('recoil').hold;
     }
     return;
   }
@@ -7785,6 +7949,8 @@ function enemyUpdate(e,dt){
   /* HP10%を切った門番は、以後ずっと離れる方向にしか動かない。
      「逃げながら遠距離が本命」を、系統ごとの間合い設定より優先する。 */
   if(e.fleeing){ mvx=-dx/d; mvy=-dy/d; }
+  // 癖「退く」のあいだは、間合いの理屈より離れることを優先する
+  else if(e.recoil>0 && a.ms>0){ e.recoil-=dt; mvx=-dx/d; mvy=-dy/d; }
   else if(a.ms>0){
     if(a.keep && d < a.keep-0.8){ mvx=-dx/d; mvy=-dy/d; }
     else if(d > (a.range*0.85)){ mvx=dx/d; mvy=dy/d; }
@@ -7822,6 +7988,76 @@ function enemyUpdate(e,dt){
     e.tele = a.tele*(e.teleMul||1)/aq;
     e.cd   = (a.range>3?2.2:1.5)/aq;
   }
+}
+
+/* ==================== 亡者は起き上がる ====================
+   フォーセイクン（undead）は倒しても約1分で同じ場所に立ち上がる。
+   「片付けた道を戻る」が安全ではなくなるので、往復する遊び方に値段が付く。
+
+   二度目からは経験値も金も落とし物も出さない（noXp / noDrop）——
+   出すと、湧きを待って同じ1体を殴り続けるのが最良の稼ぎになる。
+
+   復活はその階を出るまで。W.risen は階ごとに作り直す。 */
+const UNDEAD_RISE_SEC = 60;
+function scheduleRise(e){
+  if(!S.run || !W.fl) return;
+  if(!e.fam || e.fam.id!=='undead') return;
+  if(e.boss || e.uniq || e.mirror || e.summoned) return;   // 主と分身は戻らない
+  (W.risen = W.risen || []).push({e, t:UNDEAD_RISE_SEC});
+}
+function tickRisen(dt){
+  const list=W.risen;
+  if(!list || !list.length || !S.run) return;
+  for(let i=list.length-1;i>=0;i--){
+    const r=list[i];
+    r.t-=dt;
+    if(r.t>0) continue;
+    list.splice(i,1);
+    const e=r.e;
+    if(!standable(e.x, e.y)) continue;      // 床でなくなっていたら諦める
+    e.dead=false; e.fade=undefined;
+    e.hp=e.maxHp; e.st={}; e.bu={};
+    e.state='chase'; e.cd=rf(0.4,1.0); e.tele=0; e.hit=0;
+    e.noXp=true; e.noDrop=true;             // 二度目の実入りは無い
+    if(!/^甦/.test(e.name)) e.name='甦った'+e.name;
+    W.enemies.push(e);
+    W.fx.push({t:'grave', x:e.x, y:e.y, life:0.5, max:0.5});
+  }
+}
+
+/* ---------- 癖「跳ぶ」 ----------
+   狙っている相手の**周り**へ跳ぶ。真上に跳ぶと殴られる位置に自分から入るだけで、
+   逃げ場を潰す動きにならない。跳んだ先が床でなければ諦める（壁抜けはしない）。
+   跳ぶ前と後に印を出す——消えて現れるだけだと、事故と区別が付かない。 */
+function zakoBlink(e, dt, tg, d){
+  const t=zakoTraitDef('blink');
+  e.traitCd = (e.traitCd||0) - dt;
+  if(e.traitCd>0 || d < 2.2) return;
+  e.traitCd = rf(t.every[0], t.every[1]);
+  for(let i=0;i<8;i++){
+    const ang=rnd()*Math.PI*2, r=rf(1.4, 2.6);
+    const nx=tg.x+Math.cos(ang)*r, ny=tg.y+Math.sin(ang)*r;
+    if(!standable(nx,ny)) continue;
+    if(Math.hypot(nx-e.x, ny-e.y) > t.dist*1.6) continue;   // 跳べる距離まで
+    W.fx.push({t:'grave', x:e.x, y:e.y, life:0.25, max:0.25});
+    e.x=nx; e.y=ny;
+    W.fx.push({t:'grave', x:nx, y:ny, life:0.25, max:0.25});
+    e.cd=Math.max(e.cd, 0.35);         // 跳んだ直後に殴らない（理不尽になる）
+    return;
+  }
+}
+/* ---------- 癖「弾ける」 ----------
+   自分を中心に小さく爆ぜる。ボスの slam と同じ形だが半径も威力も一回り小さい。
+   当たり判定はボスと同じ aoeTargets を通す——味方だけ巻き込まれない、
+   という不整合をここで作らない。 */
+function zakoBurst(e){
+  const t=zakoTraitDef('burst');
+  // col は必ず渡す。描画側は rgba(f.col,…) を通すので、省くとそこで落ちる。
+  W.fx.push({t:'shock', x:e.x, y:e.y, r:t.r, life:0.3, max:0.3,
+             col: (DTYPE[e.dt] && DTYPE[e.dt].col) || '#ff8a80'});
+  aoeTargets().forEach(tgt=>{
+    if(Math.hypot(tgt.x-e.x, tgt.y-e.y) - (tgt.r||0.3) < t.r) aoeHit(e, tgt, t.mult);
+  });
 }
 
 /* ---------- ボスの第2段階と範囲攻撃 ---------- */
@@ -9348,6 +9584,7 @@ function update(dt){
   if(S.run.frozen>0) S.run.frozen = Math.max(0, S.run.frozen-dt);
   tickTrial(dt);      // 試練の籠城戦
   tickFinalBossBane(dt); // ラスボス戦中だけ切り替わる枷
+  tickRisen(dt);      // 倒した亡者が起き上がる
   autoPickup();
   if(W.grave && Math.hypot(W.grave.x-P.x, W.grave.y-P.y) < 0.9) collectGrave();
   livingParty().forEach(a=>allyUpdate(a,dt));
@@ -13860,6 +14097,19 @@ function tryPhoenix(h, isPlayer){
     P.invuln = Math.max(P.invuln||0, 2.0);
     log('🜂 不滅の遺物が砕けた — 立ち上がった');
     showBanner('不滅の遺物', 'HP 全快で立ち上がった', '#ff9a5a', 2.6);
+    return true;
+  }
+  /* 装飾品のレア付帯「不死」。1回の探索につき一度だけ、半分まで戻して立ち上がる。
+     遺物「不滅」（全快）とも恩寵の不死鳥とも別枠にしてある——
+     同じ枠に入れると、3つ揃えても1回しか起きないことになる。 */
+  if(isPlayer && hasCharmRevive(h) && S.run && !S.run.charmRiseUsed){
+    S.run.charmRiseUsed = true;
+    h.hpNow = Math.max(1, Math.round(stats(h).maxHp*0.5));
+    h.dead = false;
+    W.fx.push({t:'parry', x:P.x, y:P.y, life:1.1, max:1.1});
+    P.invuln = Math.max(P.invuln||0, 1.6);
+    log('◇ 装飾品が砕けた — 立ち上がった');
+    showBanner('不死の付帯', 'HP 半分で立ち上がった', '#ff9a5a', 2.4);
     return true;
   }
   const v = boonSum(h,'phoenix');

@@ -203,7 +203,11 @@ R.xp = await pg.evaluate(()=>{
     S.hero=newHero(); startRun(6); S.hero.party=[];
     for(let i=0;i<n;i++){ const a=makeAlly(6,S.hero); a.lv=1; a.xp=0; S.hero.party.push(a); }
     S.hero.lv=99; S.hero.xp=0;            // レベルアップで xp がリセットされないよう高レベルに
-    livingParty().forEach(a=>{ a.lv=99; a.xp=0; });
+    /* 見たいのは**分配のしかた**。仲間は恩寵をランダムに持って生まれ、
+       研鑽（xp +%）を引いた1人だけ受け取りが増えるので、
+       ここを空にしないと引きしだいで「均等でない」ことになる。 */
+    S.hero.boons=[];
+    livingParty().forEach(a=>{ a.lv=99; a.xp=0; a.boons=[]; });
     const share=grantXp(1000);
     return {playerXp:Math.round(S.hero.xp), share:Math.round(share),
             allyXp:livingParty().map(a=>Math.round(a.xp)),

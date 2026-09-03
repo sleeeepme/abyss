@@ -103,7 +103,12 @@ R.swingType = await pg.evaluate(()=>{
 // 2-b. 追加属性が乗ると elem に載る（斬撃＋炎が見た目に出る）
 R.swingElem = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(3); S.hero.party=[];
+  /* 「素の状態」を見たいので、属性の付いていない剣に固定する。
+     genBaseItem は Magic も引くので、業火や雷光の接尾辞が乗ると
+     何も足していないのに属性が出て、この試験は引きしだいで落ちる。 */
   S.hero.equip.weapon=genBaseItem('sword',10,1);
+  S.hero.equip.weapon.aff=[];
+  S.hero.equip.accessory=null; S.hero.equip.armor=null; S.hero.equip.shield=null;
   const plain=elemOf(stats(S.hero));
   // 炎の接尾辞を無理やり足す
   S.hero.equip.weapon.aff.push({t:'s',id:'fire',nm:'炎',stat:'fire',v:12});
