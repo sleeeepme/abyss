@@ -57,11 +57,22 @@ R.strongerThanRelicPlus10 = await pg.evaluate(()=>{
   const relic=buildItem(sword, RARITY[4], LEGEND_ILVL);
   relic.up=10;
   const relicAtk=Math.round(relic.atk*(1+10*UP_ATK_PER));
+  /* 比べるのは**1振りで出る合計**。多段（飛燕）や散弾（テミス）は
+     1撃あたりを下げてあるので、素の攻撃力だけ見ると弱く見える。
+     プレイヤーが受け取るのは「1回振ったときにどれだけ出るか」のほう。 */
+  const swingOut=(it)=>{
+    const L=legendDef(it);
+    const hits=(L && L.hits)||1;
+    const shots=(L && L.spread) ? L.spread.length : 1;
+    const per=(L && L.shotMul)||1;
+    return it.atk * hits * shots * per;
+  };
   const weak=LEGENDS.map(L=>{
     const it=makeLegend(L.id);
     const b=BASES.find(x=>x.id===L.base);
     const r=buildItem(b, RARITY[4], LEGEND_ILVL); r.up=10;
-    return {id:L.id, legend:it.atk, relic10:Math.round(r.atk*(1+10*UP_ATK_PER))};
+    return {id:L.id, legend:Math.round(swingOut(it)),
+            relic10:Math.round(r.atk*(1+10*UP_ATK_PER))};
   }).filter(x=>x.legend<=x.relic10);
   const lev=makeLegend('levantine');
   return {sampleLegend:lev.atk, sampleRelic10:relicAtk, weaker:weak,
@@ -271,11 +282,11 @@ R.multiStrike = await pg.evaluate(()=>{
                      P.queue.length=0; P.atkCd=0; playerAttack();
                      return P.queue.length; })();
   return {gladius:g, javelin:j, hien:h, plainQueued:plain,
-          gladiusIsThree: g.want===3 && g.queued===2,
+          gladiusIsTwo:   g.want===2 && g.queued===1,
           javelinIsTwo:   j.want===2 && j.queued===1,
           hienIsThree:    h.want===3 && h.queued===2,
           plainStaysOne:  plain===0,
-          ok: g.want===3 && g.queued===2 && j.want===2 && j.queued===1
+          ok: g.want===2 && g.queued===1 && j.want===2 && j.queued===1
               && h.want===3 && h.queued===2 && plain===0};
 });
 
@@ -309,11 +320,11 @@ R.shockwaves = await pg.evaluate(()=>{
   const none=(()=>{ const st=LT.arm('yoichi'); LT.target(1.0);
                     return {hits:legendWave(st,0), fx:W.fx.map(f=>f.t)}; })();
   return {king, gae, gor, hyp, moon, none,
-          coneHits:  king.hits>0 && king.fx.includes('swing'),
+          coneHits:  king.hits>0 && king.fx.includes('lwave'),
           lineHits:  gae.hits>0  && gae.fx.includes('ultbeam'),
           ringHits:  gor.hits>0  && gor.fx.includes('ultring'),
           bowLineHits: hyp.hits>0 && hyp.fx.includes('ultbeam'),
-          moonConeHits: moon.hits>0 && moon.fx.includes('swing'),
+          moonConeHits: moon.hits>0 && moon.fx.includes('lwave'),
           quietWithoutOne: none.hits===0 && none.fx.length===0,
           ok: king.hits>0 && gae.hits>0 && gor.hits>0 && hyp.hits>0 && moon.hits>0
               && none.hits===0};
@@ -407,6 +418,103 @@ R.slowButHeavy = await pg.evaluate(()=>{
           ok: Math.abs(gor.spd-plainMace.spd*0.5)<0.001
               && Math.abs(hyp.spd-plainBow.spd*0.5)<0.001
               && stG.aspd < stP.aspd};
+});
+
+/* ============ 5-i. 調整で入れた効き目が、書いたとおりに出る ============ */
+
+// レヴァンテインは眷属を1体連れてくる。上限（KIN_MAX）は恩寵と共有。
+R.levantineBringsKin = await pg.evaluate(()=>{
+  LT.arm('levantine');
+  const withSword=kinOf(S.hero).length;
+  const st=stats(S.hero);
+  LT.arm('kingsword');
+  const without=kinOf(S.hero).length;
+  const plain=stats(S.hero);
+  // 恩寵で上限まで持っていても、武器のぶんで超えない
+  LT.arm('levantine');
+  for(let i=0;i<KIN_MAX;i++) S.hero.boons.push({id:'kin', rar:'common'});
+  const capped=kinOf(S.hero).length;
+  return {withSword, without, capped, cap:KIN_MAX,
+          aspd:+st.aspd.toFixed(3), plainAspd:+plain.aspd.toFixed(3),
+          bringsOne: withSword===without+1,
+          plainBringsNone: without===0,
+          respectsCap: capped===KIN_MAX,
+          alsoFaster: st.aspd > plain.aspd,
+          ok: withSword===without+1 && without===0 && capped===KIN_MAX
+              && st.aspd > plain.aspd};
+});
+
+// 幻夢の +50% が上限に飲まれない（飲まれると書いてある数字が嘘になる）
+R.gengmuIsNotCapped = await pg.evaluate(()=>{
+  /* 他の枠にも回避の付く装備が入りうる（接頭辞「疾き」）。
+     見たいのはこの1本ぶんなので、武器以外は外してから測る。 */
+  const bare=()=>{ S.hero.equip.shield=null; S.hero.equip.armor=null;
+                   S.hero.equip.accessory=null; };
+  LT.arm('gengmu'); bare(); const st=stats(S.hero);
+  LT.arm('kingsword'); bare(); const plain=stats(S.hero);
+  const dagger=BASES.find(x=>x.id==='dagger');
+  return {evade:st.evade, plainEvade:plain.evade, cap:EVADE_CAP,
+          base:dagger.evade,
+          underTheCap: st.evade < EVADE_CAP,
+          fullFifty: st.evade >= dagger.evade + 50 - 0.01,
+          capLeavesRoom: EVADE_CAP > dagger.evade + 50,
+          ok: st.evade < EVADE_CAP && st.evade >= dagger.evade+50-0.01};
+});
+
+// 光魔の杖は全周（360度）を薙ぐ。振り遅くならない。
+R.koumaSweepsAllRound = await pg.evaluate(()=>{
+  const st=LT.arm('koumastaff');
+  const plain=LT.arm('sagestaff');
+  // 背中側の相手にも当たる
+  LT.arm('koumastaff');
+  const e=LT.target(1.0);
+  e.x=P.x-1.0; e.y=P.y;                 // 真後ろ
+  stepSim(0.02); e.x=P.x-1.0; e.y=P.y; e.hp=1e9;
+  const hp0=e.hp;
+  meleeSwing(stats(S.hero), 0, 1);      // 正面（+X）へ振る
+  const hitBehind = e.hp < hp0;
+  return {arc:st.arc, degrees:st.arc*2, proj:st.proj,
+          aspd:+st.aspd.toFixed(2), plainAspd:+plain.aspd.toFixed(2),
+          fullCircle: st.arc>=180,
+          notAProjectile: st.proj===null,
+          hitsBehind: hitBehind,
+          faster: st.aspd > plain.aspd,
+          ok: st.arc>=180 && st.proj===null && hitBehind && st.aspd>plain.aspd};
+});
+
+// 3方向に増えたぶん、1本あたりの威力は下がる（合計で釣り合う）
+R.spreadSplitsTheDamage = await pg.evaluate(()=>{
+  const fire=(id)=>{ LT.arm(id); LT.target(3.0);
+    P.queue.length=0; P.atkCd=0; W.fx.length=0; playerAttack();
+    return W.fx.filter(f=>f.t==='pshot').map(s=>s.mult); };
+  const th=fire('themis'), cb=fire('cambantein'), one=fire('yoichi');
+  const sum=a=>a.reduce((x,y)=>x+y,0);
+  return {themis:th.map(v=>+v.toFixed(2)), cambantein:cb.map(v=>+v.toFixed(2)),
+          plain:one.map(v=>+v.toFixed(2)),
+          themisTotal:+sum(th).toFixed(2), plainTotal:+sum(one).toFixed(2),
+          eachIsAThird: th.every(v=>Math.abs(v-1/3)<0.02),
+          cambanteinToo: cb.every(v=>Math.abs(v-1/3)<0.02),
+          totalsMatchOneShot: Math.abs(sum(th)-sum(one))<0.05,
+          plainStaysFull: one.every(v=>Math.abs(v-1)<0.02),
+          ok: th.every(v=>Math.abs(v-1/3)<0.02) && cb.every(v=>Math.abs(v-1/3)<0.02)
+              && Math.abs(sum(th)-sum(one))<0.05};
+});
+
+// 多段の3本は1撃あたりを半分にしてある（回数だけ増やさない）
+R.multiStrikeCostsPerHit = await pg.evaluate(()=>{
+  const pair=(legendId, baseId)=>{
+    const it=makeLegend(legendId);
+    const b=BASES.find(x=>x.id===baseId);
+    const mid=(b.atk[0]+b.atk[1])/2;
+    const fullPrice=Math.round(mid*scaleOf(LEGEND_ILVL)*LEGEND_ATK_MUL);
+    return {atk:it.atk, ifItWereFull:fullPrice, hits:legendDef(it).hits};
+  };
+  const g=pair('gladius','dagger'), j=pair('javelin','spear'), h=pair('hien','axe');
+  const half=x=>Math.abs(x.atk - x.ifItWereFull*0.5) <= 1;
+  return {gladius:g, javelin:j, hien:h,
+          gladiusHalved: half(g), javelinHalved: half(j), hienHalved: half(h),
+          gladiusIsTwoHits: g.hits===2,
+          ok: half(g) && half(j) && half(h) && g.hits===2};
 });
 
 /* ============ 6. デバッグの全開放 ============ */

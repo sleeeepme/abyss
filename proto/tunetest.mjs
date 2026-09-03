@@ -88,8 +88,13 @@ R.evadeApplies = await pg.evaluate(()=>{
   const withGear=stats(S.hero).evade;
   it.aff[0].v2=999;
   const capped=stats(S.hero).evade;
-  return {base, withGear, capped,
-          ok: base===0 && withGear===9 && capped===40};
+  /* 上限は 40 から 60 へ広げた。幻夢（短剣7＋50＝57）を丸ごと飲んでしまい、
+     「+50%」と書いてある効果が何も起きないままだったため。 */
+  return {base, withGear, capped, cap:EVADE_CAP,
+          startsAtZero: base===0,
+          gearAdds: withGear===9,
+          cappedAtCeiling: capped===EVADE_CAP,
+          ok: base===0 && withGear===9 && capped===EVADE_CAP};
 });
 
 // 2-c. 回避が出るとダメージが0で終わる
@@ -97,7 +102,7 @@ R.evadeBlocks = await pg.evaluate(()=>{
   TH.run(1,{seed:8}); TH.floor(3);
   const it=genBaseItem('sword',20,1);
   it.ident=true; it.aff=[{t:'p',id:'swift',nm:'疾き',stat:'msPct',v:8,stat2:'evade',v2:999}];
-  S.hero.equip.weapon=it;                 // 回避 40%
+  S.hero.equip.weapon=it;                 // 上限いっぱいの回避（EVADE_CAP）
   const e=W.enemies[0]; e.atkV=5;
   let dodged=0, hits=0;
   const hp0=S.hero.hpNow=stats(S.hero).maxHp;
@@ -107,8 +112,11 @@ R.evadeBlocks = await pg.evaluate(()=>{
     if(S.hero.hpNow===before) dodged++; else hits++;
     S.hero.hpNow=hp0;
   }
-  return {dodged, hits, rate:+(dodged/200).toFixed(2),
-          inRange: dodged>20 && dodged<120,
+  /* 上限が 60% になったので、200回振れば 120 前後は避ける。
+     見たいのは「避けもするし当たりもする」ことなので、幅で受ける。 */
+  return {dodged, hits, rate:+(dodged/200).toFixed(2), cap:EVADE_CAP,
+          bothHappen: dodged>20 && hits>20,
+          nearTheCap: Math.abs(dodged/200 - EVADE_CAP/100) < 0.15,
           ok: dodged>20 && hits>20};
 });
 

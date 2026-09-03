@@ -395,10 +395,10 @@ R.blindHidesFarEnemy = await pg.evaluate(()=>{
   TH.run(12,{seed:5}); TH.immortal();
   for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
   S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
-  /* 6.5マス先に1体だけ置く。狙っている相手なので、見えていれば名前が出る（7.5マス以内）。
-     暗幕が掛かると明かりは 13×0.55＝約7.2マス、その3/4＝約5.4マスまで縮むので隠れる。 */
+  /* 7.2マス先に1体だけ置く。狙っている相手なので、見えていれば名前が出る（7.5マス以内）。
+     暗幕は 7マス（BLIND_DARK）から先を完全な闇にするので、そこでは隠れる。 */
   const e=W.enemies.find(x=>!x.boss && !x.dead);
-  W.enemies=[e]; e.x=P.x+6.5; e.y=P.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
+  W.enemies=[e]; e.x=P.x+7.2; e.y=P.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
   e.lurk=0; e.tele=0; e.dead=false; P.target=e;
   const seen=()=>{
     const hits=[]; const orig=window.label;
@@ -449,6 +449,36 @@ R.noTargetInfoPanel = await pg.evaluate(()=>{
           panelHidden: el('targetinfo').style.display==='none',
           baneGaugeShown: el('trialbar').style.display!=='none',
           ok: !!P.target && el('targetinfo').style.display==='none'};
+});
+
+// 8-e. 暗幕は 3マスまで明るく、3〜7マスで落ち、7マスの先は真っ暗
+R.blindGradient = await pg.evaluate(()=>{
+  TH.run(12,{seed:5}); TH.immortal(); TH.clearEnemies();
+  for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
+  S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
+  const air=window.drawAir; window.drawAir=()=>{};   // 漂う塵で1枚が揺れる
+  const dpr=Math.min(2, devicePixelRatio||1);
+  /* 主人公の真横（+X）へ n マスの点を測る。床でなければ壁の色を拾うので、
+     同じ点を「暗幕あり／なし」で比べる形にして、地形の差を打ち消す。 */
+  const lum=(tiles)=>{
+    draw();
+    const px=Math.round((tiles*TS + innerWidth/2)*dpr);
+    const py=Math.round((innerHeight/2)*dpr);
+    const d=ctx.getImageData(px-2, py-2, 4, 4).data;
+    let s=0; for(let i=0;i<d.length;i+=4) s+=(d[i]+d[i+1]+d[i+2])/3;
+    return s/(d.length/4);
+  };
+  const at=[2,5,8];
+  const open=at.map(lum);
+  S.run.trial={bane:'blind', t:30, max:30};
+  const dark=at.map(lum);
+  window.drawAir=air;
+  return {at, open:open.map(v=>+v.toFixed(1)), dark:dark.map(v=>+v.toFixed(1)),
+          clear:BLIND_CLEAR, black:BLIND_DARK,
+          nearIsUntouched: Math.abs(dark[0]-open[0]) < 2,
+          midIsDimmer:     dark[1] < open[1]-8,
+          farIsPitchBlack: dark[2] <= 1,
+          ok: Math.abs(dark[0]-open[0])<2 && dark[1]<open[1]-8 && dark[2]<=1};
 });
 
 await done(b, errs, R);

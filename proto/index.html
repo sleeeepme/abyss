@@ -1683,6 +1683,7 @@ const RARCOL = ['#c8ced9','#5b8dd6','#d6b34a','#d97a2b','#c4433f','#e8c95a'];
 const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
 const BASE_MOVE_SPEED = 4.125;
+const EVADE_CAP = 60;      // 回避率の上限。ここを超えると当たらない相手になる
 const SLOTNM = {weapon:'武器', shield:'盾', armor:'防具', accessory:'装飾品'};
 const baseOf = it => BASES.find(b=>b.id===it.base) || {};
 
@@ -1814,7 +1815,7 @@ function genBaseItem(baseId, ilvl, maxRar=1){
      blades 周回刃の本数 */
 const LEGEND_RAR      = 5;
 const LEGEND_ILVL     = 55;    // 赤の+10と並べるための基準の深さ
-const LEGEND_ATK_MUL  = 2.6;   // 赤+10（≒1.7倍）より確実に上へ置くための係数
+const LEGEND_ATK_MUL  = 2.08;  // 赤+10（≒1.7倍）より上へ置く係数。強すぎたので2割下げた
 const LEGEND_DROP_FROM = 40;   // この階から落ち始める
 const LEGEND_DROP_RATE = 0.01; // 黄色個体1体につき1%
 const LEGEND_ORE       = 'tama';
@@ -1824,8 +1825,8 @@ const TAMA_RATE        = 0.12; // 最深部の苔玉1体につき
 const LEGENDS=[
   /* ---------- 剣 ---------- */
   {id:'levantine', nm:'レヴァンテイン', base:'sword',
-   desc:'魔法属性。槍と同じ間合いで薙ぐ',
-   shape:{dt:'arcane', reach:2.30}},
+   desc:'魔法属性。槍と同じ間合い。眷属が1体増え、攻撃速度 +10%',
+   shape:{dt:'arcane', reach:2.30}, ap:a=>{ a.aspdPct+=10; }, kin:1},
   {id:'kingsword', nm:'キングスソード', base:'sword',
    desc:'斬撃の扇状の衝撃波を放つ',
    wave:{shape:'cone', dt:'slash', mult:0.55, r:3.6, arc:70}},
@@ -1846,11 +1847,11 @@ const LEGENDS=[
 
   /* ---------- 短剣 ---------- */
   {id:'gengmu', nm:'幻夢', base:'dagger',
-   desc:'回避率 +30%',
-   ap:a=>{ a.evade+=30; }},
+   desc:'回避率 +50%',
+   ap:a=>{ a.evade+=50; }},
   {id:'gladius', nm:'グラディウス', base:'dagger',
-   desc:'一度の attack が3撃になる。炎属性',
-   shape:{dt:'fire'}, hits:3},
+   desc:'一度の攻撃が2撃になる。炎属性（1撃あたりの威力は半分）',
+   shape:{dt:'fire'}, hits:2, atkMul:0.5},
   {id:'dagger', nm:'ダガー', base:'dagger',
    desc:'周回刃が3つ。攻撃速度 +15%',
    ap:a=>{ a.aspdPct+=15; }, blades:3},
@@ -1860,16 +1861,16 @@ const LEGENDS=[
    desc:'炎属性。線状の炎の衝撃波を放つ',
    shape:{dt:'fire'}, wave:{shape:'line', dt:'fire', mult:0.60, r:6.5, wide:0.8}},
   {id:'javelin', nm:'ジャベリン', base:'spear',
-   desc:'一度の攻撃が2撃になる',
-   hits:2},
+   desc:'一度の攻撃が2撃になる（1撃あたりの威力は半分）',
+   hits:2, atkMul:0.5},
   {id:'longinus', nm:'ロンギヌス', base:'spear',
    desc:'弓と同じ間合い。HPが回復し続ける',
    shape:{reach:5.8}, regen:0.9},
 
   /* ---------- 斧 ---------- */
   {id:'hien', nm:'飛燕', base:'axe',
-   desc:'攻撃回数 +2',
-   hits:3},
+   desc:'攻撃回数 +2（1撃あたりの威力は半分）',
+   hits:3, atkMul:0.5},
   {id:'bloodaxe', nm:'ブラッドアクス', base:'axe',
    desc:'与えた傷の 30% を吸う',
    ap:a=>{ a.leech+=30; }},
@@ -1891,8 +1892,8 @@ const LEGENDS=[
 
   /* ---------- 弓 ---------- */
   {id:'themis', nm:'テミスの弓', base:'bow',
-   desc:'魔法属性。3方向へ射る',
-   shape:{dt:'arcane'}, spread:[-0.26, 0, 0.26]},
+   desc:'魔法属性。3方向へ射る（1本あたりの威力は1/3）',
+   shape:{dt:'arcane'}, spread:[-0.26, 0, 0.26], shotMul:1/3},
   {id:'yoichi', nm:'与一の弓', base:'bow',
    desc:'射程と攻撃速度 +15%',
    ap:a=>{ a.rangePct+=15; a.aspdPct+=15; }},
@@ -1903,12 +1904,14 @@ const LEGENDS=[
 
   /* ---------- 杖 ---------- */
   {id:'cambantein', nm:'カンバンテイン', base:'staff',
-   desc:'3方向へ撃ち、それぞれ別の属性が乗る',
-   spread:[-0.30, 0, 0.30], randElem:14},
+   desc:'3方向へ撃ち、それぞれ別の属性が乗る（1発あたりの威力は1/3）',
+   spread:[-0.30, 0, 0.30], randElem:14, shotMul:1/3},
+  /* 扇ではなく**全周**。arc は「中心からの片側の角度」なので、
+     360度＝180 と書く（剣の 75 は ±75＝150度ぶん）。 */
   {id:'koumastaff', nm:'光魔の杖', base:'staff',
-   desc:'剣と同じ間合いと速さで振る。魔法属性。攻撃力 +25%',
-   shape:{reach:1.45, arc:75, spd:1.00, proj:null, dt:'arcane'},
-   ap:a=>{ a.dmgPct+=25; }},
+   desc:'自分の周り全方位を薙ぐ。魔法属性。攻撃力 +25% / 攻撃速度 +25%',
+   shape:{reach:1.45, arc:180, spd:1.00, proj:null, dt:'arcane'},
+   ap:a=>{ a.dmgPct+=25; a.aspdPct+=25; }},
   {id:'sagestaff', nm:'賢者の杖', base:'staff',
    desc:'近くの味方の攻撃力と防御力 +15%',
    aura:{atk:15, dr:15}},
@@ -1927,7 +1930,9 @@ function makeLegend(id){
   const it = {uid:(genItem._n=(genItem._n||0)+1), base:base.id, nm:L.nm, slot:base.slot,
               ilvl:LEGEND_ILVL, rar:LEGEND_RAR, ident:true, aff:[], legend:L.id};
   const mid = (base.atk[0]+base.atk[1])/2;
-  it.atk = Math.round(mid * scaleOf(LEGEND_ILVL) * LEGEND_ATK_MUL);
+  /* 多段（グラディウス・ジャベリン・飛燕）は1撃あたりを下げる。
+     回数だけ増やすと、同じ枠の他の武器が誰にも選ばれなくなる。 */
+  it.atk = Math.round(mid * scaleOf(LEGEND_ILVL) * LEGEND_ATK_MUL * (L.atkMul||1));
   it.spd = (base.spd||1) * ((L.shape && L.shape.spdMul) || 1);
   // 耐久を持たない＝壊れない。durMax が無ければ damageGear も修理も素通りする。
   return it;
@@ -2579,11 +2584,14 @@ const TRIAL_SPAWN_MIN = 5.5;    // 湧く距離（近すぎると理不尽にな
 const TRIAL_SPAWN_MAX = 9.0;
 /* 枷は5種。どれも「戦い方を変えさせる」物にしてある——
    ただ弱くするだけの枷は、耐える時間が延びるだけで判断が増えない。 */
+/* 暗幕の見え方。層ごとの明かりに関係なく、この2つの距離だけで決まる。 */
+const BLIND_CLEAR = 3;   // ここまでは今までどおり見える
+const BLIND_DARK  = 7;   // ここから先は完全な闇
 const TRIAL_BANES=[
   {id:'heavy',  nm:'重圧',   desc:'移動速度 -30%',        ms:-30},
   {id:'dull',   nm:'鈍化',   desc:'攻撃速度 -30%',        aspd:-30},
   {id:'frail',  nm:'脆弱',   desc:'被ダメージ +35%',      dmgTaken:35},
-  {id:'blind',  nm:'暗幕',   desc:'明かりが届く距離 -45%（遠くの敵は見えなくなる）', sight:0.55},
+  {id:'blind',  nm:'暗幕',   desc:'3マスの先から暗くなり、7マスの先は何も見えない', sight:0.55},
   {id:'silent', nm:'封技',   desc:'大技が使えない',       silence:true},
 ];
 function trialBaneDef(id){ return TRIAL_BANES.find(b=>b.id===id); }
@@ -3142,9 +3150,14 @@ function boonAtCap(id){
    威力はその1体を連れてきた恩寵のレア度から引く。 */
 function kinOf(h){
   if(!h || !h.boons) return [];
-  return h.boons.filter(x=>x.id==='kin')
-                .slice(0, KIN_MAX)
-                .map(x=>boonValue('kin', x.rar));
+  const out = h.boons.filter(x=>x.id==='kin').map(x=>boonValue('kin', x.rar));
+  /* レヴァンテインは、それ1本で眷属を1体連れてくる。
+     恩寵で増やすのと同じ枠に入れるので、上限（KIN_MAX）も同じように効く。
+     威力は恩寵の一番下と同じ——武器で無条件に付く分を、
+     引き当てた恩寵より強くはしない。 */
+  const LG = legendDef(h.equip && h.equip.weapon);
+  if(LG && LG.kin) for(let i=0;i<LG.kin;i++) out.push(boonDef('kin').v[0]);
+  return out.slice(0, KIN_MAX);
 }
 function kinCount(h){ return kinOf(h).length; }
 function boonValue(id, rar){ return boonDef(id).v[BOON_RAR_I[rar]||0]; }
@@ -4658,7 +4671,11 @@ function stats(h){
     hasShield, block, parryWin,
     /* 回避率。上限を置いてあるのは、装備を積むだけで無敵になる道を潰すため。
        「たまに当たらない」は気持ちよく、「ほとんど当たらない」は緊張を殺す。 */
-    evade: clamp(a.evade + (h===S.hero ? relicSum('evade') : 0), 0, 40),
+    /* 回避の上限。40 のままだと幻夢（短剣7＋50＝57）が丸ごと飲まれて、
+       **+50% と書いてあるのに何も変わらない**——書いたとおりに効かない数字は
+       置かないほうがまだ良い。避けきりを許さないための蓋なので、
+       「たまに素通りする」の範囲に収まる 60 まで開ける。 */
+    evade: clamp(a.evade + (h===S.hero ? relicSum('evade') : 0), 0, EVADE_CAP),
     leech: a.leech + B('leech'),
     mf:a.mf + U('mf')*12 + C('mf') + B('mf')
        + (h===S.hero ? curseBonus().mf + relicSum('mf') : 0),
@@ -6147,15 +6164,19 @@ function enterFloor(depth){
   /* 層が切り替わったときだけ名前を大きく出す（10階層ごと）。
      地名を持つ階（51階＝アビスの口）は、層ではなくその1階の名前を出す——
      ここは層の続きではなく、たどり着いた場所だから。 */
+  /* 層が変わったことは**ログの1行だけ**で伝える。
+     以前は画面中央に大きく層名と一文を出していたが、降りるたびに
+     操作を止めて読ませる文章が挟まるのは、道中のテンポをそのぶん削る。
+     地名を持つ階（51階＝アビスの口）だけは、たどり着いた事実そのものが
+     区切りなので、そこだけバナーを残してある。 */
   const pl = floorPlace(depth);
   const z = fl.zone;
   if(pl){
     S.run.zoneId = z ? z.id : S.run.zoneId;
-    showBanner(pl.nm, pl.sub, pl.accent, 3.4);
+    showBanner(pl.nm, '', pl.accent, 2.6);
     log('── '+pl.nm+' ──');
   }else if(z && z.id !== S.run.zoneId){
     S.run.zoneId = z.id;
-    showZoneBanner(z);
     log('── '+z.nm+' ──');
   }
 
@@ -6553,9 +6574,11 @@ function legendWave(st, ang){
     });
 
   }else{                                      // cone：キングスソード／ムーンライト
+    /* 扇は専用のエフェクトで描く。ここで通常の swing を流用していたころは、
+       ただの空振りと見分けが付かず、**衝撃波が出ていることに気付けなかった。**
+       広がる帯として描けば、届く範囲もそのまま目で読める。 */
     const r=w.r, half=(w.arc||70)*Math.PI/180/2;
-    W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:0.22, max:0.22, r, arc:half,
-               dt, elem:dt, self:true});
+    W.fx.push({t:'lwave', x:P.x, y:P.y, a:ang, life:0.34, max:0.34, r, arc:half, dt});
     nearEnemies(P.x,P.y,r+1).forEach(e=>{
       if(e.dead) return;
       const dx=e.x-P.x, dy=e.y-P.y;
@@ -6620,7 +6643,10 @@ function playerAttack(){
     const sp=legendSpread(st);
     if(sp){
       const els=['fire','shock','frost'];
-      sp.forEach(o=>shot(o, 1, (LG && LG.randElem) ? {type:pick(els), amount:LG.randElem} : null));
+      /* 3方向に増えたぶん、1本あたりを下げる（shotMul）。
+         等倍のまま本数だけ増やすと、同じ弓の枠で他の2本が選ばれなくなる。 */
+      const sm=(LG && LG.shotMul) || 1;
+      sp.forEach(o=>shot(o, sm, (LG && LG.randElem) ? {type:pick(els), amount:LG.randElem} : null));
       legendWave(st, ang);
       return;
     }
@@ -8077,10 +8103,8 @@ function bossRage(e){
        「激昂＝HP半分」という既存の節目にそのまま乗せる。
        予兆は出さない代わり、単発の大きさに留めて即死にはしない。 */
     if(e.uniqueBoss===FINAL_DEPTH){
-      if(e.revealed){
-        log(e.name+'——全体を巻き込む一撃');
-        showBanner(e.name, '一帯を巻き込む大技を放った', '#c98adf', 2.6);
-      }
+      // 何が起きたかはログの1行で足りる。画面を覆う文章は挟まない。
+      if(e.revealed) log(e.name+'——全体を巻き込む一撃');
       W.fx.push({t:'shock', x:e.x, y:e.y, r:40, life:0.5, max:0.5, col:'#c98adf'});
       aoeTargets().forEach(t=>aoeHit(e, t, 1.8));
     }
@@ -8228,7 +8252,7 @@ function finalBossTick(e, dt){
     spawnFinalMirrors(e, 3, null);
     if(e.revealed){
       log(e.name+'——常に4人になって攻撃してくる');
-      showBanner(e.name, '幻が本体から離れなくなった。全員が同じように攻撃してくる', '#c98adf', 3.0);
+      log(e.name+'——幻が本体から離れなくなった');
     }
   }
   if(!e.fleePhase && e.hp <= e.maxHp*0.10){
@@ -8239,7 +8263,7 @@ function finalBossTick(e, dt){
     e.fleeing = true;
     if(e.revealed){
       log(e.name+'——本体だけが残り、逃げながら遠距離に切り替えた');
-      showBanner(e.name, '幻を捨てて逃げに転じた。近づけない相手になる', '#c98adf', 3.0);
+      log(e.name+'——幻を捨てて逃げに転じた');
     }
   }
 }
@@ -9849,9 +9873,14 @@ function draw(){
      見える範囲を狭めるなら、狭めるべきは**実際に描く明かりの距離**のほう。
      併せて奥の下限も落とす。下限 0.34 のままだと、範囲を縮めても遠くが
      「少し暗いがはっきり見える」ままで、やはり効いて見えない。 */
-  const sightMul = baneMul('sight',1);
-  const lightR   = Z.lightR * sightMul;
-  const litFloor = sightMul<1 ? 0.10 : 0.34;
+  /* 暗幕は層の明かり（lightR）を割るのではなく、**距離そのもの**で決める。
+     割り算にしていたころは、層ごとに効き目がばらばらで
+     （白の層は lightR:44 なので実質ほぼ無効）、掛かっていても分からなかった。
+     3マスまでは今までどおり見え、そこから7マスへ向けて落ち、7マスで完全な闇。 */
+  const sightMul  = baneMul('sight',1);
+  const blinded   = sightMul<1;
+  const lightR    = Z.lightR;
+  const litFloor  = 0.34;
   const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
   const x0=Math.max(0,Math.floor(camX/TS)-1), x1=Math.min(f.W-1,Math.ceil((camX+innerWidth)/TS));
   const y0=Math.max(0,Math.floor(camY/TS)-1), y1=Math.min(f.H-1,Math.ceil((camY+innerHeight)/TS));
@@ -9861,7 +9890,11 @@ function draw(){
     const dist=Math.hypot(x+0.5-P.x,y+0.5-P.y);
     // 明かりの届く距離も層ごと。白の層だけ極端に広い——手前と奥が同じ明るさになり、
     // 「距離が測れない」が色ではなく光で出る。
-    const lit=clamp(1.3-dist/lightR,litFloor,1);
+    const lit = blinded
+      ? (dist<=BLIND_CLEAR ? 1
+         : dist>=BLIND_DARK ? 0
+         : 1 - (dist-BLIND_CLEAR)/(BLIND_DARK-BLIND_CLEAR))
+      : clamp(1.3-dist/lightR, litFloor, 1);
     const sx=x*TS-camX, sy=y*TS-camY;
     if(t===T.WALL){ ctx.fillStyle=shade(Z.wall,lit*dim); }
     /* 縁の向こうは空が見えている、という扱いにする。壁と同じ暗さで塗ると
@@ -10041,7 +10074,7 @@ function draw(){
        ボスだけは残す——画面の主役が消えるのは事故と区別が付かない。
        予兆リングは lurk と同じ扱いで、見えない相手のぶんも出す
        （避けようのない攻撃にはしない）。 */
-    if(sightMul<1 && !e.boss && !e.dead && Math.hypot(e.x-P.x, e.y-P.y) > lightR*0.75){
+    if(blinded && !e.boss && !e.dead && Math.hypot(e.x-P.x, e.y-P.y) >= BLIND_DARK){
       if(e.tele>0){
         const p=1-e.tele/e.arch.tele;
         ctx.strokeStyle='rgba(255,110,80,'+(0.30+p*0.45)+')'; ctx.lineWidth=2+p*3;
@@ -10572,6 +10605,37 @@ function draw(){
       ctx.stroke();
       ctx.restore();
     }
+    /* レジェンドの扇状の衝撃波。通常の斬撃（swing）とは別の絵にしてある——
+       同じ形で描くと空振りと区別が付かず、出ていることに気付けない。
+       ・内側から外へ広がる（放った物だと分かる）
+       ・先端に白い帯を重ねる（どこまで届いたかが読める）
+       ・両脇に縁の線を引く（当たる角度がそのまま見える） */
+    if(f.t==='lwave'){
+      const k=clamp(1-f.life/f.max, 0, 1);      // 0→1。負の半径で arc() が投げるので丸める
+      const fade=1-k;
+      const sx=f.x*TS-camX, sy=f.y*TS-camY;
+      const col=(DTYPE[f.dt]||DTYPE.slash).col;
+      const R=Math.max(0, f.r*TS*(0.30+k*0.80));
+      const a0=f.a-f.arc, a1=f.a+f.arc;
+      ctx.save();
+      // 内側の塗り
+      ctx.fillStyle=rgba(col, 0.22*fade);
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.arc(sx,sy,R,a0,a1); ctx.closePath(); ctx.fill();
+      // 先端の帯（本体）
+      ctx.lineCap='round';
+      ctx.strokeStyle=rgba(col, 0.95*fade); ctx.lineWidth=TS*0.20;
+      ctx.beginPath(); ctx.arc(sx,sy,R,a0,a1); ctx.stroke();
+      // 先端の白。ここが「今どこまで来たか」の芯になる
+      ctx.strokeStyle=rgba('#ffffff', 0.65*fade); ctx.lineWidth=TS*0.07;
+      ctx.beginPath(); ctx.arc(sx,sy,R*0.99,a0,a1); ctx.stroke();
+      // 当たる角度の縁
+      ctx.strokeStyle=rgba(col, 0.55*fade); ctx.lineWidth=TS*0.05;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy); ctx.lineTo(sx+Math.cos(a0)*R, sy+Math.sin(a0)*R);
+      ctx.moveTo(sx,sy); ctx.lineTo(sx+Math.cos(a1)*R, sy+Math.sin(a1)*R);
+      ctx.stroke();
+      ctx.restore();
+    }
     if(f.t==='ultring'){       // 震撼・守護：広がる輪
       /* life は「減らしてから、同じフレームで描いて、最後に捨てる」順で回るので、
          描く瞬間だけ負になっていることがある。そのまま半径にすると
@@ -10832,7 +10896,8 @@ let _banner=null;   // {title, sub, col, t, max}
 function showBanner(title, sub, col, secs){
   _banner={title, sub:sub||'', col:col||'#cfd6e4', t:secs||3.0, max:secs||3.0};
 }
-function showZoneBanner(Z){ showBanner(Z.nm, Z.sub, Z.accent, 3.4); }
+/* 層のバナーは廃止（降りるたびに読ませる文章が挟まると道中が止まる）。
+   層が変わったことは enterFloor のログ1行で伝えている。 */
 function drawBanner(){
   if(!_banner) return;
   _banner.t -= _drawDt;

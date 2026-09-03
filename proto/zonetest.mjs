@@ -163,22 +163,32 @@ R.noEarlyUnlock = await pg.evaluate(()=>{
 /* ============ 4. 見せ方 ============ */
 
 // 4-a. 層が変わった階でだけバナーが出る
+/* 層が変わったことは**ログの1行**で伝える。
+   以前は画面中央のバナーで層名と一文を出していたが、降りるたびに
+   読ませる文章が挟まってテンポを削るのでやめた（バナー自体は
+   装備の破損など「止めて伝えるべき事」のために残っている）。 */
 R.banner = await pg.evaluate(()=>{
-  // バナーは層の切り替わりと装備の破損で共用（_banner）
   S.hero=newHero(); S.upg={hp:8}; startRun(1);
-  const first=!!_banner;                  // 第1階層に入った時点で出る
-  _banner=null;
+  const zoneLine=()=>logs.filter(l=>/^── /.test(l)).length;
+  logs.length=0;
   enterFloor(2);
-  const sameZone=!!_banner;               // 同じ層なので出ない
+  const sameZone=zoneLine();              // 同じ層なので増えない
   enterFloor(11);
-  const newZone=!!_banner;                // 層が変わったので出る
-  const title=_banner? _banner.title : null;
-  _banner=null;
+  const newZone=zoneLine();               // 層が変わったので1行増える
+  const line=logs.filter(l=>/^── /.test(l)).pop() || '';
+  logs.length=0;
   enterFloor(12);
-  const stillSame=!!_banner;
-  return {first, sameZone, newZone, bannerTitle:title, stillSame,
-          titleIsZoneName: title===zoneAt(11).nm,
-          onlyOnZoneChange: first && !sameZone && newZone && !stillSame};
+  const stillSame=zoneLine();
+  _banner=null;
+  enterFloor(21);
+  const noBanner=_banner;
+  return {sameZone, newZone, line, stillSame,
+          quietWithinZone:  sameZone===0,
+          announcesNewZone: newZone===1,
+          namesTheZone:     line.includes(zoneAt(11).nm),
+          quietAgainAfter:  stillSame===0,
+          noBannerAnyMore:  noBanner===null,
+          onlyOnZoneChange: sameZone===0 && newZone===1 && stillSame===0};
 });
 
 // 4-b. HUD と階段ダイアログに層の名前が出る
