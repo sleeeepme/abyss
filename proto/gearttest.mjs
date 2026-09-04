@@ -259,7 +259,7 @@ R.tieredNaming = await pg.evaluate(()=>{
               && commonUnchanged && risesInGrandeur && !!prefixed && !!legendUnaffected};
 });
 
-// --- 13. 10層まではドロップの色が制限される（青は半分、黄以上は封印）
+// --- 13. 10層まではドロップの色が制限される（青は STONE_MAGIC_MUL 倍、黄以上は封印）
 R.lowDepthRarityCap = await pg.evaluate(()=>{
   const N=6000;
   const sample=(ilvl,depth)=>{
@@ -272,21 +272,21 @@ R.lowDepthRarityCap = await pg.evaluate(()=>{
   RNG=mulberry32(42);
   const ungated = sample(10, undefined); // depth省略＝今まで通り
   RNG=mulberry32(42);
-  const beyond = sample(10, 11);         // 11層（>10）は制限なし
+  const beyond = sample(10, 25);         // 25層（>20）は制限なし
   const gatedRarePlus = gated[2]+gated[3]+gated[4];
   const ungatedRarePlus = ungated[2]+ungated[3]+ungated[4];
   const beyondRarePlus = beyond[2]+beyond[3]+beyond[4];
   const gatedMagicShare = gated[1]/N, ungatedMagicShare = ungated[1]/N;
-  // 生の重みは「青半分・黄以上ゼロ」だが、母数が縮む分だけ正規化後の割合は
-  // 単純な半分にはならない——実装と同じ式で解析的に期待値を出して比べる。
+  // 生の重みは「青は STONE_MAGIC_MUL 倍・黄以上ゼロ」だが、母数が縮む分だけ
+  // 正規化後の割合は単純な掛け算にはならない——実装と同じ式で解析的に期待値を出して比べる。
   const boost = 1 + 0/100 + 10*0.004;
   const wCommon=60, wMagic=28*boost, wRare=10*boost, wUniq=1.8*boost, wRelic=0.2*boost;
   const ungatedTot = wCommon+wMagic+wRare+wUniq+wRelic;
-  const gatedTot = wCommon + wMagic*0.5;
-  const expectedGatedMagicShare = (wMagic*0.5)/gatedTot;
+  const gatedTot = wCommon + wMagic*STONE_MAGIC_MUL;
+  const expectedGatedMagicShare = (wMagic*STONE_MAGIC_MUL)/gatedTot;
   const expectedUngatedMagicShare = wMagic/ungatedTot;
   const closeEnough=(got,expect)=>Math.abs(got-expect)<0.03;   // N=6000での統計誤差ぶんの余裕
-  return {gated, ungated, beyond,
+  return {gated, ungated, beyond, mul:STONE_MAGIC_MUL,
           gatedRarePlus, ungatedRarePlus, beyondRarePlus,
           gatedMagicShare:+gatedMagicShare.toFixed(3), ungatedMagicShare:+ungatedMagicShare.toFixed(3),
           expectedGatedMagicShare:+expectedGatedMagicShare.toFixed(3),
@@ -299,6 +299,50 @@ R.lowDepthRarityCap = await pg.evaluate(()=>{
           ok: gatedRarePlus===0 && ungatedRarePlus>0 && beyondRarePlus>0
               && closeEnough(gatedMagicShare, expectedGatedMagicShare)
               && closeEnough(ungatedMagicShare, expectedUngatedMagicShare)};
+});
+
+// --- 13b. 11〜20層（水の層）は紫以上は野放しのまま、黄(Rare)だけ SUMP_RARE_MUL で絞る。
+//          狙いは「水の層の黄ドロップ率 ≒ 石の層の青ドロップ率」で、階層帯を跨いでも
+//          体感の希少さが揃うこと。
+R.sumpRarityGate = await pg.evaluate(()=>{
+  const N=6000;
+  const sample=(ilvl,depth)=>{
+    const counts={0:0,1:0,2:0,3:0,4:0};
+    for(let i=0;i<N;i++){ const r=rollRarity(ilvl, 0, depth); counts[r.id]++; }
+    return counts;
+  };
+  RNG=mulberry32(7);
+  const stone = sample(8, 8);    // 石の層・8層
+  RNG=mulberry32(7);
+  const sump  = sample(18, 18);  // 水の層・18層
+  RNG=mulberry32(7);
+  const beyond= sample(18, 25);  // 21層以降は Rare も野放し
+
+  const stoneMagicShare = stone[1]/N;
+  const sumpRareShare   = sump[2]/N;
+  const sumpUniqPlus    = sump[3]+sump[4];
+  const beyondUniqPlus  = beyond[3]+beyond[4];
+
+  // 解析式で期待値を出す（Common:60, Magic:自然重み, Rare: *SUMP_RARE_MUL）
+  const boostStone = 1+8*0.004, boostSump = 1+18*0.004;
+  const stoneTot = 60 + 28*boostStone*STONE_MAGIC_MUL;
+  const expectedStoneMagicShare = (28*boostStone*STONE_MAGIC_MUL)/stoneTot;
+  const sumpTot = 60 + 28*boostSump + 10*boostSump*SUMP_RARE_MUL + 1.8*boostSump + 0.2*boostSump;
+  const expectedSumpRareShare = (10*boostSump*SUMP_RARE_MUL)/sumpTot;
+  const closeEnough=(got,expect,tol)=>Math.abs(got-expect)<tol;
+
+  return {stoneMagicShare:+stoneMagicShare.toFixed(3), sumpRareShare:+sumpRareShare.toFixed(3),
+          expectedStoneMagicShare:+expectedStoneMagicShare.toFixed(3),
+          expectedSumpRareShare:+expectedSumpRareShare.toFixed(3),
+          sumpUniqPlus, beyondUniqPlus,
+          matchesFormula: closeEnough(sumpRareShare, expectedSumpRareShare, 0.03),
+          // 「水の黄 ≒ 石の青」——ぴったり一致ではなく、体感が揃う程度の近さでよい
+          balancedAcrossZones: closeEnough(sumpRareShare, stoneMagicShare, 0.035),
+          uniqPlusNotBlockedInSump: sumpUniqPlus>0,
+          uniqPlusExistsBeyond: beyondUniqPlus>0,
+          ok: closeEnough(sumpRareShare, expectedSumpRareShare, 0.03)
+              && closeEnough(sumpRareShare, stoneMagicShare, 0.035)
+              && sumpUniqPlus>0 && beyondUniqPlus>0};
 });
 
 // --- 14. 重装鎧は移動速度・攻撃速度の両方が下がる

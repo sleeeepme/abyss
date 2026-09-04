@@ -162,27 +162,25 @@ R.dpsTable = await pg.evaluate(()=>{
 
 /* ============ 4. 見え方 ============ */
 
-// 4-a. HUD に今の撃ち方と倍率が出る（弓のときだけ）
+// 4-a. HUD の表記は廃止済み。飛び道具でも近接でも #foottag は常に隠す
+//      （倍率そのものは 2-a/2-b/3 が実ダメージで検証している）。
 R.hud = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(10); S.hero.party=[];
   const dummy=mkDummy(P.x+2, P.y);
   W.enemies=[dummy];
-  const read=(w,mvx,mvy,moving)=>{
+  const hiddenAfter=(w,mvx,mvy,moving)=>{
     S.hero.equip.weapon=genBaseItem(w,10,0);
     P.target=dummy; P.mvx=mvx; P.mvy=mvy; P.moving=moving;
     updateHUD();
     const el2=document.getElementById('foottag');
-    return {shown:el2.style.display==='block', text:el2.textContent};
+    return el2.style.display!=='block';
   };
-  const kite=read('bow',-1,0,true);
-  const still=read('bow',0,0,false);
-  const melee=read('sword',-1,0,true);
-  return {kite, still, melee,
-          showsForRanged: kite.shown && still.shown,
-          hiddenForMelee: !melee.shown,
-          saysKite: kite.text.includes('引き撃ち'),
-          saysPercent: /威力 \d+%/.test(kite.text),
-          saysFull: still.text.includes('満額')};
+  const rangedKiteHidden  = hiddenAfter('bow',-1,0,true);
+  const rangedStillHidden = hiddenAfter('bow',0,0,false);
+  const meleeHidden       = hiddenAfter('sword',-1,0,true);
+  return {rangedKiteHidden, rangedStillHidden, meleeHidden,
+          alwaysHidden: rangedKiteHidden && rangedStillHidden && meleeHidden,
+          ok: rangedKiteHidden && rangedStillHidden && meleeHidden};
 });
 
 // 4-b. 減衰した一撃はダメージ表示に「↓」が付く

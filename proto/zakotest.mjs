@@ -31,7 +31,7 @@ R.traitGrid = await pg.evaluate(()=>{
               && new Set(sigs).size>=5};
 });
 
-// 1-b. 実際に湧いた敵に癖が乗る。全員ではなく一部だけ。名前で予告する。
+// 1-b. 実際に湧いた敵に癖が乗る。全員ではなく一部だけ。表記では予告しない。
 R.traitsOnSpawn = await pg.evaluate(()=>{
   let total=0, withTrait=0;
   const kinds={}, names=[];
@@ -53,16 +53,17 @@ R.traitsOnSpawn = await pg.evaluate(()=>{
     }
   }
   const share=withTrait/Math.max(1,total);
-  const named=names.filter(n=>/^(跳ぶ|退く|弾ける)/.test(n));
+  // 表記は出さない方針（挙動だけ乗る）。名前に癖の接頭辞が紛れ込んでいないか確認する。
+  const tagged=names.filter(n=>/^(跳ぶ|退く|弾ける)/.test(n));
   return {total, withTrait, share:+share.toFixed(3), kinds, names,
           wanted:ZAKO_TRAIT_SHARE, offGrid:badArch.length,
           someHaveTraits: withTrait>0,
           notEveryone:    share < 0.5,
           followsGrid:    badArch.length===0,
-          namesWarn:      names.length>0 && named.length===names.length,
+          noNameTell:     tagged.length===0,
           severalKinds:   Object.keys(kinds).length>=2,
           ok: withTrait>0 && share<0.5 && badArch.length===0
-              && named.length===names.length && Object.keys(kinds).length>=2};
+              && tagged.length===0 && Object.keys(kinds).length>=2};
 });
 
 // 1-c. 精鋭・規格外・ボス・苔玉には癖を足さない（性質が重なって読めなくなる）

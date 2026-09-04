@@ -80,7 +80,7 @@ export async function install(pg){
       ally(depth, job, lv){
         const a=makeAlly(depth, S.hero);
         a.boons=[];
-        if(job) a.job=job;
+        if(job){ a.job=job; a.artVariant=pickAllyVariant(job); }   // 職を差し替えたら見た目の抽選もやり直す
         if(lv!=null){ a.lv=lv; a.str=5+lv-1; a.dex=5+lv-1; a.vit=5+lv-1; }
         a.hpNow=allyStats(a).maxHp;
         return a;

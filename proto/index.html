@@ -1716,18 +1716,30 @@ const baseOf = it => BASES.find(b=>b.id===it.base) || {};
 const scaleOf = ilvl => 1 + Math.sqrt(Math.max(0,ilvl-1)) * 0.42;
 
 /* 序盤（10階まで）は青(Magic)を出にくくし、黄(Rare)以上は封じる。
+   11〜20階（水の層）は黄(Rare)も同じ考え方で絞る——石の層の青と
+   同じくらいの体感になるよう倍率を逆算してある（紫以上はここでは絞らない）。
    depth は「実際に今いる階層」——ilvl はオフセット込みで先の階の値を
    使う呼び出しが多く、そのままでは境界がぶれるので別引数にしてある。
    depth が渡されない呼び出し（店・ガチャ・鍛冶の練り直し等）は今まで通り無制限。 */
-const LOWDEPTH_RARITY_CAP = 10;
+const LOWDEPTH_RARITY_CAP = 10;   // 石の層: これ以下は黄(Rare)以上を完全に封じる
+const MIDDEPTH_RARITY_CAP = 20;   // 水の層: これ以下は紫(Unique)以上を完全に封じる
+/* 石の層(1-10)の青(Magic)倍率。以前の 0.5 をさらに1/3に絞った値。
+   10階までの間に2〜3個ほど出るのを狙っている。 */
+const STONE_MAGIC_MUL = 1/6;
+/* 水の層(11-20)の黄(Rare)倍率。石の層の青ドロップ率とだいたい釣り合うよう
+   逆算した値（Common:60, Magic:28 は素の重みのまま、Rare だけここで絞る）。 */
+const SUMP_RARE_MUL = 0.68;
 function rollRarity(ilvl, mf, depth){
   const boost = 1 + mf/100 + ilvl*0.004;
-  const gated = depth!==undefined && depth<=LOWDEPTH_RARITY_CAP;
+  const stoneGate = depth!==undefined && depth<=LOWDEPTH_RARITY_CAP;
+  const sumpGate = depth!==undefined && depth>LOWDEPTH_RARITY_CAP && depth<=MIDDEPTH_RARITY_CAP;
   const w = RARITY.map(r => {
     let x = r.id===0 ? r.w : r.w*boost;
-    if(gated){
-      if(r.id===1) x *= 0.5;
+    if(stoneGate){
+      if(r.id===1) x *= STONE_MAGIC_MUL;
       if(r.id>=2) x = 0;
+    }else if(sumpGate){
+      if(r.id===2) x *= SUMP_RARE_MUL;
     }
     return x;
   });
@@ -3843,6 +3855,16 @@ function pickJob(){
 
 /* 主人公を基準に一段弱い仲間を作る。
    forceJob を渡すと抽選せずその職で作る（デバッグの「仲間を指定して追加」用）。 */
+/* 見た目のばらつき（1〜3体目の絵）を個体ごとに一度だけ抽選する。
+   毎回ランダムなので同じ職業の1人目が必ず同じ色にはならない。
+   ただし今生きている同職の仲間とは被らせない——「複数いるとき絵が重なる」を防ぐ。
+   3人を超えてなお同職が並ぶ（想定外）ときだけ、被り覚悟でランダムに振る。 */
+function pickAllyVariant(jobId){
+  if(!CharacterArt.variantJobs.has(jobId)) return 1;
+  const used=new Set(livingParty().filter(m=>m&&m.job===jobId).map(m=>m.artVariant||1));
+  const opts=[1,2,3].filter(v=>!used.has(v));
+  return opts.length ? pick(opts) : ri(1,3);
+}
 function makeAlly(depth, hero, forceJob){
   const job = forceJob || pickJob();
   // 酒場のレベルぶん、主人公とのレベル差が縮まる
@@ -3850,7 +3872,8 @@ function makeAlly(depth, hero, forceJob){
   const lv  = clamp(hero.lv - gap, 1, Math.max(1,hero.lv));
   const ilvl= clamp(Math.round(depth*0.8), 1, 60);
   const a = {
-    ally:true, uidA:(genItem._n=(genItem._n||0)+1), job:job.id, name:rollAllyName(), lv, xp:0,
+    ally:true, uidA:(genItem._n=(genItem._n||0)+1), job:job.id, artVariant:pickAllyVariant(job.id),
+    name:rollAllyName(), lv, xp:0,
     str:5+(lv-1), dex:5+(lv-1), vit:5+(lv-1), int:5,
     equip:{weapon:null, shield:null, armor:null, accessory:null},
     // 加入時に恩寵を持っていることがある（主人公のレベルで数もレア度も伸びる）
@@ -4393,7 +4416,7 @@ function gachaNextBand(){
 
 /* ---------- ステート ---------- */
 const S={
-  stash:[], legendStash:[], gold:0, deepest:1, deaths:0, runs:0,
+  stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1, deaths:0, runs:0,
   /* ---------- 生成の塩 ----------
      階層の生成は S.runs と depth だけを種にしていた。決定的なのは良い
      （同じ探索で同じ階へ戻れば同じ地形になる）が、**初回だけは誰がやっても
@@ -4587,6 +4610,8 @@ function newHero(){
           // 恩寵は死ぬまで残る（街に戻っても消えない）。
           // 祭壇があれば、前のキャラの恩寵をいくつか引き継いで生まれる。
           boons:(S.legacyBoons||[]).slice(),
+          // 見た目も新規ゲームのたびに抽選する（毎回同じ顔で始まらないように）
+          artKey: pick(CharacterArt.heroArtKeys),
           party:[]};   // 仲間も同じ。主人公が死ねば一緒に失われる
 }
 function xpNeed(lv){ return Math.round(18*Math.pow(lv,1.55)); }
@@ -5100,8 +5125,7 @@ function applyZoneTraits(e, fl, depth){
   if(!t) return;
   e.trait = id;
   e.traitCd = rf(1.0, 2.4);
-  // 名前で予告する。精鋭の接頭辞と同じ作法——見てから備えられる形にする。
-  e.name = t.nm + e.name;
+  // 表記は出さない。挙動そのものは変わらない——見た目で予告しない形にする。
 }
 /* 水の中にいるか。層に置いた水そのものを見る（別々に持つと必ずずれる）。 */
 function inWater(x,y){ const h=hazardAt(x,y); return !!(h && h.nm==='水'); }
@@ -5940,6 +5964,9 @@ function spawnNpc(fl, depth){
   a.npc = true;          // 加入前。倒れても「倒れた仲間」ではなく消滅する
   a.awake = false;       // まだ気づいていない（見られるまで戦わない）
   a.hpNow = allyStats(a).maxHp;
+  // 名前はここで確定させる。加入時にもう一度引き直すと、
+  // 出会ったときと加入後で名前が変わって見える事故になる。
+  uniqueAllyName(a);
   return a;
 }
 
@@ -7935,10 +7962,27 @@ function ownedLegends(){
   scan(S.grave && S.grave.items);
   return out;
 }
+/* ---------- 恒久記録 ----------
+   一度でも手に入れたレジェンドのIDだけを覚えている、リセットで消えない台帳。
+   「今どこかに持っているか」を見る ownedLegends() とは別物——
+   倉庫を全部売っても遺体が消えても、この記録だけは残る。 */
+function everOwnedLegends(){
+  const out=new Set();
+  (S.legendEverOwned||[]).forEach(id=>out.add(id));
+  return out;
+}
+function markLegendEverOwned(id){
+  if(!id) return;
+  S.legendEverOwned = S.legendEverOwned || [];
+  if(!S.legendEverOwned.includes(id)) S.legendEverOwned.push(id);
+}
 function rollNewLegend(){
-  const have=ownedLegends();
-  const pool=LEGENDS.filter(L=>!have.has(L.id));
-  return pool.length ? pick(pool).id : null;
+  const have=ownedLegends(), everHad=everOwnedLegends();
+  const pool=LEGENDS.filter(L=>!have.has(L.id) && !everHad.has(L.id));
+  if(!pool.length) return null;
+  const id=pick(pool).id;
+  markLegendEverOwned(id);
+  return id;
 }
 
 function enemyUpdate(e,dt){
@@ -9832,7 +9876,12 @@ function mossSpriteKey(e){ return (e && e.moss) ? (MOSS_SPRITE[e.moss]||null) : 
    この文字列を直接いじらない。 */
 const CharacterArt = (function(){
   const FILES={
-    'hero': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIElEQVR42u3YPQrCQBCG4dzENq1iIQgWiqVgrXZ2FoKFYOEt7GJl4xUET6AX8AzeQltnigxDom523w++apOQeYrNT5YRQgghhNSUVj56ffY87ZT2vh2L6vMBAACAsAfc9HJRC0APrKuPDw4EAAASA7AGtm74+biK1r0OAAAAhL3p3YqdqB7IWwAAAKDZL0ZekOg+jgAAIHKAyaIrut4PRb0vOtb5AAAAwG8HvByXotYNWQMdTjNRve49vnYgAABIHEAPbK17N8XVoF1afby+3tc3RQAASBzAuwnqWgMW876oXreupz+u/v4UAACAyACqglkAFoh1veB+oAAAAAClN+z9ePKeH9wfIgAAiBzAu+lVBQgOBAAAEgcghBBCSGPzBqBLOSQ/yzQ7AAAAAElFTkSuQmCC',
+    'hero_scout': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIElEQVR42u3YPQrCQBCG4dzENq1iIQgWiqVgrXZ2FoKFYOEt7GJl4xUET6AX8AzeQltnigxDom523w++apOQeYrNT5YRQgghhNSUVj56ffY87ZT2vh2L6vMBAACAsAfc9HJRC0APrKuPDw4EAAASA7AGtm74+biK1r0OAAAAhL3p3YqdqB7IWwAAAKDZL0ZekOg+jgAAIHKAyaIrut4PRb0vOtb5AAAAwG8HvByXotYNWQMdTjNRve49vnYgAABIHEAPbK17N8XVoF1afby+3tc3RQAASBzAuwnqWgMW876oXreupz+u/v4UAACAyACqglkAFoh1veB+oAAAAAClN+z9ePKeH9wfIgAAiBzAu+lVBQgOBAAAEgcghBBCSGPzBqBLOSQ/yzQ7AAAAAElFTkSuQmCC',
+    'hero_cartographer': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAGk2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMzoyNzoyMSswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjc1ZWE0MTVmLWU4OGEtNGMzYy1hYTU5LWY2ZjRhZThiZTY0OCI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6NzVlYTQxNWYtZTg4YS00YzNjLWFhNTktZjZmNGFlOGJlNjQ4IiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZmM5NDY4ZjctNmQzYi00NTk3LTlkYTUtNzZkNmIxMmM2NzljIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjUwOjAzKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8cmRmOmxpIHN0RXZ0OmFjdGlvbj0ic2F2ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6ZDQzM2JhZDctNTdlMC00NTA1LTlkN2EtZTU5MmIxMzhiODVkIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIzOjI3OjIxKzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIgc3RFdnQ6Y2hhbmdlZD0iLyIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz42QYXJAAACBklEQVR4nO3bv0pcQRQG8G8+h7yDNiaFREFchTRiTAIKvsK2CmGXILZBSCFi8gABYUUSy2hpJYJCIohdVkkgCRb+CegbBAmEK5ZnihmGu3GL7/66szNzZmCZ2Tvnsq4oCigjxBHiCHGEOEIcIY4Q51MdnHNZCfsHp8yDRY/7mzX+X/HAxBc/97MWkPtcQ4gjxBHifNkEqT0/NvE8Or59+MXET56Oh12KMmdCCiGOEEeI87kDcn/nP8yPmHh8YcnEXz8tRdtPNm1cq3f2TCDEEeIIcf5/T3DV/m7io/d2T4dS7Z1GiCPEEeJc6v6cqgekngvC+/3O64lovr6xYRPX6msmPv+x52Lrq+oBmQhxhDiX2jMPh6ZNh2bvmWlvXT+y/Wdemvh8dz2a/2SzEd3zqXzhXaA6AzIR4ghxPnfAszlb42u9vYzu0XAPb726MfEN/kT7p/KFNcO7cw0ZCHGEOEKc7/YCjr/9Dj4ZiPbfnrXfWW233PyEOEIcIc7nDjj4aN/lAfYukLLRXI53GHmH+0SII8QR4lxuTTCsAebe50cf95n4+NdVdP5UPaGqB5REiCPE+dwB4Z4L39eHFidPTdx4E6/phWfM2sqLYPxndBIhjhBHiPOdThi+N2ivnpW6O7RXN4L8tr0Fe2ZUNcFMhDhCnKv+NyiOEEeII8QR4ghx7PYCuu0WfnWVT3MwfiMAAAAASUVORK5CYII=',
+    'hero_salvager': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo0OToxNCswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOmFlZDNlYWZlLTg1YzctNDM5Ni1iYzYxLTIwZmRjNDM3NjQ0YiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6YWVkM2VhZmUtODVjNy00Mzk2LWJjNjEtMjBmZGM0Mzc2NDRiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4aU6IgAAACFUlEQVR4nO3bPUtcQRQG4Hderm0CkkiqaJHCENitxDbgkhT6B7SxESsrK/ML0lmIBBQbCZg/oOSDFQIWQVKEXQhukUKtgjEWsbRY63OEGYbZxcB7n+7sfN3mnDsz3A39fh/KCHGEOEJcleoQQihaYHxyJqvInPUOyxZ0UjWOEEeII8SFVI7k1gCf8529iazxzYXTgdaEugYkEOIIcaG0BqRy/ni/W/J8WN57EG1P1Yi6BiQQ4ghxIbcG5OZ88/WqiVfaj0y82brMau98Xo/WCF8T6hqQQIgjxFXDXuBP79zEm614f5/zw0aII8QR4qphLzD39ouJ99+8ivZ/PPk0671/etIOJfcXhDhCHCEupPbKE89bpsOHF7b92+9/Jt74Gz+/e8e7SyaeXtxBbL35nzau7wMKEeIIcSG3BsyOXUX7H1yMRtt9Tqf4nN9efWbi5fVfJq7vAzIR4ghxVekEY41x+0P72oSjUyMm3mrYvf7CQ/saXzs6cyvcmKjZfOnabQ3IRYgjxBHiqtIJLro+Z+P7gP8NIY4QR4irUh383voAM1lng48ri9HzftftExpun9DFeXT83fsE+M1/9L6AEEeII8RVuQN8TXjXQ/z7gc7X6Hw/3n8y81258XfO/9/t3v/J9HzRd4SEOEIcIS4M+jvB3DtDX1MGPV99J5hAiCPEhfp/g+IIcYQ4QhwhjhDH+36A+3YLI1u1G6K/klgAAAAASUVORK5CYII=',
+    'hero_minewalker': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA/0lEQVR42u3YIQ7CMBjF8d0ECZYAFkNIcAtXQCCWEBLUsgsgMATJCbgAhhNwArgCtxiO8D3R0gzRbv+XPNV1tD+xtGQZIYQQQsif0hvM6u9Wo76z1+XEVOcDAAAAaW9YN6h9VgvT5EAAAAAAs0DdwOtxM9Xnm44DAAAAcX8E7+fSVDcUWgAAACDtg1EoSOsuRwAA0DIAXeA435n6Dja+DfveBwAAAMS94fVqY3rYH53V56MDAQAAAAAAAAAAPr2Uc1MdL6ZDZ3W+jof+HgAAABDX3UCbb0/O+uYndxsEAICOA/gWnNw/QAAA0HGA0INOKEDT9wEAAACEEEIIIT/lDTJmB/U0xkSlAAAAAElFTkSuQmCC',
+    'hero_herbalist': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABIklEQVR42u3YLQ7CQBCG4d4ECYqEBIMAgyQoEASFQCFQCILgCgRbSTgFEtUTcASC4grFdiZkJ5t2m/68X/KpbifsI5pdoogQQgghpKB0etM02/5w7uxssRfV7wMAAAD12qD1XG9Y15oHAAAAVPujptd/Xg/Rop8DAAAA5QJYBxcNksRHUb0h3wIAAAD1Phj5gjTucgQAAA0HSJ430e87EbUOOhaANQ8AAACo1oZ1i14PAAAAlAuwmwzSbH1Buqut6Oh0dlavt4CCgwAAQMMB9IDNYeysXq9rbXgdX0UtAD1fr9eXLW8QAAAAwAlwuS9F8wJYIL4Auf9QAQCAlgNYINZA6weGfj/47Q8AAFoG4AukL0vW5Sn0PAAAAIAQQggh5G9+mDaJotsX3/IAAAAASUVORK5CYII=',
+    'hero_wanderer': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABBklEQVR42u3YMQrCQBCF4dzCRrASLE0nIiKojY0IChaeIKWVCN7AE1h5By08idfReqbIOOxGdsn/4FXr4s5XhE2KghBCCCEkUnqD+SdmAQAAgLwG7nRL0fHsIGqtZwcCAAAAiAPqgV6nnaj+feg6AAAAkPZDUA8QWgAAACCve8F1PXE1u4EBAKDlAPqA78eqttZFR9faDwAAAPx3wOft6Krefx4ua3tf7EX1OgAAANAsgP6DS7UV1QNW01LUAtj0R6JekMY/mAAAQMsBvCBWYwPodQAAACCt7wfWxcc6YOj+5N4OAQCg5QD6oecF8O4HAAAA0gLQL0u6sfcDAAAAhBBCCCE/5Qu+1FiW2xr12gAAAABJRU5ErkJggg==',
     'warrior': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABvklEQVR4nO3bsUoDQRAG4P9+trOyEYMWJjYqqQQRUoiIkMIuD6GWpkoXsItvEK3MC6QLGLCyiIhtUKvEQrDTyjrWO8Idy96Z4s/XTXZvdpvZTPZIMpvNoIwQR4gjxBHiCHGEOEKcyzvhxvZxVGPx/nqfhMx/m3x4621V1oOeJ8QR4ghxLu+aP1n58sYPyukl+TCdpeazZ4IdvxvcBj1vEeIIcYQ4V/QCh61O+riJB40rhNR8LEIcIY4Q5/JO2O76Nbxvavqp34oazxshjhBHiHOxCbJ6dVvT1n/XvEWII8QR4pKsd4Ohd3z90x8vvh7vefFw9IKYfI2bpag7RIsQR4gjxLmsmg+taVuj9Zqff2215MXVynJqPuu8NE3db+iZQIgjxBHiXNYEW/Ox2pcXXtzv9YKe736WvXjRB0QixBHiXNELjCff/gem5s+qz148HPl9xG7z0ftef2/muz9CHCGOEOdC7/jqtZ2gBWyvn91nhN0XxCLEEeIIcS5rQlavbc8I+3u9O0rPb+cDfq9fNEIcIY4Q52IT/K3hsDOkc7SZeoYUjRBHiCPEJYv/DYojxBHiCHGEOEIc572BefsFAXiDJzkpj8MAAAAASUVORK5CYII=',
     'knight': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAAE9WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgMTAuMC1jMDAwIDc5LmQwNGNjMTY5OCwgMjAyNS8wNy8wMi0xMjoxODoxMyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIDI3LjMgKE1hY2ludG9zaCkiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiB4bXA6TW9kaWZ5RGF0ZT0iMjAyNi0wOC0yNFQyMjo0MzowNiswOTowMCIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wOC0yNFQyMjo0MzowNiswOTowMCIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOjhhNjNhYzJiLTIyY2UtNDI3OS05ZTk0LTEzMzIzOGE1ZjQyYiI+IDx4bXBNTTpIaXN0b3J5PiA8cmRmOlNlcT4gPHJkZjpsaSBzdEV2dDphY3Rpb249ImNyZWF0ZWQiIHN0RXZ0Omluc3RhbmNlSUQ9InhtcC5paWQ6OGE2M2FjMmItMjJjZS00Mjc5LTllOTQtMTMzMjM4YTVmNDJiIiBzdEV2dDp3aGVuPSIyMDI2LTA4LTI0VDIyOjA5OjQ2KzA5OjAwIiBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZG9iZSBQaG90b3Nob3AgMjcuMyAoTWFjaW50b3NoKSIvPiA8L3JkZjpTZXE+IDwveG1wTU06SGlzdG9yeT4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz4gt9/mAAAB4ElEQVR4nO3bsUvDQBQG8C8fB45Sd1GcVBAEdekiqEPFWVwLLW4iRXDsILgIIuImCq5FoZPooIJLFxVcRDfrX9DZqS4O3kNyHIkU+frbHrl7lwzvcrkkSbfbhTJCHCGOEOdCDZIkwX8yMr7oTWofb7feBdg5jxBHiCPEub+uwbzZmrbjXV+eee1LK2V7Pl5/QhwhjhDnsiawNVicL3rH52ZnUvtPTY5FjVet1FJr/uruKSofIY4QR4hzeSds3be8+KrZ8OLG86MXr07Pph5fM8cHh4aRJ0IcIY4Q5/JOGFoHvFzeeXF9d8+L+d724vPmhRdXK7WczvR7PIgjxBHiCHGEOEIcIc5lff4/OT1IvU/bZ4PNrY2o8UL3ffv8f7h/lLqHaBHiCHGEuCT0fcDoxFKmPT9bk7HsnLG84I+3s3fsxfXtdS8urZS9uP16038v8BMhjhDn8k4YqvnQHGL7Pzw+pcZ2nVEycX8dEECII8S5vBPa+3bWdYDViqzxEEIcIY4Q50INfqmxbkyNxgrtF2TNbxHiCHGEOBfbITQnxK71bU3H7jdkRYgjxBHiktCeYOh/AfueoFAYSG3f6XxGffubNZ/V/1/AIMQR4pL+f4PiCHGEOEIcIY4Qx16fQK99AbfolKhkEfUXAAAAAElFTkSuQmCC',
     'rogue': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABsklEQVR4nO3bTyhEURgF8POOW/YWYzNFsqCUrCwokZRmIwtLZUfWmu1szWwoipW9veRPVshGsjEWiBoxyuwVjfV31ZPmvhl13m935s7c+zb3m+++3ovq9TqUEeIIcYQ4QhwhjhBHiHOhJ+zun2yosXgsH0doIkIcIY4Q50Lv+f1Se9D5kq4JhDhCHCEu+uv9AH+PFmfeY78/Nl+MHa/dr8WOT698IMmaQIgjxBHiXOgJ/T0/OJU3+fpw1eTxpZfYccDPYRHiCHGEuCh0H7B+MYCQnl9tjUj7gMAIcYQ4F7r39/fsb/cH/F6/2QhxhDhCnEt6gY2SrQm+XCb+93tvHSZXy0emJu0sL5rxocKuyV3ZTpP7erLmfgIhjhBHiIv8s8DtQ8V88FSpmvGrwpzJC5tbJg/P2vN7LlMz+bN3NPaC3N1pbA1IzwKBEeIIcVGjzwn6ZwV/zzcqrQEJI8QR4lzSC/j/+xNfZyaftI3E9gFJI8QR4ghxLukFDs5vTN4uX5rzeP5HH4GmIsQR4ghx7r/1/j5//tDPERLiCHGEuCh9b1AcIY4QR4gjxBHi2OoLaLVvU2l9w/Fwmb0AAAAASUVORK5CYII=',
@@ -9866,13 +9915,23 @@ const CharacterArt = (function(){
   const VARIANT_JOBS=new Set(['warrior','knight','rogue','priest','hunter','mage']);
   /* 同じ初期ジョブを2人・3人と連れる場合、パーティ内の加入順で色違いを使う。
      酒場の候補など、まだパーティにいない個体は通常色のままにする。 */
+  /* 見た目のばらつきは、生きている隊列の並び順から**その場で**計算していた。
+     加入前（隊列にまだいない）と加入後（隊列に入った）とで並びの数え方が
+     変わるので、同じ個体の絵が加入の前後で変わってしまっていた。
+     今は a.artVariant——生成時に一度だけ決めて個体に持たせた値——を見るだけにする。 */
   function allyKey(a){
     const base=a&&a.job;
     if(!VARIANT_JOBS.has(base)) return base;
-    const same=party().filter(m=>m&&m.job===base);
-    const order=same.indexOf(a)+1;
-    const key=order===2||order===3 ? base+'_'+order : base;
+    const v=a&&a.artVariant;
+    const key=(v===2||v===3) ? base+'_'+v : base;
     return ready(key) ? key : base;
+  }
+  /* 主人公の見た目。newHero() で一度だけ抽選した h.artKey を見るだけ。
+     欠けていたら（旧セーブ形式など）既定の scout に落とす。 */
+  const HERO_ART_DEFAULT='hero_scout';
+  function heroKey(h){
+    const k=h&&h.artKey;
+    return (k && ready(k)) ? k : HERO_ART_DEFAULT;
   }
   function enemyKey(e){
     if(!e || e.moss) return null;
@@ -9894,7 +9953,9 @@ const CharacterArt = (function(){
     ctx.restore();
     return true;
   }
-  return {allyKey,enemyKey,put};
+  return {allyKey,enemyKey,heroKey,put,variantJobs:VARIANT_JOBS,
+          heroArtKeys:['hero_scout','hero_cartographer','hero_salvager',
+                       'hero_minewalker','hero_herbalist','hero_wanderer']};
 })();
 
 /* ---------- 描画 ---------- */
@@ -10822,7 +10883,7 @@ function draw(){
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
   if(!heroBlinkOff){
-    if(!CharacterArt.put('hero',px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
+    if(!CharacterArt.put(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
@@ -11472,18 +11533,9 @@ function updateHUD(){
     }).join('');
   }else pb.style.display='none';
 
-  // 飛び道具を持っているときだけ、今の撃ち方と倍率を出す。
-  // 「足を止めれば強い」を数字で見せないと、ただ弱くなっただけに感じられる。
+  // 引き撃ちの倍率は内部処理としては残すが、画面上の表記は出さない。
   const ft=el('foottag');
-  if(st.proj && P.target){
-    const f = kiteMul(st, P.mvx, P.mvy, P.moving, P.target.x, P.target.y, P.x, P.y);
-    const label = {still:'足を止めて撃つ', advance:'踏み込みながら',
-                   strafe:'横に動きながら', retreat:'引き撃ち'}[f.k] || '';
-    const col = f.mul>=1 ? '#7fe0c0' : f.mul>=0.8 ? '#d6b34a' : '#e0705a';
-    ft.style.display='block';
-    ft.style.color=col; ft.style.borderColor=col+'55';
-    ft.textContent = label+'　'+(f.mul>=1?'威力 満額':'威力 '+Math.round(f.mul*100)+'%');
-  }else ft.style.display='none';
+  ft.style.display='none';
 
   const gh=el('gravehint');
   if(S.grave){
@@ -11860,7 +11912,7 @@ function memInter(a){
   S.fallen.push({
     uidA:a.uidA, job:a.job, name:a.name, lv:a.lv,
     str:a.str, dex:a.dex, vit:a.vit, int:a.int,
-    boons:(a.boons||[]).slice(),
+    boons:(a.boons||[]).slice(), artVariant:a.artVariant,
     revived:a.revived, depth:(S.run?S.run.depth:0), t:nowMs()
   });
   while(S.fallen.length > MEM_MAX) S.fallen.shift();
@@ -11881,8 +11933,9 @@ function memRevive(uidA){
   if(!c.ok) return c;
   S.shards -= memCost(f);
   const a = makeAlly(Math.max(1,f.lv), S.hero);
-  // 生まれ直しではなく「あの子」なので、名前もレベルも恩寵もそのまま戻す
+  // 生まれ直しではなく「あの子」なので、名前もレベルも恩寵も見た目もそのまま戻す
   a.uidA=f.uidA; a.job=f.job; a.name=f.name; a.lv=f.lv; a.xp=0;
+  a.artVariant = f.artVariant || pickAllyVariant(f.job);
   a.str=f.str; a.dex=f.dex; a.vit=f.vit; a.int=f.int;
   a.boons=(f.boons||[]).slice();
   a.revived=f.revived;
@@ -13838,7 +13891,8 @@ function joinAlly(){
   const a=W.npc; if(!a) return;
   const jc=canJoin(a);
   if(!jc.ok){ log(jc.why); showBanner('連れて行けない', jc.why, '#e0705a', 2.2); return; }
-  uniqueAllyName(a);          // 酒場・流れ者・慰霊碑まで見て突き合わせる
+  // 名前は spawnNpc で出会った時点で確定済み。ここで引き直すと
+  // 「出会ったときの名前」と「加入後の名前」がずれてしまうので触らない。
   // 空いている隊列スロットを割り当てる（左後ろ・右後ろ・真後ろ…）
   const used=party().map(m=>m.slot);
   a.slot = [0,1,2,3].find(i=>!used.includes(i)) ?? party().length;
@@ -14341,6 +14395,8 @@ bindTap(el('btn-fixall'), ()=>{
   renderShop();
 });
 bindTap(el('btn-reset'), ()=>{
+  // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
+  // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
   S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
@@ -14529,7 +14585,7 @@ bindTap(el('dbg-legend'), ()=>{
   let n=0;
   LEGENDS.forEach(L=>{
     if(shelf.some(x=>x.legend===L.id)) return;
-    shelf.push(makeLegend(L.id)); n++;
+    shelf.push(makeLegend(L.id)); markLegendEverOwned(L.id); n++;
   });
   S.ore = S.ore || {};
   S.ore[LEGEND_ORE] = Math.max(S.ore[LEGEND_ORE]||0, 999);

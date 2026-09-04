@@ -56,6 +56,63 @@ R.saltDrawnOnNewSave = await pg.evaluate(()=>{
           ok: after!==-1 && after>=0 && after<=0xffffffff};
 });
 
+/* ================= 1b. 主人公の見た目 =================
+   新規にゲームを始めるたびに、用意した数種類のどれかへランダムに変わる。
+   1種類しか無かった頃の名残で、以前は誰がやっても同じ絵だった。 */
+
+// 1b-a. newHero() のたびに抽選される。用意された種類の中からしか出ないし、固定でもない。
+R.heroArtRandomPerNewGame = await pg.evaluate(()=>{
+  const keys=CharacterArt.heroArtKeys;
+  const seen=[];
+  for(let i=0;i<80;i++) seen.push(newHero().artKey);
+  const unknown=seen.filter(k=>!keys.includes(k));
+  return {keys, sample:seen.slice(0,8), distinct:[...new Set(seen)],
+          count:keys.length, atLeastTwo: keys.length>=2,
+          onlyKnownKeys: unknown.length===0,
+          varied: new Set(seen).size>1,
+          ok: keys.length>=2 && unknown.length===0 && new Set(seen).size>1};
+});
+
+// 1b-b. 実際の「新規ゲーム」の入口（名前確定→startAdventure）でも同じように決まる
+R.heroArtDrawnAtRealStart = await pg.evaluate(()=>{
+  S.hero=null;
+  el('nm-input').value='テスト2';
+  confirmName();
+  const key=S.hero && S.hero.artKey;
+  const valid=CharacterArt.heroArtKeys.includes(key);
+  return {key, valid, ok: valid};
+});
+
+// 1b-c. 一度決まったら、その場では変わらない（毎フレーム引き直したりしない）
+R.heroArtStaysFixed = await pg.evaluate(()=>{
+  TH.run(1,{seed:2});
+  const before=S.hero.artKey;
+  stepSim(2, {draw:true});
+  updateHUD();
+  const after=S.hero.artKey;
+  return {before, after, unchanged: before===after, ok: before===after};
+});
+
+// 1b-d. 6種類とも実際に読み込めていて、描画に使える（壊れた画像で無言に劣化しない）
+R.heroArtAllDrawable = await pg.evaluate(()=>{
+  const results=CharacterArt.heroArtKeys.map(k=>{
+    const resolved=CharacterArt.heroKey({artKey:k});
+    const drew=CharacterArt.put(k, 0, 0, 26, {}, 1, 0);
+    return {k, resolved, drew};
+  });
+  const bad=results.filter(r=>r.resolved!==r.k || !r.drew);
+  return {results, bad, ok: bad.length===0};
+});
+
+// 1b-e. 未知・欠落の artKey は既定（scout）へ落ちる
+R.heroArtFallsBackWhenMissing = await pg.evaluate(()=>{
+  const noKey=CharacterArt.heroKey({});
+  const badKey=CharacterArt.heroKey({artKey:'hero_nonexistent'});
+  return {noKey, badKey,
+          fallsBack: noKey==='hero_scout' && badKey==='hero_scout',
+          ok: noKey==='hero_scout' && badKey==='hero_scout'};
+});
+
 /* ================= 2. 最初の1階の武器 ================= */
 
 /* 2-a. 素手で始まる初回の第1階層は、宝箱の1つが**コモンの武器で確定**。

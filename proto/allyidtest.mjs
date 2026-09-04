@@ -8,20 +8,52 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
-/* ================= 0. 同職仲間の色違い ================= */
+/* ================= 0. 同職仲間の色違い =================
+   以前は「隊列の並び順」で色が決まっていた（1人目は必ず素の色）。
+   今は生成時に一度だけ抽選する——毎回同じ色が固定で出ないようにしつつ、
+   今生きている同職とは被らせない。 */
 
-R.colorVariants = await pg.evaluate(async()=>{
-  const priorParty=S.hero.party;
-  const a={job:'warrior'}, b={job:'warrior'}, c={job:'warrior'};
-  S.hero.party=[a,b,c];
-  await new Promise(resolve=>setTimeout(resolve,100));
+// 0-a. 生成時に artVariant が決まり、同職3人が被らない
+//      （実際の加入は1人ずつ起きる——被り回避も1人ずつパーティに入れながら見る）
+R.colorVariants = await pg.evaluate(()=>{
+  TH.run(1,{seed:2}); S.hero.party=[];
+  const a=TH.ally(1,'warrior',5); S.hero.party.push(a);
+  const b=TH.ally(1,'warrior',5); S.hero.party.push(b);
+  const c=TH.ally(1,'warrior',5); S.hero.party.push(c);
   const keys=[CharacterArt.allyKey(a),CharacterArt.allyKey(b),CharacterArt.allyKey(c)];
   const unaffected=CharacterArt.allyKey({job:'paladin'});
-  S.hero.party=priorParty;
-  return {keys, unaffected,
-          firstBase:keys[0]==='warrior', secondVariant:keys[1]==='warrior_2',
-          thirdVariant:keys[2]==='warrior_3', upperJobBase:unaffected==='paladin',
-          ok:keys.join(',')==='warrior,warrior_2,warrior_3' && unaffected==='paladin'};
+  const variants=[a.artVariant,b.artVariant,c.artVariant];
+  return {keys, unaffected, variants,
+          allHaveVariant: variants.every(v=>[1,2,3].includes(v)),
+          noDuplicates: new Set(variants).size===3,
+          keysMatchVariant: keys.every((k,i)=>{
+            const v=variants[i];
+            return k===(v===2||v===3?'warrior_'+v:'warrior');
+          }),
+          upperJobBase: unaffected==='paladin',
+          ok: variants.every(v=>[1,2,3].includes(v)) && new Set(variants).size===3
+              && unaffected==='paladin'};
+});
+
+// 0-b. 何度も作ると、1人目が毎回同じ色には固定されない（ランダム）
+R.colorVariantsRandom = await pg.evaluate(()=>{
+  TH.run(1,{seed:6}); S.hero.party=[];
+  const firsts=[];
+  for(let i=0;i<60;i++){ S.hero.party=[]; firsts.push(TH.ally(1,'hunter',5).artVariant); }
+  const kinds=new Set(firsts);
+  return {sample:firsts.slice(0,10), kinds:[...kinds],
+          variedFirstPick: kinds.size>1,
+          ok: kinds.size>1};
+});
+
+// 0-c. 4人目（想定外の重なり）が来ても落ちない
+R.colorVariantsOverflow = await pg.evaluate(()=>{
+  TH.run(1,{seed:8}); S.hero.party=[];
+  const four=[];
+  for(let i=0;i<4;i++){ const m=TH.ally(1,'mage',5); S.hero.party.push(m); four.push(m); }
+  const keys=four.map(a=>CharacterArt.allyKey(a));
+  return {keys, allValid: keys.every(k=>/^mage(_[23])?$/.test(k)),
+          ok: keys.every(k=>/^mage(_[23])?$/.test(k))};
 });
 
 /* ================= 1. 名前 ================= */

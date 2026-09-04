@@ -1,6 +1,6 @@
 # キャラクターアート対応表
 
-最終更新: 2026-08-31
+最終更新: 2026-09-04
 
 キャラクター設定とスプライト画像の対応、および制作・承認・ゲーム反映の進行状況を管理する。
 
@@ -8,7 +8,12 @@
 
 | 管理ID | ゲーム側ID | キャラクター | 区分 | プレビュー | 原寸画像 | 向き・状態 | アート状態 | ゲーム反映 | 備考 |
 |---|---|---|---|---|---|---|---|---|---|
-| `CHAR-HERO-001` | `hero` | 冒険者 | プレイヤー | ![冒険者候補B・遺跡の斥候](../proto/assets/sprites/characters/hero/scout-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/scout-right-idle.png) | 右・待機1 | 承認済み（6候補） | ゲーム反映済み | B・D・E・F・G・Hの6候補から、作成時と死亡後の新キャラ作成時に抽選。死亡後は前代と異なる候補を選ぶ |
+| `CHAR-HERO-001` | `hero_scout` | 冒険者（斥候） | プレイヤー | ![冒険者・斥候](../proto/assets/sprites/characters/hero/scout-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/scout-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補B。赤茶の束ね髪、苔緑の肩マント、ロープ束。新規ゲーム開始時にランダム選出される6候補の1つ |
+| `CHAR-HERO-002` | `hero_cartographer` | 冒険者（地図師） | プレイヤー | ![冒険者・地図師](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補D（v3）。青みの濃い髪、青ジャケット、生成りシャツ、巻物筒。新規ゲーム開始時にランダム選出される6候補の1つ |
+| `CHAR-HERO-003` | `hero_salvager` | 冒険者（回収屋） | プレイヤー | ![冒険者・回収屋](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補E（v3）。金髪ボブ、朱色スカーフ、深緑ベスト、小型背嚢。新規ゲーム開始時にランダム選出される6候補の1つ |
+| `CHAR-HERO-004` | `hero_minewalker` | 冒険者（坑道歩き） | プレイヤー | ![冒険者・坑道歩き](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補F。短い赤髪、灰色ベスト、濃青シャツ。新規ゲーム開始時にランダム選出される6候補の1つ |
+| `CHAR-HERO-005` | `hero_herbalist` | 冒険者（薬草採り） | プレイヤー | ![冒険者・薬草採り](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補G。黒髪ポニー、象牙ケープ、青緑服、薬草ポーチ。新規ゲーム開始時にランダム選出される6候補の1つ |
+| `CHAR-HERO-006` | `hero_wanderer` | 冒険者（放浪者） | プレイヤー | ![冒険者・放浪者](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 旧候補H（v2）。短い縮れ髪、褐色肌、黄土スカーフ、えんじコート。新規ゲーム開始時にランダム選出される6候補の1つ |
 | `ALLY-WARRIOR-001` | `warrior` | 剣士 | 仲間 | ![剣士・右向き](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/warrior-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 茶髪、両目1px、剣、丸盾、鎖帷子。2人目・3人目用の色違いあり |
 | `ALLY-KNIGHT-001` | `knight` | 重騎士 | 仲間 | ![重騎士・右向き](../proto/assets/sprites/characters/allies/knight-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/knight-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 全身を鋼色で統一。フルフェイス兜、幅広い板金鎧、大剣。2人目・3人目用の色違いあり |
 | `ALLY-ROGUE-001` | `rogue` | 盗賊 | 仲間 | ![盗賊・右向き](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/rogue-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 黄土色のフードとスカーフ、顔マスク、両手の短剣。2人目・3人目用の色違いあり |
@@ -16,7 +21,7 @@
 | `ALLY-HUNTER-001` | `hunter` | 狩人 | 仲間 | ![狩人・右向き](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 緑のフード、右手の弓、背中の矢筒。2人目・3人目用の色違いあり |
 | `ALLY-MAGE-001` | `mage` | 魔術師 | 仲間 | ![魔術師・右向き](../proto/assets/sprites/characters/allies/mage-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/mage-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | 大きな紫の三角帽子、影の顔と水色の両目、魔力結晶付きの杖。2人目・3人目用の色違いあり |
 | `ALLY-PALADIN-001` | `paladin` | パラディン（聖騎士） | 上位仲間 | ![パラディン・右向きv4](../proto/assets/sprites/allies/paladin/right-idle-v4-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/paladin/right-idle-v4-draft.png) | 右・待機1 | 承認済み | 未反映 | 金髪の女性聖騎士。明るい左目側の顔影、青いタバード、象牙色の鎧、盾、頭高まで届く長剣（ゲーム側の武器設定は現時点でメイス） |
-| `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向きv6](../proto/assets/sprites/characters/allies/summoner-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/allies/summoner-right-idle.png) | 右・待機1 | 承認済み | ゲーム反映済み | ユーザー修正版v6を採用。枝角、苔色のフード、銀髪、肌の顔・頬影、原寸1pxの両目、両手、木の杖、淡緑の精霊 |
+| `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向き](../proto/assets/sprites/allies/summoner/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/summoner/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 青緑の重ねフードとローブ、護符付きの杖、左後方の使い魔 |
 | `ALLY-ARCHMAGE-001` | `archmage` | 大魔導士 | 上位仲間 | ![大魔導士・右向きv2](../proto/assets/sprites/allies/archmage/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/archmage/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 腰を深く曲げた老魔術師。白眉・白髪・長い白髭、魔力球付きの杖 |
 | `ENEMY-BEAST-RUSH-001` | `beast / rush` | アッシュハウンド | 敵 | ![アッシュハウンド・右向きv5](../proto/assets/sprites/enemies/ash-hound/right-idle-v5-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-hound/right-idle-v5.png) | 右・待機1 | 承認済み | 未反映 | 別タスクでユーザーがレタッチし、最新版に指定した64×64画像を採用。透明画素を正規化して16×16へ復元し、可視画素は元画像と完全一致 |
 | `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | 承認済み | 未反映 | 胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
@@ -38,18 +43,22 @@
 | 狩人 | ![狩人1人目](../proto/assets/sprites/characters/allies/hunter-right-idle.png) | ![狩人2人目](../proto/assets/sprites/characters/allies/hunter-right-idle_2.png) | ![狩人3人目](../proto/assets/sprites/characters/allies/hunter-right-idle_3.png) |
 | 魔術師 | ![魔術師1人目](../proto/assets/sprites/characters/allies/mage-right-idle.png) | ![魔術師2人目](../proto/assets/sprites/characters/allies/mage-right-idle_2.png) | ![魔術師3人目](../proto/assets/sprites/characters/allies/mage-right-idle_3.png) |
 
-## 冒険者デザイン候補
+## 冒険者デザイン候補（採用済み）
 
-選択式キャラクターアートを想定した右向き・待機1の候補。Bはキープ指定、D〜Hは追加提案。
+以前は選択式キャラクターアートの候補案だったが、**6候補すべてを採用**し、
+新規ゲーム開始のたびにランダムに1体が選ばれる仕様で反映済み（`CHAR-HERO-001`〜`006`、
+実データは `proto/assets/sprites/characters/hero/` の各 `*-right-idle.png`、
+`index.html` の `CharacterArt.FILES` に `hero_scout` などのキーで埋め込み済み）。
+下表は元の候補一覧（デザイン意図の記録として残す）。
 
 | 候補 | デザイン | プレビュー | 原寸画像 | 状態 | 識別要素 |
 |---|---|---|---|---|---|
-| B | 遺跡の斥候 | ![候補B](../proto/assets/sprites/characters/hero/scout-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/scout-right-idle.png) | 登録済み | 赤茶の束ね髪、苔緑の肩マント、ロープ束 |
-| D | 蒼衣の地図師 | ![候補D](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/cartographer-right-idle.png) | 登録済み | 青みの濃い髪、暖色の明るい肌、青ジャケット、生成りシャツ、巻物筒 |
-| E | 金髪の回収屋 | ![候補E](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/salvager-right-idle.png) | 登録済み | 金髪ボブ、朱色スカーフ、深緑ベスト、小型背嚢 |
-| F | 赤髪の坑道歩き | ![候補F](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/minewalker-right-idle.png) | 登録済み | 短い赤髪、灰色ベスト、濃青シャツ、携行品なし |
-| G | 黒髪の薬草採り | ![候補G](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/herbalist-right-idle.png) | 登録済み | 黒髪ポニー、象牙ケープ、青緑服、薬草ポーチ |
-| H | 褐色肌の放浪者 | ![候補H](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/hero/wanderer-right-idle.png) | 登録済み | 短い縮れ髪、褐色肌、黄土スカーフ、えんじコート、寝具 |
+| B | 遺跡の斥候（`hero_scout`） | ![候補B](../proto/assets/sprites/hero/concepts/b-scout-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/b-scout-right-idle.png) | 採用済み | 赤茶の束ね髪、苔緑の肩マント、ロープ束 |
+| D | 蒼衣の地図師（`hero_cartographer`） | ![候補D v3](../proto/assets/sprites/hero/concepts/d-cartographer-right-idle-v3-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/d-cartographer-right-idle-v3.png) | 採用済み（v3） | 両目を共通座標へ修正し、Hと同じ位置に3pxのあご影を追加。青みの濃い髪、暖色の明るい肌、青ジャケット、生成りシャツ、巻物筒 |
+| E | 金髪の回収屋（`hero_salvager`） | ![候補E v3](../proto/assets/sprites/hero/concepts/e-salvager-right-idle-v3-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/e-salvager-right-idle-v3.png) | 採用済み（v3） | 両目を共通座標へ修正し、Hと同じ位置に3pxのあご影を追加。金髪ボブ、朱色スカーフ、深緑ベスト、小型背嚢 |
+| F | 赤髪の坑道歩き（`hero_minewalker`） | ![候補F](../proto/assets/sprites/hero/concepts/f-minewalker-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/f-minewalker-right-idle.png) | 採用済み | 短い赤髪、灰色ベスト、濃青シャツ、携行品なし |
+| G | 黒髪の薬草採り（`hero_herbalist`） | ![候補G](../proto/assets/sprites/hero/concepts/g-herbalist-right-idle-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/g-herbalist-right-idle.png) | 採用済み | 黒髪ポニー、象牙ケープ、青緑服、薬草ポーチ |
+| H | 褐色肌の放浪者（`hero_wanderer`） | ![候補H v2](../proto/assets/sprites/hero/concepts/h-wanderer-right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/hero/concepts/h-wanderer-right-idle-v2.png) | 採用済み（v2） | 右目右上の輪郭を補完し、両足を1px左へ修正。短い縮れ髪、褐色肌、黄土スカーフ、えんじコート、寝具 |
 
 ## 方向・アニメーション進行表
 
@@ -117,4 +126,3 @@
 - 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
 - 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。
 - 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
-- 2026-08-31: 召喚士の右向き・待機1をユーザー修正版v6へ差し替え、ゲームのスプライト参照へ反映。

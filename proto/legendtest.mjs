@@ -143,6 +143,32 @@ R.neverDropsADuplicate = await pg.evaluate(()=>{
           ok: new Set(seen).size===seen.length && seen.length===LEGENDS.length && after===null};
 });
 
+/* 一度手にした物は、全消去（初期化）を跨いでも二度と出ない。
+   S.legendEverOwned は btn-reset で触らない恒久記録——それが本当に
+   効いているかを、実際にリセットボタンを押して確かめる。 */
+R.neverReturnsAfterReset = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(45); S.hero.party=[];
+  S.stash=[]; S.legendStash=[]; S.run.loot=[]; S.grave=null; S.legendEverOwned=[];
+  const first=rollNewLegend();               // 1本引く→恒久記録に載る
+  const beforeReset=[...(S.legendEverOwned||[])];
+  el('btn-reset').click();                    // 全消去
+  const afterReset=[...(S.legendEverOwned||[])];
+  const stashWiped = S.stash.length===0 && S.legendStash.length===0;
+  // リセット後、新しい冒険者でも同じ物は引けない
+  S.hero=newHero(); S.upg={}; startRun(45); S.hero.party=[];
+  S.stash=[]; S.legendStash=[]; S.run.loot=[]; S.grave=null;
+  let sawDuplicate=false;
+  for(let i=0;i<40;i++){ const id=rollNewLegend(); if(id===first) sawDuplicate=true; if(!id) break; }
+  // sawDuplicate 自身は「起きてはいけない事」なので、期待どおりなら常に false。
+  // 掃引は R 内の生の false を失敗として読むので、真偽の向きを揃えた neverRedrawn だけを返す。
+  return {first, beforeReset, afterReset, stashWiped,
+          recordedOnFirstDraw: !!first && beforeReset.includes(first),
+          survivesReset: !!first && afterReset.includes(first),
+          neverRedrawn: !sawDuplicate,
+          ok: !!first && beforeReset.includes(first) && afterReset.includes(first)
+              && stashWiped && !sawDuplicate};
+});
+
 /* ============ 3. 壊れない・死んでも失わない ============ */
 
 R.neverBreaks = await pg.evaluate(()=>{

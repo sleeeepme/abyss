@@ -17,6 +17,7 @@ await pg.evaluate(()=>{
     a.npc=true; a.awake=false;
     a.x=P.x+(o.dx!=null?o.dx:30); a.y=P.y+(o.dy!=null?o.dy:0);
     a.hpNow=allyStats(a).maxHp;
+    uniqueAllyName(a);                 // spawnNpc と同じく、ここで名前を確定させる
     W.npc=a;
     return a;
   };
@@ -198,6 +199,31 @@ R.joinsWounded = await pg.evaluate(()=>{
 R.flagCleared = await pg.evaluate(()=>{
   const a=livingParty()[0];
   return {npcFlagGone: !a.npc, awakeCleared: !a.awake, ok: !a.npc};
+});
+
+/* 4-c. 出会ったときの名前・見た目が、加入後もそのまま。
+   以前は joinAlly() が加入時にもう一度名前を引き直していたため、
+   同名の仲間が偶然パーティに増えていると、出会った瞬間に見た名前と
+   加入後の名前がずれることがあった（見た目も、隊列の並び順から
+   その場で計算していたので同様にずれた）。 */
+R.nameAndLookSurviveJoin = await pg.evaluate(()=>{
+  TH.run(1,{seed:12}); TH.floor(4); TH.immortal(); S.hero.party=[];
+  // わざと同名の仲間をパーティに先に入れておく（引き直しが起きやすい状況を作る）
+  const decoy=makeAlly(4,S.hero); S.hero.party.push(decoy);
+  const a=TH.npc(4,{dx:1,dy:0});
+  a.job='hunter'; a.artVariant=pickAllyVariant('hunter');
+  a.name=decoy.name;                 // 衝突するように上書き
+  uniqueAllyName(a);                 // spawnNpc がやるのと同じ手順を、上書き後にもう一度かける
+  const nameBefore=a.name, keyBefore=CharacterArt.allyKey(a);
+  a.awake=true;
+  W.enemies.length=0;
+  joinAlly();
+  const nameAfter=a.name, keyAfter=CharacterArt.allyKey(a);
+  return {nameBefore, nameAfter, keyBefore, keyAfter,
+          nameUnchanged: nameBefore===nameAfter,
+          lookUnchanged: keyBefore===keyAfter,
+          noCollisionWithDecoy: nameAfter!==decoy.name,
+          ok: nameBefore===nameAfter && keyBefore===keyAfter && nameAfter!==decoy.name};
 });
 
 /* ================= 5. 祭壇の値 ================= */

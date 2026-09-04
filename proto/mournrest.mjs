@@ -211,17 +211,29 @@ R.charmHeal = await pg.evaluate(()=>{
   W.enemies.length=0;
 
   // 自分が持っている → 瀕死で全回復する
-  S.hero.hpNow = Math.round(stats(S.hero).maxHp*0.2);
-  hitPlayer(null, 1, 'blunt', 3);
-  const healedWhenMine = S.hero.hpNow === stats(S.hero).maxHp;
+  // 「疾き」など回避が乗っていると、たまたま避けて一撃が素通りすることがある
+  // （このスイートは主人公を使い回すので、他の節の装備が残っていることがある）。
+  // 見たいのは被弾したときに全回復するかどうかなので、避けたら仕切り直す。
+  const startHp = Math.round(stats(S.hero).maxHp*0.2);
+  let connected=false;
+  for(let i=0;i<40 && !connected;i++){
+    S.hero.hpNow = startHp;
+    hitPlayer(null, 1, 'blunt', 3);
+    connected = S.hero.hpNow !== startHp;
+  }
+  const healedWhenMine = connected && S.hero.hpNow === stats(S.hero).maxHp;
 
   // 仲間に渡す → 自分は助からない
   S.run.healUsed=false;
   giveCharm(heal, a);
-  S.hero.hpNow = Math.round(stats(S.hero).maxHp*0.2);
-  const before=S.hero.hpNow;
-  hitPlayer(null, 1, 'blunt', 3);
-  const notHealedWhenGiven = S.hero.hpNow < before + 5;   // 減りこそすれ全回復しない
+  const before=Math.round(stats(S.hero).maxHp*0.2);
+  let connected2=false;
+  for(let i=0;i<40 && !connected2;i++){
+    S.hero.hpNow = before;
+    hitPlayer(null, 1, 'blunt', 3);
+    connected2 = S.hero.hpNow !== before;
+  }
+  const notHealedWhenGiven = connected2 && S.hero.hpNow < before + 5;   // 減りこそすれ全回復しない
   return {healedWhenMine, notHealedWhenGiven,
           hp:S.hero.hpNow, max:stats(S.hero).maxHp,
           ok: healedWhenMine && notHealedWhenGiven};
