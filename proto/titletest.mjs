@@ -123,18 +123,20 @@ R.resetToTitle = await pg.evaluate(()=>{
           ok: S.screen==='title' && !S.name && !S.hero && S.deepest===1};
 });
 
-// 4-c. 記録があるとタイトルの足元に出る（無いうちは遊び方の一言）
+/* 4-c. 記録があるとタイトルの足元に出る。
+       無いうちは**何も書かない**——操作の説明は「遊び方」の中にあり、
+       押す前に読ませても、まだ何のことか分からない。 */
 R.footRecord = await pg.evaluate(()=>{
   S.deepest=1; S.deaths=0; S.name='';
   renderTitle();
-  const fresh=document.getElementById('t-foot').textContent;
+  const fresh=document.getElementById('t-foot').textContent.trim();
   S.deepest=23; S.deaths=4; S.name='ヨシダ';
   renderTitle();
   const played=document.getElementById('t-foot').textContent;
   return {fresh, played,
-          freshHasNoRecord: !fresh.includes('最深'),
+          freshIsEmpty: fresh==='',
           playedShowsDepth: played.includes('23'),
-          ok: !fresh.includes('最深') && played.includes('23')};
+          ok: fresh==='' && played.includes('23')};
 });
 
 await b.close();

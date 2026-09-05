@@ -4,18 +4,43 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Abyss Relic — コアループ検証プロトタイプ</title>
+<!-- ドット絵のゲームなので、文字もドットで揃える。
+     Pixelify Sans を先に置くと欧文だけがそちらで拾われ、持っていない日本語が
+     DotGothic16 へ落ちる（＝並び順がそのまま文字種の振り分けになる）。
+
+     取りに行くのは http(s) で開いたときだけ。file:// では必ず失敗して
+     コンソールにエラーが残り、回帰テスト（file:// で走る）が全スイート
+     その1件だけで赤くなる。さらに外部シートが styleSheets[0] に入ると、
+     別オリジン扱いで cssRules が読めなくなる。
+     読み込めなくても、下に並べた端末フォントでそのまま遊べる。 -->
+<script>
+if(location.protocol==='http:'||location.protocol==='https:'){
+  const HREF='https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=DotGothic16&display=swap';
+  for(const [rel,href,cross] of [['preconnect','https://fonts.googleapis.com',false],
+                                 ['preconnect','https://fonts.gstatic.com',true],
+                                 ['stylesheet',HREF,false]]){
+    const l=document.createElement('link');
+    l.rel=rel; l.href=href; if(cross) l.crossOrigin='anonymous';
+    document.head.appendChild(l);
+  }
+}
+</script>
 <style>
   :root{
     --bg:#0d0f14; --panel:#161a23; --line:#2a3040; --txt:#e6e9f0; --dim:#8b93a7;
     --c-common:#c8ced9; --c-magic:#5b8dd6; --c-rare:#d6b34a; --c-unique:#d97a2b; --c-relic:#c4433f;
     --c-legend:#e8c95a;
     --hp:#c4433f; --xp:#4a9d6e;
+    /* 欧文＝Pixelify Sans、和文＝DotGothic16。前者は日本語を持たないので、
+       この順に並べるだけで文字種ごとに勝手に振り分けられる。
+       後ろは読み込めなかったときの受け皿。 */
+    --font:"Pixelify Sans","DotGothic16",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* touch-action:none を body 全体に掛けると、一部の内蔵ブラウザでタップ自体が
      拾われなくなる。ここは manipulation に留め、none はゲーム画面だけに掛ける。 */
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
-    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    font-family:var(--font);
     -webkit-user-select:none;user-select:none;touch-action:manipulation}
   /* 位置指定は inset ではなく top/right/bottom/left で書く（古い WebKit 対策） */
   #wrap{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;
@@ -143,9 +168,8 @@
   #scr-title{justify-content:center;align-items:center;text-align:center;
     background:radial-gradient(120% 90% at 50% 8%, #16202e 0%, var(--bg) 62%)}
   #scr-title .logo{font-size:38px;font-weight:800;letter-spacing:.14em;line-height:1.1;
-    margin:0 0 6px;color:#e8e2d8;
+    margin:0 0 10px;color:#e8e2d8;
     text-shadow:0 0 28px rgba(150,190,255,.18)}
-  #scr-title .tagline{font-size:12px;color:var(--dim);letter-spacing:.18em;margin:0 0 4px}
   #scr-title .ver{font-size:10px;color:#5c6479;letter-spacing:.1em;margin-bottom:34px}
   #scr-title .tbtns{width:100%;max-width:300px;display:flex;flex-direction:column;gap:10px}
   #scr-title .foot{margin-top:30px;font-size:10px;color:#5c6479;line-height:1.8}
@@ -349,7 +373,6 @@
 <!-- ============ タイトル ============ -->
 <div class="screen on" id="scr-title">
   <div class="logo">ABYSS<br>RELIC</div>
-  <p class="tagline">深く潜り、生きて帰る</p>
   <div class="ver">proto v0.3</div>
   <div class="tbtns">
     <button class="primary" id="t-start">冒険に出る</button>
@@ -9049,6 +9072,11 @@ addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
 let stickId=null, stickOx=0, stickOy=0, stickDx=0, stickDy=0;
 const stickEl=el('stick'), knobEl=el('knob');
 function el(id){return document.getElementById(id)}
+/* canvas に描く文字も HUD と同じ書体で揃える。
+   種は CSS の --font 1ヶ所だけ——ここで読み直すので、書体を変えるときに
+   直す場所が2つに割れない。読めなければ端末のフォントに落ちる。 */
+const FONT = (getComputedStyle(document.documentElement)
+                .getPropertyValue('--font') || '').trim() || 'sans-serif';
 /* HUDの書き換えを間引くための差分チェック。
    updateHUD() は毎フレーム（60回/秒）呼ばれるが、値そのものは
    ほとんどのフレームで前回と同じ——それでも innerHTML/textContent/style を
@@ -10128,7 +10156,7 @@ function draw(){
   ctx.setLineDash([5,4]);
   ctx.beginPath(); ctx.arc(stx,sty,TS*0.55,0,7); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle='#7fc3e0'; ctx.font='bold '+(TS*0.55)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#7fc3e0'; ctx.font='bold '+(TS*0.55)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('▼',stx,sty);
   if(S.run.bossAlive){
     ctx.strokeStyle='#c4433f'; ctx.lineWidth=2.5;
@@ -10533,7 +10561,7 @@ function draw(){
       ctx.strokeStyle='#8e9bb0'; ctx.lineWidth=3;
       ctx.beginPath(); ctx.arc(sx,sy,TS*0.72,0,7); ctx.stroke();
       ctx.globalAlpha=1; ctx.fillStyle='#8e9bb0';
-      ctx.font='bold '+Math.round(TS*0.28)+'px system-ui';
+      ctx.font='bold '+Math.round(TS*0.28)+'px '+FONT;
       ctx.textAlign='center';
       ctx.fillText(String(h.barrier), sx, sy-TS*0.78);
       ctx.restore();
@@ -10609,7 +10637,7 @@ function draw(){
       ctx.globalAlpha=1;
       ctx.fillStyle='#5b6072';
       ctx.fillRect(sx-TS*0.30, sy+TS*0.16, TS*0.60, TS*0.16);
-      ctx.font=Math.round(TS*0.40)+'px sans-serif';
+      ctx.font=Math.round(TS*0.40)+'px '+FONT;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle='#ffd9c0';
       ctx.fillText('⚒', sx, sy-TS*0.02);
@@ -10690,7 +10718,7 @@ function draw(){
       ctx.fillRect(sx-TS*0.30, sy-TS*0.02, TS*0.60, TS*0.34);   // 荷
       ctx.fillStyle='#c8a24a';
       ctx.fillRect(sx-TS*0.34, sy-TS*0.10, TS*0.68, TS*0.10);   // 蓋
-      ctx.font=Math.round(TS*0.34)+'px sans-serif';
+      ctx.font=Math.round(TS*0.34)+'px '+FONT;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle='#2a2418';
       ctx.fillText('◈', sx, sy+TS*0.16);
@@ -10722,7 +10750,7 @@ function draw(){
       ctx.globalAlpha=0.4+0.35*Math.sin(performance.now()/380);
       ctx.beginPath(); ctx.arc(sx,sy,TS*0.55,0,7); ctx.stroke();
       ctx.globalAlpha=1;
-      ctx.font=Math.round(TS*0.62)+'px sans-serif';
+      ctx.font=Math.round(TS*0.62)+'px '+FONT;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(d.icon, sx, sy);
       ctx.textBaseline='alphabetic';
@@ -10953,12 +10981,12 @@ function draw(){
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
   endPixelFx();
   // ダメージ数値
-  ctx.font='bold '+(TS*0.46)+'px sans-serif'; ctx.textAlign='center';
+  ctx.font='bold '+(TS*0.46)+'px '+FONT; ctx.textAlign='center';
   W.pops.forEach(p=>{
     if(p.delay>0) return;                    // 順番待ちのものはまだ描かない
     ctx.globalAlpha=clamp(p.life/0.3,0,1); ctx.fillStyle=p.c;
     const txt = p.txt !== undefined ? p.txt : ((p.player?'-':'')+p.v + (p.mark||''));
-    ctx.font='bold '+Math.round(p.reward?Math.max(11,TS*.26):TS*.46)+'px monospace';
+    ctx.font='bold '+Math.round(p.reward?Math.max(11,TS*.26):TS*.46)+'px '+FONT;
     const tx=Math.round(p.x*TS-camX), ty=Math.round(p.y*TS-camY-TS*.5-((p.max||.7)-p.life)*26);
     ctx.strokeStyle='#091017'; ctx.lineWidth=3; ctx.lineJoin='round';
     ctx.strokeText(txt,tx,ty); ctx.fillText(txt,tx,ty);
@@ -11041,7 +11069,7 @@ function drawFrozen(){
   ctx.lineWidth=Math.max(4, Math.min(w,h)*0.012);
   ctx.strokeRect(0,0,w,h);
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font='bold '+Math.round(w*0.048)+'px sans-serif';
+  ctx.font='bold '+Math.round(w*0.048)+'px '+FONT;
   ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillText('凍結', w*0.5+1.5, h*0.24+1.5);
   ctx.fillStyle='#cfeeff';        ctx.fillText('凍結', w*0.5, h*0.24);
   ctx.restore();
@@ -11070,12 +11098,12 @@ function drawBanner(){
   ctx.strokeStyle=b.col; ctx.lineWidth=1.5; ctx.globalAlpha=a*0.5;
   ctx.beginPath(); ctx.moveTo(innerWidth*0.5-96,cy+26); ctx.lineTo(innerWidth*0.5+96,cy+26); ctx.stroke();
   ctx.globalAlpha=a;
-  ctx.font='bold '+Math.round(innerWidth*0.072)+'px sans-serif';
+  ctx.font='bold '+Math.round(innerWidth*0.072)+'px '+FONT;
   ctx.fillStyle='rgba(0,0,0,.75)'; ctx.fillText(b.title, innerWidth*0.5+1.5, cy+1.5);
   ctx.fillStyle=b.col;             ctx.fillText(b.title, innerWidth*0.5, cy);
   if(b.sub){
     ctx.globalAlpha=a*0.85;
-    ctx.font=Math.round(innerWidth*0.030)+'px sans-serif';
+    ctx.font=Math.round(innerWidth*0.030)+'px '+FONT;
     ctx.fillStyle='rgba(0,0,0,.75)'; ctx.fillText(b.sub, innerWidth*0.5+1, cy+45);
     ctx.fillStyle='#cfd6e4';         ctx.fillText(b.sub, innerWidth*0.5, cy+44);
   }
@@ -11085,7 +11113,7 @@ function drawBanner(){
 /* 小さな文字を暗い背景の上でも読ませるため、黒フチをつけて描く */
 function label(text,x,y,color,scale){
   const s=Math.max(9, TS*0.36*(scale||1));
-  ctx.font='bold '+s+'px -apple-system,"Hiragino Sans",sans-serif';
+  ctx.font='bold '+s+'px '+FONT;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.lineWidth=3; ctx.strokeStyle='rgba(6,8,12,.9)';
   ctx.strokeText(text,x,y);
@@ -12392,9 +12420,9 @@ const uds=unlockedDepths();
          中継地点から始めると <b>Lv.${beaconLevel(S.startDepth)}</b> まで引き上げ、
          足りない装備を支給する<br>
          <span style="font-size:11px">自前のレベルと装備がそれを上回っていれば、そのまま使う</span></div>`
-    : (uds.length===1
-      ? '<div class="empty" style="width:100%">第10階層の<b>大ボス</b>を倒すと、第11階層から始められるようになる</div>'
-      : ''));
+    /* 中継地点がまだ1つも無いときは何も書かない。
+       選べる階層が「第1階層」1つだけという事実が、そのまま「まだ無い」を伝えている。 */
+    : '');
 
   // メニューの副題（開かなくても状況が分かるようにする）
   el('m-gacha-sub').textContent = S.carry.length
@@ -14542,10 +14570,12 @@ bindTap(el('r-ok'), ()=>{ el('m-ret').classList.remove('on'); setScreen('town');
 function renderTitle(){
   const f=el('t-foot');
   const played=(S.deepest||1)>1 || (S.deaths||0)>0;
+  /* 遊んだことがない人には何も書かない。操作の説明は「遊び方」の中にあり、
+     押す前のタイトルで先に読ませても、まだ何のことか分からない。 */
   f.innerHTML = played
     ? `最深 <b style="color:#d6b34a">${S.deepest}</b> 階層　／　ロスト ${S.deaths} 回`
       + (S.name?`<br>${heroName()}`:'')
-    : '攻撃は自動。あなたが決めるのは<b>立ち位置</b>と<b>引き際</b>。';
+    : '';
   el('t-start').textContent = played ? '冒険を続ける' : '冒険に出る';
 }
 /* 名前を決める。決めるのは1回だけで、以後は代を重ねる（heroName）。 */

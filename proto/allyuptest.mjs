@@ -331,20 +331,22 @@ R.beaconOutfit = await pg.evaluate(()=>{
           ok: lvOK && gearGiven.length===2 && survives>=3 && keptLv && keptGear};
 });
 
-// 4-d. 拠点の表示が「大ボスを倒すと開く」と言っている
+/* 4-d. 中継地点がまだ無いときは、開き方の説明を書かない。
+       選べる階層が「第1階層」1つだけという事実がそのまま「まだ無い」を伝えている。
+       実際に開いたあとだけ、何が起きるのか（レベル引き上げと支給）を言う。 */
 R.beaconHelpText = await pg.evaluate(()=>{
   S.beacons=[]; S.startDepth=1;
   if(!S.hero) S.hero=newHero();
   setScreen('town');
-  const locked=el('startdepth').textContent.replace(/\s+/g,' ');
+  const locked=el('startdepth').textContent.replace(/\s+/g,' ').trim();
   S.beacons=[10]; S.startDepth=11;
   setScreen('town');
   const open=el('startdepth').textContent.replace(/\s+/g,' ');
   S.beacons=[]; S.startDepth=1; setScreen('town');
   return {locked, open,
-          saysBoss: locked.includes('大ボス') && locked.includes('第11階層'),
+          lockedIsButtonsOnly: locked==='第1階層',
           saysOutfit: open.includes('引き上げ') && open.includes('支給'),
-          ok: locked.includes('大ボス') && open.includes('支給')};
+          ok: locked==='第1階層' && open.includes('支給')};
 });
 
 await done(b, errs, R);
