@@ -366,21 +366,24 @@ R.guardButton = await pg.evaluate(()=>{
           ok: shown && pe==='auto' && guardsWhileStill && released};
 });
 
-/* 7-b. 盾を持っていないときは**消さずにグレーで出す。**
-       消してしまうと「盾を持てば何かできる」ことが画面から一切消える。
-       ただし押しても構えない——見た目と挙動を一致させる。 */
-R.guardDimNoShield = await pg.evaluate(()=>{
+/* 7-b. 盾を持っていないときは**ボタンごと消す。**
+       以前はグレーで置いていたが、押せないボタンが常に1つ画面にあるほうが邪魔だった。
+       消えているあいだは押しても構えない（見えていなくても口が生きていたら同じこと）。
+       盾を持ち直せば戻る。 */
+R.guardHiddenNoShield = await pg.evaluate(()=>{
   const gb=el('guardbtn');
   S.hero.equip.shield=null; updateHUD();
-  const stillShown = gb.classList.contains('on');
-  const dimmed = gb.classList.contains('dim');
+  const hidden = !gb.classList.contains('on');
+  const notDisplayed = getComputedStyle(gb).display === 'none';
   stickId=null; P.guard=false;
   gb.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
   const didNotGuard = !P.guard;
   dispatchEvent(new MouseEvent('mouseup',{bubbles:true,cancelable:true}));
+  // 盾を持ち直せば出直す
   S.hero.equip.shield=genBaseItem('round',5,1); updateHUD();
-  return {stillShown, dimmed, didNotGuard,
-          ok: stillShown && dimmed && didNotGuard};
+  const backWithShield = gb.classList.contains('on');
+  return {hidden, notDisplayed, didNotGuard, backWithShield,
+          ok: hidden && notDisplayed && didNotGuard && backWithShield};
 });
 
 /* 7-c. 「疾風の加護が切れた」は、掛かっていたときにだけ言う。

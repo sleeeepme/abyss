@@ -104,10 +104,8 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     background:rgba(16,20,28,.82);border:2px solid #39415a;color:#8fc7ff;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
+  /* 出るのは盾を装備しているときだけ（updateHUD が付け外しする） */
   #guardbtn.on{display:flex}
-  /* 盾なし。押しても何も起きないことを、押す前に見せる */
-  #guardbtn.dim{opacity:.32;border-color:#2a3040;color:#5c6479;
-    background:rgba(16,20,28,.55)}
   /* ---------- デバッグ ----------
      出荷物には出ない。タイトルの版番号を5回叩いたときだけ現れる。
      見えていると必ず押されるので、**入口を隠す**のではなく
@@ -190,7 +188,8 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   #hud.on{display:block}
   #topbar{display:flex;gap:10px;align-items:flex-start}
   #bars{flex:1;max-width:230px}
-  .bar{height:12px;background:#1b2029;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:4px}
+  /* ドットの画面なので、ゲージの角は丸めない（丸めるとそこだけ解像度が違って見える） */
+  .bar{height:8px;background:#1b2029;border:1px solid var(--line);overflow:hidden;margin-bottom:4px}
   .bar>i{display:block;height:100%;transition:width .12s linear}
   #hpfill{background:var(--hp)}
   #xpfill{background:var(--xp);}
@@ -202,7 +201,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   #depth .zn{font-size:10px;font-weight:700;letter-spacing:.03em}
   #bossbar{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 58px);width:66%;display:none;text-align:center}
-  #bossbar .bl{height:9px;background:#1b2029;border:1px solid #4a2523;border-radius:5px;overflow:hidden}
+  #bossbar .bl{height:9px;background:#1b2029;border:1px solid #4a2523;overflow:hidden}
   #bossbar .bl>i{display:block;height:100%;background:linear-gradient(90deg,#c4433f,#e0803f);
     width:100%;transition:width .12s linear}
   #bossbar span{font-size:11px;font-weight:700;color:#e0a090;letter-spacing:.06em}
@@ -210,7 +209,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
      どちらも「これが終わるまで戦い続ける」という同じ意味だから。 */
   #trialbar{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 58px);width:66%;display:none;text-align:center}
-  #trialbar .bl{height:9px;background:#1b2029;border:1px solid #4a3a5a;border-radius:5px;overflow:hidden}
+  #trialbar .bl{height:9px;background:#1b2029;border:1px solid #4a3a5a;overflow:hidden}
   #trialbar .bl>i{display:block;height:100%;background:linear-gradient(90deg,#c98adf,#8fd8ff);
     width:100%;transition:width .12s linear}
   #trialbar span{font-size:11px;font-weight:700;color:#d0aee0;letter-spacing:.06em}
@@ -224,7 +223,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   #partybar .mate{padding:1px 0;min-width:104px}
   #partybar .mn{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1.3;white-space:nowrap;
     text-shadow:0 1px 2px #000,0 0 5px #000,0 0 9px #000}
-  #partybar .mb{height:4px;background:rgba(9,12,17,.75);border-radius:3px;overflow:hidden;margin-top:2px;
+  #partybar .mb{height:4px;background:rgba(9,12,17,.75);overflow:hidden;margin-top:2px;
     box-shadow:0 1px 2px rgba(0,0,0,.7)}
   #partybar .mb>i{display:block;height:100%;transition:width .12s linear}
   .boon{background:var(--panel);border:1px solid var(--line);border-left:3px solid #d6b34a;
@@ -474,7 +473,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
 <div class="screen" id="scr-upg">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>能力強化</h1><span class="gold" id="upg-gold"></span></div>
-  <p class="sub">対価は<b style="color:#8fd8ff">欠片</b>。敵が落とし、<b>拾った瞬間に貯まる</b>ので
+  <p class="sub">対価は<b style="color:#8fd8ff">マナ</b>。敵が落とし、<b>拾った瞬間に貯まる</b>ので
     <b style="color:#7fe0c0">死んでも失いません</b>。<br>
     どんな探索も、必ずここに変わります。</p>
   <div class="grid" id="upgrades"></div>
@@ -528,7 +527,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>慰霊碑</h1><span class="gold" id="mem-shards"></span></div>
   <p class="sub">失った仲間の名前が刻まれている。<br>
-    欠片を捧げれば、レベルと恩寵を保ったまま呼び戻せる。<b>装備は戻らない。</b></p>
+    マナを捧げれば、レベルと恩寵を保ったまま呼び戻せる。<b>装備は戻らない。</b></p>
   <div class="grid" id="memlist"></div>
   <div style="height:24px"></div>
 </div>
@@ -774,7 +773,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     <button class="sw ghost" id="dbg-clear">実行</button>
   </div>
   <div class="row">
-    <div><b>欠片・金・黒鉄を足す</b><s>それぞれ +9999</s></div>
+    <div><b>マナ・金・黒鉄を足す</b><s>それぞれ +9999</s></div>
     <button class="sw ghost" id="dbg-rich">実行</button>
   </div>
   <div class="row">
@@ -973,11 +972,11 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     一度きちんと抜けた場所を、毎回同じ速度で歩き直す必要はないからです。
   </div>
 
-  <h2>欠片 <span style="color:var(--dim);font-weight:400;font-size:11px">死んでも失わない</span></h2>
+  <h2>マナ <span style="color:var(--dim);font-weight:400;font-size:11px">死んでも失わない</span></h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
-    敵が<b style="color:#8fd8ff">◆欠片</b>を落とします。<b>拾った瞬間に貯まる</b>ので、
+    敵が<b style="color:#8fd8ff">◆マナ</b>を落とします。<b>拾った瞬間に貯まる</b>ので、
     そのあと死んでも失いません。<br>
-    欠片は<b>能力強化</b>の対価です（金では買えません）。<br>
+    マナは<b>能力強化</b>の対価です（金では買えません）。<br>
     どんなに酷い死に方をしても、潜った時間は必ず能力強化に変わります。<br>
     <span style="font-size:11px">エリート・ユニーク・ボスほど多く落とし、深いほど増えます。</span>
   </div>
@@ -988,9 +987,9 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     <b>毎週3つ</b>提示され、週が変わると入れ替わります。<b>重ねがけできます。</b><br><br>
     縛りと報酬は必ずセットです。<br>
     <span style="font-size:11px">
-      飢餓（穴回復が効かない → 欠片+60%）/ 奔流（敵が速い → 黒鉄+80%）/
+      飢餓（穴回復が効かない → マナ+60%）/ 奔流（敵が速い → 黒鉄+80%）/
       重圧（最大HP-25% → 発見力+60）/ 静寂（大技が使えない → 経験値+50%）/
-      孤独（仲間なし → 金+100%）/ 薄氷（被ダメージ+40% → 欠片・金+40%）/
+      孤独（仲間なし → 金+100%）/ 薄氷（被ダメージ+40% → マナ・金+40%）/
       アビスの呼び声（敵のレベル+4 → 全報酬+30%）</span><br><br>
     <b style="color:#e0705a">潜った時点で確定し、途中では外せません。</b><br>
     <span style="font-size:11px">デイリー報酬のような「得だけの物」は置かない方針なので、
@@ -1011,7 +1010,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     セットできるのは<b>1つだけ</b>。探索中は画面右下の丸ボタンで発動します。<br>
     <span style="font-size:11px">震撼（周囲を殴る）/ 瞬歩（跳んで無敵）/ 業火（前方へ炎）/
       守護（全員の被ダメージ減）/ 崩落（画面内すべて）</span><br><br>
-    技レベルは<b style="color:#8fd8ff">欠片</b>で上げられます（街 → 能力強化）。
+    技レベルは<b style="color:#8fd8ff">マナ</b>で上げられます（街 → 能力強化）。
     威力が上がり、<b>リキャストも短くなります</b>。<br>
     <span style="font-size:11px">操作は移動だけ、という原則の唯一の例外です。だから枠は1つ、
       リキャストは20〜40秒、狙いを付ける操作はありません。増えるのは「ここで切るかどうか」の判断だけです。</span>
@@ -1081,8 +1080,8 @@ if(location.protocol==='http:'||location.protocol==='https:'){
       <span style="color:#7fc8e0">精鉱</span>（12〜34階）/
       <span style="color:#c98adf">深鉱</span>（28階〜）</span><br><br>
     <b style="color:#e0705a">黒鉄は持ち帰らないと自分の物になりません。</b>
-    死ぬと半分を遺体に落とし、残りは失われます（欠片とは逆の性格です）。<br>
-    <span style="font-size:11px">欠片は「潜った時間そのものの対価」なので絶対に失いません。
+    死ぬと半分を遺体に落とし、残りは失われます（マナとは逆の性格です）。<br>
+    <span style="font-size:11px">マナは「潜った時間そのものの対価」なので絶対に失いません。
     黒鉄は「持ち帰るという判断の対価」なので失います。だから引き返す判断が生まれます。</span><br><br>
     <b>装備中の武器</b>を、黒鉄＋ゴールドで <b>+10</b> まで鍛えられます。<br>
     ・街の<b>鍛冶屋</b>＝口座のゴールド。定価（鍛冶屋のレベルで割引）<br>
@@ -1637,7 +1636,7 @@ const SUFFIX=[
   {id:'rShock',nm:'耐雷',  stat:'resShock',r:[8,20]},
   {id:'rFrost',nm:'耐氷',  stat:'resFrost',r:[8,20]},
   /* 大技のリキャスト短縮。
-     ここまで大技を短くする手が**技レベル（欠片）だけ**だった。
+     ここまで大技を短くする手が**技レベル（マナ）だけ**だった。
      装備でも恩寵でも触れないので、「大技を軸に組む」という遊び方が作れなかった。
      装備・恩寵・仲間の3方向から詰められるようにする。 */
   {id:'haste', nm:'早鐘',  stat:'ultCdr',  r:[5,12]},
@@ -2248,7 +2247,7 @@ function canJoin(a){
 const PARTY_MAX = PARTY_BASE;    // 旧名。partyMax() を使うこと（枠は伸びる）
 
 /* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
-/* 対価は欠片（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
+/* 対価はマナ（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
 const UPGRADES=[
   {id:'hp',    nm:'生命力',   max:8, shard:6,  step:'最大HP +12%',      desc:'倒れにくくなる'},
   {id:'atk',   nm:'攻撃力',   max:8, shard:8,  step:'物理ダメージ +9%', desc:'雑魚を早く溶かす'},
@@ -2386,14 +2385,14 @@ function relicToggle(id){
   }
 }
 
-/* ---------- 欠片 ----------
+/* ---------- マナ ----------
    能力強化の対価を「金」から「敵が落とす石」に変えるためのもの。
 
    金で買える成長は、結局のところ「上手く帰ってきた回数」の関数でしかない。
    死んだランは丸ごと無駄になり、死んだ瞬間に何も前進していないことになる。
    それが一番モチベーションを削る。
 
-   欠片は<b>拾った瞬間に口座へ入る</b>ので、そのあと死んでも残る。
+   マナは<b>拾った瞬間に口座へ入る</b>ので、そのあと死んでも残る。
    どんなに酷い死に方をしても、潜った時間そのものは必ず能力強化に変わる。
    逆に金は「生きて帰らないと1Gも手に入らない」ままにしてある（帰還の価値を残すため）。 */
 function upgCost(u,lv){ return Math.round(u.shard*Math.pow(lv+1,1.35)); }
@@ -2414,7 +2413,7 @@ function gainShards(n, x, y){
   if(n<=0) return;
   S.shards = (S.shards||0) + n;      // 即座に口座へ。死んでも消えない。
   S.shardsRun = (S.shardsRun||0) + n;
-  if(x!==undefined) W.pops.push({x, y:y-0.3, txt:'欠片 +'+n, c:'#8fd8ff', life:0.9});
+  if(x!==undefined) W.pops.push({x, y:y-0.3, txt:'マナ +'+n, c:'#8fd8ff', life:0.9});
 }
 
 /* ---------- 置いてはいけない場所 ----------
@@ -2546,7 +2545,7 @@ function hazardAt(x,y){
 }
 
 /* ---------- 黒鉄と武器の打ち直し ----------
-   欠片が「キャラの外側（能力強化）」を伸ばすのに対して、
+   マナが「キャラの外側（能力強化）」を伸ばすのに対して、
    黒鉄は「今この1本の武器」を伸ばす。役割をはっきり分けてある。
 
    狙いは、拾った装備が使い捨てにならないこと。
@@ -2556,7 +2555,7 @@ function hazardAt(x,y){
 
    ただし強化した武器も、装備したまま死ねば他の装備と同じくロストする。
    ここを安全にすると恒久ロストの緊張が消えるので、あえて守らない。
-   代わりに黒鉄そのものは欠片と同じく拾った瞬間に口座へ入る＝素材は死んでも残る。
+   代わりに黒鉄そのものはマナと同じく拾った瞬間に口座へ入る＝素材は死んでも残る。
    「素材は安全・投資は危険」という線引きにしてある。 */
 const ORES=[
   {id:'raw',  nm:'粗鉱', icon:'▰', col:'#9aa3b2', min:1,  max:16},
@@ -2575,8 +2574,8 @@ function oreHave(id){ return (S.ore && S.ore[id]) || 0; }
 /* 鍛える場所によって、どちらの袋を見るかが変わる（金とまったく同じ扱い） */
 function orePurse(id, mid){ return mid ? oreRun(id) : oreHave(id); }
 /* 黒鉄は「持ち帰らないと自分の物にならない」資源。
-   欠片（拾った瞬間に口座＝死んでも残る）とは、あえて逆の性格にしてある。
-     欠片 = 潜った時間そのものの対価。だから絶対に失わせない。
+   マナ（拾った瞬間に口座＝死んでも残る）とは、あえて逆の性格にしてある。
+     マナ = 潜った時間そのものの対価。だから絶対に失わせない。
      黒鉄 = 持ち帰るという判断の対価。だから死ねば失う。
    両方を安全側にすると「深く潜って引き返す」という判断そのものが消える。
    道中の鍛冶場が割高でも使われるのは、この「今使うか、持ち帰るか」があるからでもある。 */
@@ -2884,9 +2883,9 @@ const BUILDINGS=[
   {id:'market',nm:'商館',   icon:'⚖️', max:5, base:150,
    step:lv=>'売値 +'+(lv*10)+'%　道具屋の品揃え +'+lv,
    desc:'持ち帰った物の価値が上がる'},
-  /* 倉庫は能力強化（欠片）から街開発（金）へ移した。
+  /* 倉庫は能力強化（マナ）から街開発（金）へ移した。
      倉庫は**キャラの強さではなく街の設備**で、死んでも消えない側の物。
-     欠片は「自分を強くするか、仲間を強くするか」の取り合いに使いたいので、
+     マナは「自分を強くするか、仲間を強くするか」の取り合いに使いたいので、
      そこに置き場所の話を混ぜない。 */
   {id:'stash', nm:'倉庫',   icon:'📦', max:5, base:120,
    step:lv=>'倉庫スロット +'+(lv*6),
@@ -3377,7 +3376,7 @@ const JOBS=[
 const CURSES=[
   {id:'hunger', nm:'飢餓', icon:'◔', col:'#e0705a',
    what:'穴での回復と、回復の恩寵が働かない',
-   pay:'欠片 +60%',            shard:0.60},
+   pay:'マナ +60%',            shard:0.60},
   {id:'torrent',nm:'奔流', icon:'≈', col:'#7fc8e0',
    what:'敵の移動速度 +30%',
    pay:'黒鉄 +80%',            ore:0.80},
@@ -3392,7 +3391,7 @@ const CURSES=[
    pay:'金 +100%',             gold:1.00},
   {id:'thin',   nm:'薄氷', icon:'◇', col:'#ff9a5a',
    what:'被ダメージ +40%',
-   pay:'欠片 +40%・金 +40%',   shard:0.40, gold:0.40},
+   pay:'マナ +40%・金 +40%',   shard:0.40, gold:0.40},
   {id:'call',   nm:'アビスの呼び声', icon:'∵', col:'#a07fe0',
    what:'敵のレベルが +4 される',
    pay:'すべての報酬 +30%',    shard:0.30, ore:0.30, gold:0.30, xp:0.30},
@@ -3447,7 +3446,7 @@ function curseBonus(){
    操作の忙しさは増えない。移動＝回避という核は壊れていない。
 
    解放は大ボス（10階ごと）を1体倒すごとに1つ。アカウント単位で恒久。
-   技レベルは欠片で上げる——能力強化がカンストしたあとの欠片の行き先でもある。 */
+   技レベルはマナで上げる——能力強化がカンストしたあとのマナの行き先でもある。 */
 const ULTS=[
   {id:'quake', nm:'震撼', icon:'✹', col:'#d6b34a', cd:26,
    desc:lv=>`周囲 ${(3.2+lv*0.35).toFixed(1)} マスに ATK×${(2.6+lv*0.55).toFixed(1)} の打撃。全員よろめく`,
@@ -3470,7 +3469,7 @@ function ultDef(id){ return ULTS.find(u=>u.id===id); }
 /* 解放済みの大技。大ボスを n 体倒していれば at<=n の技が使える。 */
 function unlockedUlts(){ return ULTS.filter(u=>greatKills() >= u.at); }
 function ultLv(id){ return (S.ultLv && S.ultLv[id]) || 1; }
-/* 技レベルの対価は欠片。能力強化を上げ切ったあとの行き先を作る意味もある。 */
+/* 技レベルの対価はマナ。能力強化を上げ切ったあとの行き先を作る意味もある。 */
 function ultUpCost(lv){ return Math.round(14 * Math.pow(lv+1, 1.45)); }
 function ultCanUp(id){
   const lv=ultLv(id);
@@ -3481,7 +3480,7 @@ function ultEquipped(){
   return (id && unlockedUlts().some(u=>u.id===id)) ? ultDef(id) : null;
 }
 /* 大技のリキャスト。
-   技レベル（欠片）＋装備／恩寵＋そばにいる盗賊、の3つで縮む。
+   技レベル（マナ）＋装備／恩寵＋そばにいる盗賊、の3つで縮む。
    下限を 35% に切ってあるのは、押しっぱなしで回るようになると
    「ここぞで切る手札」ではなく通常攻撃の一種になってしまうため。 */
 const ULT_CDR_FLOOR = 0.35;
@@ -4477,13 +4476,13 @@ const S={
   cleared2:{},           // 一度抜けた階。穴の位置を伏せない（口座側）
   moss:{},               // 苔玉を層ごとに何匹倒したか（口座側）
   duranGiven:false,      // ドゥラントリーを渡したか（一度だけ）
-  shards:0,              // 欠片。拾った瞬間に入る＝死んでも失わない
+  shards:0,              // マナ。拾った瞬間に入る＝死んでも失わない
   shardsRun:0,           // 今回の探索で拾った数（結果表示用）
   ore:{},                // 黒鉄（口座）。生きて帰った分だけがここに入る
   curses:[], curseWeek:-1,  // 掛けている呪いと、その週番号
   greatKills:0,          // 倒した大ボスの数。大技と上位ジョブの解放段階
   ult:null,              // セットしている大技の id
-  ultLv:{},              // 技レベル（欠片で上げる）
+  ultLv:{},              // 技レベル（マナで上げる）
   legacyBoons:[],        // 祭壇で次のキャラへ引き継ぐ恩寵
   deathAdBonus:0,        // 死亡時に広告を見て増やした引き継ぎ枠（その死の間だけ）
   fallen:[],             // 慰霊碑。失った仲間（アカウント単位・キャラが死んでも残る）
@@ -5744,7 +5743,7 @@ const INTRUDER_TIER_ATK  = [1.0, 1.25, 1.55, 1.9];
 const INTRUDER_TIER_HP   = [1.0, 1.3,  1.7,  2.2];
 const INTRUDER_MIN_DEPTH = 4;    // 序盤には出さない。まず戦い方を覚える階が要る
 const INTRUDER_NAME      = 'アビスの巡回者';
-const INTRUDER_SHARDS    = 12;   // 撃退の見返り。欠片なので死んでも消えない＝挑む価値が残る
+const INTRUDER_SHARDS    = 12;   // 撃退の見返り。マナなので死んでも消えない＝挑む価値が残る
 // 湧く距離。直線ではなく「歩く距離」（マス）。この足で 5〜11 秒ぶん。
 const INTRUDER_SPAWN_MIN = 16;   // 下限（すぐ隣は恐怖ではなく事故）
 const INTRUDER_SPAWN_MAX = 40;   // 上限（遠すぎると来るまでに何も起きない）
@@ -7943,7 +7942,7 @@ function killEnemy(e, byAlly){
     return;
   }
 
-  // 欠片。拾った瞬間に口座へ入るので、この探索が失敗しても無駄にならない。
+  // マナ。拾った瞬間に口座へ入るので、この探索が失敗しても無駄にならない。
   const shards = shardDrop(e, S.run.depth);
   if(shards>0) W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3), shard:shards});
 
@@ -8720,8 +8719,8 @@ function die(){
   /* 死んだ画面で唯一の前進を見せる。ここが空だと、死＝完全な無駄になる。 */
   if(S.shardsRun>0){
     html += '<div style="color:#8fd8ff;margin-top:14px">'
-      + 'この探索で <b>◆ '+S.shardsRun+' 欠片</b> を持ち帰った<br>'
-      + '<span style="color:var(--dim);font-size:11px">欠片は死んでも失われない。'
+      + 'この探索で <b>◆ '+S.shardsRun+' マナ</b> を持ち帰った<br>'
+      + '<span style="color:var(--dim);font-size:11px">マナは死んでも失われない。'
       + '所持 ◆ '+(S.shards||0)+' — 能力強化に使える</span></div>';
   }
   if(keptOreN>0 || oreRunTotal()>0){
@@ -8751,7 +8750,7 @@ function die(){
      だが今までは**ただ消えていた**——名前も残らず、呼び戻す手も無かった。
      育てた相手が痕跡なく消えるのは、痛みではなく理不尽になる。
 
-     刻めば、欠片という値段のついた選択肢に変わる。 */
+     刻めば、マナという値段のついた選択肢に変わる。 */
   const lost=party().slice();
   lost.forEach(a=>{ if(a) memInter(a); });
   if(lost.length) log('慰霊碑に '+lost.length+' 人の名を刻んだ');
@@ -8952,7 +8951,7 @@ function finishReturn(overflow){
   + `<div class="row"><span class="k">帰還報酬</span><span style="color:#d6b34a"><b>+${bonus} G</b>`
   + `<span style="color:var(--dim);font-size:11px">（深いほど増える）</span></span></div>`
   + `<div class="row"><span class="k">所持金</span><span><b>${S.gold} G</b></span></div>`
-  + `<div class="row"><span class="k">欠片</span><span style="color:#8fd8ff">`
+  + `<div class="row"><span class="k">マナ</span><span style="color:#8fd8ff">`
   + `<b>◆ +${S.shardsRun||0}</b> <span style="color:var(--dim);font-size:11px">（所持 ${S.shards||0}）</span></span></div>`
   + (fixes.length
       ? `<div class="row"><span class="k" style="color:#ffb08a">要修理</span>`
@@ -9037,7 +9036,7 @@ function bindTap(node, fn){
    （こちらが touchend を preventDefault していれば必ず来ない）、
    click だけのハンドラは一度も呼ばれない。
    実際に慰霊碑と「誰に着せるか」がこれで完全に無反応だった（利用者からの報告）。
-   押しても何も起きないので、原因が「欠片が足りない」に見えてしまう。
+   押しても何も起きないので、原因が「マナが足りない」に見えてしまう。
 
    同じ物を各画面に書き写すと必ず1ヶ所抜けるので、ここに集める。
    実際、抜けていたのは5ヶ所——報告が来たのはそのうち2ヶ所だけだった。 */
@@ -10186,7 +10185,7 @@ function draw(){
     if(!tileSeen(d.x, d.y)) return;          // 床と足並みを揃える
     const sx=d.x*TS-camX, sy=d.y*TS-camY+bob;
     if(d.shard){
-      /* 欠片。装備のひし形と混ざらないよう、六角形＋青で描く。
+      /* マナ。装備のひし形と混ざらないよう、六角形＋青で描く。
          死んでも失わない物なので、拾いたさが一目で分かるようにする。 */
       const sc='#8fd8ff', R=TS*0.22;
       ctx.beginPath();
@@ -10967,11 +10966,10 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   drawPlayerLight(camX,camY);
-  label('自分', px, py-TS*0.72, '#7fe0c0');
+  /* 主人公の頭上に「自分」とは書かない。画面の中央にいて、
+     ジョイスティックで動いているのが自分——それ以上の説明は要らない。 */
   /* 貯めておいた仲間のHPバーをここでまとめて描く。
-     主人公（直前に描いた「自分」の文字を含め）より後＝誰のキャラ絵よりも上になる。
-     文字のほうを先に描いておかないと、ぴったり重なったときに「自分」の字が
-     バーの上端を数ピクセルだけ踏むことがある。 */
+     主人公より後＝誰のキャラ絵よりも上になる。 */
   allyBars.forEach(bar=>{
     ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2,3.5);
     ctx.fillStyle=bar.col; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2*bar.pct,3.5);
@@ -11553,12 +11551,12 @@ function updateHUD(){
     hset('ult-cd.t', ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s', v=>el('ult-cd').textContent=v);
   }else ub.classList.remove('on');
 
-  /* 盾のボタン。**盾が無くても消さない**——グレーで出しておく。
-     消すと「盾を持てば何かできる」ことが画面から一切分からなくなる。
+  /* 盾のボタン。**盾を装備しているときだけ出す。**
+     以前は「盾を持てば何かできる」と伝えるために無くてもグレーで置いていたが、
+     押せないボタンが常に1つ画面にあるほうが邪魔だった。盾の説明は遊び方にある。
      押しているあいだだけ構えるので、状態はここで見た目に返す。 */
   const gb=el('guardbtn');
-  gb.classList.add('on');
-  gb.classList.toggle('dim', !st.hasShield);
+  gb.classList.toggle('on', !!st.hasShield);
   gb.classList.toggle('held', !!P.guard && !!st.hasShield);
 
   // ボスHPバー。ボス階では「あと何割か」が最重要の情報になる。
@@ -11952,7 +11950,7 @@ function upgradeHTML(u){
   return `<div class="item" data-upg="${u.id}" style="border-left-color:${maxed?'#4a9d6e':'#5b8dd6'}">
     <div class="nm" style="color:${col}">${u.nm} <span style="font-size:11px;color:var(--dim)">Lv.${lv}/${u.max}</span></div>
     <div class="af">${u.step}　<span style="color:#7b8398">${u.desc}</span></div>
-    <div class="af" style="color:${maxed?'#4a9d6e':afford?'#8fd8ff':'#5c6479'}">${maxed?'最大':'◆ '+cost+' 欠片'}</div>
+    <div class="af" style="color:${maxed?'#4a9d6e':afford?'#8fd8ff':'#5c6479'}">${maxed?'最大':'◆ '+cost+' マナ'}</div>
   </div>`;
 }
 function buildingHTML(b){
@@ -11977,7 +11975,7 @@ function renderBld(){
 }
 
 /* ---------- 慰霊碑 ----------
-   失った仲間を、欠片を払って呼び戻せる場所。
+   失った仲間を、マナを払って呼び戻せる場所。
 
    道中の広告蘇生（Lv.1・装備ランダムロスト・1人1回）とは役割を分けてある。
    あちらは「今この場をしのぐ」ための手で、こちらは
@@ -11987,8 +11985,8 @@ function renderBld(){
 
    代わりに **装備は戻らない**。装備は失われた物として扱わないと、
    死んでも何も減らないことになってしまう。
-   値段は欠片。金にしなかったのは、金は帰還のたびに増えるので
-   「重い決断」にならないから。欠片は能力強化と取り合う唯一の資源で、
+   値段はマナ。金にしなかったのは、金は帰還のたびに増えるので
+   「重い決断」にならないから。マナは能力強化と取り合う唯一の資源で、
    自分を強くするか、あの子を連れ戻すかを天秤にかけさせたい。
 
    全滅していても使える。むしろ全滅したときのための場所なので。 */
@@ -12013,7 +12011,7 @@ function memCheck(f){
   if(!f) return {ok:false, why:'選ばれていない'};
   if(!S.hero) return {ok:false, why:'冒険者がいない'};
   const c=canJoin(f); if(!c.ok) return c;
-  if((S.shards||0) < memCost(f)) return {ok:false, why:'欠片が足りない'};
+  if((S.shards||0) < memCost(f)) return {ok:false, why:'マナが足りない'};
   return {ok:true};
 }
 function memRevive(uidA){
@@ -12056,7 +12054,7 @@ function renderMem(){
           <div class="af">第${f.depth}階層で失われた</div>
           <div class="af" style="color:#d6b34a">${bl}</div>
           <div class="af" style="color:${c.ok?'#8fd8ff':afford?'#5c6479':'#e0705a'}">
-            ${c.ok ? '◆ '+cost+' 欠片で呼び戻す' : (full?'パーティが満員':'◆ '+cost+' 欠片（所持 '+(S.shards||0)+'）')}
+            ${c.ok ? '◆ '+cost+' マナで呼び戻す' : (full?'パーティが満員':'◆ '+cost+' マナ（所持 '+(S.shards||0)+'）')}
           </div>
         </div>`;
       }).join('');
@@ -12077,7 +12075,7 @@ function boodName(id){ const d=boonDef(id); return d?d.nm:id; }
 
    そして**酒場にいる間は失われない。** 連れて行った仲間はあなたが死ねば
    一緒に消えるという線は動かさない。だから「置いていく」が守る手になる。
-   ここが慰霊碑（失った後に欠片で呼び戻す場所）との役割の違いで、
+   ここが慰霊碑（失った後にマナで呼び戻す場所）との役割の違いで、
    酒場は失う前に決める場所、慰霊碑は失った後に悔やむ場所。 */
 const TAVERN_MAX = 8;              // 待たせておける人数
 
@@ -12327,7 +12325,7 @@ bindRowTap(el('scr-tavern'), '[data-hire]', t=>{
 bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   const r=memRevive(+t.dataset.mem);
   /* 呼び戻せなかったら**理由を言う。**
-     黙って何も起きないと、押し方が悪いのか欠片が足りないのか分からない。 */
+     黙って何も起きないと、押し方が悪いのかマナが足りないのか分からない。 */
   if(r.ok) log(r.ally.name+'が戻ってきた');
   else showBanner('呼び戻せない', r.why||'', '#e0705a', 2.0);
   renderMem(); renderTown();
@@ -12355,7 +12353,7 @@ function renderChar(){
     '<div class="row"><span class="k">クリ率 / 攻速 / 攻撃範囲</span><span>'+Math.round(st.crit)+'% / '+st.aspd.toFixed(2)+' / '+st.range.toFixed(2)+'</span></div>'+
     '<div class="row"><span class="k">移動速度 / 発見力</span><span>'+st.ms.toFixed(2)+' / '+st.mf+'</span></div>'+
     '<div class="row"><span class="k">所持金</span><span style="color:#d6b34a;font-weight:700">'+S.gold+' G</span></div>'+
-    '<div class="row"><span class="k">欠片</span><span style="color:#8fd8ff;font-weight:700">◆ '+(S.shards||0)+'</span></div>'+
+    '<div class="row"><span class="k">マナ</span><span style="color:#8fd8ff;font-weight:700">◆ '+(S.shards||0)+'</span></div>'+
     '<div class="row"><span class="k">黒鉄</span><span style="text-align:right">'+oreLine(false)+'</span></div>'+
     masteryRow()+ relicRow()+ mossRow()+
     '<div class="row"><span class="k">最深到達 / ロスト回数</span><span>'+S.deepest+'階層 / '+S.deaths+'</span></div>'+
@@ -12440,7 +12438,7 @@ const uds=unlockedDepths();
     + (livingParty().length?`・仲間 ${livingParty().length}`:'');
   const buyable = UPGRADES.filter(u=>upgLv(u.id)<u.max && (S.shards||0)>=upgCost(u,upgLv(u.id))).length
                 + unlockedUlts().filter(u=>ultCanUp(u.id)).length;
-  el('m-upg-sub').textContent   = buyable ? `${buyable}件 習得可能` : `◆ ${S.shards||0} 欠片`;
+  el('m-upg-sub').textContent   = buyable ? `${buyable}件 習得可能` : `◆ ${S.shards||0} マナ`;
   const w=S.hero.equip.weapon;
   const fc=upCheck(w, false);
   const fgSub=el('m-forge-sub');
@@ -12488,7 +12486,7 @@ function renderCurses(){
   const b=curseBonusPreview();
   el('curse-hint').innerHTML = n
     ? `<b>${n}つ</b>掛かっている　`
-      + `<span style="color:#7fe0c0">欠片 ×${b.shard.toFixed(2)}　黒鉄 ×${b.ore.toFixed(2)}　`
+      + `<span style="color:#7fe0c0">マナ ×${b.shard.toFixed(2)}　黒鉄 ×${b.ore.toFixed(2)}　`
       + `金 ×${b.gold.toFixed(2)}　経験値 ×${b.xp.toFixed(2)}`
       + (b.mf?`　発見力 +${b.mf}`:'') + '</span>'
       + '<br><span style="color:var(--dim);font-size:11px">潜った時点で確定する。途中で外せない。</span>'
@@ -12964,7 +12962,7 @@ function renderStash(){
       : (shelf.length ? '' : '<div class="empty">空</div>')));
 }
 function renderUpg(){
-  el('upg-gold').innerHTML = '<span style="color:#8fd8ff">◆ '+(S.shards||0)+' 欠片</span>';
+  el('upg-gold').innerHTML = '<span style="color:#8fd8ff">◆ '+(S.shards||0)+' マナ</span>';
   el('upgrades').innerHTML = UPGRADES.filter(u=>!(u.hidden && u.hidden())).map(upgradeHTML).join('');
   renderRelics();
   renderUlts();
@@ -13023,7 +13021,7 @@ function renderUlts(){
   el('ult-hint').innerHTML = list.length
     ? `倒した大ボス <b>${greatKills()}</b> 体`
       + (left>0 ? `　<span style="color:var(--dim)">あと${left}つ、さらに深くで覚える</span>` : '')
-      + '<br><span style="color:var(--dim);font-size:11px">探索中はHUDの丸ボタンで発動。技レベルは欠片で上げる（リキャストも短くなる）</span>'
+      + '<br><span style="color:var(--dim);font-size:11px">探索中はHUDの丸ボタンで発動。技レベルはマナで上げる（リキャストも短くなる）</span>'
     : '大ボスは10階ごと。1体倒すごとに大技が1つ解放される。';
 }
 function charmName(c){ return '🔮 '+c.nm; }   // 護符も行頭でそれと分かるように
@@ -14190,7 +14188,7 @@ function openFallen(a){
   el('fal-body').innerHTML = can
     ? `<div class="row"><span class="k">見送ると</span><span>この仲間は失われる<br>
          <span style="color:var(--dim);font-size:11px">装備も恩寵も護符も一緒に消える</span><br>
-         <span style="color:#8fd8ff;font-size:11px">◆ ${allyLossShards(a)} 欠片が残る（死んでも消えない）</span>
+         <span style="color:#8fd8ff;font-size:11px">◆ ${allyLossShards(a)} マナが残る（死んでも消えない）</span>
          ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:11px">弔いの恩寵が発動する</span>':''}</span></div>
        <div class="row"><span class="k">蘇生すると</span><span><b>Lv.1</b> に戻り、装備をランダムに失う<br>
          <span style="color:var(--dim);font-size:11px">恩寵は残る</span></span></div>
@@ -14217,7 +14215,7 @@ function closeFallen(){
    その仲間に注いだ時間が丸ごと無かったことになるので、
    潜りを続ける気力ごと折れる（死亡時に何も進まないのがつらい、というのと同じ話）。
 
-   欠片を渡すのは、その時間を「無かったこと」にしないため。
+   マナを渡すのは、その時間を「無かったこと」にしないため。
    額はレベルに比例させてある——だから**わざと失って稼ぐことはできない**。
    拾ったばかりの Lv.1 を捨てても 2 しか出ず、
    育った仲間を失えば大きいが、それは注いだ物のほうがずっと大きいから。
@@ -14376,10 +14374,10 @@ function letFallenGo(){
   S.hero.party = party().filter(x=>x!==a);
   // 持たせていた護符も一緒に失われる（装備と同じ扱い）
   const lostCharms=dropCharmsOf(a);
-  memInter(a);                       // 慰霊碑に名前を刻む（欠片で呼び戻せる）
+  memInter(a);                       // 慰霊碑に名前を刻む（マナで呼び戻せる）
   const sh=allyLossShards(a);
   gainShards(sh, P.x, P.y);
-  log(a.name+'を失った（◆ '+sh+' 欠片が残された'
+  log(a.name+'を失った（◆ '+sh+' マナが残された'
       + (lostCharms.length ? ' / '+lostCharms.map(c=>c.nm).join('・')+'も失った' : '')+'）');
   igniteAvenge();
   closeFallen();
@@ -14393,7 +14391,7 @@ function reviveFallen(){
     a.revived=true; a.revivedAt=(S.run?S.run.depth:0); a.dead=false;
     /* ---------- レベルは戻さない ----------
        以前は Lv.1 に落としていた。「死んだ意味を残す」つもりだったが、
-       慰霊碑（欠片を払ってレベルと恩寵を保ったまま呼び戻す）が既にあるので、
+       慰霊碑（マナを払ってレベルと恩寵を保ったまま呼び戻す）が既にあるので、
        **広告で立たせるほうが厳密に損**という並びになっていた。
        払う物が違うだけで、結果まで劣るなら誰も押さない。
 
@@ -14690,7 +14688,7 @@ bindTap(el('dbg-legend'), ()=>{
 bindTap(el('dbg-rich'), ()=>{
   S.shards=(S.shards||0)+9999; S.gold=(S.gold||0)+9999;
   S.ore=S.ore||{}; ['raw','fine','deep'].forEach(k=>S.ore[k]=(S.ore[k]||0)+9999);
-  log('🐞 欠片・金・黒鉄を足した');
+  log('🐞 マナ・金・黒鉄を足した');
   renderDebug(); if(RENDERERS[S.screen]) RENDERERS[S.screen]();
 });
 bindTap(el('dbg-boon'), ()=>{

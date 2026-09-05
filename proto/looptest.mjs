@@ -386,7 +386,7 @@ R.shardUI = await pg.evaluate(()=>{
   S.hero.hpNow=0; die();
   const over=document.getElementById('d-lost').innerHTML;
   return {hud:hud.replace(/\s+/g,' '), hudShows:hud.includes('9'),
-          overShows: over.includes('欠片') && over.includes('9'),
+          overShows: over.includes('マナ') && over.includes('9'),
           shardsRun:S.shardsRun};
 });
 
