@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Abyss Relic — コアループ検証プロトタイプ</title>
 <!-- ドット絵のゲームなので、文字もドットで揃える。
-     Pixelify Sans を先に置くと欧文だけがそちらで拾われ、持っていない日本語が
+     Tiny5 を先に置くと欧文だけがそちらで拾われ、持っていない日本語が
      DotGothic16 へ落ちる（＝並び順がそのまま文字種の振り分けになる）。
 
      取りに行くのは http(s) で開いたときだけ。file:// では必ず失敗して
@@ -15,7 +15,7 @@
      読み込めなくても、下に並べた端末フォントでそのまま遊べる。 -->
 <script>
 if(location.protocol==='http:'||location.protocol==='https:'){
-  const HREF='https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=DotGothic16&display=swap';
+  const HREF='https://fonts.googleapis.com/css2?family=Tiny5&family=DotGothic16&display=swap';
   for(const [rel,href,cross] of [['preconnect','https://fonts.googleapis.com',false],
                                  ['preconnect','https://fonts.gstatic.com',true],
                                  ['stylesheet',HREF,false]]){
@@ -31,10 +31,10 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     --c-common:#c8ced9; --c-magic:#5b8dd6; --c-rare:#d6b34a; --c-unique:#d97a2b; --c-relic:#c4433f;
     --c-legend:#e8c95a;
     --hp:#c4433f; --xp:#4a9d6e;
-    /* 欧文＝Pixelify Sans、和文＝DotGothic16。前者は日本語を持たないので、
+    /* 欧文＝Tiny5、和文＝DotGothic16。前者は日本語を持たないので、
        この順に並べるだけで文字種ごとに勝手に振り分けられる。
        後ろは読み込めなかったときの受け皿。 */
-    --font:"Pixelify Sans","DotGothic16",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --font:"Tiny5","DotGothic16",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* touch-action:none を body 全体に掛けると、一部の内蔵ブラウザでタップ自体が
