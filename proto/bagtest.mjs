@@ -24,7 +24,7 @@ R.identRule = await pg.evaluate(()=>{
   return {wrong, counts:c};
 });
 
-// --- 2. 未鑑定品は名前・ilvl・能力が一切漏れない
+// --- 2. 未鑑定品は名前・レベル・能力が一切漏れない
 R.hidden = await pg.evaluate(()=>{
   RNG=mulberry32(7);
   let it=null;
@@ -35,7 +35,8 @@ R.hidden = await pg.evaluate(()=>{
   if(html.includes(it.nm)) leaks.push('base name: '+it.nm);          // 「両手剣」等
   if(it.atk && html.includes(String(it.atk))) leaks.push('atk');
   if(it.def && html.includes(String(it.def))) leaks.push('def');
-  if(html.includes('ilvl')) leaks.push('ilvl');
+  // 装備のレベル（内部名 ilvl）。表記は「Lv.」に変えたので、値ごと出ていないかで見る
+  if(html.includes('ilvl') || html.includes('Lv.'+it.ilvl)) leaks.push('level');
   it.aff.forEach(a=>{ if(html.includes(a.nm)) leaks.push('affix '+a.nm); });
   return {found:true, rarity:it.rar, leaks, name:itemName(it), showsUnident:html.includes('未鑑定')};
 });

@@ -2188,8 +2188,10 @@ function affLines(it){
 }
 function itemSubLine(it){
   if(isConsum(it)) return '消耗品 / 使うと無くなる';
-  return it.ident ? ('ilvl '+it.ilvl+' / '+RARITY[it.rar].nm)
-                  : (RARITY[it.rar].nm+' / 未鑑定');   // ilvl も伏せる（強さのヒントになる）
+  /* 内部名は ilvl（item level）だが、画面では他のレベル表記と同じ「Lv.」で出す。
+     プレイヤーから見れば「その装備のレベル」でしかなく、略語を1つ覚えさせる意味がない。 */
+  return it.ident ? ('Lv.'+it.ilvl+' / '+RARITY[it.rar].nm)
+                  : (RARITY[it.rar].nm+' / 未鑑定');   // レベルも伏せる（強さのヒントになる）
 }
 
 /* ---------- 連れて行ける人数 ----------
