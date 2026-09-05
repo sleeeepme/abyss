@@ -31,6 +31,7 @@
 | `pick.py` | 変更に関係するスイートだけ選ぶ。対応表は持たず、テストの語彙から毎回作る |
 | `docs/GAME_DESIGN.md` | 設計書。各決定の「なぜ」を全部記録してある |
 | `docs/CHARACTER_ART_LIST.md` | キャラアートの一覧と採用状況。**絵の正はここと `proto/assets/sprites/`** |
+| `docs/PIXELLAB_INTEGRATION.md` | PixelLabによる候補生成、検査、4倍プレビューの制作手順 |
 | `proto/assets/sprites/` | 16px のスプライト。本体には data URI で写しが入る（**直すのは PNG のほう**） |
 | `docs/BULLET_STORM.md` | 後半を弾幕嵐にする設計案（実測つき） |
 | `docs/abyss-引継書-収益設計監査.md` | 収益設計の監査・引継書（第3版／広告のみ前提） |

@@ -234,7 +234,8 @@
   .fgwho b{display:block;font-size:12px}
   .fgwho.on{background:#1e2634}
   /* top は layoutHud() が毎回入れ直す。この 150px は初期値でしかない。 */
-  #log{position:absolute;left:12px;top:150px;font-size:11px;line-height:1.7;color:#9aa4bb;max-width:60%}
+  #log{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 155px);transform:translateX(-50%);font-size:12px;line-height:1.6;color:#d6dfdb;width:max-content;max-width:min(70%,560px);text-align:center;pointer-events:none;text-shadow:0 2px 2px #000;background:#0b121bdd;padding:5px 12px;border-left:2px solid #83bca6}
+  #log:empty{display:none}
   #log div{opacity:.9}
 
   #stick{position:absolute;width:130px;height:130px;border-radius:50%;
@@ -816,7 +817,8 @@
 
   <h2>操作</h2>
   <div class="card">
-    <div class="row"><span class="k">移動</span><span>画面をドラッグ<br><span style="color:var(--dim);font-size:11px">操作はこれだけ</span></span></div>
+    <div class="row"><span class="k">移動</span><span>画面をドラッグ</span></div>
+    <div class="row"><span class="k">ダッシュ</span><span>画面を短くタップ / X<br><span style="color:var(--dim);font-size:11px">移動中は進行方向、停止中はタップした方向へ。<br>連続使用は少し待つ。壁や穴の手前で止まる</span></span></div>
     <div class="row"><span class="k">攻撃</span><span><b>自動</b><br><span style="color:var(--dim);font-size:11px">緑の点線＝攻撃範囲。<br>その中に敵が入ると自動で斬る</span></span></div>
     <div class="row"><span class="k">アイテム</span><span><b>自動で拾う</b><br><span style="color:var(--dim);font-size:11px">上を通るだけ</span></span></div>
     <div class="row"><span class="k">ガード</span><span><b style="color:#8fc7ff">左下の🛡を押さえている間</b><br><span style="color:var(--dim);font-size:11px">離すと解ける。移動しながらでも押せる<br>盾を装備していないときは灰色（押しても何も起きない）</span></span></div>
@@ -6124,6 +6126,9 @@ function enterFloor(depth){
   P.x = fl.start.cx+0.5; P.y = fl.start.cy+0.5;
   P.vx=P.vy=0; P.dirx=1; P.diry=0; P.atkCd=0; P.swing=0;
   W.fl=fl; W.enemies=spawnEnemies(fl,depth); W.drops=[]; W.fx=[]; W.pops=[];
+  resetFeel();   // 階が変わった時点で同期する。次の update() まで遅延させると、
+                 // 入った直後に瞬歩を撃った場合に P.dash が消される（syncFeel の
+                 // 階変化検知がここより後に走り、直前に発生させた瞬歩を巻き戻してしまう）。
   W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
@@ -6675,6 +6680,7 @@ function playerAttack(){
   const chill = hasStatus({st:(S.run&&S.run.pst)||{}},'chill') ? (1-CHILL_SLOW) : 1;
   P.atkCd = 1/ (1.9*st.aspd*chill);
   P.swing = 0.18;
+  feelKick(1.6, 0.12);
   const ang=Math.atan2(P.diry,P.dirx);
   const twin = rnd()*100 < (st.multi||0);      // 打ち直しの技「連撃」
 
@@ -6825,7 +6831,7 @@ function tickPits(dt){
     if(!godMode() && (P.invuln||0)<=0){
       const dmg = Math.max(FALL_MIN, Math.round(stats(S.hero).maxHp*FALL_PCT));
       S.hero.hpNow -= dmg;
-      pop(P.x, P.y-0.4, dmg, '#c0e07f');
+      popPlayerDamage(dmg, '#c0e07f');
       W.fx.push({t:'hurt', life:0.14});
       P.invuln = FALL_INV;
       log('▼ 踏み外した');
@@ -6871,7 +6877,7 @@ function tickHazards(dt){
     const cap = stats(S.hero).maxHp*dotPct()*step;
     const dmg = Math.max(1, Math.round(Math.min(ph.dps*step*(1+lv*0.06), cap)));
     S.hero.hpNow -= dmg;
-    pop(P.x, P.y-0.4, dmg, ph.edge);
+    popPlayerDamage(dmg, ph.edge, true);
     if(ph.st && rnd()<0.35 && !statusSuppressed({isPlayer:true}, ph.st))
       addStatus({isPlayer:true, st:S.run.pst}, ph.st, lv);
     W.fx.push({t:'hurt', life:0.10});
@@ -7791,6 +7797,7 @@ function killEnemy(e, byAlly){
     }
   }
   e.dead=true; S.run.kills++;
+  burstEnemyPixels(e);
   countMossKill(e);                 // 苔玉は層ごとに数える（口座側）
   scheduleRise(e);                  // 亡者は倒しても起き上がる
   /* 起き上がった亡者は二度目の実入りを出さない。出すと、同じ1体を
@@ -7805,10 +7812,11 @@ function killEnemy(e, byAlly){
      ——どちらも「主が呼んだ」もので、道中の自然湧きとは区別する。 */
   const offeringTrashMul = (!e.boss && S.run.depth===OFFERING_BOSS_DEPTH && (e.escort || e.summoned)) ? 3 : 1;
   const xp = Math.round((6+e.lv*4.2)*(e.elite?2.5:1)*(cfg?cfg.xp:1)*offeringTrashMul);
-  grantXp(xp);
+  const receivedXp = grantXp(xp) * (1 + boonSum(S.hero,'xp')/100);
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
                        *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
   S.run.gold+=g;
+  W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+Number(receivedXp.toFixed(1))+' EXP  +'+g+' G',c:'#e5d18c',life:1.3,max:1.3,reward:true});
 
   if(e.boss){
     /* ---------- 双子（第20階層）は先に倒した方では終わらない ----------
@@ -8556,7 +8564,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
      ここまで来ない——避けたのに押される、が起きると盾を構える理由が濁る。 */
   if(e && !boltDmg) knockBack(P, e, e.push);
   cancelMine('殴られて手が止まった');      // 掘っている最中に殴られたら中断
-  pop(P.x,P.y-0.4,dm,guarded?'#8fc7ff':(DTYPE[type]?DTYPE[type].col:'#ff8a80'));
+  popPlayerDamage(dm,guarded?'#8fc7ff':'#ffaaa0');
   W.fx.push({t:'hurt',life:guarded?0.12:0.2});
   damageGear('armor', DUR.armorPerHit);
   if(st.thorns && e && !e.dead){ e.hp-=dm*st.thorns/100; if(e.boss) e.revealed=true; if(e.hp<=0) killEnemy(e); }
@@ -9037,7 +9045,7 @@ function el(id){return document.getElementById(id)}
    スマホでの発熱の主因だったので、「前と同じ値なら触らない」を徹底する。 */
 const _hc={};
 function hset(key, val, apply){ if(_hc[key]!==val){ _hc[key]=val; apply(val); } }
-const cv=el('cv'), ctx=cv.getContext('2d');
+const cv=el('cv'); let ctx=cv.getContext('2d');
 
 /* ---------- 指の役割分担 ----------
    以前は **画面の左右**で決めていた（左半分＝スティック／右半分＝ガード）。
@@ -9097,7 +9105,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')) continue;
+    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
       if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
@@ -9139,7 +9147,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')));
+      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -9589,6 +9597,7 @@ function stepSim(seconds, opt){
   return ran;
 }
 function update(dt){
+  updateFeel(dt);
   /* 弔いの残り時間。stats() を取る前に減らす——同じフレーム内で
      「もう切れているのに効いている」状態を作らないため。 */
   if(S.hero.avengeT>0) S.hero.avengeT=Math.max(0, S.hero.avengeT-dt);
@@ -9604,7 +9613,7 @@ function update(dt){
   const pt={isPlayer:true, st:S.run.pst};
   tickStatus(pt, dt, (d,col)=>{
     if(godMode()) return;
-    S.hero.hpNow-=d; pop(P.x,P.y-0.4,d,col);
+    S.hero.hpNow-=d; popPlayerDamage(d,col,true);
   });
   if(S.hero.hpNow<=0){ die(); return; }
   const pChill = hasStatus({st:S.run.pst},'chill') ? (1-CHILL_SLOW) : 1;
@@ -9660,7 +9669,7 @@ function update(dt){
      解けた瞬間に、押しっぱなしの向きへそのまま走り出せる。
      落下演出の最中（P.fallAnim）も同じく歩けない・振れない。 */
   const froz = frozenNow();
-  if(m>0.15 && !W.mine && !froz && !P.fallAnim){
+  if(m>0.15 && !W.mine && !froz && !P.fallAnim && !P.dash){
     // ガード中は動きが鈍る。この game では移動＝回避なので、これがガードの代償になる。
     const known = windGrace() ? KNOWN_SPEED : 1;               // 疾風の加護
     const sp=st.ms*known*Math.min(1,m)*(P.guard && st.hasShield ? GUARD_MOVE_MUL : 1)*pChill
@@ -9960,7 +9969,7 @@ const CharacterArt = (function(){
     ctx.restore();
     return true;
   }
-  return {allyKey,enemyKey,heroKey,put,variantJobs:VARIANT_JOBS,
+  return {allyKey,enemyKey,heroKey,put,image:id=>ready(id)?img[id]:null,variantJobs:VARIANT_JOBS,
           heroArtKeys:['hero_scout','hero_cartographer','hero_salvager',
                        'hero_minewalker','hero_herbalist','hero_wanderer']};
 })();
@@ -9971,13 +9980,14 @@ function resize(){
   const dpr=Math.min(2,devicePixelRatio||1);
   cv.width=innerWidth*dpr; cv.height=innerHeight*dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  TS = clamp(Math.round(Math.min(innerWidth,innerHeight)/17), 22, 46);
+  TS = clamp(Math.round(Math.min(innerWidth,innerHeight)/13), 28, 60);
 }
 addEventListener('resize',resize);
 
 function draw(){
   ctx.fillStyle='#0d0f14'; ctx.fillRect(0,0,innerWidth,innerHeight);
   if(S.screen!=='game'||!W.fl||!S.hero||!S.run) return;
+  beginFeelWorld();
   const f=W.fl;
   // 層（10階層ごと）の見た目。色・装飾・明かりの届く距離がここで切り替わる。
   const Z = f.zone || ZONES[0];
@@ -10053,6 +10063,9 @@ function draw(){
         const sx=x*TS-camX, sy=y*TS-camY;
         if(sx<-TS||sy<-TS||sx>innerWidth||sy>innerHeight) continue;
         // 脈打たせる。動いていないと「ただの色違いの床」に見えて踏んでしまう。
+        if(['water','poison','spore','slick','lava'].includes(W.haz.kind)){
+          drawLivingLiquid(hz,sx,sy,x,y,t); continue;
+        }
         const puls = 0.5 + 0.5*Math.sin(t*1.6 + (x*0.7 + y*1.1));
         ctx.fillStyle = hz.col;
         ctx.globalAlpha = 0.72 + puls*0.16;
@@ -10181,6 +10194,7 @@ function draw(){
 
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
   W.enemies.forEach(e=>{
+    if(e.dead && e.pixelBurst) return;
     const sx=e.x*TS-camX, sy=e.y*TS-camY;
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
@@ -10702,6 +10716,7 @@ function draw(){
   }
 
   // 弾（敵の遠距離攻撃）・回収エフェクト
+  beginPixelFx();
   W.fx.forEach(f=>{
     if(f.t==='levelup'){       // レベルアップ：広がる二重の輪
       const k=1-f.life/f.max;
@@ -10856,6 +10871,8 @@ function draw(){
   });
 
   // 主人公（候補B・遺跡の斥候）。
+  endPixelFx();
+  drawEnemyPixels(camX,camY);
   const px=innerWidth/2, py=innerHeight/2;
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -10891,6 +10908,8 @@ function draw(){
   const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
+  const heroBob=feelHeroOffset();
+  ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   if(!heroBlinkOff){
     if(!CharacterArt.put(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
@@ -10901,7 +10920,9 @@ function draw(){
       ctx.restore();
     }
   }
+  ctx.restore();
   ctx.globalAlpha=1;
+  drawPlayerLight(camX,camY);
   label('自分', px, py-TS*0.72, '#7fe0c0');
   /* 貯めておいた仲間のHPバーをここでまとめて描く。
      主人公（直前に描いた「自分」の文字を含め）より後＝誰のキャラ絵よりも上になる。
@@ -10912,17 +10933,23 @@ function draw(){
     ctx.fillStyle=bar.col; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2*bar.pct,3.5);
   });
   // 攻撃エフェクト（属性ごとに形が変わる）
+  beginPixelFx();
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
+  endPixelFx();
   // ダメージ数値
   ctx.font='bold '+(TS*0.46)+'px sans-serif'; ctx.textAlign='center';
   W.pops.forEach(p=>{
-    ctx.globalAlpha=clamp(p.life/0.7,0,1); ctx.fillStyle=p.c;
-    const txt = p.txt !== undefined ? p.txt : (p.v + (p.mark||''));
-    ctx.fillText(txt, p.x*TS-camX, p.y*TS-camY-TS*0.5-(0.7-p.life)*26);
+    ctx.globalAlpha=clamp(p.life/0.3,0,1); ctx.fillStyle=p.c;
+    const txt = p.txt !== undefined ? p.txt : ((p.player?'-':'')+p.v + (p.mark||''));
+    ctx.font='bold '+Math.round(p.reward?Math.max(11,TS*.26):TS*.46)+'px monospace';
+    const tx=Math.round(p.x*TS-camX), ty=Math.round(p.y*TS-camY-TS*.5-((p.max||.7)-p.life)*26);
+    ctx.strokeStyle='#091017'; ctx.lineWidth=3; ctx.lineJoin='round';
+    ctx.strokeText(txt,tx,ty); ctx.fillText(txt,tx,ty);
   });
   ctx.globalAlpha=1;
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
   drawAir(Z, _drawDt);
+  ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
   // 被弾フラッシュ
   const hu=W.fx.find(f=>f.t==='hurt');
   if(hu){ ctx.fillStyle='rgba(196,67,63,'+(hu.life*1.2)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
@@ -11260,6 +11287,8 @@ function emberBurst(sx, sy, a, half, r, p, col, n){
    色だけ変えると「同じ絵にフィルタを掛けた」ようにしか見えない。
    床に落ちている物の形が変わると、同じ間取りでも別の場所に見える。 */
 function drawDeco(Z, sx, sy, lit, gx, gy){
+  drawLivingDeco(Z,sx,sy,lit,gx,gy);
+  if(['block','silt','vein'].includes(Z.deco)) return;
   const c = shade(Z.dot, lit);
   const h = (gx*7 + gy*13) % 4;              // タイル位置から決まる固定のばらつき
   ctx.fillStyle = c;
@@ -11706,19 +11735,13 @@ function layoutHud(force){
   layoutLeftColumn(base);                   // 左肩を先に積んでから
   layoutTargetInfo(base);                   // ログより先に、こちらの位置を決める
 
-  let top = 150;                            // 何も出ていないときの位置
-  for(const id of HUD_STACK){
-    const n=el(id); if(!n || n.style.display==='none') continue;
-    const r=n.getBoundingClientRect();
-    if(r.height>0) top = Math.max(top, r.bottom - base + 8);
-  }
-  lg.style.top = Math.round(top)+'px';
+  lg.style.top = 'auto';
 }
 
 let logs=[];
 function log(t){
-  logs.unshift(t); logs=logs.slice(0,5);
-  el('log').innerHTML=logs.map((l,i)=>'<div style="opacity:'+(1-i*0.18)+'">'+l+'</div>').join('');
+  logs.unshift(t); logs=logs.slice(0,5);   // 履歴は保持（判定・テストが参照する）
+  el('log').innerHTML='<div>'+t+'</div>';  // 画面には直近1件だけ（情報過多で読まれなくなっていたため）
   layoutHud(true);      // 行が増えた直後は、同じフレームでも測り直す
 }
 
@@ -14676,6 +14699,231 @@ function initHudOnce(){
 const nojs=el('nojs'); if(nojs && nojs.parentNode) nojs.parentNode.removeChild(nojs);
 initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
+</script>
+<script>
+/* Shared game feel. Visual state never changes combat rolls or save data. */
+const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0};
+const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
+function resetFeel(){
+  FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
+  FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
+}
+function syncFeel(){ if(FEEL.floor!==W.fl) resetFeel(); }
+function feelKick(strength,seconds){
+  syncFeel(); FEEL.strength=Math.max(FEEL.strength*(FEEL.kick/FEEL.kickMax),strength);
+  FEEL.kick=seconds; FEEL.kickMax=seconds;
+}
+function popPlayerDamage(damage,col,dot=false){
+  pop(P.x,P.y-.4,damage,col);
+  W.pops[W.pops.length-1].player=true;
+  feelKick(dot?1:2.8,dot?.1:.2);
+}
+function updateFeel(dt){
+  syncFeel(); FEEL.time+=dt; FEEL.kick=Math.max(0,FEEL.kick-dt);
+  FEEL.dashCd=Math.max(0,FEEL.dashCd-dt);
+  if(P.moving) FEEL.step+=dt*13;
+  let dx=P.moving?P.mvx:(P.dirx||1), dy=P.moving?P.mvy:(P.diry||0);
+  if(P.dash){const n=Math.hypot(P.dash.x1-P.dash.x0,P.dash.y1-P.dash.y0)||1;dx=(P.dash.x1-P.dash.x0)/n;dy=(P.dash.y1-P.dash.y0)/n;}
+  const blend=1-Math.exp(-dt*12);
+  FEEL.lightX+=(dx-FEEL.lightX)*blend; FEEL.lightY+=(dy-FEEL.lightY)*blend;
+  FEEL.particles=FEEL.particles.filter(p=>{
+    p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=dt*1.5;
+    p.vx*=Math.exp(-dt*2); return p.life>0;
+  });
+}
+function beginFeelWorld(){
+  syncFeel(); ctx.save();
+  if(FEEL_REDUCED.matches) return;
+  const kick=FEEL.strength*FEEL.kick/FEEL.kickMax;
+  const walk=P.moving?.8:0;
+  ctx.translate(Math.round(Math.sin(FEEL.time*83)*kick+Math.sin(FEEL.step)*walk),
+                Math.round(Math.cos(FEEL.time*71)*kick+Math.cos(FEEL.step*2)*walk));
+}
+function feelHeroOffset(){
+  if(FEEL_REDUCED.matches) return {x:0,y:0};
+  const k=FEEL.kick/FEEL.kickMax;
+  return {x:Math.round(Math.sin(FEEL.time*96)*k*2-P.dirx*P.swing*7),
+          y:Math.round((P.moving?-Math.abs(Math.sin(FEEL.step))*1.5:0)+Math.cos(FEEL.time*86)*k-P.diry*P.swing*7)};
+}
+
+// Short tap = dash. A drag keeps the existing movement stick; HUD taps stay UI taps.
+// Collision checks include the character radius and stop before pits, in small steps.
+function tapDash(cx,cy){
+  syncFeel();
+  if(S.screen!=='game'||!S.hero||!S.run||P.dash||FEEL.dashCd>0||frozenNow()||P.fallAnim||W.mine) return false;
+  let dx=stickDx,dy=stickDy;
+  if(keys.a||keys.arrowleft) dx=-1; if(keys.d||keys.arrowright) dx=1;
+  if(keys.w||keys.arrowup) dy=-1; if(keys.s||keys.arrowdown) dy=1;
+  if(Math.hypot(dx,dy)<.15){
+    dx=cx-innerWidth/2;dy=cy-innerHeight/2;
+    if(Math.hypot(dx,dy)<8){dx=P.dirx||1;dy=P.diry||0;}
+  }
+  const n=Math.hypot(dx,dy)||1; dx/=n;dy/=n;
+  const r=P.r||.32;
+  let gx=P.x,gy=P.y;
+  for(let d=.08;d<=2.4;d+=.08){
+    const x=P.x+dx*d,y=P.y+dy*d;
+    if([[-r,-r],[r,-r],[-r,r],[r,r],[0,0]].some(([ox,oy])=>{
+      const row=W.fl.g[Math.floor(y+oy)],t=row?.[Math.floor(x+ox)];
+      return t===undefined||t===T.WALL||t===T.PIT;
+    })) break;
+    gx=x;gy=y;
+  }
+  if(Math.hypot(gx-P.x,gy-P.y)<.12) return false;
+  P.dirx=dx;P.diry=dy;
+  P.dash={x0:P.x,y0:P.y,x1:gx,y1:gy,t:0,max:.2,col:'#91dfcb'};
+  FEEL.dashCd=.8; feelKick(1.5,.14);
+  return true;
+}
+const feelPointers=new Map();
+cv.addEventListener('pointerdown',e=>{
+  if(S.screen!=='game'||e.button!==0) return;
+  feelPointers.set(e.pointerId,{x:e.clientX,y:e.clientY,t:performance.now(),drag:false});
+});
+addEventListener('pointermove',e=>{
+  const p=feelPointers.get(e.pointerId);
+  if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>10) p.drag=true;
+});
+addEventListener('pointerup',e=>{
+  const p=feelPointers.get(e.pointerId);feelPointers.delete(e.pointerId);
+  if(p&&!p.drag&&performance.now()-p.t<300&&Math.hypot(e.clientX-p.x,e.clientY-p.y)<=10) tapDash(e.clientX,e.clientY);
+});
+addEventListener('pointercancel',e=>feelPointers.delete(e.pointerId));
+addEventListener('blur',()=>feelPointers.clear());
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='x'&&!e.repeat) tapDash(innerWidth/2,innerHeight/2);});
+
+// Render the existing effects at a shared coarse pixel resolution, preserving their timing.
+const feelFxCanvas=document.createElement('canvas'),feelFxCtx=feelFxCanvas.getContext('2d');
+let feelMainCtx=null;
+function beginPixelFx(){
+  const q=Math.max(2,Math.round(TS/16));
+  const w=Math.ceil(innerWidth/q),h=Math.ceil(innerHeight/q);
+  if(feelFxCanvas.width!==w||feelFxCanvas.height!==h){feelFxCanvas.width=w;feelFxCanvas.height=h;}
+  feelFxCtx.setTransform(1,0,0,1,0,0);feelFxCtx.clearRect(0,0,w,h);
+  feelFxCtx.save();feelFxCtx.scale(1/q,1/q);feelMainCtx=ctx;ctx=feelFxCtx;
+}
+function endPixelFx(){
+  const q=Math.max(2,Math.round(TS/16));
+  feelFxCtx.restore();ctx=feelMainCtx;
+  ctx.save();ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(feelFxCanvas,0,0,feelFxCanvas.width*q,feelFxCanvas.height*q);ctx.restore();
+}
+
+// Exact grid traversal: rays stop at the first wall face, never behind it.
+function feelLightRay(ang,range){
+  const dx=Math.cos(ang),dy=Math.sin(ang),f=W.fl;
+  let x=Math.floor(P.x),y=Math.floor(P.y),dist=0;
+  const sx=dx<0?-1:1,sy=dy<0?-1:1;
+  const ddx=Math.abs(1/dx),ddy=Math.abs(1/dy);
+  let tx=(dx<0?P.x-x:x+1-P.x)*ddx,ty=(dy<0?P.y-y:y+1-P.y)*ddy;
+  for(let i=0;i<40;i++){
+    if(tx<ty){dist=tx;tx+=ddx;x+=sx;}else{dist=ty;ty+=ddy;y+=sy;}
+    if(dist>=range){dist=range;break;}
+    if(!f.g[y]||f.g[y][x]===undefined||f.g[y][x]===T.WALL) break;
+  }
+  return {x:P.x+dx*dist,y:P.y+dy*dist};
+}
+function drawPlayerLight(camX,camY){
+  const px=P.x*TS-camX,py=P.y*TS-camY;
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  const paint=(angle,spread,range,col,alpha)=>{
+    ctx.save();ctx.beginPath();ctx.moveTo(px,py);
+    for(let i=0;i<=100;i++){
+      const p=feelLightRay(angle-spread/2+spread*i/100,range);
+      ctx.lineTo(p.x*TS-camX,p.y*TS-camY);
+    }
+    ctx.closePath();ctx.clip();
+    const g=ctx.createRadialGradient(px,py,0,px,py,range*TS);
+    g.addColorStop(0,`rgba(${col},${alpha})`);g.addColorStop(.45,`rgba(${col},${alpha*.5})`);g.addColorStop(1,`rgba(${col},0)`);
+    ctx.fillStyle=g;ctx.fillRect(px-range*TS,py-range*TS,range*TS*2,range*TS*2);ctx.restore();
+  };
+  paint(0,Math.PI*2,2.7,'91,181,148',.16);
+  const angle=Math.atan2(FEEL.lightY,FEEL.lightX);
+  paint(angle,1.45,5.8,'125,184,160',.035);
+  paint(angle,1.15,5.8,'125,184,160',.045);
+  paint(angle,.85,5.8,'125,184,160',.055);
+  ctx.restore();
+}
+
+function drawLivingLiquid(hz,sx,sy,gx,gy,time){
+  const q=TS/16,phase=FEEL_REDUCED.matches?0:time;
+  ctx.save();ctx.fillStyle=hz.col;ctx.globalAlpha=.76;ctx.fillRect(sx,sy,TS+1,TS+1);
+  // All pools share a world-space flow; boundaries only appear at the actual bank.
+  ctx.fillStyle=hz.edge;
+  for(let j=2;j<16;j+=4){
+    const wave=Math.sin((gy*16+j)*.24+phase*1.4+gx*.4);
+    const x=((gx*7+j*3+Math.floor(phase*3+wave*2))%13+13)%13;
+    ctx.globalAlpha=.16+.13*(wave+1)/2;
+    ctx.fillRect(Math.round(sx+x*q),Math.round(sy+j*q),q*(2+(j%3)),Math.max(1,q));
+    ctx.globalAlpha=.09;ctx.fillRect(Math.round(sx+(15-x)*q),Math.round(sy+(j+1)*q),q,q);
+  }
+  const wet=(x,y)=>W.haz.g[y]?.[x];
+  ctx.globalAlpha=.42;
+  if(!wet(gx,gy-1))ctx.fillRect(sx,sy,TS,q);
+  if(!wet(gx,gy+1))ctx.fillRect(sx,sy+TS-q,TS,q);
+  if(!wet(gx-1,gy))ctx.fillRect(sx,sy,q,TS);
+  if(!wet(gx+1,gy))ctx.fillRect(sx+TS-q,sy,q,TS);
+  // A small stepped wake follows anyone moving through a pool.
+  const d=Math.hypot(gx+.5-P.x,gy+.5-P.y);
+  if(d<.8&&P.moving){ctx.globalAlpha=.6;ctx.fillRect(sx+q*3,sy+q*12,q*3,q);ctx.fillRect(sx+q*10,sy+q*10,q*2,q);}
+  ctx.restore();
+}
+function drawLivingDeco(Z,sx,sy,lit,gx,gy){
+  const seed=(gx*17+gy*31)>>>0,q=TS/16;
+  const sway=FEEL_REDUCED.matches?0:Math.round(Math.sin(FEEL.time*1.8+seed)*1.1);
+  const near=Math.hypot(gx+.5-P.x,gy+.5-P.y)<1&&P.moving;
+  const bend=sway+(near?2:0),kind=seed%5;
+  const rect=(x,y,w,h,c)=>{ctx.fillStyle=shade(c,lit);ctx.fillRect(Math.round(sx+x*q),Math.round(sy+y*q),w*q,h*q);};
+  if(kind<3){
+    for(let i=0;i<3;i++){rect(5+i*3,10,1,3,'#435a43');rect(5+i*3+bend,6+i%2,1,4,Z.id==='sump'?'#548d88':'#6c9170');}
+  }else if(kind===3){
+    rect(7,9,2,4,'#7d8a73');rect(5+bend,7,6,2,Z.id==='root'?'#9bb77b':'#748d86');rect(6+bend,6,4,1,'#b3c5a0');rect(6+bend,7,1,1,'#d1d3a8');
+  }else{
+    const crawl=FEEL_REDUCED.matches?0:Math.round(Math.sin(FEEL.time*.65+seed)*2);
+    rect(6+crawl,10,3,2,'#688879');rect(8+crawl,9,2,2,'#89a590');rect(9+crawl,9,1,1,'#cadab8');
+    rect(5+crawl,12,1,1,'#4a665a');rect(8+crawl+sway,12,1,1,'#4a665a');
+  }
+}
+
+// Sample the enemy's own sprite pixels. Geometric enemies are rasterized first.
+function burstEnemyPixels(e){
+  syncFeel();
+  const im=CharacterArt.image(CharacterArt.enemyKey(e))||sprite(mossSpriteKey(e));
+  const n=im?Math.min(32,im.naturalWidth):16;
+  const c=document.createElement('canvas');c.width=c.height=n;
+  const cc=c.getContext('2d',{willReadFrequently:true});cc.imageSmoothingEnabled=false;
+  if(im) cc.drawImage(im,0,0,n,n);
+  else{
+    const main=ctx;ctx=cc;
+    cc.fillStyle=e.col||e.arch.col;shape(e.arch.id,n/2,n/2,n*.36);cc.fill();ctx=main;
+  }
+  let data;try{data=cc.getImageData(0,0,n,n).data;}catch{return;}
+  const r=(e.boss||e.looksBoss)?e.r:(e.intruder?.54:e.uniq?.46:e.elite?.42:.32);
+  const size=CharacterArt.enemyKey(e)?(e.uniqueBoss===5?r*2.25:e.elite?1.12:1):im?r*2.6:r*2.8;
+  // Hard cap protects mass kills; no gameplay RNG calls for visual particles.
+  const cap=1400;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    const i=(y*n+x)*4;if(data[i+3]<100)continue;
+    const dx=(x+.5)/n-.5,dy=(y+.5)/n-.5;
+    const noise=((x*73+y*151)%97)/97;
+    FEEL.particles.push({x:e.x+dx*size*((e._artFace)||1),y:e.y+dy*size,
+      vx:FEEL_REDUCED.matches?0:dx*(2+noise*3),vy:FEEL_REDUCED.matches?0:dy*3-1,
+      life:.5+noise*.35,max:.5+noise*.35,size:size/n,c:`rgb(${data[i]},${data[i+1]},${data[i+2]})`});
+  }
+  if(FEEL.particles.length>cap)FEEL.particles.splice(0,FEEL.particles.length-cap);
+  e.pixelBurst=true;
+}
+function drawEnemyPixels(camX,camY){
+  ctx.save();
+  for(const p of FEEL.particles){
+    if(!tileSeen(p.x,p.y))continue;
+    ctx.globalAlpha=Math.min(1,p.life/.25);ctx.fillStyle=p.c;
+    const size=Math.max(1,Math.round(p.size*TS));
+    ctx.fillRect(Math.round(p.x*TS-camX),Math.round(p.y*TS-camY),size,size);
+  }
+  ctx.restore();
+}
+
 </script>
 </body>
 </html>

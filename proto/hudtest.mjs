@@ -44,16 +44,23 @@ R.miniBottomRight = await pg.evaluate(()=>{
           ok: ox>innerWidth*0.5 && oy>innerHeight*0.5 && oy+mh<=innerHeight-96};
 });
 
-// 1-b. パーティ表示や敵の情報パネルと重ならない（上の帯から離れた）
+/* 1-b. パーティ表示や敵の情報パネルと重ならない（上の帯から離れた）。
+   ログだけは画面下中央の固定表示なので、同じ判定はできない
+   （下の帯にいること自体は正しい）。ミニマップの実際の矩形と
+   交差していないかで見る。 */
 R.miniClear = await pg.evaluate(()=>{
   const f=W.fl, s=Math.min(110/f.W, 110/f.H);
-  const mh=f.H*s, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
+  const mw=f.W*s, mh=f.H*s;
+  const ox=innerWidth-mw-14, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
   const base=el('hud').getBoundingClientRect().top;
-  const clash=['partybar','targetinfo','log'].filter(id=>{
+  const clash=['partybar','targetinfo'].filter(id=>{
     const n=el(id); if(!n || n.style.display==='none') return false;
     const r=n.getBoundingClientRect();
     return r.height>0 && r.bottom-base > oy;
   });
+  const lg=el('log').getBoundingClientRect();
+  const logClash = lg.height>0 && lg.left<ox+mw && ox<lg.right && lg.top<oy+mh && oy<lg.bottom;
+  if(logClash) clash.push('log');
   return {clash, minimapTop:Math.round(oy), ok: clash.length===0};
 });
 
@@ -153,10 +160,10 @@ R.logClear = await pg.evaluate(()=>{
           ok: clash.length===0 && logs.length===3};
 });
 
-/* 4-b. 仲間が増えるほど下がる（人数ぶん伸びる表示に追従する）。
-       測り直しは1フレームに1回なので、**フレームを進めてから**測る。
-       updateHUD() を直に呼ぶだけだと同じフレーム扱いになり、前回の位置を読む。
-       比べるのは仲間の数だけの差にしたいので、敵の情報パネルは出さないでおく。 */
+/* 4-b. 仲間が増えても位置は動かない（画面下固定・直近1件だけの表示に
+       作り替えたため）。以前は人数ぶん押し下げる仕様だったが、今は
+       他のHUD状態と無縁の固定位置。パーティ表示の下にある、という
+       関係だけは変わらず保証する。 */
 R.logFollowsParty = await pg.evaluate(()=>{
   TH.busyFloor();
   /* 敵ごと片付けて、敵の情報パネルが出ない状態にそろえる。
@@ -176,8 +183,8 @@ R.logFollowsParty = await pg.evaluate(()=>{
   const pb=el('partybar').getBoundingClientRect();
   return {alone:Math.round(alone), withTwo:Math.round(withTwo),
           partyBottom:Math.round(pb.bottom),
-          moved: withTwo>alone, belowParty: withTwo>=pb.bottom,
-          ok: withTwo>alone && withTwo>=pb.bottom};
+          fixedRegardlessOfParty: withTwo===alone, belowParty: withTwo>=pb.bottom,
+          ok: withTwo===alone && withTwo>=pb.bottom};
 });
 
 /* ================= 5. 左肩の縦積み =================

@@ -1,0 +1,104 @@
+<!doctype html><meta charset="utf-8"><title>Game feel regression</title>
+<style>body{background:#10171c;color:#d5e5df;font:14px monospace}iframe{border:1px solid #567;width:390px;height:844px}pre{white-space:pre-wrap}button{padding:10px;margin:6px}</style>
+<h1>Game feel regression</h1><pre id="result">Running…</pre>
+<button onclick="scene(11)">Water preview</button><button onclick="scene(21)">Root preview</button>
+<iframe id="game" src="index.html?feel-test"></iframe>
+<script>
+const frame=document.getElementById('game');
+const errors=[];
+function scene(depth){frame.contentWindow.eval(`S.hero=newHero();startRun(${depth});P.invuln=999;W.enemies=[];S.run.pst={};`);}
+frame.onload=async()=>{
+  const w=frame.contentWindow;
+  w.addEventListener('error',e=>errors.push(e.message));
+  // Allow embedded sprites to decode before verifying source-pixel explosions.
+  await Promise.all(Array.from(w.document.images).map(im=>im.decode().catch(()=>{})));
+  const results=w.eval(`(()=>{
+    const out=[];const check=(name,fn)=>{try{if(!fn())throw Error('assertion failed');out.push({name,pass:true});}catch(e){out.push({name,pass:false,error:e.message});}};
+    S.name='Feel test';S.hero=newHero();startRun(1);W.enemies=[];S.hero.party=[];
+    const room=W.fl.rooms.find(r=>r.w>=6&&r.h>=6);
+    P.x=room.x+2.5;P.y=room.y+2.5;syncFeel();
+    check('Tap starts one dash and cooldown rejects repeat',()=>{
+      const x=P.x;const started=tapDash(innerWidth*.8,innerHeight/2);
+      const blocked=!tapDash(innerWidth*.8,innerHeight/2);
+      stepSim(.25);return started&&blocked&&P.x>x+1&&!P.dash;
+    });
+    check('Held movement direction wins over attack facing',()=>{
+      FEEL.dashCd=0;P.x=room.x+2.5;P.y=room.y+2.5;P.dirx=-1;P.diry=0;keys.d=1;
+      const ok=tapDash(innerWidth/2,innerHeight/2)&&P.dash.x1>P.x;keys.d=0;P.dash=null;return ok;
+    });
+    check('Dash stops with radius clearance before wall',()=>{
+      FEEL.dashCd=0;P.x=room.x+2.5;P.y=room.y+2.5;
+      const x=Math.floor(P.x)+2,y=Math.floor(P.y),old=W.fl.g[y][x];W.fl.g[y][x]=T.WALL;
+      const ok=tapDash(innerWidth,innerHeight/2)&&P.dash.x1+P.r<x;
+      stepSim(.25);const clear=P.x+P.r<x;W.fl.g[y][x]=old;return ok&&clear;
+    });
+    check('Dash stops before pit even in a floor without pit metadata',()=>{
+      FEEL.dashCd=0;P.x=room.x+2.5;P.y=room.y+2.5;
+      const x=Math.floor(P.x)+2,y=Math.floor(P.y),old=W.fl.g[y][x];W.fl.g[y][x]=T.PIT;
+      const ok=tapDash(innerWidth,innerHeight/2)&&P.dash.x1+P.r<x;
+      P.dash=null;W.fl.g[y][x]=old;return ok;
+    });
+    check('Pointer tap works; drag and cancellation do not dash',()=>{
+      FEEL.dashCd=0;P.x=room.x+2.5;P.y=room.y+2.5;
+      const send=(t,x,id=7)=>cv.dispatchEvent(new PointerEvent(t,{bubbles:true,pointerId:id,clientX:x,clientY:innerHeight/2,button:0}));
+      send('pointerdown',300);send('pointerup',300);const tap=!!P.dash;P.dash=null;FEEL.dashCd=0;
+      send('pointerdown',200);send('pointermove',230);send('pointerup',200);const drag=!P.dash;
+      send('pointerdown',300);send('pointercancel',300);send('pointerup',300);return tap&&drag&&!P.dash;
+    });
+    check('Menu blocks dash and does not advance cooldown',()=>{
+      FEEL.dashCd=.5;setScreen('bag');const blocked=!tapDash(300,400);stepSim(.2);
+      const same=FEEL.dashCd===.5;setScreen('game');return blocked&&same;
+    });
+    check('Touch drag releases; HUD buttons never acquire the stick',()=>{
+      touchStart({changedTouches:[{identifier:90,clientX:180,clientY:400,target:cv}]});
+      touchMove({changedTouches:[{identifier:90,clientX:220,clientY:400}]});
+      const moved=stickDx>0;
+      touchEnd({changedTouches:[{identifier:90}],touches:[]});
+      const released=stickId===null&&stickDx===0;
+      touchStart({changedTouches:[{identifier:91,clientX:350,clientY:180,target:el('bagbtn')}]});
+      return moved&&released&&stickId===null;
+    });
+    check('Light stops on wall face and illuminated pixels do not leak behind it',()=>{
+      P.x=room.x+2.5;P.y=room.y+2.5;
+      const x=Math.floor(P.x)+1,y=Math.floor(P.y),old=W.fl.g[y][x];W.fl.g[y][x]=T.WALL;
+      const ray=feelLightRay(0,5.8),save=ctx,c=document.createElement('canvas');c.width=800;c.height=800;ctx=c.getContext('2d');
+      ctx.fillStyle='#000';ctx.fillRect(0,0,800,800);FEEL.lightX=1;FEEL.lightY=0;
+      const camX=P.x*TS-200,camY=P.y*TS-200;drawPlayerLight(camX,camY);
+      const at=d=>ctx.getImageData(Math.round(200+d*TS),200,1,1).data[1];
+      const ok=Math.abs(ray.x-x)<1e-6&&at(.2)>0&&at(1.8)===0;ctx=save;W.fl.g[y][x]=old;return ok;
+    });
+    check('Kill shows credited XP and G; death emits original colored pixels only once',()=>{
+      enterFloor(1);syncFeel();const e=W.enemies.find(e=>!e.undying&&!e.moss);P.x=e.x-.8;P.y=e.y;
+      const gold=S.run.gold,particles=FEEL.particles.length;killEnemy(e);
+      const count=FEEL.particles.length,pop=W.pops.find(p=>p.reward);
+      killEnemy(e);return e.dead&&e.pixelBurst&&count>particles&&count===FEEL.particles.length&&pop.txt.includes('+'+(S.run.gold-gold)+' G')&&pop.txt.includes(' EXP');
+    });
+    check('Damage produces readable player pop and shake',()=>{
+      P.invuln=0;P.guard=false;S.hero.hpNow=stats(S.hero).maxHp;W.pops=[];
+      for(let i=0;i<20&&!W.pops.some(p=>p.v>0);i++)hitPlayer(null,5,'blunt',1);
+      return W.pops.some(p=>p.v>0&&Math.abs(p.x-P.x)<.1)&&FEEL.kick>0;
+    });
+    check('Latest log only, bottom placement, no prompt overlap',()=>{
+      log('first');log('second');el('prompt').style.display='block';layoutHud(true);
+      const r=el('log').getBoundingClientRect(),p=el('prompt').getBoundingClientRect();
+      return el('log').children.length===1&&el('log').textContent==='second'&&r.top>innerHeight/2&&r.bottom<p.top;
+    });
+    check('World/effect rendering restores main context and transform',()=>{
+      if(S.screen!=='game')throw Error('not in game: '+S.screen);
+      const main=ctx,before=ctx.getTransform();draw();const after=ctx.getTransform();
+      return ctx===main&&before.a===after.a&&before.e===after.e&&before.f===after.f;
+    });
+    check('Water and root layers draw; particles reset at floor transition',()=>{
+      for(const d of [11,21]){enterFloor(d);if(S.screen!=='game')throw Error('not in game: '+S.screen);draw();if(FEEL.particles.length) return false;}
+      return true;
+    });
+    check('Particle budget and lifetime stay bounded',()=>{
+      const e=W.enemies.find(e=>!e.undying);for(let i=0;i<12;i++)burstEnemyPixels(e);
+      const bounded=FEEL.particles.length<=1400;updateFeel(2);return bounded&&FEEL.particles.length===0;
+    });
+    const start=performance.now();for(let i=0;i<30;i++)draw();out.push({name:'30 draw frames (ms)',ms:Math.round(performance.now()-start)});
+    setScreen('none');return out;
+  })()`);
+  document.getElementById('result').textContent=JSON.stringify({results,errors},null,2);
+};
+</script>

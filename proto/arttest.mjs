@@ -427,15 +427,18 @@ R.logNoOverlap = await pg.evaluate(()=>{
           clash, ok: clash.length===0 && logs.length===3};
 });
 
-/* 5-b. 何も出ていないときは元の高さに戻る（下がりっぱなしにならない）。
-       測り直しは1フレームに1回なので、**フレームを進めてから**測る。
-       敵は片付ける——自動で狙い直すので、P.target を消すだけでは
-       次のフレームで情報パネルが戻ってくる。 */
+/* 5-b. ログは画面下に固定表示になった（直近1件だけ、情報過多対策）。
+       以前は仲間や敵の情報パネルぶん押し下げられ、片付くと元の高さに
+       戻る仕様だったが、今は他のHUD状態に連動しない固定位置なので、
+       周りが賑やかでも静かでも位置が変わらないことを見る。 */
 R.logResets = await pg.evaluate(()=>{
+  log('位置確認用');
+  stepSim(0.1);
+  const busy=Math.round(el('log').getBoundingClientRect().top);
   S.hero.party=[]; TH.clearEnemies(); P.target=null;
   stepSim(0.1);
-  const t=Math.round(el('log').getBoundingClientRect().top);
-  return {top:t, ok: t<=170};
+  const cleared=Math.round(el('log').getBoundingClientRect().top);
+  return {busy, cleared, ok: busy===cleared};
 });
 
 // 5-c. 雑魚の名前は狙っている1体だけ（乱戦で足元が文字の山にならない）

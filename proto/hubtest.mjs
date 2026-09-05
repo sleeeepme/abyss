@@ -174,8 +174,9 @@ R.revealOnCollect = await pg.evaluate(async ()=>{
   const expected=S.grave.items.map(itemName);
   P.x=W.grave.x; P.y=W.grave.y;
   await new Promise(r=>setTimeout(r,300));
-  const logHtml=document.getElementById('log').innerHTML;
-  return {collected:S.grave===null, logShowsNames: expected.slice(0,1).some(n=>logHtml.includes(n))};
+  // 画面には直近1件しか出ない表示なので、「言われたか」は履歴(logs)で見る
+  const logHistory=logs.join(' / ');
+  return {collected:S.grave===null, logShowsNames: expected.slice(0,1).some(n=>logHistory.includes(n))};
 });
 
 /* ============ ガチャは1日5回（探索では戻らない） ============ */
