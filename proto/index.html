@@ -9030,6 +9030,13 @@ addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
 let stickId=null, stickOx=0, stickOy=0, stickDx=0, stickDy=0;
 const stickEl=el('stick'), knobEl=el('knob');
 function el(id){return document.getElementById(id)}
+/* HUDの書き換えを間引くための差分チェック。
+   updateHUD() は毎フレーム（60回/秒）呼ばれるが、値そのものは
+   ほとんどのフレームで前回と同じ——それでも innerHTML/textContent/style を
+   毎回書き直すと、ブラウザは変わっていなくても再パース・再レイアウトをやり直す。
+   スマホでの発熱の主因だったので、「前と同じ値なら触らない」を徹底する。 */
+const _hc={};
+function hset(key, val, apply){ if(_hc[key]!==val){ _hc[key]=val; apply(val); } }
 const cv=el('cv'), ctx=cv.getContext('2d');
 
 /* ---------- 指の役割分担 ----------
@@ -10037,9 +10044,11 @@ function draw(){
   if(W.haz){
     const hz=hazardDef(W.haz.kind);
     const t=performance.now()/1000;
-    for(let y=0;y<f.H;y++){
+    // 描くのは画面に映っている範囲だけ（地形本体のループと同じ x0..x1/y0..y1）。
+    // 階層全体（最大96×96）を毎フレーム舐めていたのを、可視範囲に絞る。
+    for(let y=y0;y<=y1;y++){
       const row=W.haz.g[y]; if(!row) continue;
-      for(let x=0;x<f.W;x++){
+      for(let x=x0;x<=x1;x++){
         if(!row[x] || !W.seen[y][x]) continue;
         const sx=x*TS-camX, sy=y*TS-camY;
         if(sx<-TS||sy<-TS||sx>innerWidth||sy>innerHeight) continue;
@@ -11409,8 +11418,9 @@ function updateHUD(){
   // 疾風の加護。切れたことに気づけるよう、効いているあいだは出しっぱなしにする
   const wg = windGrace()
     ? `<span style="color:#7fe0c0">🌀 疾風の加護</span>` : '';
-  el('statusbar').innerHTML = wg + av + act.map(k=>
-    `<span style="color:${STATUS[k].col}">${STATUS[k].nm} ${pst[k].t.toFixed(1)}</span>`).join('');
+  hset('statusbar.h', wg + av + act.map(k=>
+    `<span style="color:${STATUS[k].col}">${STATUS[k].nm} ${pst[k].t.toFixed(1)}</span>`).join(''),
+    v=>el('statusbar').innerHTML=v);
 
   /* ---------- 敵の情報パネルは廃止 ----------
      画面上部中央に出していたが、そこはラスボス戦のデバフ帯と同じ場所で、
@@ -11419,9 +11429,9 @@ function updateHUD(){
 
      代わりに敵そのものへ寄せる。名前の下に Lv を出せば、視線を戦場から
      外さずに強さが読める（描画は draw() の敵ラベル側）。
-     弱点・耐性は一旦しまう。属性の見せ方は図鑑で引ける形が残っている。 */
-  el('targetinfo').style.display='none';
-  el('hpfill').style.width = clamp(S.hero.hpNow/st.maxHp*100,0,100)+'%';
+     弱点・耐性は一旦しまう。属性の見せ方は図鑑で引ける形が残っている。
+     常に非表示で固定なので、初期化時に一度だけ消せば足りる（initHudOnce 参照）。 */
+  hset('hpfill.w', clamp(S.hero.hpNow/st.maxHp*100,0,100)+'%', v=>el('hpfill').style.width=v);
   /* レベルアップ直後だけHPバーが光る。バーが一気に満ちる瞬間と重ねることで、
      「上がった」と「全快した」を1つの出来事として見せる。 */
   if(_lvFlash>0){
@@ -11432,15 +11442,16 @@ function updateHUD(){
   }else if(el('hpfill').style.boxShadow){
     el('hpfill').style.boxShadow=''; el('hpfill').style.background='';
   }
-  el('xpfill').style.width = clamp(S.hero.xp/xpNeed(S.hero.lv)*100,0,100)+'%';
-  el('stat').textContent = 'Lv.'+S.hero.lv+'  HP '+Math.max(0,Math.ceil(S.hero.hpNow))+'/'+st.maxHp+
-    '   ATK '+Math.round(st.atk)+'  DEF '+Math.round(st.def)+'  MF '+st.mf;
-  el('dnum').textContent = S.run.depth;
+  hset('xpfill.w', clamp(S.hero.xp/xpNeed(S.hero.lv)*100,0,100)+'%', v=>el('xpfill').style.width=v);
+  hset('stat.t', 'Lv.'+S.hero.lv+'  HP '+Math.max(0,Math.ceil(S.hero.hpNow))+'/'+st.maxHp+
+    '   ATK '+Math.round(st.atk)+'  DEF '+Math.round(st.def)+'  MF '+st.mf,
+    v=>el('stat').textContent=v);
+  hset('dnum.t', S.run.depth, v=>el('dnum').textContent=v);
   // 階層カウンタの脇に層の名前を出す。「今どこにいるか」を数字以外でも持たせる。
   // 地名を持つ階（51階＝アビスの口）は、層の名前ではなくそちらを出す
   const pl = floorPlace(S.run.depth);
   const z = pl || (W.fl && W.fl.zone);
-  el('dsub').innerHTML = '階層'
+  hset('dsub.h', '階層'
     + (knownFloor(S.run.depth) ? ' <span style="color:#7fe0c0;font-size:9px">踏破済</span>' : '')
     + (z ? '<br><span class="zn" style="color:'+z.accent+'">'+z.nm+'</span>' : '')
     + '<br>'+S.run.loot.length+'点 / '+S.run.gold+'G'
@@ -11451,8 +11462,9 @@ function updateHUD(){
           + activeCurses().map(id=>{ const c=curseDef(id);
               return '<span style="color:'+c.col+'">'+c.icon+'</span>'; }).join('')
           + '</span>'
-        : '');
-  el('bagcount').textContent = S.run.loot.length;
+        : ''),
+    v=>el('dsub').innerHTML=v);
+  hset('bagcount.t', S.run.loot.length, v=>el('bagcount').textContent=v);
 
   // 大技のボタン
   const ub=el('ultbtn'), u=ultEquipped();
@@ -11460,10 +11472,11 @@ function updateHUD(){
     const ready=(P.ultCd||0)<=0;
     ub.classList.add('on');
     ub.classList.toggle('ready', ready);
-    ub.style.color = ready ? u.col : '';
-    el('ult-icon').textContent = u.icon;
-    el('ult-nm').textContent = u.nm;
-    el('ult-cd').textContent = ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s';
+    hset('ultbtn.col', ready ? u.col : '', v=>ub.style.color=v);
+    hset('ult-icon.t', u.icon, v=>el('ult-icon').textContent=v);
+    hset('ult-nm.t', u.nm, v=>el('ult-nm').textContent=v);
+    // Math.ceil なので実際には1秒に1回しか値が変わらない——差分チェックが素直に効く。
+    hset('ult-cd.t', ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s', v=>el('ult-cd').textContent=v);
   }else ub.classList.remove('on');
 
   /* 盾のボタン。**盾が無くても消さない**——グレーで出しておく。
@@ -11478,11 +11491,11 @@ function updateHUD(){
   // ただし出るのは一撃入れてから（revealed）。それまでは名前もゲージも伏せる。
   const boss = W.enemies.find(e=>e.boss && !e.dead && e.revealed);
   const bb=el('bossbar');
+  hset('bossbar.disp', boss?'block':'none', v=>bb.style.display=v);
   if(boss){
-    bb.style.display='block';
-    el('bossfill').style.width = clamp(boss.hp/boss.maxHp*100,0,100)+'%';
-    el('bossname').textContent = boss.name + (boss.rage?'（激昂）':'');
-  }else bb.style.display='none';
+    hset('bossfill.w', clamp(boss.hp/boss.maxHp*100,0,100)+'%', v=>el('bossfill').style.width=v);
+    hset('bossname.t', boss.name + (boss.rage?'（激昂）':''), v=>el('bossname').textContent=v);
+  }
   /* デバフ（枷）の帯。
      ・ラスボスと実際に戦っている間（S.run.bossBane）は、次々切り替わる枷の
        残り時間を本物のゲージで見せる——ボスのHPバーと同じ場所を取り合っていた
@@ -11492,58 +11505,64 @@ function updateHUD(){
        時間で切れない効果に「満タンのまま出しっぱなし」のゲージを添えるのが、
        そもそもボスバーと重なる帯を常設していた原因だった。 */
   const tb=el('trialbar'), tr=S.run && S.run.trial, fbane=S.run && S.run.bossBane;
+  const trialShown = !!(fbane || (tr && tr.t>0));
+  hset('trialbar.disp', trialShown?'block':'none', v=>tb.style.display=v);
   if(fbane){
-    tb.style.display='block';
-    el('trialfill').style.width = clamp(fbane.t/fbane.max*100,0,100)+'%';
-    el('trialname').textContent = '⛓ '+trialBaneDef(fbane.id).nm+'　あと '+Math.ceil(fbane.t)+'秒';
+    hset('trialfill.w', clamp(fbane.t/fbane.max*100,0,100)+'%', v=>el('trialfill').style.width=v);
+    hset('trialname.t', '⛓ '+trialBaneDef(fbane.id).nm+'　あと '+Math.ceil(fbane.t)+'秒', v=>el('trialname').textContent=v);
   }else if(tr && tr.t>0){
-    tb.style.display='block';
-    el('trialfill').style.width = clamp(tr.t/tr.max*100,0,100)+'%';
-    el('trialname').textContent = '🗿 試練　'+trialBaneDef(tr.bane).nm+'　あと '+Math.ceil(tr.t)+'秒';
-  }else tb.style.display='none';
-  // ボスバーが出ているときだけ、その実測の下へデバフ帯を落とす（重ならないように）
-  if(bb.style.display!=='none' && tb.style.display!=='none'){
-    const base=el('hud').getBoundingClientRect().top;
-    const r=bb.getBoundingClientRect();
-    if(r.height>0) tb.style.top=Math.round(r.bottom-base+8)+'px';
-  }else tb.style.top='';
+    hset('trialfill.w', clamp(tr.t/tr.max*100,0,100)+'%', v=>el('trialfill').style.width=v);
+    hset('trialname.t', '🗿 試練　'+trialBaneDef(tr.bane).nm+'　あと '+Math.ceil(tr.t)+'秒', v=>el('trialname').textContent=v);
+  }
+  /* ボスバーが出ているときだけ、その実測の下へデバフ帯を落とす（重ならないように）。
+     getBoundingClientRect は強制レイアウトを伴う重い呼び出しなので、
+     ボス戦中ずっと毎フレーム呼ぶのはやりすぎ——表示の組み合わせが
+     「切り替わった瞬間」だけ測り直せば、位置がずれることはない。 */
+  const bothShown = !!boss && trialShown;
+  // rage も鍵に含める。名前に「（激昂）」が付き足で折り返して高さが変わりうるため。
+  hset('trialbar.stackKey', bothShown+':'+(boss?!!boss.rage:false), ()=>{
+    if(bothShown){
+      const base=el('hud').getBoundingClientRect().top;
+      const r=bb.getBoundingClientRect();
+      if(r.height>0) tb.style.top=Math.round(r.bottom-base+8)+'px';
+    }else tb.style.top='';
+  });
   /* 耐久の警告。壊れると性能を完全に失うのに、ログは流れて消えてしまう。
      壊れそう／壊れているあいだは出しっぱなしにして、見落としようがなくする。 */
   const alerts=gearAlerts(), dtag=el('durtag');
+  hset('durtag.disp', alerts.length?'block':'none', v=>dtag.style.display=v);
   if(alerts.length){
     const broken=alerts.some(x=>x.broken);
-    dtag.style.display='block';
-    dtag.className = broken ? 'crit' : '';
-    dtag.innerHTML = alerts.map(x=> x.broken
+    hset('durtag.cls', broken?'crit':'', v=>dtag.className=v);
+    hset('durtag.h', alerts.map(x=> x.broken
       ? '<span class="brk">✕ '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）が壊れている</span>'
       : '⚠ '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）耐久 <b>'+x.pct+'%</b>'
     ).join('<br>')
-    + (broken ? '<br><span style="color:#c8a">性能を失っています。道具屋で修理を</span>' : '');
-  }else dtag.style.display='none';
+    + (broken ? '<br><span style="color:#c8a">性能を失っています。道具屋で修理を</span>' : ''),
+    v=>dtag.innerHTML=v);
+  }
 
   // パーティ。誰が削れているかが常に見えないと、庇う・祈るの意味が伝わらない。
   const pb=el('partybar'), mates=livingParty();
+  hset('partybar.disp', mates.length?'flex':'none', v=>pb.style.display=v);
   if(mates.length){
-    pb.style.display='flex';
-    pb.innerHTML = mates.map(a=>{
+    hset('partybar.h', mates.map(a=>{
       const j=jobDef(a.job), mx=allyStats(a).maxHp;
       const pct=clamp(a.hpNow/mx*100,0,100);
       return `<div class="mate" data-ally="${a.uidA}"><div class="mn" style="color:${j.col}">${a.name} <span style="color:var(--dim);font-weight:400">${j.nm} Lv.${a.lv}</span></div>`+
              `<div class="mb"><i style="width:${pct}%;background:${j.col}"></i></div></div>`;
-    }).join('');
-  }else pb.style.display='none';
-
-  // 引き撃ちの倍率は内部処理としては残すが、画面上の表記は出さない。
-  const ft=el('foottag');
-  ft.style.display='none';
+    }).join(''), v=>pb.innerHTML=v);
+  }
+  // 引き撃ちの倍率の表記（#foottag）は常に非表示固定なので initHudOnce() で一度だけ消す。
 
   const gh=el('gravehint');
+  hset('gravehint.disp', S.grave?'block':'none', v=>gh.style.display=v);
   if(S.grave){
-    gh.style.display='block';
-    gh.textContent = W.grave ? '遺体はこの階層にある（ミニマップの緑）'
+    hset('gravehint.t', W.grave ? '遺体はこの階層にある（ミニマップの緑）'
                              : '遺体：第'+S.grave.depth+'階層'
-                               + (graveDecay(S.grave)<1 ? '（'+Math.round(graveDecay(S.grave)*100)+'%）' : '');
-  }else gh.style.display='none';
+                               + (graveDecay(S.grave)<1 ? '（'+Math.round(graveDecay(S.grave)*100)+'%）' : ''),
+      v=>gh.textContent=v);
+  }
 
   /* 侵入者の表示。これは脅かすためではなく、**帰る計画を立てさせるため**に出す。
      だから前の版と逆で、秒数を隠さずに出す。
@@ -11553,15 +11572,15 @@ function updateHUD(){
   const iv=el('intruder'), ie=liveIntruder();
   const mmss = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
   const tierRoman = t => ['','Ⅰ','Ⅱ','Ⅲ'][t]||'';
+  let ivShown=false, ivOpac=1, ivHtml='';
   if(ie){
     const d=Math.hypot(ie.x-P.x, ie.y-P.y);
     const nx=intruderNextTierIn();
-    iv.style.display='block';
-    iv.style.opacity = d<8 ? 1 : 0.8;
+    ivShown=true; ivOpac = d<8 ? 1 : 0.8;
     /* 2行目は「今いちばん要る一言」だけにする。
        追いつかれかけているときに強化までの時計を読ませても仕方がない——
        走る以外にやることが無いので。離れているあいだだけ計画の材料を出す。 */
-    iv.innerHTML = '☠ '+ie.name+'　'+Math.round(d)+'m'
+    ivHtml = '☠ '+ie.name+'　'+Math.round(d)+'m'
       + '<span class="t">'
       + (d<5 ? '走れ'
              : nx!=null ? '強化まで '+mmss(nx) : 'もう足では逃げ切れない — 帰れ')
@@ -11569,56 +11588,38 @@ function updateHUD(){
   }else if(S.run && intruderAwake()){
     // 撃破後の 90 秒。買った時間が目に見えるほうが、帰るかどうかを決めやすい。
     const inn=intruderComingIn();
-    iv.style.display='block'; iv.style.opacity=0.85;
-    iv.innerHTML = '☠ 次の巡回まで '+mmss(inn||0)+tierRoman(intruderTier())
+    ivShown=true; ivOpac=0.85;
+    ivHtml = '☠ 次の巡回まで '+mmss(inn||0)+tierRoman(intruderTier())
       + '<span class="t">倒しても解除されない</span>';
   }else if(S.run && (S.run.elapsed||0) >= INTRUDER_AFTER-INTRUDER_WARN_LEAD){
-    iv.style.display='block'; iv.style.opacity=0.8;
-    iv.innerHTML = '⚠ 巡回まで '+mmss(INTRUDER_AFTER-(S.run.elapsed||0))
+    ivShown=true; ivOpac=0.8;
+    ivHtml = '⚠ 巡回まで '+mmss(INTRUDER_AFTER-(S.run.elapsed||0))
       + '<span class="t">引き上げどきだ</span>';
-  }else iv.style.display='none';
+  }
+  hset('intruder.disp', ivShown?'block':'none', v=>iv.style.display=v);
+  if(ivShown){
+    hset('intruder.op', ivOpac, v=>iv.style.opacity=v);
+    hset('intruder.h', ivHtml, v=>iv.innerHTML=v);
+  }
   // 下へ逃がすのは layoutTargetInfo() がやる（横に重なるときだけ落とす）
 
   // 表示の順番は interact() の判定順と揃える。
   // ずれると「書いてあるのと違うことが起きる」になり、詰みより先に信用が壊れる。
   const pr=el('prompt');
-  if(W.mine){
-    pr.style.display='block';
-    pr.textContent = '⛏ 採掘中… 動くと中断';
-  }
-  else if(onStair()){
-    pr.style.display='block';
-    pr.textContent = S.run.bossAlive ? '✕ ボスを倒すまで進めない'
+  let prText=null;
+  if(W.mine) prText='⛏ 採掘中… 動くと中断';
+  else if(onStair()) prText = S.run.bossAlive ? '✕ ボスを倒すまで進めない'
                    : (returnPortalAt(S.run.depth)?'▼ 帰還ポータル':'▼ 穴を降りる');
-  }
-  else if(nearNpc()){
-    pr.style.display='block';
-    pr.textContent = (W.npc.awake && W.npc.tgt)
+  else if(nearNpc()) prText = (W.npc.awake && W.npc.tgt)
       ? '◆ '+W.npc.name+'を助けて連れて行く'
       : '◆ '+W.npc.name+'に話しかける';
-  }
-  else if(nearEvent()){
-    const d=eventDef(W.ev.id);
-    pr.style.display='block';
-    pr.textContent = d.icon+' '+d.nm+'を調べる';
-  }
-  else if(nearMerchant()){
-    pr.style.display='block';
-    pr.textContent = '🎒 商人と取引する';
-  }
-  else if(nearForge()){
-    pr.style.display='block';
-    pr.textContent = '⚒ 鍛冶場で鍛える／直す';
-  }
-  else if(nearTrial()){
-    pr.style.display='block';
-    pr.textContent = '🗿 試練の石碑に触れる';
-  }
-  else if(nearOre()){
-    pr.style.display='block';
-    pr.textContent = '⛏ '+oreDef(nearOre().grade).nm+'を掘る（立ち止まる）';
-  }
-  else pr.style.display='none';
+  else if(nearEvent()){ const d=eventDef(W.ev.id); prText = d.icon+' '+d.nm+'を調べる'; }
+  else if(nearMerchant()) prText = '🎒 商人と取引する';
+  else if(nearForge()) prText = '⚒ 鍛冶場で鍛える／直す';
+  else if(nearTrial()) prText = '🗿 試練の石碑に触れる';
+  else if(nearOre()) prText = '⛏ '+oreDef(nearOre().grade).nm+'を掘る（立ち止まる）';
+  hset('prompt.disp', prText!==null?'block':'none', v=>pr.style.display=v);
+  if(prText!==null) hset('prompt.t', prText, v=>pr.textContent=v);
 
   layoutHud();
 }
@@ -11636,16 +11637,27 @@ function updateHUD(){
    なので座標を決め打ちせず、**上に居る物の一番下を測って、その下に置く**。
    毎フレーム測ると reflow を強制するので、見た目が変わったときだけ測り直す。 */
 const HUD_STACK = ['partybar','targetinfo','intruder','statusbar','gravehint','bossbar','trialbar'];
-/* 測り直しは **1フレームに1回**。
-   以前は表示状態と文字数から署名を作って、変わったときだけ測っていた。
-   だが署名は衝突する——文字数がたまたま前と同じ組み合わせになると、
-   見た目が変わっているのに測り直しを飛ばして、ログが前の位置に残った
-   （実際に踏んだ: 仲間2人を出し直したのにログが上に残る）。
+/* 測り直しの頻度について。
+   以前は「表示状態と文字数から作った署名が変わったときだけ測る」形だったが、
+   署名は衝突する——文字数がたまたま前と同じ組み合わせになると、見た目が
+   変わっているのに測り直しを飛ばして、ログが前の位置に残った
+   （実際に踏んだ: 仲間2人を出し直したのにログが上に残る）。そこで一度、
+   毎フレーム測る形に倒した経緯がある（updateHUD がどのみち毎フレーム
+   innerHTML を書き換えていたので、reflow は既に避けられなかった）。
 
-   updateHUD はどのみち毎フレーム innerHTML を書き換えていて、
-   その時点でレイアウトは無効化されている。まとめて1回測るだけなら
-   reflow は1回で済むので、素直にフレーム単位で測り直す。 */
+   いまは updateHUD 側の書き換えを差分チェックで間引いた（hset）ので、
+   その前提が崩れている。かといって署名方式には戻さない——上の事故を
+   繰り返すだけなので。代わりに**フレーム数で間引く**: 4フレームに1回
+   （60fps基準で約15回/秒）だけ実測する。署名判定と違って「変化を
+   見逃す」ことがなく、最悪でも次の間引き窓（4フレーム以内）で必ず追いつく。
+   実時間（performance.now）ではなく _tickCount 基準にしているのは、
+   テストの stepSim() が実時間を進めずフレームだけ進めるため——
+   時間basisだと同期実行のテストでは絶対に間引き窓に届かず、
+   実際に R.logResets 等が壊れた（stepSim(0.1)＝6フレーム進めても
+   実時間はほぼ0msのまま）。
+   log() だけは force=true で毎回即測る（行が増えた瞬間はズレて見えるため）。 */
 let _hudLaidTick=-1;
+const HUD_LAYOUT_EVERY=4;
 /* 敵の情報パネルは中央寄せ、パーティ表示は左寄せ。
    横に重なるときだけ下へ落とす（重なっていないのに落とすと、無駄に下がる）。 */
 function layoutTargetInfo(base){
@@ -11687,7 +11699,7 @@ function layoutLeftColumn(base){
 }
 function layoutHud(force){
   const lg=el('log'); if(!lg) return;
-  if(!force && _hudLaidTick===_tickCount) return;
+  if(!force && _tickCount-_hudLaidTick<HUD_LAYOUT_EVERY) return;
   _hudLaidTick=_tickCount;
 
   const base = el('hud').getBoundingClientRect().top;
@@ -14653,8 +14665,16 @@ bindTap(el('nm-roll'), ()=>{ el('nm-input').value = rollAllyName()+rollAllyName(
 // Enter でも決定できるようにする（PC で遊ぶときのため）
 el('nm-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); confirmName(); } });
 
+/* HUD要素のうち「常に非表示で固定」の物は、毎フレーム触らず起動時に一度だけ消す。
+   #targetinfo（敵の情報パネル、廃止済み）と #foottag（引き撃ちの倍率表記、廃止済み）。 */
+function initHudOnce(){
+  const ti=el('targetinfo'); if(ti) ti.style.display='none';
+  const ft=el('foottag');    if(ft) ft.style.display='none';
+}
+
 /* 起動。ここまで到達したら JS は動いているので「動いていません」表示を消す */
 const nojs=el('nojs'); if(nojs && nojs.parentNode) nojs.parentNode.removeChild(nojs);
+initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
 </body>
