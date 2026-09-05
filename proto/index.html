@@ -194,9 +194,14 @@
   #partybar{position:absolute;left:max(10px,env(safe-area-inset-left));
     top:calc(max(10px,env(safe-area-inset-top)) + 96px);display:none;
     flex-direction:column;gap:5px;pointer-events:none}
-  #partybar .mate{background:rgba(13,15,20,.62);border-radius:7px;padding:4px 7px;min-width:104px}
-  #partybar .mn{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1.3;white-space:nowrap}
-  #partybar .mb{height:4px;background:#1b2029;border-radius:3px;overflow:hidden;margin-top:2px}
+  /* ログと同じで、下に板は敷かない。名前は黒フチだけで読ませる。
+     HPの溝（.mb の background）は残す——溝が無いと、伸びている帯が
+     「満タンなのか、途中まで減ったのか」を比べる相手を失う。 */
+  #partybar .mate{padding:1px 0;min-width:104px}
+  #partybar .mn{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1.3;white-space:nowrap;
+    text-shadow:0 1px 2px #000,0 0 5px #000,0 0 9px #000}
+  #partybar .mb{height:4px;background:rgba(9,12,17,.75);border-radius:3px;overflow:hidden;margin-top:2px;
+    box-shadow:0 1px 2px rgba(0,0,0,.7)}
   #partybar .mb>i{display:block;height:100%;transition:width .12s linear}
   .boon{background:var(--panel);border:1px solid var(--line);border-left:3px solid #d6b34a;
     border-radius:9px;padding:12px 14px;cursor:pointer;text-align:left}
@@ -234,7 +239,9 @@
   .fgwho b{display:block;font-size:12px}
   .fgwho.on{background:#1e2634}
   /* top は layoutHud() が毎回入れ直す。この 150px は初期値でしかない。 */
-  #log{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 155px);transform:translateX(-50%);font-size:12px;line-height:1.6;color:#d6dfdb;width:max-content;max-width:min(70%,560px);text-align:center;pointer-events:none;text-shadow:0 2px 2px #000;background:#0b121bdd;padding:5px 12px;border-left:2px solid #83bca6}
+  /* 枠も背景も持たせない。数秒で消える1行なので、囲むと「常設のUI」に見えてしまう。
+     背景が無くても読めるように、黒フチだけは濃いめに残す。 */
+  #log{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 155px);transform:translateX(-50%);font-size:12px;line-height:1.6;color:#d6dfdb;width:max-content;max-width:min(70%,560px);text-align:center;pointer-events:none;text-shadow:0 1px 2px #000,0 0 5px #000,0 0 9px #000}
   #log:empty{display:none}
   #log div{opacity:.9}
 
@@ -7743,15 +7750,15 @@ function addXp(h, amount, isPlayer){
    戦っている最中は画面の左上を読んでいない。
    結果として、この game で一番はっきりした前進が一番地味な出来事になっていた。
 
-   全快するタイミングでもあるので、そこも一緒に伝える——
-   「なぜ急にHPが戻ったのか」が分からないままなのは、得なのに不安になる。 */
+   全快もこの瞬間に起きるが、それは文章では言わない。
+   HPバーが一気に満ちて光る（_lvFlash）ので、見ていれば分かる——
+   分かることを重ねて書くと、Lv がいくつになったかが読み飛ばされる。 */
 function onLevelUp(h, isPlayer){
   const x = isPlayer ? P.x : h.x, y = isPlayer ? P.y : h.y;
   W.fx.push({t:'levelup', x, y, life:1.1, max:1.1, col:isPlayer?'#ffd06a':jobDef(h.job).col});
   W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:isPlayer?'#ffd06a':jobDef(h.job).col, life:1.2});
   if(isPlayer){
-    const st=stats(h);
-    showBanner('Lv.'+h.lv, 'HPが全快した（'+st.maxHp+'）', '#ffd06a', 2.2);
+    showBanner('Lv.'+h.lv, '', '#ffd06a', 2.2);
     _lvFlash = 1.0;              // HPバーを光らせる
   }
 }
@@ -7816,7 +7823,9 @@ function killEnemy(e, byAlly){
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
                        *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
   S.run.gold+=g;
-  W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+Number(receivedXp.toFixed(1))+' EXP  +'+g+' G',c:'#e5d18c',life:1.3,max:1.3,reward:true});
+  // 経験値 → 金の順に、少しずらして1つずつ出す（1行に並べると読み分けられない）
+  W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+Number(receivedXp.toFixed(1))+' EXP',c:'#e5d18c',life:1.1,max:1.1,reward:true});
+  W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+g+' G',c:'#e5d18c',life:1.1,max:1.1,reward:true,delay:0.5});
 
   if(e.boss){
     /* ---------- 双子（第20階層）は先に倒した方では終わらない ----------
@@ -9813,8 +9822,12 @@ function update(dt){
     }
     return f.life>0;
   });
-  W.pops.forEach(p=>p.life-=dt);
+  /* delay を持つポップは、その時間だけ出番を待ってから浮き始める。
+     経験値と金を1行に詰めると「まとめて1つの数字」に見えて、
+     どちらがどれだけ入ったのか読めない。1つずつ、順番に出す。 */
+  W.pops.forEach(p=>{ if(p.delay>0) p.delay-=dt; else p.life-=dt; });
   W.pops=W.pops.filter(p=>p.life>0);
+  tickLog(dt);
 
   /* ---------- 壁にめり込んだ物を引き出す ----------
      落とし物は「敵がいた場所 ± 乱数」で置いている。壁際で倒すと
@@ -10076,9 +10089,10 @@ function draw(){
         ctx.globalAlpha = 1;
       }
     }
-    // 立っているあいだは名前を出す（何で削られているか分からないのが一番よくない）
-    const on = hazardAt(P.x, P.y);
-    if(on) label(on.nm+' — '+on.desc, P.x*TS-camX, P.y*TS-camY-TS*1.15, on.edge, 1);
+    /* 立っている床の名前は出さない。
+       床には固有の色と脈動があり、踏めばダメージのポップが足元から上がる。
+       何の上にいるかも、削られていることも、絵で既に分かっている。
+       文字を重ねると、足元＝一番よく見ている場所が説明で埋まる。 */
   }
 
   // 穴マーク（未踏の階層では、自分の目で見つけるまで描かない）
@@ -10939,6 +10953,7 @@ function draw(){
   // ダメージ数値
   ctx.font='bold '+(TS*0.46)+'px sans-serif'; ctx.textAlign='center';
   W.pops.forEach(p=>{
+    if(p.delay>0) return;                    // 順番待ちのものはまだ描かない
     ctx.globalAlpha=clamp(p.life/0.3,0,1); ctx.fillStyle=p.c;
     const txt = p.txt !== undefined ? p.txt : ((p.player?'-':'')+p.v + (p.mark||''));
     ctx.font='bold '+Math.round(p.reward?Math.max(11,TS*.26):TS*.46)+'px monospace';
@@ -11739,10 +11754,22 @@ function layoutHud(force){
 }
 
 let logs=[];
+/* 出したら数秒で消す。出しっぱなしにすると、とっくに終わった出来事の1行が
+   画面の下にずっと居座り、そのぶん「今なにか出た」に気づけなくなる。
+   数えるのは実時間ではなく update() に渡る dt——メニュー中は止まるし、
+   テストの stepSim() でも同じように進む。 */
+const LOG_SHOW_SEC=4.5;
+let _logT=0;
 function log(t){
   logs.unshift(t); logs=logs.slice(0,5);   // 履歴は保持（判定・テストが参照する）
   el('log').innerHTML='<div>'+t+'</div>';  // 画面には直近1件だけ（情報過多で読まれなくなっていたため）
+  _logT=LOG_SHOW_SEC;
   layoutHud(true);      // 行が増えた直後は、同じフレームでも測り直す
+}
+function tickLog(dt){
+  if(_logT<=0) return;
+  if((_logT-=dt)>0) return;
+  const lg=el('log'); if(lg) lg.innerHTML='';   // 空になれば #log:empty で消える
 }
 
 /* ---------- 画面遷移 ----------

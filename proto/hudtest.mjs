@@ -170,7 +170,8 @@ R.logFollowsParty = await pg.evaluate(()=>{
      自動で狙い直すので、P.target を消すだけでは次のフレームで戻ってくる。 */
   TH.clearEnemies(); P.target=null;
   S.hero.party=[];
-  stepSim(0.1);
+  // ログは数秒で自分から消えるので、測る直前に必ず1行出しておく
+  log('位置確認用'); stepSim(0.1);
   const alone=el('log').getBoundingClientRect().top;
   ['knight','mage'].forEach((job,i)=>{
     const a=TH.ally(14,job,30); a.slot=i;
@@ -178,13 +179,37 @@ R.logFollowsParty = await pg.evaluate(()=>{
     uniqueAllyName(a,party()); S.hero.party.push(a);
   });
   TH.clearEnemies(); P.target=null;
-  stepSim(0.1);
+  log('位置確認用'); stepSim(0.1);
   const withTwo=el('log').getBoundingClientRect().top;
   const pb=el('partybar').getBoundingClientRect();
   return {alone:Math.round(alone), withTwo:Math.round(withTwo),
           partyBottom:Math.round(pb.bottom),
           fixedRegardlessOfParty: withTwo===alone, belowParty: withTwo>=pb.bottom,
           ok: withTwo===alone && withTwo>=pb.bottom};
+});
+
+/* 4-c. ログは数秒で自分から消える。
+       出しっぱなしだと、終わった出来事の1行が画面の下に居座り続け、
+       「今なにか出た」に気づけなくなる。枠も背景も持たない。 */
+R.logFades = await pg.evaluate(()=>{
+  TH.busyFloor();
+  log('消えるかどうかの確認');
+  stepSim(0.1);
+  const shownRightAfter = el('log').textContent.includes('消えるかどうか');
+  stepSim(LOG_SHOW_SEC + 0.5);
+  const goneLater = el('log').textContent === '';
+  const hiddenWhenEmpty = getComputedStyle(el('log')).display === 'none';
+  // 消えるのは画面だけ。履歴（判定・テストが読む）は残す
+  const historyKept = logs.some(l=>l.includes('消えるかどうか'));
+  // 次の1行でまた出る（消えたきりにならない）
+  log('また出る');
+  stepSim(0.1);
+  const shownAgain = el('log').textContent.includes('また出る');
+  const css = getComputedStyle(el('log'));
+  const noWindow = css.backgroundColor==='rgba(0, 0, 0, 0)' && css.borderLeftWidth==='0px';
+  return {shownRightAfter, goneLater, hiddenWhenEmpty, historyKept, shownAgain, noWindow,
+          ok: shownRightAfter && goneLater && hiddenWhenEmpty && historyKept
+              && shownAgain && noWindow};
 });
 
 /* ================= 5. 左肩の縦積み =================
@@ -236,7 +261,7 @@ R.logBelowLeftColumn = await pg.evaluate(()=>{
   S.grave={depth:99, x:P.x, y:P.y, items:[], gold:10, ore:{}, xp:0,
            heroName:'テスト', lv:9, t:nowMs()};
   W.grave=null;
-  stepSim(0.1);
+  log('位置確認用'); stepSim(0.1);   // ログは時間で消えるので、測る前に出す
   const lg=el('log').getBoundingClientRect();
   const gh=el('gravehint').getBoundingClientRect();
   return {logTop:Math.round(lg.top), ghBottom:Math.round(gh.bottom),

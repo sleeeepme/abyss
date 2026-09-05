@@ -310,14 +310,42 @@ R.levelUp = await pg.evaluate(()=>{
   return {lv0, lv1, ring, pop, bannerShown, bannerSub, glow, full, threw, allyRing,
           ringShown: ring===1,
           popShown: pop===1,
-          bannerSaysHeal: bannerSub.includes('全快'),
+          /* 全快したことは文章で言わない。HPバーが一気に満ちて光るので見れば分かる。
+             分かることを重ねて書くと、Lv がいくつになったかが読み飛ばされる。 */
+          bannerHasNoHealText: bannerSub==='',
           barGlows: !!glow,
           healedToFull: full,
           allyAlsoShows: allyRing===1,
           drawsFine: threw===null,
           ok: lv1===lv0+1 && ring===1 && pop===1 && bannerShown
-              && bannerSub.includes('全快') && !!glow && full
+              && bannerSub==='' && !!glow && full
               && allyRing===1 && threw===null};
+});
+
+/* ================= 実入りは1つずつ出す =================
+   経験値と金を1行に詰めると「まとめて1つの数字」に見えて、
+   どちらがどれだけ入ったのか読み分けられない。順番にずらして出す。 */
+R.rewardPopsInOrder = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; startRun(8); S.hero.party=[];
+  setScreen('game');
+  const e=W.enemies[0]; e.x=P.x+1; e.y=P.y; e.hp=1;
+  W.pops=[];
+  killEnemy(e);
+  const rewards=W.pops.filter(p=>p.reward);
+  const xpPop=rewards.find(p=>p.txt.includes('EXP'));
+  const gPop =rewards.find(p=>p.txt.includes('G'));
+  // 1行に同居していない
+  const separated = !!xpPop && !!gPop && !xpPop.txt.includes('G') && !gPop.txt.includes('EXP');
+  // 直後に見えているのは経験値だけ（金は順番待ち）
+  const xpFirst = !(xpPop.delay>0) && gPop.delay>0;
+  stepSim(0.1);
+  const goldStillWaiting = gPop.delay>0 && gPop.life===gPop.max;
+  // 待ち時間が過ぎれば金も浮き始める
+  stepSim(1.0);
+  const goldRanLater = !(gPop.delay>0) && gPop.life<gPop.max;
+  return {count:rewards.length, xpTxt:xpPop&&xpPop.txt, gTxt:gPop&&gPop.txt,
+          separated, xpFirst, goldStillWaiting, goldRanLater,
+          ok: rewards.length===2 && separated && xpFirst && goldStillWaiting && goldRanLater};
 });
 
 await b.close();
