@@ -5204,11 +5204,18 @@ function lungeTick(e, dt, slow){
    「飛ばし」は ms:0 で、その場から一歩も動かない置物だった。
    蛙が根を張っているように見えるのが、ずっとちぐはぐだった。
    歩かせるのではなく**跳ばせる**——遠ければ寄り、近すぎれば退く。
-   跳んでいる間は撃たないので、追う側には必ず詰める隙が生まれる。 */
-const HOP_EVERY = [1.6, 2.8];
+   跳んでいる間は撃たないので、追う側には必ず詰める隙が生まれる。
+
+   ただし**石の層では跳ばない**。第一層は「置いてある的を、どう回り込んで
+   殴るか」を覚える場所で、そこで的まで動くと覚えることが増えすぎる。
+   水の層から、それも**たまに**跳ぶ——常に動く相手にはせず、
+   「置物だと思っていたら、たまに位置が変わっている」くらいに留める。 */
+const HOP_FROM_DEPTH = 11;  // 水の層の入口。ここより浅いカエルは置物のまま
+const HOP_EVERY = [5.5, 10.0];
 const HOP_SEC   = 0.42;
 const HOP_DIST  = 1.7;
 const HOP_NEAR  = 2.6;      // これより近ければ、跳ぶのは逃げる向き
+function hopsHere(){ return ((S.run && S.run.depth) || 1) >= HOP_FROM_DEPTH; }
 function hopStart(e, dx, dy, d){
   const away = d < HOP_NEAR;
   const ux = (away?-dx:dx)/d, uy = (away?-dy:dy)/d;
@@ -8200,7 +8207,7 @@ function enemyUpdate(e,dt){
       e.lungeCd -= dt;
       if(e.lungeCd<=0 && d>LUNGE_MIN && d<LUNGE_MAX){ lungeStart(e, dx, dy, d); return; }
     }
-    if(a.id==='turret' && vis && e.tele<=0){
+    if(a.id==='turret' && vis && e.tele<=0 && hopsHere()){
       // ちょうど 0 を「未設定」と取り違えないよう、undefined だけを見る
       if(e.hopCd===undefined) e.hopCd = rf(HOP_EVERY[0], HOP_EVERY[1]);
       e.hopCd -= dt;
