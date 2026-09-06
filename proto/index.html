@@ -28,7 +28,10 @@ if(location.protocol==='http:'||location.protocol==='https:'){
 <style>
   :root{
     --bg:#0d0f14; --panel:#161a23; --line:#2a3040; --txt:#e6e9f0; --dim:#8b93a7;
-    --c-common:#c8ced9; --c-magic:#5b8dd6; --c-rare:#d6b34a; --c-unique:#d97a2b; --c-relic:#c4433f;
+    /* レア度の色。灰→緑→青→紫→赤→金の順に上がる。
+       レジェンドが金なので、以前はその1つ下（Rare）も金寄りで隣同士が見分けづらかった。
+       色相をひと回り離して、隣り合う段が同じ色味にならないように置き直してある。 */
+    --c-common:#c8ced9; --c-uncommon:#6cc24a; --c-rare:#5b8dd6; --c-unique:#a97fe0; --c-relic:#c4433f;
     --c-legend:#e8c95a;
     --hp:#c4433f; --xp:#4a9d6e;
     /* 欧文＝Tiny5、和文＝DotGothic16。前者は日本語を持たないので、
@@ -642,7 +645,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
 <div class="modal" id="m-boon"><div class="box">
   <h1 id="boon-title">恩寵を得た</h1>
   <p class="sub" id="boon-sub"></p>
-  <div class="grid" id="boon-choices" style="grid-template-columns:1fr"></div>
+  <div class="grid" id="boon-choices" style="grid-template-columns:repeat(3,1fr)"></div>
   <p class="sub" style="margin-top:14px">効果は<b>このキャラが死ぬまで</b>続きます</p>
 </div></div>
 
@@ -1141,9 +1144,9 @@ if(location.protocol==='http:'||location.protocol==='https:'){
     ・残り25%を切ると<b style="color:#ffb08a">画面下に警告</b>が出っぱなしになる。
       壊れた瞬間は<b style="color:#e0705a">画面が橙に光ってバナー</b>が出る。<br>
     ・帰還すると、直すべき装備の数が<b>帰還画面と道具屋のボタン</b>に出る。<br>
-    ・<b style="color:#d6b34a">Rare 以上</b>の装備は<b>未鑑定</b>で落ちる。中身が分からず、
+    ・<b style="color:var(--c-rare)">Rare 以上</b>の装備は<b>未鑑定</b>で落ちる。中身が分からず、
       <b>探索中は装備できない</b>。街に持ち帰ると鑑定される。<br>
-    ・<span style="color:#c8ced9">Common</span>・<span style="color:#5b8dd6">Magic</span>
+    ・<span style="color:var(--c-common)">Common</span>・<span style="color:var(--c-uncommon)">Uncommon</span>
       は鑑定済みで落ちるので、🎒からその場で付け替えられる。<br>
     ・<b>5階層ごと</b>に帰還ポータル。そこでのみ街に戻れる。<br>
     ・<b style="color:var(--c-relic)">死ぬとキャラと持ち物を失う</b>。倉庫の装備と所持金だけが残る。<br>
@@ -1540,9 +1543,12 @@ const BASES=[
   {id:'robe',   nm:'術士のローブ',slot:SLOT.A,def:[2,4],dur:55,  ilvl:2,
     nmByRar:['服','ローブ','絹のローブ','術師のローブ','大賢者のローブ']},
   // --- 装飾品（戦闘では減らず、階層を降りるごとに擦り減る） ---
-  {id:'ring',   nm:'指輪',     slot:SLOT.C, dur:25, ilvl:1,
+  /* 装飾品にも素の防御を持たせる。コモンは付帯を1つも引かないので（charmAffCount）、
+     これが無いと「拾っても着ける意味が無い空の装備」になり、枠だけ埋めて終わる。
+     数字は小さくてよい——「無いよりまし」がありさえすれば拾う理由になる。 */
+  {id:'ring',   nm:'指輪',     slot:SLOT.C, def:[1,2], dur:25, ilvl:1,
     nmByRar:['指輪','銀の指輪','ミスリルの指輪','魔導の指輪','聖なる指輪']},
-  {id:'amulet', nm:'護符',     slot:SLOT.C, dur:25, ilvl:3,
+  {id:'amulet', nm:'護符',     slot:SLOT.C, def:[1,3], dur:25, ilvl:3,
     nmByRar:['護符','銀の護符','ミスリルの護符','魔導の護符','聖なる護符']},
 ];
 /* ---------- 杖の弾の形 ----------
@@ -1591,7 +1597,7 @@ const ALLY_DUR_MUL = 2.5;
    端数は it._wear に持ち越し、1 を超えたぶんだけ整数で落とす（wearGear）。
    **乱数は使わない**——同じ使い方をすれば必ず同じだけ減るほうが、
    プレイヤーにも試験にも読める（以前の仲間側は確率で間引いていた）。 */
-// Common / Magic / Rare / Unique / Relic / Legend（レジェンドはそもそも耐久を持たない）
+// Common / Uncommon / Rare / Unique / Relic / Legend（レジェンドはそもそも耐久を持たない）
 const RAR_DUR_MUL  = [1, 1.35, 1.8, 2.4, 3.2, 3.2];
 const UP_DUR_TOUGH = 0.12;   // 強化1段ごとに足される壊れにくさ（+10 で 2.2 倍）
 function gearDurMul(it){
@@ -1720,7 +1726,7 @@ const STATNM={dmgPct:'物理ダメージ +%v%',aspdPct:'攻撃速度 +%v%',hp:'�
   ultCdr:'大技のリキャスト -%v%', evade:'回避率 +%v%'};
 const RARITY=[
   {id:0,nm:'Common',col:'--c-common',w:60, aff:[0,0], val:6},
-  {id:1,nm:'Magic', col:'--c-magic', w:28, aff:[1,2], val:26},
+  {id:1,nm:'Uncommon',col:'--c-uncommon',w:28, aff:[1,2], val:26},
   {id:2,nm:'Rare',  col:'--c-rare',  w:10, aff:[3,4], val:90},
   {id:3,nm:'Unique',col:'--c-unique',w:1.8,aff:[4,5], val:320},
   {id:4,nm:'Relic', col:'--c-relic', w:0.2,aff:[5,6], val:1200},
@@ -1730,7 +1736,8 @@ const RARITY=[
   {id:5,nm:'Legend',col:'--c-legend',w:0,  aff:[0,0], val:6000},
 ];
 
-const RARCOL = ['#c8ced9','#5b8dd6','#d6b34a','#d97a2b','#c4433f','#e8c95a'];
+/* :root の --c-* と同じ並び・同じ値。canvas と inline style はこちらを見る。 */
+const RARCOL = ['#c8ced9','#6cc24a','#5b8dd6','#a97fe0','#c4433f','#e8c95a'];
 /* これ以下のレア度は鑑定済みで落ちる。Rare(2) 以上が未鑑定＝現地では装備できない。 */
 const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
@@ -1746,33 +1753,47 @@ const baseOf = it => BASES.find(b=>b.id===it.base) || {};
 /* ilvl による値スケール: 設計書どおり平方根（線形インフレを避ける） */
 const scaleOf = ilvl => 1 + Math.sqrt(Math.max(0,ilvl-1)) * 0.42;
 
-/* 序盤（10階まで）は青(Magic)を出にくくし、黄(Rare)以上は封じる。
-   11〜20階（水の層）は黄(Rare)も同じ考え方で絞る——石の層の青と
-   同じくらいの体感になるよう倍率を逆算してある（紫以上はここでは絞らない）。
-   depth は「実際に今いる階層」——ilvl はオフセット込みで先の階の値を
-   使う呼び出しが多く、そのままでは境界がぶれるので別引数にしてある。
+/* ---------- 深さでほどける、レア度の階段 ----------
+   前は「石の層は青を1/6・黄以上は封印」「水の層は黄だけ0.68倍」という
+   場当たりの関門を2つ並べていた。境界でいきなり色が増える一方、
+   紫と赤は深くしても素の重みのままで、**50階まで潜っても赤が一度も出ない**。
+   （実測：21〜50階を通しても赤の期待値は 0.06 個）
+
+   段ごとに別の規則を足すのをやめて、**1本の式**にする。
+   各レア度に「出始める深さ」と「素の重みに戻る深さ」を持たせ、その間を線形に開ける。
+   狙いは、初めてその色を見る階が RARITY_LADDER の from 付近に来ること：
+     青 10階 / 黄 20階 / 橙 30階 / 赤 50階（赤だけ2個）
+
+   depth は「実際に今いる階層」。ilvl はオフセット込みで先の階の値を使う
+   呼び出しが多く、そのままでは境界がぶれるので別引数のままにしてある。
    depth が渡されない呼び出し（店・ガチャ・鍛冶の練り直し等）は今まで通り無制限。 */
-const LOWDEPTH_RARITY_CAP = 10;   // 石の層: これ以下は黄(Rare)以上を完全に封じる
-const MIDDEPTH_RARITY_CAP = 20;   // 水の層: これ以下は紫(Unique)以上を完全に封じる
-/* 石の層(1-10)の青(Magic)倍率。以前の 0.5 をさらに1/3に絞った値。
-   10階までの間に2〜3個ほど出るのを狙っている。 */
-const STONE_MAGIC_MUL = 1/6;
-/* 水の層(11-20)の黄(Rare)倍率。石の層の青ドロップ率とだいたい釣り合うよう
-   逆算した値（Common:60, Magic:28 は素の重みのまま、Rare だけここで絞る）。 */
-const SUMP_RARE_MUL = 0.68;
+const RARITY_LADDER = {
+  1: {from:3,  full:16, floor:0.03, peak:1},    // Uncommon 緑
+  2: {from:8,  full:22, floor:0,    peak:1},    // Rare     青
+  3: {from:12, full:40, floor:0,    peak:3},    // Unique   紫
+  4: {from:26, full:46, floor:0,    peak:11},   // Relic    赤
+};
+/* その深さでの重み倍率。from より浅ければ floor（多くは 0＝出ない）、
+   full より深ければ peak。あいだは線形。
+
+   peak が 1 を超えるのは上の2色だけ。素の重みが 1.8 と 0.2 しかないので、
+   深くしても素のままでは 50階を通しても赤が 0.3 個しか出ない＝
+   「最後まで一度も見ない色」になる。深いほど本当に良い物が出る、を
+   ここで作る（浅いところは from で塞いであるので、早取りにはならない）。 */
+function rarityDepthMul(rarId, depth){
+  const L = RARITY_LADDER[rarId];
+  if(!L || depth===undefined) return 1;
+  const top = L.peak===undefined ? 1 : L.peak;
+  if(depth >= L.full) return top;
+  if(depth <= L.from) return L.floor;
+  const k = (depth - L.from) / (L.full - L.from);
+  return L.floor + (top - L.floor) * k;
+}
 function rollRarity(ilvl, mf, depth){
   const boost = 1 + mf/100 + ilvl*0.004;
-  const stoneGate = depth!==undefined && depth<=LOWDEPTH_RARITY_CAP;
-  const sumpGate = depth!==undefined && depth>LOWDEPTH_RARITY_CAP && depth<=MIDDEPTH_RARITY_CAP;
   const w = RARITY.map(r => {
-    let x = r.id===0 ? r.w : r.w*boost;
-    if(stoneGate){
-      if(r.id===1) x *= STONE_MAGIC_MUL;
-      if(r.id>=2) x = 0;
-    }else if(sumpGate){
-      if(r.id===2) x *= SUMP_RARE_MUL;
-    }
-    return x;
+    if(r.id===0) return r.w;                 // コモンは常に素の重み＝階段の基準線
+    return r.w * boost * rarityDepthMul(r.id, depth);
   });
   const tot = w.reduce((a,b)=>a+b,0);
   let x = rnd()*tot;
@@ -1817,7 +1838,7 @@ function pickBase(ilvl){
    通常のドロップ（genItem）と、ジョブ固定装備（genBaseItem）の両方がここを通る。 */
 function buildItem(base, rar, ilvl){
   const s    = scaleOf(ilvl);
-  // Common / Magic は鑑定済みで落ちる。Rare 以上だけが未鑑定。
+  // Common / Uncommon は鑑定済みで落ちる。Rare 以上だけが未鑑定。
   // 全部未鑑定にすると、探索中に装備を入れ替えられるのが白装備だけになり、
   // せっかくのインベントリがほぼ機能しなくなる。
   const tierNm = (base.nmByRar && base.nmByRar[rar.id]) || base.nm;
@@ -1849,8 +1870,8 @@ function buildItem(base, rar, ilvl){
     it.aff.push({t:'s',id:a.id,nm:a.nm,stat:a.stat,v:Math.max(1,Math.round(rf(a.r[0],a.r[1])*(1+ (s-1)*0.6)))});
   }
   /* 装飾品だけの付帯。普通の接頭辞・接尾辞に**上乗せ**で引く。
-     指輪と護符は攻撃力も防御力も持たないので、ここが無いと
-     「同じ枠に同じ物が入り直すだけ」の装備のままになる。 */
+     指輪と護符は素の防御こそ持つが、それだけでは「同じ枠に同じ物が入り直す」に
+     なってしまう。装飾品を選ぶ理由はここで作る。 */
   if(isCharmSlot(it)) it.aff.push(...rollCharmAffs(rar.id, ilvl));
   return it;
 }
@@ -1860,6 +1881,18 @@ function genItem(ilvl, mf=0, depth){
      出やすくなるだけだと「同じ白い剣が増える」で終わってしまう。 */
   const plus = (base.hoard===undefined && hoardBases().includes(base.id)) ? HOARD_MF : 0;
   return buildItem(base, rollRarity(ilvl, mf+plus, depth), Math.max(1,ilvl));
+}
+/* 武器であることだけを保証して作る。スロットは genItem の中で抽選されるので、
+   欲しい種が出るまで引き直す（回数は必ず頭打ちにする）。
+   出なければ武器ベースから直に組む——「必ず落ちる」を名乗る以上、空で帰さない。 */
+function genWeapon(ilvl, mf, depth){
+  for(let i=0;i<60;i++){
+    const g=genItem(ilvl, mf, depth);
+    if(g.slot===SLOT.W) return g;
+  }
+  const w=BASES.filter(b=>b.slot===SLOT.W && b.ilvl<=Math.max(1,ilvl));
+  const b=w.length?w[Math.floor(rnd()*w.length)]:BASES.find(x=>x.id==='sword');
+  return buildItem(b, rollRarity(ilvl, mf||0, depth), Math.max(1,ilvl));
 }
 /* ベースを指定して作る。ジョブごとに武器種が固定されている仲間の装備に使う。 */
 function genBaseItem(baseId, ilvl, maxRar=1){
@@ -3031,19 +3064,19 @@ const GACHA_PER_DAY = 5;      // 1日に引ける回数
    「今日も何かあった」を作るのが目的で、広告はその先の回数を買う手段にする。
    広告収益だけで立てる前提なので、無料枠は1回に留める。 */
 const GACHA_FREE_PER_DAY = 1;
-/* Rare 以上（金・橙・赤）と Magic（青）の出やすさに掛ける係数。
+/* Rare 以上（青・紫・赤）と Uncommon（緑）の出やすさに掛ける係数。
    浮いたぶんは全部 Common へ回す。
 
-   青と紫（護符）がサクッと出すぎていた。
+   上の段と護符がサクッと出すぎていた。
    ただしコモンが「ハズレ」かというとそうではなく、
    初回は短剣以外が出るだけで戦い方が変わるし、
    打ち直しがある以上コモンの高 ilvl は普通に育てる価値のある土台になる。
    だから絞るのは上のレア度のほうで、コモンは厚くしてよい。 */
 const GACHA_RARE_MUL  = 0.45; // Rare 以上
-const GACHA_MAGIC_MUL = 0.60; // Magic（青）
+const GACHA_UNCOMMON_MUL = 0.60; // Uncommon（緑）
 const GACHA_CHARM_MUL = 0.80; // 護符（紫）が出る比率
 
-/* 削るのは主に青（Magic）のほうにしてある。
+/* 削るのは主に Uncommon（緑）のほうにしてある。
    レア以上まで一緒に削ると、最深の帯まで白ばかりになって
    「深く潜った帯ほど良い物が出る」という進行そのものが消えてしまう。
    実際、レアも 0.28 倍にしたら最深のレア率が 79% → 22% まで落ちた。
@@ -3320,7 +3353,7 @@ function rollBoons(src, n){
 const ALLY_ATK_MUL = 0.62;
 const ALLY_HP_MUL  = 0.70;
 const ALLY_LV_GAP  = [1,3];   // 主人公より何レベル低いか
-const ALLY_RAR_MAX = 1;       // 仲間の装備は Magic 止まり（Rare 以上は落ちない）
+const ALLY_RAR_MAX = 1;       // 仲間の装備は Uncommon 止まり（Rare 以上は落ちない）
 /* 仲間1人につき経験値プールがこれだけ増える。
    完全な 1/N 分配だと仲間を入れるほど損になり、誰も連れて行かなくなる。
    増えた手数のぶんだけプールを膨らませて、「分配されるが総量は増える」に着地させる。 */
@@ -4428,9 +4461,12 @@ const AD_SECONDS    = 5;      // ダミー広告の視聴秒数
      引くたびに強武器が出る＝“強いのが出過ぎる”状態になる。
    - 深く潜って死ぬほど次の引きが良くなる＝再挑戦のハードルが下がる。
      浅い階層で死んだら次も浅い装備からやり直す。
-   w は RARITY と同じ並び [Common, Magic, Rare, Unique, Relic]。 */
+   w は RARITY と同じ並び [Common, Uncommon, Rare, Unique, Relic]。 */
+/* 浅層の帯は「引いた物のうち8割がコモン」になるよう置いてある（gachaWeights 通過後）。
+   始めたばかりの人が最初に引く場所なので、ここで青や黄が続くと、
+   そのあと自分で拾う1本の白がすべて見劣りして見える。 */
 const GACHA_BANDS=[
-  {min:1,  nm:'浅層', w:[52,36,11,0.9,0.1], charm:0.55},
+  {min:1,  nm:'浅層', w:[65,28,6.2,0.3,0.1], charm:0.55},
   {min:5,  nm:'中層', w:[34,42,22,1.8,0.2], charm:0.50},
   {min:10, nm:'深層', w:[18,42,35,4.2,0.8], charm:0.46},
   {min:20, nm:'古層', w:[7, 33,47,10.5,2.5],charm:0.42},
@@ -5126,6 +5162,80 @@ const ZAKO_TRAITS = {
   burst:  {nm:'弾ける', col:'#e0705a', r:1.9, mult:0.85},
 };
 function zakoTraitDef(id){ return ZAKO_TRAITS[id] || null; }
+
+/* ---------- 寄り（ハウンド系）の飛びかかり ----------
+   「寄り」は間合いを詰めるのが仕事なのに、詰め方が歩きしかなかった。
+   歩いて来る相手は、後ろへ下がり続けるだけで永遠に触られない。
+   中距離から一度だけ踏み込ませると、「離れる」が万能ではなくなる。
+
+   予兆(LUNGE_TELE)→踏み込み(LUNGE_SEC)の順で、避ける時間は必ず先に置く。
+   踏み込み自体にダメージは無い——**運ぶだけ**。着いた先で普通の予兆を経て殴る。
+   ここで直接殴らせると、避けたのに当たる形になる。 */
+const LUNGE_MIN = 2.2;      // これより近ければ普通に殴れる
+const LUNGE_MAX = 5.5;      // これより遠いと、ただの高速接近になって理不尽
+const LUNGE_TELE = 0.32;    // 溜め
+const LUNGE_SEC  = 0.26;    // 踏み込んでいる時間
+const LUNGE_SPEED = 9.0;    // マス/秒
+const LUNGE_CD   = [2.4, 4.0];
+function lungeStart(e, dx, dy, d){
+  e.lunge = {t:0, tele:LUNGE_TELE, dx:dx/d, dy:dy/d};
+  e.lungeCd = rf(LUNGE_CD[0], LUNGE_CD[1]);
+}
+/* 踏み込み中の1フレーム。true を返したら、この敵はこのフレームぶんの
+   通常の移動・攻撃判定を行わない（踏み込みが全部を持っていく）。 */
+function lungeTick(e, dt, slow){
+  const L=e.lunge; if(!L) return false;
+  if(L.tele>0){                       // 溜め。その場で止まって身構える
+    L.tele-=dt*slow;
+    return true;
+  }
+  L.t+=dt*slow;
+  const bx=e.x, by=e.y;
+  moveEnt(e, L.dx*LUNGE_SPEED*dt*slow, L.dy*LUNGE_SPEED*dt*slow);
+  if(Math.hypot(e.x-bx, e.y-by) > 0.01)
+    W.fx.push({t:'dashghost', x:bx, y:by, life:0.18, max:0.18, col:e.col||e.arch.col});
+  else L.t = LUNGE_SEC;               // 壁に当たったら、そこで終わる
+  e.fx=L.dx; e.fy=L.dy;
+  if(L.t>=LUNGE_SEC){ e.lunge=null; e.cd=Math.max(e.cd, 0.12); }
+  return true;
+}
+
+/* ---------- 飛ばし（カエル系）の跳ね ----------
+   「飛ばし」は ms:0 で、その場から一歩も動かない置物だった。
+   蛙が根を張っているように見えるのが、ずっとちぐはぐだった。
+   歩かせるのではなく**跳ばせる**——遠ければ寄り、近すぎれば退く。
+   跳んでいる間は撃たないので、追う側には必ず詰める隙が生まれる。 */
+const HOP_EVERY = [1.6, 2.8];
+const HOP_SEC   = 0.42;
+const HOP_DIST  = 1.7;
+const HOP_NEAR  = 2.6;      // これより近ければ、跳ぶのは逃げる向き
+function hopStart(e, dx, dy, d){
+  const away = d < HOP_NEAR;
+  const ux = (away?-dx:dx)/d, uy = (away?-dy:dy)/d;
+  // 真っ直ぐだけだと列になって並ぶので、跳ぶ向きを少し散らす
+  const a = Math.atan2(uy, ux) + rf(-0.5, 0.5);
+  const nx = e.x + Math.cos(a)*HOP_DIST, ny = e.y + Math.sin(a)*HOP_DIST;
+  if(!standable(nx, ny)) return false;
+  if(!standable((e.x+nx)/2, (e.y+ny)/2)) return false;   // 角を斜めに抜けない
+  e.hop = {t:0, x0:e.x, y0:e.y, x1:nx, y1:ny};
+  e.hopCd = rf(HOP_EVERY[0], HOP_EVERY[1]);
+  return true;
+}
+function hopTick(e, dt, slow){
+  const H=e.hop; if(!H) return false;
+  H.t += dt*slow;
+  const k = Math.min(1, H.t/HOP_SEC);
+  e.x = H.x0 + (H.x1-H.x0)*k;
+  e.y = H.y0 + (H.y1-H.y0)*k;
+  if(k>=1) e.hop=null;
+  return true;
+}
+/* 跳ねているあいだの見かけの浮き（描画だけ。当たり判定は動かさない）。 */
+function hopLift(e){
+  const H=e&&e.hop; if(!H) return 0;
+  const k=Math.min(1,H.t/HOP_SEC);
+  return Math.sin(k*Math.PI) * TS * 0.42;
+}
 /* 格子。null は「その層のその形式には癖を足さない」——
    全部のマスを埋めると、逆にどの階も同じだけ賑やかになって差が消える。 */
 const ZAKO_TRAIT_GRID = {
@@ -7960,6 +8070,15 @@ function killEnemy(e, byAlly){
     W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40, S.run.depth)});
   if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf, S.run.depth)});
 
+  /* ---------- 最初の1体は必ず武器を落とす ----------
+     素手で始まる探索の一番最初に、拾える物が1つも出ないことが普通に起きる
+     （ドロップ率は 7.5%）。そこが一番投げられる場所で、しかも
+     「武器が弱い」のか「まだ武器を持っていない」のかが自分では区別できない。
+     確率ではなく確定にする。数はここだけの1本で、以降は通常の抽選に戻る。 */
+  if(S.run.kills===1)
+    W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3),
+                  it:genWeapon(S.run.depth+ri(-1,2), st.mf, S.run.depth)});
+
   /* ---------- レジェンド ----------
      40階以降の黄色個体だけが落とす。1%。**掘って出す物ではなく、出会う物**。
      宝箱にも商店にも並ばないので、遭遇した回数がそのまま確率になる。
@@ -8067,6 +8186,27 @@ function enemyUpdate(e,dt){
 
   // 癖「跳ぶ」。溜めている最中には跳ばない（避けた側が損をするので）。
   if(e.trait==='blink' && vis && e.tele<=0) zakoBlink(e, dt, tg, d);
+
+  /* 寄り＝飛びかかり、飛ばし＝跳ね。どちらも「間合いの詰め方」そのものなので、
+     一部の個体だけが持つ癖（ZAKO_TRAITS）ではなく、その形式の全員が持つ。
+     ボスは自前の技を持っているので混ぜない——重ねると何が起きたか読めなくなる。 */
+  /* e.pinned は「その場に留めておく」印。飛びかかりも跳ねも arch.ms を見ないので、
+     ms=0 にするだけでは止まらない——止めたい側が言えるようにしておく。 */
+  if(!e.boss && !e.pinned){
+    if(lungeTick(e, dt, slow)) return;
+    if(hopTick(e, dt, slow)) return;
+    if(a.id==='rush' && vis && e.tele<=0 && !e.fleeing && !e.recoil){
+      if(e.lungeCd===undefined) e.lungeCd = rf(0.4, LUNGE_CD[1]);
+      e.lungeCd -= dt;
+      if(e.lungeCd<=0 && d>LUNGE_MIN && d<LUNGE_MAX){ lungeStart(e, dx, dy, d); return; }
+    }
+    if(a.id==='turret' && vis && e.tele<=0){
+      // ちょうど 0 を「未設定」と取り違えないよう、undefined だけを見る
+      if(e.hopCd===undefined) e.hopCd = rf(HOP_EVERY[0], HOP_EVERY[1]);
+      e.hopCd -= dt;
+      if(e.hopCd<=0 && hopStart(e, dx, dy, d)) return;
+    }
+  }
 
   if(e.tele>0){
     e.tele-=dt*slow;
@@ -10238,7 +10378,8 @@ function draw(){
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
   W.enemies.forEach(e=>{
     if(e.dead && e.pixelBurst) return;
-    const sx=e.x*TS-camX, sy=e.y*TS-camY;
+    // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
+    const sx=e.x*TS-camX, sy=e.y*TS-camY-hopLift(e);
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;
@@ -11402,7 +11543,9 @@ function drawAir(Z, dt){
     if(m.x<-8) m.x=innerWidth+8; else if(m.x>innerWidth+8) m.x=-8;
     if(m.y<-8) m.y=innerHeight+8; else if(m.y>innerHeight+8) m.y=-8;
     ctx.globalAlpha = A.a * (0.45+0.55*m.s);
-    ctx.beginPath(); ctx.arc(m.x, m.y, A.size*m.s, 0, 7); ctx.fill();
+    // 丸ではなく四角。ドット絵の上に丸を浮かべると、そこだけ解像度が違って見える。
+    const sz = Math.max(1, Math.round(A.size*m.s*2));
+    ctx.fillRect(Math.round(m.x), Math.round(m.y), sz, sz);
   }
   ctx.globalAlpha=1;
 }
@@ -13104,13 +13247,13 @@ function closeAd(restore){
 /* 回数が増えたぶん、Rare(2) 以上の出現率を下げる。
    単に重みを掛けるだけだと総和も一緒に縮むので、下げ幅が帯ごとにばらつく
    （Common の重みが 0 の最深帯では、ほとんど下がらなかった）。
-   減らしたぶんを Common / Magic へ配り直して総和を保つと、
+   減らしたぶんを Common / Uncommon へ配り直して総和を保つと、
    どの帯でもレア率がきっちり GACHA_RARE_MUL 倍になる。 */
 function gachaWeights(band){
   const w = band.w.slice();
   let freed = 0;
   for(let i=2;i<w.length;i++){ const cut = w[i]*(1-GACHA_RARE_MUL);  w[i]-=cut; freed+=cut; }
-  const mc = w[1]*(1-GACHA_MAGIC_MUL); w[1]-=mc; freed+=mc;
+  const mc = w[1]*(1-GACHA_UNCOMMON_MUL); w[1]-=mc; freed+=mc;
   // 浮いたぶんは全部コモンへ。総和が変わらないので、他の帯との比較がそのまま効く。
   w[0] += freed;
   return w;

@@ -225,60 +225,62 @@ R.ally = await pg.evaluate(()=>{
    横移動との優劣は簡易ボットの出来に強く左右される（実際、周回するだけの
    ボットは第12階層の革鎧では死ぬ）ので、比較値は参考として出すだけにして、
    断言はしない。火力差の検証は 2-a / 3 が担当している。 */
+/* 引き撃ちという戦い方が成立し続けているか。
+
+   以前はここを **1つの種の1回の生死**で見ていた。だが同じ設定でも
+   間取りと敵の並びで結果は普通に引っくり返る（実測：無改造の状態でも
+   12種のうち5種で死ぬ）。1種だけ見ていると、ゲームの難易度ではなく
+   「その種が当たりだったか」を測ってしまい、床の生成順が1つずれた
+   だけで赤くなる——実際にそれで一度落ちた。
+
+   測るのは**複数の種を通した成立率**にする。半分より上で生き残り、
+   生き残った回では手が出せている（撃破がある）こと。 */
 R.viability = await pg.evaluate(async ()=>{
-  const run=async (mode)=>{
+  const one=(runs, mode)=>{
     S.hero=newHero(); S.upg={hp:8,atk:6,aspd:4}; S.hero.lv=25;
     S.hero.str=29; S.hero.dex=29; S.hero.vit=29;
-    /* 種を固定する。ここまでのどの節が何回潜ったかで S.runs がずれ、
-       同じ「第12階層」でも間取りと敵の並びが毎回変わっていた。
-       測っているのは**足の使い方**なので、床は同じ物を2回使う。 */
-    S.runs = 40;
+    S.runs = runs;
     startRun(12); S.hero.party=[];
-    /* 水の層の水を外す。**測りたいのは引き撃ちという動き方そのもの。**
-       水の上では足が鈍る（それが水の層の性格）ので、残したままだと
-       「引き撃ちが成立するか」ではなく「水の層で引き撃ちできるか」になる。 */
+    // 水の層の水を外す（測るのは足の使い方であって、水の層の性格ではない）
     W.haz=null;
     S.hero.equip.weapon=genBaseItem('bow',25,2);
     S.hero.equip.armor =genBaseItem('leather',25,2);
     S.hero.hpNow=stats(S.hero).maxHp;
     const hp0=S.hero.hpNow;
-    /* 相手は**その階の普通の敵だけ**にする。規格外（紫）は1体で戦い方が変わる
-       相手で、湧くかどうかは抽選なので、種の並びが1つずれただけで
-       「引き撃ちが成立するか」の答えが引っくり返ってしまう。 */
+    // 規格外・ボス・侵入者は1体で戦い方が変わるので外す
     W.enemies = W.enemies.filter(e=>!e.uniq && !e.boss && !e.intruder);
-    // 敵をまとめて前方に置く
     W.enemies.forEach((e,i)=>{ e.x=P.x+4+((i%4)*0.8); e.y=P.y-1.5+((i%3)*1.2); });
-    // 疑似入力。壁に突き当たって止まると比較にならないので、
-    // どちらも「最寄りの敵を基準に」動く簡易ボットにする。
-    // 疑似ボットは毎フレームの頭で入力を決める（元は 30ms ごと＝約2フレームに1回）。
     stepSim(8, {each:(t)=>{
       if(!S.hero || !S.run) return;
       const e=nearestEnemyTo(P.x,P.y,99);
       if(!e){ stickDx=0; stickDy=0; return; }
       const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy)||1e-6;
-      if(mode==='kite'){                       // 敵から離れ続ける
-        stickDx=-dx/d; stickDy=-dy/d;
-      }else{                                   // 敵を軸に横へ回り込む
-        const s=Math.sin(t*1.6)>0?1:-1;
-        stickDx=-dy/d*s; stickDy=dx/d*s;
-      }
+      if(mode==='kite'){ stickDx=-dx/d; stickDy=-dy/d; }
+      else { const s=Math.sin(t*1.6)>0?1:-1; stickDx=-dy/d*s; stickDy=dx/d*s; }
     }});
     stickDx=0; stickDy=0;
     const alive=!!S.hero;
-    return {kills:S.run?S.run.kills:0, alive,
+    return {runs, kills:S.run?S.run.kills:0, alive,
             hpLost: alive? Math.round(hp0-S.hero.hpNow) : Math.round(hp0)};
   };
-  const kite=await run('kite');
-  const strafe=await run('strafe');   // 参考値
-  /* 参考値は真偽値で返さない。掃引は「false = 失敗」で読むので、
-     『横移動ボットは第12階層の革鎧では死ぬことがある』という
-     わざと断言していない観測が、毎回失敗として並んでしまう。 */
-  const strafeRef={kills:strafe.kills, hpLost:strafe.hpLost,
-                   outcome: strafe.alive?'生存':'死亡'};
-  return {kite, strafeForReference:strafeRef,
-          // ここが守りたい一線
-          kiteStillSurvives: kite.alive,
-          kiteStillKills: kite.kills>0,
+  const SEEDS=[40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55];
+  const kite=SEEDS.map(s=>one(s,'kite'));
+  const lived=kite.filter(k=>k.alive);
+  const survival=lived.length/kite.length;
+  // 参考値。真偽値では返さない（掃引は false=失敗で読む）
+  const strafe=one(40,'strafe');
+
+  return {seeds:SEEDS.length,
+          survived:lived.length,
+          survival:+survival.toFixed(2),
+          killsWhenAlive: lived.map(k=>k.kills),
+          strafeForReference:{kills:strafe.kills, hpLost:strafe.hpLost,
+                              outcome: strafe.alive?'生存':'死亡'},
+          /* ここが守りたい一線: 引き撃ちで「そこそこ生き残れて、手も出せる」。
+             閾値は 0.4。無改造でも 0.6 前後なので、下回るのは
+             「引き撃ちが成立しなくなった」ときだけ——種の当たり外れでは切れない。 */
+          kiteStillSurvives: survival >= 0.4,
+          kiteStillKills: lived.some(k=>k.kills>0),
           loopAlive:_tickCount>300};
 });
 

@@ -120,7 +120,7 @@ R.gachaRates = await pg.evaluate(()=>{
   const n=4000;
   return {rows, sampled:{common:+((c[0]/n)*100).toFixed(1), magic:+((c[1]/n)*100).toFixed(1),
                          rare:+(((n-c[0]-c[1])/n)*100).toFixed(1)},
-          mul:{rare:GACHA_RARE_MUL, magic:GACHA_MAGIC_MUL, charm:GACHA_CHARM_MUL},
+          mul:{rare:GACHA_RARE_MUL, uncommon:GACHA_UNCOMMON_MUL, charm:GACHA_CHARM_MUL},
           commonRoseEverywhere: rows.every(r=>r.common>r.commonBefore),
           magicFellEverywhere:  rows.every(r=>r.magic<r.magicBefore),
           rareFellEverywhere:   rows.every(r=>r.rare<r.rareBefore),

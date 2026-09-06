@@ -259,90 +259,80 @@ R.tieredNaming = await pg.evaluate(()=>{
               && commonUnchanged && risesInGrandeur && !!prefixed && !!legendUnaffected};
 });
 
-// --- 13. 10層まではドロップの色が制限される（青は STONE_MAGIC_MUL 倍、黄以上は封印）
-R.lowDepthRarityCap = await pg.evaluate(()=>{
-  const N=6000;
-  const sample=(ilvl,depth)=>{
-    const counts={0:0,1:0,2:0,3:0,4:0};
-    for(let i=0;i<N;i++){ const r=rollRarity(ilvl, 0, depth); counts[r.id]++; }
-    return counts;
+/* --- 13. レア度は深さで一段ずつほどける（RARITY_LADDER）
+       場当たりの関門を2つ並べるのをやめて、色ごとに「出始める深さ」と
+       「素の重みに戻る深さ」を持たせた1本の式にした。
+       ここで見るのは式そのものではなく、**遊ぶ側から見た階段の形**： */
+R.rarityLadder = await pg.evaluate(()=>{
+  const N=20000;
+  const share=(depth)=>{
+    const c={0:0,1:0,2:0,3:0,4:0};
+    RNG=mulberry32(1234+depth);
+    for(let i=0;i<N;i++) c[rollRarity(depth+1, 0, depth).id]++;
+    return {common:c[0]/N, magic:c[1]/N, rare:c[2]/N, uniq:c[3]/N, relic:c[4]/N};
   };
-  RNG=mulberry32(42);
-  const gated = sample(10, 8);          // 8層（<=10）
-  RNG=mulberry32(42);
-  const ungated = sample(10, undefined); // depth省略＝今まで通り
-  RNG=mulberry32(42);
-  const beyond = sample(10, 25);         // 25層（>20）は制限なし
-  const gatedRarePlus = gated[2]+gated[3]+gated[4];
-  const ungatedRarePlus = ungated[2]+ungated[3]+ungated[4];
-  const beyondRarePlus = beyond[2]+beyond[3]+beyond[4];
-  const gatedMagicShare = gated[1]/N, ungatedMagicShare = ungated[1]/N;
-  // 生の重みは「青は STONE_MAGIC_MUL 倍・黄以上ゼロ」だが、母数が縮む分だけ
-  // 正規化後の割合は単純な掛け算にはならない——実装と同じ式で解析的に期待値を出して比べる。
-  const boost = 1 + 0/100 + 10*0.004;
-  const wCommon=60, wMagic=28*boost, wRare=10*boost, wUniq=1.8*boost, wRelic=0.2*boost;
-  const ungatedTot = wCommon+wMagic+wRare+wUniq+wRelic;
-  const gatedTot = wCommon + wMagic*STONE_MAGIC_MUL;
-  const expectedGatedMagicShare = (wMagic*STONE_MAGIC_MUL)/gatedTot;
-  const expectedUngatedMagicShare = wMagic/ungatedTot;
-  const closeEnough=(got,expect)=>Math.abs(got-expect)<0.03;   // N=6000での統計誤差ぶんの余裕
-  return {gated, ungated, beyond, mul:STONE_MAGIC_MUL,
-          gatedRarePlus, ungatedRarePlus, beyondRarePlus,
-          gatedMagicShare:+gatedMagicShare.toFixed(3), ungatedMagicShare:+ungatedMagicShare.toFixed(3),
-          expectedGatedMagicShare:+expectedGatedMagicShare.toFixed(3),
-          expectedUngatedMagicShare:+expectedUngatedMagicShare.toFixed(3),
-          noRarePlusUnderCap: gatedRarePlus===0,
-          rarePlusExistsNormally: ungatedRarePlus>0,
-          rarePlusExistsBeyondCap: beyondRarePlus>0,
-          gatedMagicMatchesFormula: closeEnough(gatedMagicShare, expectedGatedMagicShare),
-          ungatedMagicMatchesFormula: closeEnough(ungatedMagicShare, expectedUngatedMagicShare),
-          ok: gatedRarePlus===0 && ungatedRarePlus>0 && beyondRarePlus>0
-              && closeEnough(gatedMagicShare, expectedGatedMagicShare)
-              && closeEnough(ungatedMagicShare, expectedUngatedMagicShare)};
+  const d2=share(2), d10=share(10), d20=share(20), d30=share(30), d50=share(50);
+  // depth を渡さない呼び出し（店・ガチャ・練り直し）は今まで通り制限なし
+  const c={0:0,1:0,2:0,3:0,4:0};
+  RNG=mulberry32(7);
+  for(let i=0;i<N;i++) c[rollRarity(20, 0, undefined).id]++;
+  const ungatedRarePlus=(c[2]+c[3]+c[4])/N;
+
+  return {d2, d10, d20, d30, d50, ungatedRarePlus:+ungatedRarePlus.toFixed(3),
+    // 第2階層はほぼ白一色。最初の数階で色物が続くと、拾う1本の重みが消える
+    startsNearlyAllCommon: d2.common>0.97,
+    // 黄・橙・赤は、それぞれの解禁深度より浅いところには一切出ない
+    noRareEarly:  d2.rare===0 && d10.rare<0.02,
+    noUniqEarly:  d10.uniq===0,
+    noRelicEarly: d20.relic===0,
+    // 深くなるほど、その色が確実に増えていく（階段が単調に上がる）
+    magicRises: d2.magic < d10.magic && d10.magic < d20.magic,
+    rareRises:  d10.rare < d20.rare && d20.rare < d30.rare,
+    uniqRises:  d20.uniq < d30.uniq && d30.uniq < d50.uniq,
+    relicRises: d30.relic < d50.relic,
+    // 最深部では赤が現実に出る（素の重み 0.2 のままでは 50階でも 0.06 個だった）
+    relicRealAtDepth: d50.relic > 0.005,
+    // それでも過半は白のまま——白が基準線であることは最後まで変わらない
+    commonStaysMajority: d50.common > 0.5,
+    depthlessUnrestricted: ungatedRarePlus > 0.05,
+    ok: d2.common>0.97 && d2.rare===0 && d10.rare<0.02 && d10.uniq===0 && d20.relic===0
+        && d2.magic<d10.magic && d10.magic<d20.magic
+        && d10.rare<d20.rare && d20.rare<d30.rare
+        && d20.uniq<d30.uniq && d30.uniq<d50.uniq
+        && d30.relic<d50.relic && d50.relic>0.005
+        && d50.common>0.5 && ungatedRarePlus>0.05};
 });
 
-// --- 13b. 11〜20層（水の層）は紫以上は野放しのまま、黄(Rare)だけ SUMP_RARE_MUL で絞る。
-//          狙いは「水の層の黄ドロップ率 ≒ 石の層の青ドロップ率」で、階層帯を跨いでも
-//          体感の希少さが揃うこと。
-R.sumpRarityGate = await pg.evaluate(()=>{
-  const N=6000;
-  const sample=(ilvl,depth)=>{
-    const counts={0:0,1:0,2:0,3:0,4:0};
-    for(let i=0;i<N;i++){ const r=rollRarity(ilvl, 0, depth); counts[r.id]++; }
-    return counts;
-  };
-  RNG=mulberry32(7);
-  const stone = sample(8, 8);    // 石の層・8層
-  RNG=mulberry32(7);
-  const sump  = sample(18, 18);  // 水の層・18層
-  RNG=mulberry32(7);
-  const beyond= sample(18, 25);  // 21層以降は Rare も野放し
-
-  const stoneMagicShare = stone[1]/N;
-  const sumpRareShare   = sump[2]/N;
-  const sumpUniqPlus    = sump[3]+sump[4];
-  const beyondUniqPlus  = beyond[3]+beyond[4];
-
-  // 解析式で期待値を出す（Common:60, Magic:自然重み, Rare: *SUMP_RARE_MUL）
-  const boostStone = 1+8*0.004, boostSump = 1+18*0.004;
-  const stoneTot = 60 + 28*boostStone*STONE_MAGIC_MUL;
-  const expectedStoneMagicShare = (28*boostStone*STONE_MAGIC_MUL)/stoneTot;
-  const sumpTot = 60 + 28*boostSump + 10*boostSump*SUMP_RARE_MUL + 1.8*boostSump + 0.2*boostSump;
-  const expectedSumpRareShare = (10*boostSump*SUMP_RARE_MUL)/sumpTot;
-  const closeEnough=(got,expect,tol)=>Math.abs(got-expect)<tol;
-
-  return {stoneMagicShare:+stoneMagicShare.toFixed(3), sumpRareShare:+sumpRareShare.toFixed(3),
-          expectedStoneMagicShare:+expectedStoneMagicShare.toFixed(3),
-          expectedSumpRareShare:+expectedSumpRareShare.toFixed(3),
-          sumpUniqPlus, beyondUniqPlus,
-          matchesFormula: closeEnough(sumpRareShare, expectedSumpRareShare, 0.03),
-          // 「水の黄 ≒ 石の青」——ぴったり一致ではなく、体感が揃う程度の近さでよい
-          balancedAcrossZones: closeEnough(sumpRareShare, stoneMagicShare, 0.035),
-          uniqPlusNotBlockedInSump: sumpUniqPlus>0,
-          uniqPlusExistsBeyond: beyondUniqPlus>0,
-          ok: closeEnough(sumpRareShare, expectedSumpRareShare, 0.03)
-              && closeEnough(sumpRareShare, stoneMagicShare, 0.035)
-              && sumpUniqPlus>0 && beyondUniqPlus>0};
+/* --- 13b. 積み上がりが狙いどおりか。
+       欲しいのは「初めてその色を見る階」で、1回の抽選の確率ではない。
+       床に落ちる期待個数を階ごとに積んで、10/20/30/50階の到達時点で数える。
+       狙い：青=10階で1本、黄=20階で1本、橙=30階で1本、赤=50階で2本。 */
+R.rarityLadderPacing = await pg.evaluate(()=>{
+  const DROP=0.075;                       // 通常ドロップ率（エリート補正は数えない下限側）
+  const enemiesAt={};
+  for(let d=1; d<=50; d++){
+    let tot=0; const N=6;
+    for(let i=0;i<N;i++){ RNG=mulberry32(500+i*29+d*7); tot+=spawnEnemies(genFloor(d),d).length; }
+    enemiesAt[d]=tot/N;
+  }
+  const acc=[0,0,0,0,0], at={};
+  for(let d=1; d<=50; d++){
+    const c={0:0,1:0,2:0,3:0,4:0}, N=8000;
+    RNG=mulberry32(99+d);
+    for(let i=0;i<N;i++) c[rollRarity(d+1,0,d).id]++;
+    const items=enemiesAt[d]*DROP;
+    for(let t=0;t<5;t++) acc[t]+=items*(c[t]/N);
+    if([10,20,30,50].includes(d)) at[d]=acc.map(v=>+v.toFixed(2));
+  }
+  const near=(got,want,tol)=>Math.abs(got-want)<=tol;
+  return {at,
+    magicBy10:  at[10][1], rareBy20: at[20][2], uniqBy30: at[30][3], relicBy50: at[50][4],
+    magicOnPace: near(at[10][1], 1, 0.6),
+    rareOnPace:  near(at[20][2], 1, 0.6),
+    uniqOnPace:  near(at[30][3], 1, 0.6),
+    relicOnPace: near(at[50][4], 2, 1.0),
+    ok: near(at[10][1],1,0.6) && near(at[20][2],1,0.6)
+        && near(at[30][3],1,0.6) && near(at[50][4],2,1.0)};
 });
 
 // --- 14. 重装鎧は移動速度・攻撃速度の両方が下がる

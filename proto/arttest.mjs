@@ -74,7 +74,9 @@ const stage = (job, fn)=>pg.evaluate(({job, fnSrc})=>{
   a.x=P.x+0.6; a.y=P.y;
   uniqueAllyName(a,party()); S.hero.party.push(a);
   const e=W.enemies.find(x=>!x.boss && !x.dead);
-  W.enemies=[e]; e.x=a.x+1.6; e.y=a.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0;
+  /* 的は動かさない。測っているのは仲間の技であって、相手の間合いの取り方ではない。
+     ms=0 だけでは足りない——飛ばし（跳ねる）と寄り（飛びかかる）は arch.ms を見ない。 */
+  W.enemies=[e]; e.x=a.x+1.6; e.y=a.y; e.maxHp=e.hp=999999; e.atkV=0; e.ms=0; e.pinned=true;
   S.hero.equip.weapon=null;                 // 主人公は手出ししない
   a.artCd=0;
   return (new Function('a','e','def','return ('+fnSrc+')(a,e,def)'))(
@@ -120,6 +122,11 @@ R.bulwark = await stage('knight', (a,e,def)=>{
        後半の弾幕と競合するので、着弾だけを予約する形にしてある。 */
 R.rain = await stage('hunter', (a,e,def)=>{
   W.arts=[]; W.fx=[];
+  /* 見たいのは「この技が弾を使わないこと」。狩人は弓なので、
+     測っている 3 フレームのあいだに**普通の攻撃**がたまたま発射されると、
+     技のせいではない ashot が1本混ざる（実際にそれで一度落ちた）。
+     通常攻撃だけ止めてから測る——技は artCd で撃たれるので影響しない。 */
+  a.atkCd = 99;
   stepSim(0.05);
   const drops=W.arts.filter(f=>f.kind==='arrow');
   const shots=W.fx.filter(f=>f.t==='ashot'||f.t==='pshot').length;
