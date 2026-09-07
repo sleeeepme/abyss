@@ -503,7 +503,7 @@ const tap = async (sel)=>{
 
 // 8-a. 慰霊碑：秘石が足りていれば、行をタップして呼び戻せる
 await pg.evaluate(()=>{
-  S.hero=newHero(); S.run=null; S.hero.party=[]; S.shards=99999; S.fallen=[];
+  S.hero=newHero(); S.run=null; S.hero.party=[]; S.shards=99999; S.gold=99999; S.fallen=[];
   const v=TH.ally(10,'warrior',10); uniqueAllyName(v,[]); memInter(v);
   setScreen('mem');
 });

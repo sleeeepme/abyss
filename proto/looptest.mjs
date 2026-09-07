@@ -306,21 +306,33 @@ R.sepDegenerate = await pg.evaluate(()=>{
 
 /* ================= 4. 秘石 ================= */
 
-// 4-a. 落ちる数は強さと深さで増える
-R.shardCurve = await pg.evaluate(()=>{
-  const avg=(mk,depth)=>{
-    let t=0; const n=600;
-    for(let i=0;i<n;i++){ RNG=mulberry32(i*31337+depth); t+=shardDrop(mk(),depth); }
-    return +(t/n).toFixed(2);
-  };
+/* 4-a. SPは「倒した数」がそのまま積み上がる。
+        確率も深度倍率も無い——ここが死に戻りの土台。
+        同じ努力が同じ前進にならないと、次に潜る理由が運の話になる。 */
+R.spFlat = await pg.evaluate(()=>{
   const mob=()=>({}), elite=()=>({elite:true}), uniq=()=>({uniq:true});
-  const great=()=>({boss:true,tier:'great'}), fin=()=>({boss:true,tier:'final'});
-  const d5={mob:avg(mob,5), elite:avg(elite,5), uniq:avg(uniq,5), great:avg(great,5), final:avg(fin,5)};
-  const d40={mob:avg(mob,40), elite:avg(elite,40)};
-  return {d5, d40,
-          tierOrders: d5.mob<d5.elite && d5.elite<d5.uniq && d5.uniq<d5.great && d5.great<d5.final,
-          deeperPaysMore: d40.mob>d5.mob*1.5 && d40.elite>d5.elite*1.5,
-          mobsSometimesZero: (()=>{ let z=0; for(let i=0;i<200;i++){ RNG=mulberry32(i); if(shardDrop({},5)===0) z++; } return z>40 && z<180; })()};
+  const mid=()=>({boss:true,tier:'mid'}), great=()=>({boss:true,tier:'great'});
+  const fin=()=>({boss:true,tier:'final'});
+  // 同じ相手なら、何度引いても、どの深さでも、必ず同じ数
+  const same=(mk)=>{
+    const v=new Set();
+    for(const d of [1,5,12,25,40,50]) for(let i=0;i<50;i++){
+      RNG=mulberry32(i*31337+d); v.add(shardDrop(mk(), d));
+    }
+    return [...v];
+  };
+  const mobV=same(mob), eliteV=same(elite), uniqV=same(uniq);
+  const midV=same(mid), greatV=same(great), finV=same(fin);
+  const one = a => a.length===1;
+  return {mob:mobV, elite:eliteV, uniq:uniqV, mid:midV, great:greatV, final:finV,
+          alwaysSame: [mobV,eliteV,uniqV,midV,greatV,finV].every(one),
+          neverZero: mobV[0]>0,
+          tierOrders: mobV[0]<eliteV[0] && eliteV[0]<uniqV[0]
+                   && uniqV[0]<midV[0] && midV[0]<greatV[0] && greatV[0]<finV[0],
+          spec: mobV[0]===1 && eliteV[0]===2 && uniqV[0]===3
+             && midV[0]===5 && greatV[0]===10 && finV[0]===20,
+          ok: [mobV,eliteV,uniqV,midV,greatV,finV].every(one) && mobV[0]===1
+              && midV[0]===5 && greatV[0]===10};
 });
 
 // 4-b. 拾った瞬間に口座に入り、死んでも残る（今回の要望の本体）
@@ -386,7 +398,7 @@ R.shardUI = await pg.evaluate(()=>{
   S.hero.hpNow=0; die();
   const over=document.getElementById('d-lost').innerHTML;
   return {hud:hud.replace(/\s+/g,' '), hudShows:hud.includes('9'),
-          overShows: over.includes('マナ') && over.includes('9'),
+          overShows: over.includes('SP') && over.includes('9'),
           shardsRun:S.shardsRun};
 });
 

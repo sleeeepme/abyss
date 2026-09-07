@@ -357,7 +357,7 @@ R.legacyCarries = await pg.evaluate(()=>{
 
 R.memorial = await pg.evaluate(()=>{
   TH.run(1,{seed:41}); TH.floor(20);
-  S.fallen=[]; S.shards=0;
+  S.fallen=[]; S.shards=0; S.gold=0;
   const a=makeAlly(20,S.hero); a.lv=22; a.dead=true; a.hpNow=0;
   a.boons=[{id:'atk', rar:'rare'}];
   uniqueAllyName(a,party()); S.hero.party.push(a);
@@ -370,13 +370,17 @@ R.memorial = await pg.evaluate(()=>{
   const f=S.fallen[0];
   const cost=memCost(f);
 
-  const poor = memRevive(f.uidA);                  // 秘石が足りない
-  S.shards = cost;
+  /* 呼び戻す対価は**金**。SPは自分の恒久成長だけの通貨にしたので、
+     仲間を連れ戻すたびにツリーが遠のく形にはしない。
+     ここで letFallenGo が金を残しているぶん、いったん 0 に戻してから見る。 */
+  S.gold = 0;
+  const poor = memRevive(f.uidA);                  // 金が足りない
+  S.gold = cost;
   const r = memRevive(f.uidA);
   const back = party()[0];
   return {carved, wiped, cost, name, lv,
           refusedWhenPoor: !poor.ok, why:poor.why,
-          revived: r.ok, shardsLeft:S.shards,
+          revived: r.ok, goldLeft:S.gold,
           keepsName: !!back && back.name===name,
           keepsLevel: !!back && back.lv===lv,
           keepsBoons: !!back && back.boons.length===1 && back.boons[0].rar==='rare',
@@ -393,7 +397,7 @@ R.memorialUI = await pg.evaluate(()=>{
   TH.run(1,{seed:43}); TH.floor(20);
   S.fallen=[{uidA:9001, job:'warrior', name:'亡き戦士', lv:12,
              str:16,dex:16,vit:16,int:5, boons:[], revived:false, depth:20, t:Date.now()}];
-  S.shards=999;
+  S.shards=999; S.gold=9999;   // 呼び戻す対価は金
   setScreen('mem');
   const listed = el('memlist').textContent.includes('亡き戦士');
   const sub = (renderTown(), el('m-mem-sub').textContent);

@@ -282,21 +282,25 @@ R.lossShards = await pg.evaluate(()=>{
   S.shards=0; S.shardsRun=0;
   const a=makeAlly(20, S.hero); a.lv=18; a.hpNow=0; a.dead=true;
   uniqueAllyName(a, party()); S.hero.party.push(a);
-  const expect=allyLossShards(a);
+  /* 残るのは**金**。SPは自分の恒久成長だけの通貨にしたので、
+     仲間の喪失でSPが増えると「失うほどツリーが進む」ことになる。
+     金なら慰霊碑（呼び戻す場所）の値段と同じ通貨で、筋が通る。 */
+  const g0=S.gold||0;
+  const expect=allyLossGold(a);
   openFallen(a);
   const shownInModal = el('fal-body').textContent.includes(String(expect));
   letFallenGo();
   document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
-  return {expect, shards:S.shards, shardsRun:S.shardsRun, shownInModal,
+  return {expect, gained:(S.gold||0)-g0, shownInModal,
           gone: party().length===0,
-          banked: S.shards===expect,
+          banked: (S.gold||0)-g0===expect,
           // レベルに比例＝わざと失って稼げない（Lv.1 は最低値）
-          lv1: allyLossShards({lv:1}), lv40: allyLossShards({lv:40}),
-          scalesWithLevel: allyLossShards({lv:1}) < allyLossShards({lv:20}),
-          capped: allyLossShards({lv:400}) <= 30,
-          ok: S.shards===expect && expect>0 && party().length===0 && shownInModal
-              && allyLossShards({lv:1})<allyLossShards({lv:20})
-              && allyLossShards({lv:400})<=30};
+          lv1: allyLossGold({lv:1}), lv40: allyLossGold({lv:40}),
+          scalesWithLevel: allyLossGold({lv:1}) < allyLossGold({lv:20}),
+          capped: allyLossGold({lv:400}) <= 450,
+          ok: (S.gold||0)-g0===expect && expect>0 && party().length===0 && shownInModal
+              && allyLossGold({lv:1})<allyLossGold({lv:20})
+              && allyLossGold({lv:400})<=450};
 });
 
 /* ================= 4. 弔いの潜在 ================= */
