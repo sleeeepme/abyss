@@ -53,10 +53,25 @@ R.roster = await pg.evaluate(()=>{
 });
 
 R.strongerThanRelicPlus10 = await pg.evaluate(()=>{
-  const sword=BASES.find(x=>x.id==='sword');
-  const relic=buildItem(sword, RARITY[4], LEGEND_ILVL);
-  relic.up=10;
-  const relicAtk=Math.round(relic.atk*(1+10*UP_ATK_PER));
+  /* 以前はレリックを**1本だけ引いて**比べていた。種も固定していなかったので、
+     たまたま上振れした1本が出た回だけ赤くなる（実測 sweep 11回に1回）。
+     それはレジェンドの強さではなく、その日の引きを測っている。
+
+     ここで確かめたいのは「レジェンドは赤+10より強い」という**約束**なので、
+     比べる相手は平均ではなく**上限**にする。上振れした赤に負けるなら、
+     それはプレイヤーから見れば約束が破れている。
+     種を固定したうえで3000本引き、その最大値を相手にする。 */
+  RNG=mulberry32(31337);
+  const RELIC_ROLLS=3000;
+  const relicTop=(baseId)=>{
+    const b=BASES.find(x=>x.id===baseId);
+    let mx=0;
+    for(let i=0;i<RELIC_ROLLS;i++){
+      const r=buildItem(b, RARITY[4], LEGEND_ILVL); r.up=10;
+      mx=Math.max(mx, r.atk*(1+10*UP_ATK_PER));
+    }
+    return mx;
+  };
   /* 比べるのは**1振りで出る合計**。多段（飛燕）や散弾（テミス）は
      1撃あたりを下げてあるので、素の攻撃力だけ見ると弱く見える。
      プレイヤーが受け取るのは「1回振ったときにどれだけ出るか」のほう。 */
@@ -67,17 +82,19 @@ R.strongerThanRelicPlus10 = await pg.evaluate(()=>{
     const per=(L && L.shotMul)||1;
     return it.atk * hits * shots * per;
   };
-  const weak=LEGENDS.map(L=>{
-    const it=makeLegend(L.id);
-    const b=BASES.find(x=>x.id===L.base);
-    const r=buildItem(b, RARITY[4], LEGEND_ILVL); r.up=10;
-    return {id:L.id, legend:Math.round(swingOut(it)),
-            relic10:Math.round(r.atk*(1+10*UP_ATK_PER))};
-  }).filter(x=>x.legend<=x.relic10);
-  const lev=makeLegend('levantine');
-  return {sampleLegend:lev.atk, sampleRelic10:relicAtk, weaker:weak,
+  const top={};
+  const rows=LEGENDS.map(L=>{
+    if(top[L.base]===undefined) top[L.base]=relicTop(L.base);
+    return {id:L.id, legend:Math.round(swingOut(makeLegend(L.id))),
+            relic10max:Math.round(top[L.base])};
+  });
+  const weak=rows.filter(x=>x.legend<=x.relic10max);
+  const margin=rows.map(x=>x.legend/x.relic10max);
+  return {relicRolls:RELIC_ROLLS, weaker:weak,
+          minMargin:+Math.min(...margin).toFixed(3),
+          maxMargin:+Math.max(...margin).toFixed(3),
           everyOneBeatsRelic10: weak.length===0,
-          ok: weak.length===0 && lev.atk>relicAtk};
+          ok: weak.length===0};
 });
 
 // 名前は固有名がそのまま出る。鍛えた段だけが頭に付く。
