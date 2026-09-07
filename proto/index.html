@@ -495,7 +495,7 @@
 <div class="screen" id="scr-upg">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>能力強化</h1><span class="gold" id="upg-gold"></span></div>
-  <p class="sub">対価は<b style="color:#8fd8ff">SP</b>。敵が落とし、<b>拾った瞬間に貯まる</b>ので
+  <p class="sub">対価は<b style="color:#8fd8ff">SP</b>。敵を倒した瞬間に貯まるので
     <b style="color:#7fe0c0">死んでも失いません</b>。<br>
     どんな探索も、必ずここに変わります。</p>
   <div class="grid" id="upgrades"></div>
@@ -996,11 +996,12 @@
 
   <h2>SP <span style="color:var(--dim);font-weight:400;font-size:12px">死んでも失わない</span></h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
-    敵が<b style="color:#8fd8ff">◆SP</b>を落とします。<b>拾った瞬間に貯まる</b>ので、
-    そのあと死んでも失いません。<br>
-    SPは<b>能力強化</b>の対価です（金では買えません）。<br>
+    敵を倒すと<b style="color:#8fd8ff">◆SP</b>が入ります。経験値や金と同じで、
+    <b>倒した瞬間に貯まる</b>ので、拾いに行く必要はありません。<br>
+    そのあと死んでも失いません。SPは<b>能力強化</b>の対価です（金では買えません）。<br>
     どんなに酷い死に方をしても、潜った時間は必ず能力強化に変わります。<br>
-    <span style="font-size:12px">エリート・ユニーク・ボスほど多く落とし、深いほど増えます。</span>
+    <span style="font-size:12px">雑魚 1 ／ 精鋭 2 ／ 規格外 3 ／ 中ボス 5 ／ 大ボス 10。<br>
+    <b>深さでは増えません</b>——深いところは敵の数で増えます。</span>
   </div>
 
   <h2>呪い（週替わりの縛り）</h2>
@@ -2312,6 +2313,19 @@ const UPGRADES=[
   {id:'ms',    nm:'移動速度', max:5, shard:9,  step:'移動速度 +5%',     desc:'避けやすくなる'},
   {id:'mf',    nm:'発見力',   max:6, shard:11, step:'発見力 +12',       desc:'良い装備が出やすい'},
   {id:'crit',  nm:'会心',     max:5, shard:11, step:'クリティカル率 +4%',desc:'たまに大ダメージ'},
+  /* ---------- 守りをSPで買えるようにする ----------
+     ここまで能力強化には**防御を伸ばす項目が1つも無かった**。
+     伸ばせるのはHPだけで、装備とVIT以外に軽減の手段が存在しない。
+
+     死にゲーにすると、これが効いてくる。HPは殴られる回数を1回ずつ増やすだけの
+     線形な buffer だが、防御と軽減は1発ごとの目減りに効く。
+     「もう1発耐える」ではなく「そもそも減りが遅くなる」ほうが、
+     道中の消耗で削られてボス部屋に入る、という負け方に直接効く。
+
+     鉄皮＝防御力（装備の防御と同じ土俵に乗る）。
+     不動＝被ダメージそのものを削る（防御を抜けてくる属性攻撃にも効く）。 */
+  {id:'def',   nm:'鉄皮',     max:5, shard:10, step:'防御力 +4',         desc:'一撃の目減りが遅くなる'},
+  {id:'dr',    nm:'不動',     max:5, shard:16, step:'被ダメージ -3%',    desc:'属性攻撃にも効く'},
   /* 仲間の練度。ここまでの能力強化は全部「自分だけ」が伸びる物だったので、
      パーティを連れて歩くほど、強化の恩恵から外れる頭数が増えていた。
      仲間は死んで入れ替わるが、この強化は口座側に残る——
@@ -2448,7 +2462,7 @@ function relicToggle(id){
    死んだランは丸ごと無駄になり、死んだ瞬間に何も前進していないことになる。
    それが一番モチベーションを削る。
 
-   SPは<b>拾った瞬間に口座へ入る</b>ので、そのあと死んでも残る。
+   SPは<b>倒した瞬間に口座へ入る</b>ので、そのあと死んでも残る。
    どんなに酷い死に方をしても、潜った時間そのものは必ず能力強化に変わる。
    逆に金は「生きて帰らないと1Gも手に入らない」ままにしてある（帰還の価値を残すため）。 */
 function upgCost(u,lv){ return Math.round(u.shard*Math.pow(lv+1,1.35)); }
@@ -2469,18 +2483,28 @@ function upgLv(id){ return S.upg[id]||0; }
 const SP_MOB = 1, SP_ELITE = 2, SP_UNIQ = 3;
 const SP_MID = 5, SP_GREAT = 10, SP_FINAL = 20;
 function shardDrop(e, depth){
+  /* 侵入者は先に見る。倒した瞬間に入る経路が1本になったので、
+     ここで返さないと「基本分＋侵入者分」で二重に入る。
+     **この敵が何SPか**を答える場所は、ここ1ヶ所に保つ。 */
+  if(e.intruder) return INTRUDER_SHARDS;
   if(e.boss) return e.tier==='final' ? SP_FINAL
            : e.tier==='great' ? SP_GREAT : SP_MID;
   if(e.uniq)  return SP_UNIQ;
   if(e.elite) return SP_ELITE;
   return SP_MOB;
 }
+/* SPを口座へ入れる。**床には落とさない。**
+   経験値・金と同じで、倒した瞬間に入る。
+   拾いに行かせると、倒した敵の数と手に入るSPがずれる——
+   逃げながら倒した分や、危なくて近寄れなかった分が消える。
+   「倒した数がそのまま積み上がる」を守るなら、拾う工程を挟んではいけない。
+   返り値は呪いの取り分を掛けたあとの実数（表示に使う）。 */
 function gainShards(n, x, y){
   n = Math.round(n * curseBonus().shard);       // 呪いの取り分
-  if(n<=0) return;
+  if(n<=0) return 0;
   S.shards = (S.shards||0) + n;      // 即座に口座へ。死んでも消えない。
   S.shardsRun = (S.shardsRun||0) + n;
-  if(x!==undefined) W.pops.push({x, y:y-0.3, txt:'SP +'+n, c:'#8fd8ff', life:0.9});
+  return n;
 }
 
 /* ---------- 置いてはいけない場所 ----------
@@ -2622,7 +2646,7 @@ function hazardAt(x,y){
 
    ただし強化した武器も、装備したまま死ねば他の装備と同じくロストする。
    ここを安全にすると恒久ロストの緊張が消えるので、あえて守らない。
-   代わりに黒鉄そのものはSPと同じく拾った瞬間に口座へ入る＝素材は死んでも残る。
+   代わりに黒鉄そのものはSPと同じく即座に口座へ入る＝素材は死んでも残る。
    「素材は安全・投資は危険」という線引きにしてある。 */
 const ORES=[
   {id:'raw',  nm:'粗鉱', icon:'▰', col:'#9aa3b2', min:1,  max:16},
@@ -2641,7 +2665,7 @@ function oreHave(id){ return (S.ore && S.ore[id]) || 0; }
 /* 鍛える場所によって、どちらの袋を見るかが変わる（金とまったく同じ扱い） */
 function orePurse(id, mid){ return mid ? oreRun(id) : oreHave(id); }
 /* 黒鉄は「持ち帰らないと自分の物にならない」資源。
-   SP（拾った瞬間に口座＝死んでも残る）とは、あえて逆の性格にしてある。
+   SP（倒した瞬間に口座＝死んでも残る）とは、あえて逆の性格にしてある。
      SP = 潜った時間そのものの対価。だから絶対に失わせない。
      黒鉄 = 持ち帰るという判断の対価。だから死ねば失う。
    両方を安全側にすると「深く潜って引き返す」という判断そのものが消える。
@@ -3194,6 +3218,9 @@ const BLADE_SPIN_ASPD = 0.60;
 const BLADE_MULT = 0.62;         // 攻撃力に対する1撃の倍率
 const BLADE_HIT_R = 0.42;        // 刃そのものの当たり半径
 
+/* 会心の倍率。1.5 では率の半分しかダメージに乗らず、
+   会心系は攻撃系の恩寵の中で常に一番弱い選択肢になっていた。 */
+const CRIT_MUL = 1.8;
 const BOONS=[
   {id:'hp',    nm:'生命の恩寵',  v:[10,20,34,52], fmt:'最大HP +%v%'},
   {id:'atk',   nm:'剛力の恩寵',  v:[8,17,28,44],  fmt:'攻撃力 +%v%'},
@@ -4546,7 +4573,7 @@ const S={
   cleared2:{},           // 一度抜けた階。穴の位置を伏せない（口座側）
   moss:{},               // 苔玉を層ごとに何匹倒したか（口座側）
   duranGiven:false,      // ドゥラントリーを渡したか（一度だけ）
-  shards:0,              // SP。拾った瞬間に入る＝死んでも失わない
+  shards:0,              // SP。倒した瞬間に入る＝死んでも失わない
   shardsRun:0,           // 今回の探索で拾った数（結果表示用）
   ore:{},                // 黒鉄（口座）。生きて帰った分だけがここに入る
   curses:[], curseWeek:-1,  // 掛けている呪いと、その週番号
@@ -4813,7 +4840,11 @@ function stats(h){
            * (1 + (h===S.hero ? baneMul('aspd',0) : 0)/100)
            * (1 + DN.aspd/100)
            * (aBase==='plate' ? PLATE_ASPD_MUL : 1),
-    def:   (bDef + a.def + vit*0.6) * (1 + B('def')/100) * SA * (1 + DN.def/100),
+    /* 「鉄皮」は**加算**で乗せる。割合で乗せても素の防御が 3 しかないので、
+       カンストしても 3→5 にしかならず、100 の一撃が 87→83 で終わっていた。
+       減衰は def/(def+50+10*敵レベル) なので、浅いところほど効き、
+       深くなると薄れる——序盤を支えるための項目として、それでいい。 */
+    def:   (bDef + a.def + vit*0.6 + U('def')*4) * (1 + B('def')/100) * SA * (1 + DN.def/100),
     crit:  clamp(4 + dex*0.5 + a.critPct + U('crit')*4 + B('crit'), 0, 75),
     // 遺物は主人公本人にだけ乗る（口座に残る物なので、渡す概念が無い）
     ms:    BASE_MOVE_SPEED * (1 + a.msPct/100) * (1 + U('ms')*0.05)
@@ -4850,6 +4881,9 @@ function stats(h){
     mf:a.mf + U('mf')*12 + C('mf') + B('mf')
        + (h===S.hero ? curseBonus().mf + relicSum('mf') : 0),
     thorns:a.thorns + B('thorns'), lowDR:a.lowDR, charmDR:C('dr') + B('dr'),
+    /* 能力強化「不動」。護符・恩寵の軽減とは別枠で持つ——
+       同じ枠に足すと、片方を伸ばすともう片方の意味が薄れる。 */
+    upgDR: (h===S.hero ? U('dr')*3 : 0),
     ailPct: B('ail'), regenPct: B('regen'),
     // 大技のリキャスト短縮（装備＋恩寵）。仲間ぶんは ultCooldown 側で足す。
     ultCdr: a.ultCdr + B('ultcdr')
@@ -6736,7 +6770,11 @@ function hitEnemy(e, st, mult, opt){
      倍率の掛け算に1つ足すだけの形にして、resolveDamage の中は触らない。 */
   const LG = legendOf(st);
   const lm = (LG && LG.vsCaster && isCaster(e)) ? (1 + LG.vsCaster) : 1;
-  const r = resolveDamage(e, playerParts(st,(crit?1.5:1.0)*(mult||1)*back*lm), src.lv,
+  /* 会心の倍率。1.5 だと、率が +17% でも実効ダメージは +8.5% にしかならず
+     （0.17 × 0.5）、同じ段の「剛力 +28%」の3割の価値しかなかった。
+     表示された率が、そのまま強さとして読めない状態になっていた。
+     1.8 にすると +17% → 実効 +13.6%。上限の 75% まで積んだときで +60%。 */
+  const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
@@ -6747,7 +6785,7 @@ function hitEnemy(e, st, mult, opt){
   const col = crit ? '#ffd06a'
             : weak ? '#8b93a7'
             : (DTYPE[r.mainType] ? DTYPE[r.mainType].col : '#fff');
-  pop(e.x,e.y,r.total,col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')));
+  pop(e.x,e.y,r.total,col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')), crit || r.weak);
   r.procs.forEach(sid=>W.pops.push({x:e.x,y:e.y-0.5,txt:STATUS[sid].nm,c:STATUS[sid].col,life:0.8}));
   if(st.leech) healEnt(src, r.total*st.leech/100);
   /* 命中したときだけ起きるぶん。血河・ノコギリ鉈の出血、トールハンマーの感電と
@@ -7894,7 +7932,12 @@ function downAlly(a){
   openFallen(a);
 }
 function heal(v){ const st=stats(S.hero); S.hero.hpNow=Math.min(st.maxHp,S.hero.hpNow+v); }
-function pop(x,y,v,c,mark){ W.pops.push({x,y,v:Math.round(v),c,mark:mark||'',life:0.7}); }
+/* 数字の太字は**意味を持たせる**。Silkscreen には本物の Bold があるので、
+   全部を太字にすると太さが情報を運ばなくなる。
+   太くするのは「いつもと違う一撃」だけ——会心と、弱点を突いたとき。 */
+function pop(x,y,v,c,mark,bold){
+  W.pops.push({x,y,v:Math.round(v),c,mark:mark||'',life:0.7,bold:!!bold});
+}
 
 /* ---------- 経験値の分配 ----------
    仲間が増えるほど 1 人あたりの取り分は減る。これが仲間を入れる代償。
@@ -7998,9 +8041,17 @@ function killEnemy(e, byAlly){
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
                        *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
   S.run.gold+=g;
-  // 経験値 → 金の順に、少しずらして1つずつ出す（1行に並べると読み分けられない）
+  /* SPも経験値・金と同じ扱いにする。床に落として拾わせるのをやめた——
+     倒した数とSPがずれる（逃げ撃ちした分・近寄れなかった分が消える）ので、
+     「倒した数がそのまま積み上がる」という土台に穴が開いていた。 */
+  const spGot = gainShards(shardDrop(e, S.run.depth));
+
+  // 経験値 → 金 → SP の順に、少しずつずらして1つずつ出す
+  // （1行に並べると読み分けられない）
   W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+Number(receivedXp.toFixed(1))+' EXP',c:'#e5d18c',life:1.1,max:1.1,reward:true});
   W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+g+' G',c:'#e5d18c',life:1.1,max:1.1,reward:true,delay:0.5});
+  if(spGot>0)
+    W.pops.push({x:e.x,y:e.y-0.85,txt:'+'+spGot+' SP',c:'#8fd8ff',life:1.1,max:1.1,reward:true,delay:1.0});
 
   if(e.boss){
     /* ---------- 双子（第20階層）は先に倒した方では終わらない ----------
@@ -8073,7 +8124,6 @@ function killEnemy(e, byAlly){
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.9,max:0.9});
     S.run.intruder=null;
     S.run.intrNext=(S.run.elapsed||0)+INTRUDER_RESPAWN;
-    W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3), shard:INTRUDER_SHARDS});
     for(let i=0;i<3;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
                     it:genItem(S.run.depth+5, st.mf+30, S.run.depth)});
@@ -8092,10 +8142,6 @@ function killEnemy(e, byAlly){
     openBoonPick('unique', e.name);
     return;
   }
-
-  // SP。拾った瞬間に口座へ入るので、この探索が失敗しても無駄にならない。
-  const shards = shardDrop(e, S.run.depth);
-  if(shards>0) W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3), shard:shards});
 
   // 消耗品。頻度は低く、回復連打で緊張が消えない量に抑える。
   if(rnd() < CONSUM_DROP_RATE * (e.elite?2.2:1))
@@ -8738,6 +8784,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
   let dm = r.total;
   if(st.lowDR && S.hero.hpNow/st.maxHp<=0.3) dm=Math.round(dm*(1-st.lowDR/100));
   if(st.charmDR) dm=Math.round(dm*(1-st.charmDR/100));      // 加護の護符
+  if(st.upgDR)  dm=Math.round(dm*(1-st.upgDR/100));        // 能力強化「不動」
   if(S.run.ward) dm=Math.max(1, Math.round(dm*(1-S.run.ward.cut/100)));   // 大技「守護」
   if(hasCurse('thin')) dm=Math.round(dm*1.4);                              // 呪い「薄氷」
   /* 精鋭・ユニークの性質。当たった瞬間に効く物はここでまとめて見る。
@@ -9420,7 +9467,14 @@ function autoPickup(){
     const d=W.drops[i];
     if(Math.hypot(d.x-P.x,d.y-P.y) < 0.7){
       W.drops.splice(i,1);
-      if(d.shard){ gainShards(d.shard, d.x, d.y); continue; }   // 即座に口座へ
+      /* 床に落ちたSP。いまは誰も置かない（倒した瞬間に口座へ入る）が、
+         古いセーブに残っている分を拾えなくすると詰むので、受け口は残す。 */
+      if(d.shard){
+        const n=gainShards(d.shard);
+        if(n>0) W.pops.push({x:d.x, y:d.y-0.85, txt:'+'+n+' SP', c:'#8fd8ff',
+                             life:1.1, max:1.1, reward:true});
+        continue;
+      }
       S.run.loot.push(d.it);
       log('拾った：'+itemName(d.it));
     }
@@ -11161,12 +11215,13 @@ function draw(){
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
   endPixelFx();
   // ダメージ数値
-  ctx.font='bold '+(TS*0.46)+'px '+FONT; ctx.textAlign='center';
+  ctx.font=(TS*0.46)+'px '+FONT; ctx.textAlign='center';
   W.pops.forEach(p=>{
     if(p.delay>0) return;                    // 順番待ちのものはまだ描かない
     ctx.globalAlpha=clamp(p.life/0.3,0,1); ctx.fillStyle=p.c;
     const txt = p.txt !== undefined ? p.txt : ((p.player?'-':'')+p.v + (p.mark||''));
-    ctx.font='bold '+Math.round(p.reward?Math.max(11,TS*.26):TS*.46)+'px '+FONT;
+    const sz = Math.round(p.reward ? Math.max(11,TS*.26) : TS*.46);
+    ctx.font = ((p.bold || p.reward) ? 'bold ' : '') + sz + 'px ' + FONT;
     const tx=Math.round(p.x*TS-camX), ty=Math.round(p.y*TS-camY-TS*.5-((p.max||.7)-p.life)*26);
     ctx.strokeStyle='#091017'; ctx.lineWidth=3; ctx.lineJoin='round';
     ctx.strokeText(txt,tx,ty); ctx.fillText(txt,tx,ty);
@@ -12106,8 +12161,13 @@ function compareHTML(it){
     ['攻速', +(after.aspd-before.aspd).toFixed(2)],
   ].filter(r=>r[1]!==0);
   if(!rows.length) return '<div class="af" style="color:#7b8398">増減なし</div>';
+  /* **上がる値だけ太字にする。** 色（緑／赤）だけだと、
+     持ち替えるかどうかを決める瞬間に「どれが得か」を色で探すことになる。
+     太さが付くと、得の側が先に目に入る。下がる値は太らせない——
+     両方太いと、また探すことになる。 */
   return '<div class="af">'+rows.map(([k,v])=>
-    `<span style="color:${v>0?'#4a9d6e':'#c4433f'}">${k} ${v>0?'+':''}${v}</span>`).join('　')+'</div>';
+    v>0 ? `<span style="color:#4a9d6e">${k} <b>+${v}</b></span>`
+        : `<span style="color:#c4433f">${k} ${v}</span>`).join('　')+'</div>';
 }
 /* 店の品揃え。到達最深度に応じて質が上がる＝潜るほど買える物が良くなる */
 function rerollShop(){
@@ -12823,9 +12883,11 @@ function renderAllyEquip(){
       ['範囲', after.range-before.range, 2],
     ].filter(([,v])=>Math.abs(v)>=(0.005));
     if(!rows.length) return '<span style="color:var(--dim)">変化なし</span>';
+    // 主人公の比較（compareHTML）と同じ作法。上がる値だけ太字にする。
     return rows.map(([nm,v,dp])=>{
       const s=(v>0?'+':'')+ (dp ? v.toFixed(dp) : Math.round(v));
-      return `<span style="color:${v>0?'#7fe0c0':'#e0705a'}">${nm} ${s}</span>`;
+      return v>0 ? `<span style="color:#7fe0c0">${nm} <b>${s}</b></span>`
+                 : `<span style="color:#e0705a">${nm} ${s}</span>`;
     }).join('　');
   };
   const src=aeSource().filter(it=>allyCanEquip(a,it));

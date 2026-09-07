@@ -11,10 +11,15 @@
      設計ではなく、その日の出目を測ってしまう。
      だから**固定シードを複数本まわして中央値と四分位で見る。**
 
+   ファイル名の頭に _ が付いているのは sweep から外すため。
+   proto/_*.mjs は掃引に入らない規約になっている（_h.mjs = 共通部品、
+   _intrperf.mjs = 単発の計測）。これは測定であってテストではないので、
+   同じ扱いにする。名前を戻すと sweep が拾って毎回 CRASH 行を出す。
+
    使い方:
-     node proto/balance.mjs
-     node proto/balance.mjs --seeds 24 --sp 0,60,130,300,450
-     node proto/balance.mjs --maxdepth 20 --csv out.csv
+     node proto/_balance.mjs
+     node proto/_balance.mjs --seeds 24 --sp 0,60,130,300,450
+     node proto/_balance.mjs --maxdepth 20 --csv out.csv
    ============================================================ */
 import { chromium, devices } from 'playwright';
 import path from 'path';
@@ -55,7 +60,11 @@ await pg.evaluate(() => {
     /* 累計SPを、決まった優先順で既存の能力強化に注ぎ込む。
        ツリーができたらこの関数だけ差し替える。 */
     loadout(sp) {
-      const order = ['hp', 'atk', 'aspd', 'ms', 'crit', 'range', 'mf'];
+      /* 買う順。死にゲーで人が実際に選ぶ順に近づける——
+         まず死ににくさ（HP・守り）、次に手数、最後に稼ぎ。
+         ここに項目を足し忘れると、その項目が無い世界を測ることになる。
+         **UPGRADES に項目を足したら、必ずここにも足す。** */
+      const order = ['hp', 'def', 'dr', 'atk', 'aspd', 'ms', 'crit', 'range', 'mf'];
       const up = {};
       let left = sp;
       let moved = true;
@@ -70,7 +79,8 @@ await pg.evaluate(() => {
           left -= c; up[id] = lv + 1; moved = true;
         }
       }
-      return { up, spent: sp - left };
+      const missing = UPGRADES.filter(u => !order.includes(u.id) && !u.hidden).map(u => u.id);
+      return { up, spent: sp - left, missing };
     },
 
     /* 穴までの流れ場。tileWalk が通れると言うマスだけを辿る。 */
@@ -322,9 +332,15 @@ await pg.evaluate(() => {
 /* ---- まわす ---------------------------------------------------------- */
 const rows = [];
 for (const sp of SP_LIST) {
+  let warned = false;
   for (let s = 0; s < SEEDS; s++) {
     const r = await pg.evaluate(([seed, sp, md, cap]) => BAL.run(seed, sp, md, cap),
       [1000 + s * 7, sp, MAXDEPTH, CAP]);
+    if (r.missing && r.missing.length && !warned) {
+      warned = true;
+      console.log('\n  ⚠ 買う順に入っていない項目:', r.missing.join(','),
+                  '— _balance.mjs の order に足すこと');
+    }
     rows.push(r);
     if (r.why && !QUIET) console.log('\n  ' + r.outcome + ':', JSON.stringify(r.why));
     if (!QUIET) process.stdout.write('.');

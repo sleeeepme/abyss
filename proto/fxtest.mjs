@@ -333,19 +333,28 @@ R.rewardPopsInOrder = await pg.evaluate(()=>{
   killEnemy(e);
   const rewards=W.pops.filter(p=>p.reward);
   const xpPop=rewards.find(p=>p.txt.includes('EXP'));
-  const gPop =rewards.find(p=>p.txt.includes('G'));
+  const gPop =rewards.find(p=>/ G$/.test(p.txt));
+  /* SPも経験値・金と同じ「倒した瞬間に入る報酬」になった。
+     床に落として拾わせるのをやめたので、ここに3つ目として並ぶ。 */
+  const spPop=rewards.find(p=>p.txt.includes('SP'));
   // 1行に同居していない
-  const separated = !!xpPop && !!gPop && !xpPop.txt.includes('G') && !gPop.txt.includes('EXP');
-  // 直後に見えているのは経験値だけ（金は順番待ち）
-  const xpFirst = !(xpPop.delay>0) && gPop.delay>0;
+  const separated = !!xpPop && !!gPop && !!spPop
+                 && !xpPop.txt.includes(' G') && !gPop.txt.includes('EXP');
+  // 直後に見えているのは経験値だけ（金とSPは順番待ち）
+  const xpFirst = !(xpPop.delay>0) && gPop.delay>0 && spPop.delay>0;
+  // SPは金より後ろ（読み分けられるように1つずつ出す）
+  const spLast = spPop.delay > gPop.delay;
+  const spBlue = spPop.c==='#8fd8ff';
   stepSim(0.1);
   const goldStillWaiting = gPop.delay>0 && gPop.life===gPop.max;
   // 待ち時間が過ぎれば金も浮き始める
   stepSim(1.0);
   const goldRanLater = !(gPop.delay>0) && gPop.life<gPop.max;
   return {count:rewards.length, xpTxt:xpPop&&xpPop.txt, gTxt:gPop&&gPop.txt,
-          separated, xpFirst, goldStillWaiting, goldRanLater,
-          ok: rewards.length===2 && separated && xpFirst && goldStillWaiting && goldRanLater};
+          spTxt:spPop&&spPop.txt, spCol:spPop&&spPop.c,
+          separated, xpFirst, spLast, spBlue, goldStillWaiting, goldRanLater,
+          ok: rewards.length===3 && separated && xpFirst && spLast && spBlue
+              && goldStillWaiting && goldRanLater};
 });
 
 await b.close();

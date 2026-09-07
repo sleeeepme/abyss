@@ -352,20 +352,24 @@ R.shardSurvivesDeath = await pg.evaluate(()=>{
           goldStillLost: S.gold===0};
 });
 
-// 4-c. 倒すと落とす（実際の killEnemy 経由）
-R.shardFromKill = await pg.evaluate(()=>{
+/* 4-c. 倒した瞬間に口座へ入る（実際の killEnemy 経由）。
+        床には落とさない——拾いに行かせると、倒した数と手に入るSPがずれる。
+        逃げながら倒した分や、危なくて近寄れなかった分が消えてしまう。 */
+R.spFromKill = await pg.evaluate(()=>{
   // 10階ごとは大広間＝ボス戦だけの階（雑魚が湧かない）。群れが要るので手前の階で見る。
   S.hero=newHero(); S.upg={hp:8}; startRun(19); S.shards=0;
   W.drops.length=0;
   W.enemies.length=0;
   W.enemies.push(...spawnEnemies(W.fl, 19));
-  const kills=W.enemies.length;
-  W.enemies.slice().forEach(e=>{ e.elite=true; killEnemy(e); });
-  const dropped=W.drops.filter(d=>d.shard);
-  const total=dropped.reduce((a,d)=>a+d.shard,0);
-  return {kills, shardDrops:dropped.length, total,
-          someDropped: dropped.length>0,
-          bankedOnlyOnPickup: S.shards===0};   // 落ちただけでは口座に入らない
+  const foes=W.enemies.slice();
+  const want=foes.reduce((a,e)=>a+shardDrop(e,19),0);
+  foes.forEach(e=>killEnemy(e));
+  return {kills:foes.length, want, got:S.shards,
+          floorDrops: W.drops.filter(d=>d.shard).length,
+          bankedAtOnce: S.shards===want,
+          nothingOnFloor: W.drops.filter(d=>d.shard).length===0,
+          ok: S.shards===want && want>0
+              && W.drops.filter(d=>d.shard).length===0};
 });
 
 // 4-d. 永続強化は秘石でだけ買える（金では買えない）

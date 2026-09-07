@@ -1,12 +1,16 @@
 <!doctype html><meta charset="utf-8"><title>Game feel regression</title>
 <style>body{background:#10171c;color:#d5e5df;font:14px monospace}iframe{border:1px solid #567;width:390px;height:844px}pre{white-space:pre-wrap}button{padding:10px;margin:6px}</style>
 <h1>Game feel regression</h1><pre id="result">Running…</pre>
-<button onclick="scene(11)">Water preview</button><button onclick="scene(21)">Root preview</button>
+<button onclick="scene(1)">Stone preview</button><button onclick="scene(11)">Water preview</button><button onclick="scene(21)">Root preview</button><button onclick="scene(5,true)">Boss preview</button>
 <iframe id="game" src="index.html?feel-test"></iframe>
 <script>
 const frame=document.getElementById('game');
 const errors=[];
-function scene(depth){frame.contentWindow.eval(`S.hero=newHero();startRun(${depth});P.invuln=999;W.enemies=[];S.run.pst={};`);}
+function scene(depth,boss=false){frame.contentWindow.eval(`S.hero=newHero();startRun(${depth});P.invuln=999;S.run.pst={};
+  document.querySelectorAll('.modal.on').forEach(n=>n.classList.remove('on'));setScreen('game');
+  if(${boss}){const e=W.enemies.find(e=>e.boss);P.x=e.x-1;P.y=e.y;killEnemy(e);}
+  else{W.enemies=[];if(W.haz){outer:for(let y=0;y<W.fl.H;y++)for(let x=0;x<W.fl.W;x++)if(W.haz.g[y]?.[x]){P.x=x+.5;P.y=y+.5;break outer;}}}
+  W.seen.forEach(r=>r.fill(1));`);}
 frame.onload=async()=>{
   const w=frame.contentWindow;
   w.addEventListener('error',e=>errors.push(e.message));
@@ -50,8 +54,8 @@ frame.onload=async()=>{
       const same=FEEL.dashCd===.5;setScreen('game');return blocked&&same;
     });
     check('Touch drag releases; HUD buttons never acquire the stick',()=>{
-      touchStart({changedTouches:[{identifier:90,clientX:180,clientY:400,target:cv}]});
-      touchMove({changedTouches:[{identifier:90,clientX:220,clientY:400}]});
+      touchStart({changedTouches:[{identifier:90,clientX:70,clientY:650,target:cv}]});
+      touchMove({changedTouches:[{identifier:90,clientX:110,clientY:650}]});
       const moved=stickDx>0;
       touchEnd({changedTouches:[{identifier:90}],touches:[]});
       const released=stickId===null&&stickDx===0;
@@ -70,8 +74,8 @@ frame.onload=async()=>{
     check('Kill shows credited XP and G; death emits original colored pixels only once',()=>{
       enterFloor(1);syncFeel();const e=W.enemies.find(e=>!e.undying&&!e.moss);P.x=e.x-.8;P.y=e.y;
       const gold=S.run.gold,particles=FEEL.particles.length;killEnemy(e);
-      const count=FEEL.particles.length,pop=W.pops.find(p=>p.reward);
-      killEnemy(e);return e.dead&&e.pixelBurst&&count>particles&&count===FEEL.particles.length&&pop.txt.includes('+'+(S.run.gold-gold)+' G')&&pop.txt.includes(' EXP');
+      const count=FEEL.particles.length,pops=W.pops.filter(p=>p.reward);
+      killEnemy(e);return e.dead&&e.pixelBurst&&count>particles&&count===FEEL.particles.length&&pops.some(p=>p.txt==='+'+(S.run.gold-gold)+' G')&&pops.some(p=>p.txt.includes(' EXP'));
     });
     check('Damage produces readable player pop and shake',()=>{
       P.invuln=0;P.guard=false;S.hero.hpNow=stats(S.hero).maxHp;W.pops=[];
@@ -95,6 +99,80 @@ frame.onload=async()=>{
     check('Particle budget and lifetime stay bounded',()=>{
       const e=W.enemies.find(e=>!e.undying);for(let i=0;i<12;i++)burstEnemyPixels(e);
       const bounded=FEEL.particles.length<=1400;updateFeel(2);return bounded&&FEEL.particles.length===0;
+    });
+    const fresh=()=>{S.hero=newHero();startRun(1);S.hero.party=[];W.enemies=[];W.haz=null;syncFeel();P.invuln=0;P.guard=false;return W.fl.rooms.find(r=>r.w>=6&&r.h>=6);};
+    check('Just dodge cancels one hit, expires, and does not alter armor durability',()=>{
+      const r=fresh();P.x=r.x+2.5;P.y=r.y+2.5;const hp=S.hero.hpNow,dur=S.hero.equip.armor?.dur;
+      if(!tapDash(innerWidth,innerHeight/2))return false;
+      hitPlayer(null,10,'blunt',1);
+      const ok=S.hero.hpNow===hp&&S.hero.equip.armor?.dur===dur&&FEEL.justUsed&&FEEL.slow>0;
+      const once=!feelJustDodge();FEEL.just=.001;update(.02);return ok&&once&&FEEL.just===0;
+    });
+    check('Outside just window, an incoming hit still deals damage',()=>{
+      fresh();FEEL.just=0;const old=RNG;RNG=()=>.99;
+      try{const hp=S.hero.hpNow;hitPlayer(null,10,'blunt',1);return S.hero.hpNow<hp;}finally{RNG=old;}
+    });
+    check('Parry success triggers slowdown without damage',()=>{
+      fresh();let shield;for(let i=0;i<1000&&!shield;i++){const it=genItem(14,0);if(it.slot==='shield')shield=it;}
+      if(!shield)throw Error('no shield');shield.ident=true;S.hero.equip.shield=shield;
+      P.guard=true;P.guardStart=nowSec();const hp=S.hero.hpNow;hitPlayer(null,10,'blunt',1);
+      const ok=hp===S.hero.hpNow&&FEEL.slow>0&&W.pops.some(p=>p.txt==='PARRY');P.guard=false;return ok;
+    });
+    check('Critical hit flashes enemy, recoils safely and shakes harder',()=>{
+      fresh();enterFloor(1);syncFeel();const e=W.enemies.find(e=>!e.boss&&!e.undying);e.hp=e.maxHp=1e6;e.aff=[];
+      P.x=e.x-.5;P.y=e.y;hitEnemy(e,stats(S.hero),1,{forceCrit:true});
+      return feelMotion(e).crit>0&&FEEL.strength>=FEEL_TUNING.criticalShake&&standable(e.x,e.y);
+    });
+    check('Actual slow movement produces less bob; walking emits dust',()=>{
+      const r=fresh();P.x=r.x+2.5;P.y=r.y+2.5;stickDx=.3;
+      stepSim(.1);const slow=feelMotion(P).speed;stickDx=1;stepSim(.1);const fast=feelMotion(P).speed;stickDx=0;
+      return slow>0&&fast>slow*2&&FEEL.motes.some(p=>p.kind==='dust');
+    });
+    check('Moving ally receives measured motion and bob',()=>{
+      fresh();const a=makeAlly(1,S.hero,'warrior');a.x=P.x+3;a.y=P.y;S.hero.party=[a];a.hpNow=allyStats(a).maxHp;
+      stepSim(.3);return feelMotion(a).phase>0;
+    });
+    check('Water footsteps spawn droplets and ripples; rendering stays valid',()=>{
+      fresh();enterFloor(11);syncFeel();W.enemies=[];
+      let wet;for(let y=0;y<W.fl.H;y++)for(let x=0;x<W.fl.W;x++)if(W.haz?.g[y]?.[x])wet={x:x+.5,y:y+.5};
+      if(!wet)throw Error('no water');P.x=wet.x;P.y=wet.y;feelFootstep(P);draw();
+      return FEEL.motes.some(p=>p.kind==='water')&&FEEL.ripples.length>0;
+    });
+    check('Decoration is stable, irregular and does not consume combat RNG',()=>{
+      const a=feelHash(4,7),b=feelHash(4,7),c=feelHash(5,7);const rng=RNG;
+      let calls=0;RNG=()=>{calls++;return .5;};for(let x=0;x<20;x++)feelDecorAt(x,5,ZONES[0]);RNG=rng;
+      return a===b&&a!==c&&calls===0;
+    });
+    check('Ultimate triggers enhanced effects and respects cooldown',()=>{
+      fresh();S.greatKills=10;S.ult='quake';S.ultLv={quake:1};P.ultCd=0;
+      const ok=fireUlt();return ok&&!fireUlt()&&FEEL.strength>=FEEL_TUNING.ultimateShake&&W.fx.some(f=>f.t==='feelring');
+    });
+    check('Slow motion expires in real time and preserves expedition clock',()=>{
+      fresh();const t=S.run.elapsed;feelSlow(.18,.22);stepSim(.3);
+      return FEEL.slow===0&&Math.abs(S.run.elapsed-t-.3)<.001;
+    });
+    check('Boss cinematic zoom finishes and rewards are granted only once',()=>{
+      fresh();enterFloor(5);syncFeel();const e=W.enemies.find(e=>e.boss);if(!e)throw Error('no boss');
+      killEnemy(e);const gold=S.run.gold,kills=S.run.kills,count=W.drops.length;
+      const started=!!FEEL.boss;killEnemy(e);stepSim(1.3,{draw:true});
+      return started&&!FEEL.boss&&S.run.gold===gold&&S.run.kills===kills&&W.drops.length===count;
+    });
+    check('Drop rises and lands before it becomes collectible',()=>{
+      fresh();const d={x:P.x,y:P.y,it:makeConsum(),feelDrop:{age:0,x:P.x,y:P.y}};W.drops=[d];autoPickup();
+      const held=W.drops.length===1;d.feelDrop.age=.2;const risen=feelDropOffset(d).y<0;
+      d.feelDrop.age=.6;autoPickup();return held&&risen&&W.drops.length===0;
+    });
+    check('Final boss clear dialog waits for cinematic and returns once',()=>{
+      fresh();enterFloor(51);syncFeel();const e=W.enemies.find(e=>e.boss);if(!e)throw Error('no final boss');
+      const before=S.cleared||0;killEnemy(e);
+      const delayed=S.screen==='game'&&!!FEEL.boss&&!el('m-clear').classList.contains('on');
+      stepSim(1.3,{draw:true});const ok=delayed&&S.screen==='clear'&&el('m-clear').classList.contains('on')&&S.cleared===before+1;
+      el('m-clear').classList.remove('on');setScreen('game');return ok;
+    });
+    check('All damage-type trails and enemy magic render without context leakage',()=>{
+      fresh();const before=ctx;
+      for(const dt of ['slash','pierce','blunt','fire','frost','shock','arcane'])drawSwing({x:P.x,y:P.y,a:0,r:2,arc:1,dt,life:.1,max:.2},0,0);
+      drawFeelMagic({x:P.x,y:P.y,vx:5,vy:2},0,0,'#f99');return ctx===before;
     });
     const start=performance.now();for(let i=0;i<30;i++)draw();out.push({name:'30 draw frames (ms)',ms:Math.round(performance.now()-start)});
     setScreen('none');return out;

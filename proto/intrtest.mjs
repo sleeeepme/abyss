@@ -366,9 +366,13 @@ R.intrKill = await pg.evaluate(()=>{
   const tierBefore=intruderTier();
   const hp=e.maxHp;
   const drops0=W.drops.length;
+  /* SPは床に落ちなくなった（倒した瞬間に口座へ入る）。
+     侵入者の見返りも同じ経路にしたので、口座の増分で見る。 */
+  const sp0=S.shards||0;
   killEnemy(e);
-  const shard = W.drops.slice(drops0).find(d=>d.shard);
+  const spGained = (S.shards||0) - sp0;
   const items = W.drops.slice(drops0).filter(d=>d.it).length;
+  const shardOnFloor = W.drops.slice(drops0).filter(d=>d.shard).length;
   const boonOpen = el('m-boon').classList.contains('on');
   el('m-boon').classList.remove('on');
   const cleared = !liveIntruder();
@@ -379,11 +383,11 @@ R.intrKill = await pg.evaluate(()=>{
   S.run.elapsed = S.run.intrNext + 0.1; tickIntruder();
   const second = !!liveIntruder();
   const secondTier = second ? liveIntruder().tier : -1;
-  return {maxHp:hp, shard: shard&&shard.shard, items, boonOpen, cleared,
+  return {maxHp:hp, spGained, shardOnFloor, items, boonOpen, cleared,
           stillAwake, tierBefore, tierAfter, tierHeld: tierAfter>=tierBefore,
           bought:+bought.toFixed(1), boughtIsRespawn: Math.abs(bought-INTRUDER_RESPAWN)<0.2,
           second, secondTier, secondNotWeaker: secondTier>=tierBefore,
-          ok: cleared && !!shard && shard.shard===INTRUDER_SHARDS && items===3
+          ok: cleared && spGained===INTRUDER_SHARDS && shardOnFloor===0 && items===3
               && boonOpen && stillAwake && tierAfter>=tierBefore
               && Math.abs(bought-INTRUDER_RESPAWN)<0.2
               && second && secondTier>=tierBefore};
