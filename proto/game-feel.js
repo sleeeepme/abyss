@@ -150,6 +150,16 @@ function drawFeelFlash(e,x,y,size){
   }else{ctx.fillStyle=m.crit>0?'#fff2ae':'#fff';shape(e.arch?.id||'swarm',x,y,size*.35);ctx.fill();}
   ctx.restore();
 }
+function drawFeelRing(f,camX,camY){
+  const p=clamp(1-f.life/f.max,0,1),q=Math.max(2,Math.round(TS/16));
+  ctx.save();ctx.globalAlpha=(1-p)*.8;ctx.fillStyle=f.col;
+  for(let i=0;i<48;i++){
+    const a=i*Math.PI/24,r=f.r*TS*p;
+    ctx.fillRect(Math.round((f.x*TS-camX+Math.cos(a)*r)/q)*q,
+      Math.round((f.y*TS-camY+Math.sin(a)*r)/q)*q,q*2,q);
+  }
+  ctx.restore();
+}
 function drawFeelSwing(f,camX,camY){
   const p=clamp(1-f.life/f.max,0,1),fade=1-p,dt=f.dt||'slash',a=f.a||0;
   const x=f.x*TS-camX,y=f.y*TS-camY,r=(f.r||1.4)*TS*.85,q=Math.max(2,Math.round(TS/16));

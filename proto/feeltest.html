@@ -174,6 +174,34 @@ frame.onload=async()=>{
       for(const dt of ['slash','pierce','blunt','fire','frost','shock','arcane'])drawSwing({x:P.x,y:P.y,a:0,r:2,arc:1,dt,life:.1,max:.2},0,0);
       drawFeelMagic({x:P.x,y:P.y,vx:5,vy:2},0,0,'#f99');return ctx===before;
     });
+    check('Production draw reaches external feel hooks for world, actors and drops',()=>{
+      fresh();enterFloor(1);syncFeel();W.seen.forEach(r=>r.fill(1));
+      const e=W.enemies.find(e=>!e.boss&&!e.undying);e.x=P.x+1;e.y=P.y;W.enemies=[e];
+      const a=makeAlly(1,S.hero,'warrior');a.x=P.x-1;a.y=P.y;a.hpNow=allyStats(a).maxHp;S.hero.party=[a];
+      W.drops=[{x:P.x,y:P.y,it:makeConsum(),feelDrop:{age:.2,x:P.x,y:P.y}}];
+      W.fx=[{t:'bolt',x:P.x,y:P.y,vx:1,vy:0,dt:'arcane',life:.5},
+        {t:'feelring',x:P.x,y:P.y,col:'#fff',life:.2,max:.4,r:2}];
+      const names=['feelBlink','drawFeelFlash','feelEntityOffset','feelDropOffset',
+        'drawFeelMotes','drawFeelRipples','drawFeelVignette','drawFeelMagic','drawFeelRing'];
+      const originals={},calls={};
+      try{
+        for(const name of names){originals[name]=window[name];calls[name]=0;
+          window[name]=function(...args){calls[name]++;return originals[name](...args);};}
+        draw();
+        return names.every(name=>calls[name]>0)&&calls.feelBlink>=3&&calls.drawFeelFlash>=3;
+      }finally{for(const name of names)window[name]=originals[name];}
+    });
+    check('Blurred ambient appears through furnace but not in pale layer',()=>{
+      const original=drawFeelAmbient;let calls=0;
+      try{
+        drawFeelAmbient=(...args)=>{calls++;return original(...args);};
+        for(const z of ZONES){
+          syncAir(z);AIR.forEach(m=>m.s=1.5);calls=0;drawAir(z,0);
+          if(z.id==='pale'?calls!==0:calls===0)return false;
+        }
+        return true;
+      }finally{drawFeelAmbient=original;}
+    });
     const start=performance.now();for(let i=0;i<30;i++)draw();out.push({name:'30 draw frames (ms)',ms:Math.round(performance.now()-start)});
     setScreen('none');return out;
   })()`);

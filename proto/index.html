@@ -3810,6 +3810,7 @@ function tickAllyArt(a, st, dt){
   fireAllyArt(a, st, id, tgt, def);
 }
 function fireAllyArt(a, st, id, tgt, def){
+  feelUltimate(a,def.col);
   const say = txt => { log('◈ '+a.name+'『'+def.nm+'』'+(txt||'')); };
   if(id==='spin'){
     const r=2.4;
@@ -6777,6 +6778,7 @@ function hitEnemy(e, st, mult, opt){
   const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
+  feelImpact(e,src===S.hero?P:src,!!crit);
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
   // 弱点／耐性は色と記号で即座に見せる。見えないと属性を選ぶ意味が伝わらない。
   // 引き撃ちで減衰した一撃はくすんだ色＋「↓」を付ける。
@@ -7150,6 +7152,7 @@ function fireUlt(){
   const UP=ultPowerMul();
   const st = UP===1 ? base : Object.assign({}, base, {atk: base.atk*UP});
   P.ultCd = ultCooldown(u);
+  feelUltimate(P,u.col);
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && Math.hypot(e.x-P.x, e.y-P.y) <= r + e.r);
 
@@ -7893,6 +7896,7 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
             pop(e.x, e.y-0.4, Math.round(dm*lc), '#7fe0c0', '+'); }
   }
   a.hpNow -= dm;
+  feelImpact(a,e,false);
   a.hit = 0.12;
   pop(a.x, a.y-0.4, dm, DTYPE[type]?DTYPE[type].col:'#ff8a80');
   damageAllyGear(a,'armor',DUR.armorPerHit);
@@ -8731,6 +8735,7 @@ function resolveBossMove(e){
 function hitPlayer(e, boltDmg, dmgType, boltLv){
   if(!S.hero || !S.run) return true;   // 死亡した同フレームの後続ヒットを無視する
   if(godMode()) return true;           // デバッグ。⟡ は出さない（毎発出ると読めない）
+  if(feelJustDodge()) return true;
   if((P.invuln||0) > 0){               // 瞬歩の抜け際
     pop(P.x,P.y-0.4,0,'#8fc7ff','⟡');
     return true;
@@ -8748,6 +8753,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
     const since = nowSec() - P.guardStart;
     if(since <= st.parryWin){
       P.parryFx = 0.35;
+      feelPerfect('PARRY','#ffe5a0');
       log('パリイ！');
       W.fx.push({t:'parry',x:P.x,y:P.y,life:0.35,max:0.35});
       /* 近接を弾いたら本当に**よろめき状態**を入れる。
@@ -8821,6 +8827,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
 
   dm = Math.max(1, dm);                    // 当たった攻撃は必ず 1 以上通す（仲間と同じ規則）
   S.hero.hpNow-=dm;
+  feelImpact(P,e,false);
   /* 押し出しは**ダメージが通ったときだけ**。回避やパリイで消えた攻撃は
      ここまで来ない——避けたのに押される、が起きると盾を構える理由が濁る。 */
   if(e && !boltDmg) knockBack(P, e, e.push);
@@ -9465,6 +9472,7 @@ let gbHeld=false;
 function autoPickup(){
   for(let i=W.drops.length-1;i>=0;i--){
     const d=W.drops[i];
+    if(d.feelDrop && d.feelDrop.age<0.42) continue;
     if(Math.hypot(d.x-P.x,d.y-P.y) < 0.7){
       W.drops.splice(i,1);
       /* 床に落ちたSP。いまは誰も置かない（倒した瞬間に口座へ入る）が、
@@ -10324,7 +10332,7 @@ function draw(){
     if(t!==T.WALL && t!==T.PIT){
       ctx.strokeStyle=shade(Z.edge,lit*dim); ctx.lineWidth=1;
       ctx.strokeRect(sx+0.5,sy+0.5,TS,TS);
-      if((x*31+y*17)%Z.decoEvery===0) drawDeco(Z, sx, sy, lit*dim, x, y);
+      if(feelDecorAt(x,y,Z)) drawDeco(Z, sx, sy, lit*dim, x, y);
     }
   }
   // 地形ハザード。床の上、キャラの下に描く。
@@ -10359,6 +10367,7 @@ function draw(){
        文字を重ねると、足元＝一番よく見ている場所が説明で埋まる。 */
   }
 
+  drawFeelRipples(camX,camY);
   // 穴マーク（未踏の階層では、自分の目で見つけるまで描かない）
   const stx=f.stair.x*TS-camX, sty=f.stair.y*TS-camY;
   if(!stairRevealed()){
@@ -10418,7 +10427,8 @@ function draw(){
   const bob=Math.sin(performance.now()/300)*TS*0.08;
   W.drops.forEach(d=>{
     if(!tileSeen(d.x, d.y)) return;          // 床と足並みを揃える
-    const sx=d.x*TS-camX, sy=d.y*TS-camY+bob;
+    const dropOffset=feelDropOffset(d);
+    const sx=(d.x+dropOffset.x)*TS-camX, sy=(d.y+dropOffset.y)*TS-camY+bob;
     if(d.shard){
       /* SP。装備のひし形と混ざらないよう、六角形＋青で描く。
          死んでも失わない物なので、拾いたさが一目で分かるようにする。 */
@@ -10531,6 +10541,7 @@ function draw(){
     const spr = mossSpriteKey(e);
     const charKey = CharacterArt.enemyKey(e);
     let spriteDrawn=false;
+    ctx.save(); ctx.globalAlpha*=feelBlink(e);
     if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
       drawSprite(spr, sx, sy, R*2.6);
@@ -10557,6 +10568,8 @@ function draw(){
       shape(e.arch.id, sx, sy, R);
       ctx.fill(); ctx.stroke();
     }
+    ctx.restore();
+    if(!e.dead) drawFeelFlash(e,sx,sy,spr?R*2.6:e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1));
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
     if((e.boss||e.looksBoss) && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
@@ -10656,7 +10669,8 @@ function draw(){
      まとめて描く1パスにするしかない。 */
   const allyBars=[];
   const drawMate=(a, isNpc)=>{
-    const sx=a.x*TS-camX, sy=a.y*TS-camY;
+    const motion=feelEntityOffset(a);
+    const sx=a.x*TS-camX+motion.x, sy=a.y*TS-camY+motion.y;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
     /* 落とし穴の演出（主人公と同じ規則）。点滅で消えているフレームは丸ごと描かない。 */
     const aFallK = a.fallAnim ? clamp(a.fallAnim.t/a.fallAnim.dur,0,1) : 0;
@@ -10668,6 +10682,7 @@ function draw(){
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
        同じ絵でも敵と混ざらない。 */
     const mspr = isDurantree(a) ? 'moss-ball' : null;
+    ctx.save(); ctx.globalAlpha*=feelBlink(a);
     if(mspr && sprite(mspr)){
       drawSprite(mspr, sx, sy, R*2.6);
       if(a.hit>0){
@@ -10686,6 +10701,8 @@ function draw(){
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
       ctx.fill(); ctx.stroke();
     }
+    ctx.restore();
+    drawFeelFlash(a,sx,sy,mspr?R*2.6:TS*aScale);
     if(isNpc){
       /* 未加入は「？」を浮かせて、話しかけられることを見せる。
          ただし戦いが始まったら「？」ではなく **HPバー**を出す。
@@ -11135,15 +11152,9 @@ function draw(){
     }
     if(f.t==='bolt'){
       // 敵の弾も属性色にする。飛んでくる物の色を見て、何を食らうかが分かる。
-      const bx=f.x*TS-camX, by=f.y*TS-camY;
-      const bcol=(DTYPE[f.dt]||DTYPE.arcane).col;
-      ctx.strokeStyle=rgba(bcol,.35); ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx-f.vx*0.04*TS,by-f.vy*0.04*TS); ctx.stroke();
-      ctx.fillStyle=bcol;
-      ctx.beginPath(); ctx.arc(bx,by,TS*0.15,0,7); ctx.fill();
-      ctx.fillStyle='rgba(0,0,0,.45)';
-      ctx.beginPath(); ctx.arc(bx,by,TS*0.06,0,7); ctx.fill();
+      drawFeelMagic(f,camX,camY,(DTYPE[f.dt]||DTYPE.arcane).col);
     }
+    if(f.t==='feelring') drawFeelRing(f,camX,camY);
     if(f.t==='pshot'){          // 主人公の矢・魔弾
       drawShot(f, camX, camY, false);
     }
@@ -11152,6 +11163,7 @@ function draw(){
   // 主人公（候補B・遺跡の斥候）。
   endPixelFx();
   drawEnemyPixels(camX,camY);
+  drawFeelMotes(camX,camY);
   const px=innerWidth/2, py=innerHeight/2;
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -11189,6 +11201,7 @@ function draw(){
   const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
   const heroBob=feelHeroOffset();
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
+  ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){
     if(!CharacterArt.put(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
@@ -11202,6 +11215,7 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   drawPlayerLight(camX,camY);
+  if(!heroBlinkOff) drawFeelFlash(P,px+heroBob.x,py+heroBob.y,TS*heroScale);
   /* 主人公の頭上に「自分」とは書かない。画面の中央にいて、
      ジョイスティックで動いているのが自分——それ以上の説明は要らない。 */
   /* 貯めておいた仲間のHPバーをここでまとめて描く。
@@ -11230,6 +11244,7 @@ function draw(){
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
   drawAir(Z, _drawDt);
   ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
+  drawFeelVignette();
   // 被弾フラッシュ
   const hu=W.fx.find(f=>f.t==='hurt');
   if(hu){ ctx.fillStyle='rgba(196,67,63,'+(hu.life*1.2)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
@@ -11641,6 +11656,8 @@ function drawAir(Z, dt){
     ctx.globalAlpha = A.a * (0.45+0.55*m.s);
     // 丸ではなく四角。ドット絵の上に丸を浮かべると、そこだけ解像度が違って見える。
     const sz = Math.max(1, Math.round(A.size*m.s*2));
+    if(['stone','sump','root','ruin','furnace'].includes(Z.id) && m.s>1.1)
+      drawFeelAmbient(m.x,m.y,A.col,sz);
     ctx.fillRect(Math.round(m.x), Math.round(m.y), sz, sz);
   }
   ctx.globalAlpha=1;
@@ -15013,230 +15030,6 @@ const nojs=el('nojs'); if(nojs && nojs.parentNode) nojs.parentNode.removeChild(n
 initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
-<script>
-/* Shared game feel. Visual state never changes combat rolls or save data. */
-const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0};
-const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
-function resetFeel(){
-  FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
-  FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
-}
-function syncFeel(){ if(FEEL.floor!==W.fl) resetFeel(); }
-function feelKick(strength,seconds){
-  syncFeel(); FEEL.strength=Math.max(FEEL.strength*(FEEL.kick/FEEL.kickMax),strength);
-  FEEL.kick=seconds; FEEL.kickMax=seconds;
-}
-function popPlayerDamage(damage,col,dot=false){
-  pop(P.x,P.y-.4,damage,col);
-  W.pops[W.pops.length-1].player=true;
-  feelKick(dot?1:2.8,dot?.1:.2);
-}
-function updateFeel(dt){
-  syncFeel(); FEEL.time+=dt; FEEL.kick=Math.max(0,FEEL.kick-dt);
-  FEEL.dashCd=Math.max(0,FEEL.dashCd-dt);
-  if(P.moving) FEEL.step+=dt*13;
-  let dx=P.moving?P.mvx:(P.dirx||1), dy=P.moving?P.mvy:(P.diry||0);
-  if(P.dash){const n=Math.hypot(P.dash.x1-P.dash.x0,P.dash.y1-P.dash.y0)||1;dx=(P.dash.x1-P.dash.x0)/n;dy=(P.dash.y1-P.dash.y0)/n;}
-  const blend=1-Math.exp(-dt*12);
-  FEEL.lightX+=(dx-FEEL.lightX)*blend; FEEL.lightY+=(dy-FEEL.lightY)*blend;
-  FEEL.particles=FEEL.particles.filter(p=>{
-    p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=dt*1.5;
-    p.vx*=Math.exp(-dt*2); return p.life>0;
-  });
-}
-function beginFeelWorld(){
-  syncFeel(); ctx.save();
-  if(FEEL_REDUCED.matches) return;
-  const kick=FEEL.strength*FEEL.kick/FEEL.kickMax;
-  const walk=P.moving?.8:0;
-  ctx.translate(Math.round(Math.sin(FEEL.time*83)*kick+Math.sin(FEEL.step)*walk),
-                Math.round(Math.cos(FEEL.time*71)*kick+Math.cos(FEEL.step*2)*walk));
-}
-function feelHeroOffset(){
-  if(FEEL_REDUCED.matches) return {x:0,y:0};
-  const k=FEEL.kick/FEEL.kickMax;
-  return {x:Math.round(Math.sin(FEEL.time*96)*k*2-P.dirx*P.swing*7),
-          y:Math.round((P.moving?-Math.abs(Math.sin(FEEL.step))*1.5:0)+Math.cos(FEEL.time*86)*k-P.diry*P.swing*7)};
-}
-
-// Short tap = dash. A drag keeps the existing movement stick; HUD taps stay UI taps.
-// Collision checks include the character radius and stop before pits, in small steps.
-function tapDash(cx,cy){
-  syncFeel();
-  if(S.screen!=='game'||!S.hero||!S.run||P.dash||FEEL.dashCd>0||frozenNow()||P.fallAnim||W.mine) return false;
-  let dx=stickDx,dy=stickDy;
-  if(keys.a||keys.arrowleft) dx=-1; if(keys.d||keys.arrowright) dx=1;
-  if(keys.w||keys.arrowup) dy=-1; if(keys.s||keys.arrowdown) dy=1;
-  if(Math.hypot(dx,dy)<.15){
-    dx=cx-innerWidth/2;dy=cy-innerHeight/2;
-    if(Math.hypot(dx,dy)<8){dx=P.dirx||1;dy=P.diry||0;}
-  }
-  const n=Math.hypot(dx,dy)||1; dx/=n;dy/=n;
-  const r=P.r||.32;
-  let gx=P.x,gy=P.y;
-  for(let d=.08;d<=2.4;d+=.08){
-    const x=P.x+dx*d,y=P.y+dy*d;
-    if([[-r,-r],[r,-r],[-r,r],[r,r],[0,0]].some(([ox,oy])=>{
-      const row=W.fl.g[Math.floor(y+oy)],t=row?.[Math.floor(x+ox)];
-      return t===undefined||t===T.WALL||t===T.PIT;
-    })) break;
-    gx=x;gy=y;
-  }
-  if(Math.hypot(gx-P.x,gy-P.y)<.12) return false;
-  P.dirx=dx;P.diry=dy;
-  P.dash={x0:P.x,y0:P.y,x1:gx,y1:gy,t:0,max:.2,col:'#91dfcb'};
-  FEEL.dashCd=.8; feelKick(1.5,.14);
-  return true;
-}
-const feelPointers=new Map();
-cv.addEventListener('pointerdown',e=>{
-  if(S.screen!=='game'||e.button!==0) return;
-  feelPointers.set(e.pointerId,{x:e.clientX,y:e.clientY,t:performance.now(),drag:false});
-});
-addEventListener('pointermove',e=>{
-  const p=feelPointers.get(e.pointerId);
-  if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>10) p.drag=true;
-});
-addEventListener('pointerup',e=>{
-  const p=feelPointers.get(e.pointerId);feelPointers.delete(e.pointerId);
-  if(p&&!p.drag&&performance.now()-p.t<300&&Math.hypot(e.clientX-p.x,e.clientY-p.y)<=10) tapDash(e.clientX,e.clientY);
-});
-addEventListener('pointercancel',e=>feelPointers.delete(e.pointerId));
-addEventListener('blur',()=>feelPointers.clear());
-addEventListener('keydown',e=>{if(e.key.toLowerCase()==='x'&&!e.repeat) tapDash(innerWidth/2,innerHeight/2);});
-
-// Render the existing effects at a shared coarse pixel resolution, preserving their timing.
-const feelFxCanvas=document.createElement('canvas'),feelFxCtx=feelFxCanvas.getContext('2d');
-let feelMainCtx=null;
-function beginPixelFx(){
-  const q=Math.max(2,Math.round(TS/16));
-  const w=Math.ceil(innerWidth/q),h=Math.ceil(innerHeight/q);
-  if(feelFxCanvas.width!==w||feelFxCanvas.height!==h){feelFxCanvas.width=w;feelFxCanvas.height=h;}
-  feelFxCtx.setTransform(1,0,0,1,0,0);feelFxCtx.clearRect(0,0,w,h);
-  feelFxCtx.save();feelFxCtx.scale(1/q,1/q);feelMainCtx=ctx;ctx=feelFxCtx;
-}
-function endPixelFx(){
-  const q=Math.max(2,Math.round(TS/16));
-  feelFxCtx.restore();ctx=feelMainCtx;
-  ctx.save();ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(feelFxCanvas,0,0,feelFxCanvas.width*q,feelFxCanvas.height*q);ctx.restore();
-}
-
-// Exact grid traversal: rays stop at the first wall face, never behind it.
-function feelLightRay(ang,range){
-  const dx=Math.cos(ang),dy=Math.sin(ang),f=W.fl;
-  let x=Math.floor(P.x),y=Math.floor(P.y),dist=0;
-  const sx=dx<0?-1:1,sy=dy<0?-1:1;
-  const ddx=Math.abs(1/dx),ddy=Math.abs(1/dy);
-  let tx=(dx<0?P.x-x:x+1-P.x)*ddx,ty=(dy<0?P.y-y:y+1-P.y)*ddy;
-  for(let i=0;i<40;i++){
-    if(tx<ty){dist=tx;tx+=ddx;x+=sx;}else{dist=ty;ty+=ddy;y+=sy;}
-    if(dist>=range){dist=range;break;}
-    if(!f.g[y]||f.g[y][x]===undefined||f.g[y][x]===T.WALL) break;
-  }
-  return {x:P.x+dx*dist,y:P.y+dy*dist};
-}
-function drawPlayerLight(camX,camY){
-  const px=P.x*TS-camX,py=P.y*TS-camY;
-  ctx.save();ctx.globalCompositeOperation='lighter';
-  const paint=(angle,spread,range,col,alpha)=>{
-    ctx.save();ctx.beginPath();ctx.moveTo(px,py);
-    for(let i=0;i<=100;i++){
-      const p=feelLightRay(angle-spread/2+spread*i/100,range);
-      ctx.lineTo(p.x*TS-camX,p.y*TS-camY);
-    }
-    ctx.closePath();ctx.clip();
-    const g=ctx.createRadialGradient(px,py,0,px,py,range*TS);
-    g.addColorStop(0,`rgba(${col},${alpha})`);g.addColorStop(.45,`rgba(${col},${alpha*.5})`);g.addColorStop(1,`rgba(${col},0)`);
-    ctx.fillStyle=g;ctx.fillRect(px-range*TS,py-range*TS,range*TS*2,range*TS*2);ctx.restore();
-  };
-  paint(0,Math.PI*2,2.7,'91,181,148',.16);
-  const angle=Math.atan2(FEEL.lightY,FEEL.lightX);
-  paint(angle,1.45,5.8,'125,184,160',.035);
-  paint(angle,1.15,5.8,'125,184,160',.045);
-  paint(angle,.85,5.8,'125,184,160',.055);
-  ctx.restore();
-}
-
-function drawLivingLiquid(hz,sx,sy,gx,gy,time){
-  const q=TS/16,phase=FEEL_REDUCED.matches?0:time;
-  ctx.save();ctx.fillStyle=hz.col;ctx.globalAlpha=.76;ctx.fillRect(sx,sy,TS+1,TS+1);
-  // All pools share a world-space flow; boundaries only appear at the actual bank.
-  ctx.fillStyle=hz.edge;
-  for(let j=2;j<16;j+=4){
-    const wave=Math.sin((gy*16+j)*.24+phase*1.4+gx*.4);
-    const x=((gx*7+j*3+Math.floor(phase*3+wave*2))%13+13)%13;
-    ctx.globalAlpha=.16+.13*(wave+1)/2;
-    ctx.fillRect(Math.round(sx+x*q),Math.round(sy+j*q),q*(2+(j%3)),Math.max(1,q));
-    ctx.globalAlpha=.09;ctx.fillRect(Math.round(sx+(15-x)*q),Math.round(sy+(j+1)*q),q,q);
-  }
-  const wet=(x,y)=>W.haz.g[y]?.[x];
-  ctx.globalAlpha=.42;
-  if(!wet(gx,gy-1))ctx.fillRect(sx,sy,TS,q);
-  if(!wet(gx,gy+1))ctx.fillRect(sx,sy+TS-q,TS,q);
-  if(!wet(gx-1,gy))ctx.fillRect(sx,sy,q,TS);
-  if(!wet(gx+1,gy))ctx.fillRect(sx+TS-q,sy,q,TS);
-  // A small stepped wake follows anyone moving through a pool.
-  const d=Math.hypot(gx+.5-P.x,gy+.5-P.y);
-  if(d<.8&&P.moving){ctx.globalAlpha=.6;ctx.fillRect(sx+q*3,sy+q*12,q*3,q);ctx.fillRect(sx+q*10,sy+q*10,q*2,q);}
-  ctx.restore();
-}
-function drawLivingDeco(Z,sx,sy,lit,gx,gy){
-  const seed=(gx*17+gy*31)>>>0,q=TS/16;
-  const sway=FEEL_REDUCED.matches?0:Math.round(Math.sin(FEEL.time*1.8+seed)*1.1);
-  const near=Math.hypot(gx+.5-P.x,gy+.5-P.y)<1&&P.moving;
-  const bend=sway+(near?2:0),kind=seed%5;
-  const rect=(x,y,w,h,c)=>{ctx.fillStyle=shade(c,lit);ctx.fillRect(Math.round(sx+x*q),Math.round(sy+y*q),w*q,h*q);};
-  if(kind<3){
-    for(let i=0;i<3;i++){rect(5+i*3,10,1,3,'#435a43');rect(5+i*3+bend,6+i%2,1,4,Z.id==='sump'?'#548d88':'#6c9170');}
-  }else if(kind===3){
-    rect(7,9,2,4,'#7d8a73');rect(5+bend,7,6,2,Z.id==='root'?'#9bb77b':'#748d86');rect(6+bend,6,4,1,'#b3c5a0');rect(6+bend,7,1,1,'#d1d3a8');
-  }else{
-    const crawl=FEEL_REDUCED.matches?0:Math.round(Math.sin(FEEL.time*.65+seed)*2);
-    rect(6+crawl,10,3,2,'#688879');rect(8+crawl,9,2,2,'#89a590');rect(9+crawl,9,1,1,'#cadab8');
-    rect(5+crawl,12,1,1,'#4a665a');rect(8+crawl+sway,12,1,1,'#4a665a');
-  }
-}
-
-// Sample the enemy's own sprite pixels. Geometric enemies are rasterized first.
-function burstEnemyPixels(e){
-  syncFeel();
-  const im=CharacterArt.image(CharacterArt.enemyKey(e))||sprite(mossSpriteKey(e));
-  const n=im?Math.min(32,im.naturalWidth):16;
-  const c=document.createElement('canvas');c.width=c.height=n;
-  const cc=c.getContext('2d',{willReadFrequently:true});cc.imageSmoothingEnabled=false;
-  if(im) cc.drawImage(im,0,0,n,n);
-  else{
-    const main=ctx;ctx=cc;
-    cc.fillStyle=e.col||e.arch.col;shape(e.arch.id,n/2,n/2,n*.36);cc.fill();ctx=main;
-  }
-  let data;try{data=cc.getImageData(0,0,n,n).data;}catch{return;}
-  const r=(e.boss||e.looksBoss)?e.r:(e.intruder?.54:e.uniq?.46:e.elite?.42:.32);
-  const size=CharacterArt.enemyKey(e)?(e.uniqueBoss===5?r*2.25:e.elite?1.12:1):im?r*2.6:r*2.8;
-  // Hard cap protects mass kills; no gameplay RNG calls for visual particles.
-  const cap=1400;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const i=(y*n+x)*4;if(data[i+3]<100)continue;
-    const dx=(x+.5)/n-.5,dy=(y+.5)/n-.5;
-    const noise=((x*73+y*151)%97)/97;
-    FEEL.particles.push({x:e.x+dx*size*((e._artFace)||1),y:e.y+dy*size,
-      vx:FEEL_REDUCED.matches?0:dx*(2+noise*3),vy:FEEL_REDUCED.matches?0:dy*3-1,
-      life:.5+noise*.35,max:.5+noise*.35,size:size/n,c:`rgb(${data[i]},${data[i+1]},${data[i+2]})`});
-  }
-  if(FEEL.particles.length>cap)FEEL.particles.splice(0,FEEL.particles.length-cap);
-  e.pixelBurst=true;
-}
-function drawEnemyPixels(camX,camY){
-  ctx.save();
-  for(const p of FEEL.particles){
-    if(!tileSeen(p.x,p.y))continue;
-    ctx.globalAlpha=Math.min(1,p.life/.25);ctx.fillStyle=p.c;
-    const size=Math.max(1,Math.round(p.size*TS));
-    ctx.fillRect(Math.round(p.x*TS-camX),Math.round(p.y*TS-camY),size,size);
-  }
-  ctx.restore();
-}
-
-</script>
+<script src="game-feel.js"></script>
 </body>
 </html>

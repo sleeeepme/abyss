@@ -13,6 +13,17 @@ Codexはデザイナー・アニメーターとして、見た目、動き、操
 HTML末尾で `game-feel.js` を読み込む。外部ファイルは `update` / `killEnemy` の元処理を保持してラップし、`drawSwing` / `drawShot` の見た目を差し替える。元の関数名は維持する。これらの関数を改名・モジュール化する場合は接続確認が必要。
 以前の未追跡 `feel.js` / `alpha.js` は現在の本体から読み込まない。今回の編集先は `game-feel.js`。
 
+開発中は分離したまま維持し、出荷時にインライン化して「index.html単体・外部依存ゼロ」を満たす。
+古いインライン版の `const FEEL` を残すと二重宣言で起動できないため、外部読み込みと併存させない。
+
+本体を書き戻す際は、読み込みに加えて以下の接続を維持し、`proto/feeltest.html` をブラウザで実行する。
+
+- 被弾：`hitEnemy` / `hitAlly` / `hitPlayer` の `feelImpact` と、キャラ描画の `feelBlink` / `drawFeelFlash`。
+- 成功演出：`hitPlayer` の `feelJustDodge` / `feelPerfect`、主人公・仲間の大技の `feelUltimate`。
+- 描画：仲間の `feelEntityOffset`、床の `feelDecorAt`、弾の `drawFeelMagic`、成功・大技・撃破リングの `drawFeelRing`。
+- 環境：`drawFeelRipples` / `drawFeelMotes` / `drawFeelVignette`。ブラー粒子の `drawFeelAmbient` は本体側で石・水・木・遺跡・炉の層だけに限定する。
+- ドロップ：描画の `feelDropOffset` と `autoPickup` の0.42秒待ち。SPの直接加算は元の撃破処理に維持する。
+
 ## 今回、依頼により戦闘と接続した部分
 
 - 通常ダッシュ開始から **0.12秒**以内に着弾した攻撃を1回無効化。`hitPlayer` のダメージ・状態異常・装備摩耗より前で判定する。地形や継続ダメージには適用しない。
