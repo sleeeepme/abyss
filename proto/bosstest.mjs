@@ -67,6 +67,11 @@ R.stairLock = await pg.evaluate(async ()=>{
   // ボスを倒す
   const boss=W.enemies.find(e=>e.boss);
   boss.hp=1; killEnemy(boss);
+  /* ボス撃破は 1.15 秒の演出（game-feel.js の FEEL_TUNING.bossSeconds）を挟んでから
+     報酬・クリア画面へ進む。**報酬の確定そのものは killEnemy の中で即座に済んでいる**
+     ので S.run.bossAlive は先に落ちるが、画面の遷移だけが後ろにずれる。
+     画面を見る検証は、必ず演出を進ませてから行う。 */
+  stepSim(1.3);
   const unlocked = S.run.bossAlive===false;
   return {lockedAtStart, modalBlocked, unlocked};
 });
@@ -186,6 +191,7 @@ R.twinSequential = await pg.evaluate(()=>{
     t1Dead:t1.dead, t2Alive:!t2.dead,
     teleFaster: t2.teleMul<teleBefore, msFaster: t2.ms>msBefore};
   t2.hp=1; killEnemy(t2);
+  stepSim(1.3);                       // 撃破演出を進めてから画面を見る
   const afterSecond = {
     drops:W.drops.length, bossCleared: S.run.bossAlive===false,
     boonShown: document.getElementById('m-boon').classList.contains('on')};
@@ -296,6 +302,7 @@ R.finalClearGate = await pg.evaluate(()=>{
   S.upg={}; S.hero=newHero(); startRun(50); S.hero.party=[];
   const boss50=W.enemies.find(e=>e.boss);
   boss50.hp=1; killEnemy(boss50);
+  stepSim(1.3);                       // 撃破演出を進めてから画面を見る
   const notClearedAt50 = S.screen!=='clear';
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
   const clearedBefore=S.cleared||0;
@@ -303,6 +310,7 @@ R.finalClearGate = await pg.evaluate(()=>{
   S.upg={}; S.hero=newHero(); startRun(51); S.hero.party=[];
   const boss51=W.enemies.find(e=>e.boss);
   boss51.hp=1; killEnemy(boss51);
+  stepSim(1.3);                       // 撃破演出を進めてからクリア画面を見る
   const clearedAt51 = S.screen==='clear';
   const clearedAfter=S.cleared||0;
   document.getElementById('m-clear').classList.remove('on'); document.getElementById('m-boon').classList.remove('on');
