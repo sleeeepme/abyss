@@ -36,6 +36,16 @@ const CSV      = arg('csv', null);
 const QUIET    = process.argv.includes('--quiet');
 const CAP      = +arg('cap', 150);      // 1階に留まれる秒数
 const FILE     = arg('file', 'proto/index.html');   // 別案を測るとき用
+/* --dash: 予兆の切れ際にダッシュを踏んでジャスト回避を狙う操縦。
+   上手い人の側の値を出すために使う。既定は踏まない（下手な人の側）。 */
+const DASH     = process.argv.includes('--dash');
+/* --deepest: 段（tier）の解禁具合。S.deepest をここに固定して測る。
+   キーストーンは段2以降にあるので、これを 1 のままにすると
+   **不屈も衝撃波も持っていない世界**を測ることになる。
+     1  … まだ第5階層を越えていない（段1のみ）
+     6  … 中ボスを越えた（段2が開く）
+     11 … 大ボスを越えた（段3が開く） */
+const DEEPEST  = +arg('deepest', 1);
 
 const b   = await chromium.launch();
 const ctx = await b.newContext({ ...devices['iPhone 13'], hasTouch: true, isMobile: true });
@@ -59,12 +69,20 @@ await pg.evaluate(() => {
 
     /* 累計SPを、決まった優先順で既存の能力強化に注ぎ込む。
        ツリーができたらこの関数だけ差し替える。 */
-    loadout(sp) {
-      /* 買う順。死にゲーで人が実際に選ぶ順に近づける——
-         まず死ににくさ（HP・守り）、次に手数、最後に稼ぎ。
+    loadout(sp, opt) {
+      /* 買う順。死にゲーで人が実際に選ぶ順に近づける。
+         キーストーン（不屈・衝撃波・治癒・瞬足）を数値より先に取る——
+         測定では比を下げる効きがこちらのほうが桁で大きいので、
+         人も先に取るはず。段が開いていない物は下の upgLocked で弾かれる。
          ここに項目を足し忘れると、その項目が無い世界を測ることになる。
          **UPGRADES に項目を足したら、必ずここにも足す。** */
-      const order = ['hp', 'def', 'dr', 'atk', 'aspd', 'ms', 'crit', 'range', 'mf'];
+      /* 「瞬足」は踏む操縦のときだけ買う。
+         自動操縦は人の精度でジャスト回避を踏めないので、
+         踏まない側で買わせると**使えない物に払った世界**を測ることになる。 */
+      const order = [].concat(
+        ['hp'], (opt && opt.dash) ? ['dash'] : [],
+        ['def', 'dr', 'atk', 'wave', 'regen', 'revive',
+         'aspd', 'ms', 'crit', 'range', 'mf']);
       const up = {};
       let left = sp;
       let moved = true;
@@ -74,6 +92,8 @@ await pg.evaluate(() => {
           const u = UPGRADES.find(x => x.id === id);
           const lv = up[id] || 0;
           if (lv >= u.max) continue;
+          // 段が開いていない物は買えない。開き具合は S.deepest で決まる。
+          if (typeof upgLocked === 'function' && upgLocked(u)) continue;
           const c = upgCost(u, lv);
           if (c > left) continue;
           left -= c; up[id] = lv + 1; moved = true;
@@ -163,10 +183,13 @@ await pg.evaluate(() => {
     },
 
     /* 1本走らせる。死ぬか、上限階に届くか、詰むまで。 */
-    run(seed, sp, maxDepth, cap) {
-      const lo = this.loadout(sp);
+    run(seed, sp, maxDepth, cap, opt) {
+      opt = opt || {};
+      S.deepest = opt.deepest || 1;   // loadout より先に。段の判定がこれを見る
+      const lo = this.loadout(sp, opt);
       S.salt = seed;
       S.runs = 0;
+      S.deepest = opt.deepest || 1;   // 段の解禁具合を固定して測る
       S.upg = lo.up;
       S.deaths = 0;
       S.hero = newHero();
@@ -196,6 +219,26 @@ await pg.evaluate(() => {
       let dist = null, distDepth = -1, distTgt = null;
       let lastX = -1, lastY = -1, stallT = 0, noFight = 0;
       const seen = new Set();
+
+      /* ---------- 階ごとの記録 ----------
+         「何階まで行けたか」だけでは、どう直せばいいかが分からない。
+         道中で削られて空のままボス部屋に入っているのか、
+         満タンで入って普通に打ち負けているのかで、要る物が正反対になる。
+         前者なら回復と軽減、後者なら火力と手数。
+
+         maxHp は毎フレーム取ると重いので 15 フレームおきに見る。
+         削られ方の底が知りたいだけなので、その粒度で足りる。 */
+      const trace = [];
+      let cur = null;
+      const mark = d => {
+        const st = stats(S.hero);
+        cur = { d, hpIn: Math.round(S.hero.hpNow / st.maxHp * 100), hpMin: 100,
+                t: 0, k0: kills, k: 0, lv: S.hero.lv,
+                atk: +st.atk.toFixed(1), maxHp: Math.round(st.maxHp),
+                bossT: 0, bossHp: null };
+        trace.push(cur);
+      };
+      mark(1);
 
       for (let frame = 0; frame < 60 * 60 * 40; frame++) {
         if (!S.hero || !S.run) { outcome = 'lost'; break; }
@@ -232,8 +275,34 @@ await pg.evaluate(() => {
                                     Math.hypot(e.x - P.x, e.y - P.y) < DODGE);
         if (tele) {
           const away = this.toward(tele.x, tele.y, P.x, P.y);
-          stickDx = away.dx; stickDy = away.dy;
+          /* ---------- ジャスト回避を使う操縦（--dash）----------
+             game-feel.js が、ダッシュ開始から 0.12 秒以内に着弾した攻撃を
+             1回無効化する。**下がる代わりに、その場で踏む。**
+
+             ここが測りたいことの核心。既定の操縦は予兆のたびに下がるので、
+             ボス戦の大半を歩いて過ごし、手数が落ちる。
+             ジャスト回避があれば下がらなくてよくなる——
+             つまりこの技は「安全」ではなく**手数**を配る技だ、という仮説を、
+             同じ操縦の下がる版／踏む版で比べて確かめる。
+
+             踏めないとき（クールダウン中）だけ下がる。 */
+          if (opt.dash && typeof tapDash === 'function' && typeof FEEL === 'object') {
+            if (tele.tele < 0.18 && FEEL.dashCd <= 0) {
+              stickDx = away.dx; stickDy = away.dy;   // 抜ける向きへ踏む
+              tapDash(innerWidth / 2, innerHeight / 2);
+            } else if (FEEL.dashCd > 0.45) {
+              stickDx = away.dx; stickDy = away.dy;   // まだ戻らない。素直に下がる
+            } else {
+              stickDx = 0; stickDy = 0;               // 踏めるまで待って殴り続ける
+            }
+          } else {
+            stickDx = away.dx; stickDy = away.dy;
+          }
           if (typeof ultReady === 'function' && ultReady()) fireUlt();
+          /* 衝撃波は**下がっている最中にも押す。** ここに置くことに意味がある——
+             この技の値打ちは「殴れていない時間にダメージが出る」ことなので、
+             予兆から離れている間に撃たないと、測っても価値が出ない。 */
+          if (typeof waveReady === 'function' && waveReady()) fireWave();
           stepSim(1 / 60); floorT += 1 / 60;
           if (!S.hero || !S.run || !W.fl) { outcome = 'death'; break; }
           if (S.hero.hpNow <= 0 || S.deaths > 0) { outcome = 'death'; break; }
@@ -284,6 +353,7 @@ await pg.evaluate(() => {
            人は溜まった大技を抱えたまま死なないので、撃たない操縦で測ると
            ボスの重さを実際より重く見積もる。 */
         if (typeof ultReady === 'function' && ultReady()) fireUlt();
+        if (typeof waveReady === 'function' && waveReady()) fireWave();
         if (frame % 30 === 0) this.equipBest();
 
         stepSim(1 / 60);
@@ -293,11 +363,23 @@ await pg.evaluate(() => {
         if (!S.hero || !S.run || !W.fl) { outcome = 'death'; break; }
         if (S.hero.hpNow <= 0 || S.deaths > 0) { outcome = 'death'; break; }
 
+        if (cur) {
+          cur.t = +floorT.toFixed(1);
+          cur.k = kills - cur.k0;
+          const bs = W.enemies.find(e => e.boss && !e.dead);
+          if (bs) { cur.bossT += 1 / 60; cur.bossHp = Math.round(bs.hp / bs.maxHp * 100); }
+          if (frame % 15 === 0) {
+            const p = Math.round(S.hero.hpNow / stats(S.hero).maxHp * 100);
+            if (p < cur.hpMin) cur.hpMin = p;
+          }
+        }
+
         // 穴に着いたら降りる
         if (!S.run.bossAlive && onStair() && S.run.depth < maxDepth) {
           depthReached = S.run.depth + 1;
           enterFloor(S.run.depth + 1);
           floorT = 0; dist = null; distDepth = -1;
+          mark(S.run.depth);
           continue;
         }
         if (S.run.depth >= maxDepth && !S.run.bossAlive && onStair()) { outcome = 'maxdepth'; break; }
@@ -310,6 +392,7 @@ await pg.evaluate(() => {
         depth: deepest,
         outcome, kills, spEarned,
         lv: S.hero ? S.hero.lv : 0,
+        trace,
         /* 詰んだときに原因が分かるように、最後の状態を持ち帰る。
            「動けなかった」のか「倒せなかった」のかで直す場所が違う。 */
         why: {
@@ -334,8 +417,8 @@ const rows = [];
 for (const sp of SP_LIST) {
   let warned = false;
   for (let s = 0; s < SEEDS; s++) {
-    const r = await pg.evaluate(([seed, sp, md, cap]) => BAL.run(seed, sp, md, cap),
-      [1000 + s * 7, sp, MAXDEPTH, CAP]);
+    const r = await pg.evaluate(([seed, sp, md, cap, opt]) => BAL.run(seed, sp, md, cap, opt),
+      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, deepest: DEEPEST }]);
     if (r.missing && r.missing.length && !warned) {
       warned = true;
       console.log('\n  ⚠ 買う順に入っていない項目:', r.missing.join(','),
@@ -355,7 +438,7 @@ const q = (a, p) => {
   return lo === hi ? v[lo] : v[lo] + (v[hi] - v[lo]) * (i - lo);
 };
 
-console.log('\n=== 到達階の分布（シード ' + SEEDS + ' 本 / 上限 ' + MAXDEPTH + 'F）===');
+console.log('\n=== 到達階の分布（シード ' + SEEDS + ' 本 / 上限 ' + MAXDEPTH + 'F / 段は deepest=' + DEEPEST + '）===');
 console.log('  SP  使った  到達階 中央値   25%   75%   最浅  最深   撃破  獲得SP  詰み   内訳');
 for (const sp of SP_LIST) {
   const r = rows.filter(x => x.sp === sp);
@@ -375,6 +458,46 @@ for (const sp of SP_LIST) {
     '   ' + ['death','bossWall','maxdepth','stuck','lost']
       .map(k => { const n = r.filter(x => x.outcome === k).length; return n ? k + ':' + n : null; })
       .filter(Boolean).join(' '));
+}
+
+/* ---------- 階ごとの削られ方 ----------
+   到達階だけ見ていると「5Fで止まる」しか分からない。
+   直す場所を決めるには、**空で入って負けたのか、満タンで打ち負けたのか**が要る。
+     hpIn  その階に入った時点のHP%（前の階でどれだけ削られたか）
+     hpMin その階で一番減ったところ（そこで何が起きているか）
+   前者が低いなら道中の消耗＝回復と軽減、
+   高いままなら純粋な力負け＝火力と手数が足りない、という読み方をする。 */
+const floorsOf = sp => {
+  const acc = new Map();
+  for (const r of rows.filter(x => x.sp === sp))
+    for (const f of (r.trace || [])) {
+      if (!acc.has(f.d)) acc.set(f.d, []);
+      acc.get(f.d).push(f);
+    }
+  return acc;
+};
+const avg = (a, k) => a.length ? a.reduce((s, x) => s + (x[k] || 0), 0) / a.length : 0;
+
+console.log('\n=== 階ごとの削られ方（各SPの平均）===');
+console.log(' SP  階   入HP%  最低HP%  滞在秒  撃破  Lv   攻撃   最大HP  ボス戦秒  ボス残HP%');
+for (const sp of SP_LIST) {
+  const acc = floorsOf(sp);
+  for (const d of [...acc.keys()].sort((a, b) => a - b)) {
+    const a = acc.get(d);
+    const bossT = avg(a, 'bossT');
+    const withBoss = a.filter(f => f.bossHp !== null);
+    console.log(
+      String(sp).padStart(4) + String(d).padStart(4) +
+      avg(a, 'hpIn').toFixed(0).padStart(8) +
+      avg(a, 'hpMin').toFixed(0).padStart(9) +
+      avg(a, 't').toFixed(0).padStart(8) +
+      avg(a, 'k').toFixed(1).padStart(6) +
+      avg(a, 'lv').toFixed(1).padStart(5) +
+      avg(a, 'atk').toFixed(1).padStart(7) +
+      avg(a, 'maxHp').toFixed(0).padStart(9) +
+      (bossT > 0.5 ? bossT.toFixed(0) : '-').padStart(10) +
+      (withBoss.length ? avg(withBoss, 'bossHp').toFixed(0) : '-').padStart(11));
+  }
 }
 
 if (errs.length) console.log('\nerrs:', errs.slice(0, 5));

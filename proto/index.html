@@ -149,6 +149,21 @@
   #ultbtn b{font-size:12px;font-weight:700;letter-spacing:.06em;margin-top:2px}
   #ultbtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
     font-weight:700;margin-top:1px}
+  /* ---------- 通常技のボタン（衝撃波） ----------
+     大技の**すぐ上**に置く。左右に並べると親指の可動域から外れるし、
+     反対側は盾（押しているあいだ構える）で埋まっている。
+     大技より一回り小さくして、切り札と気軽な技の格を見た目で分ける。 */
+  #wavebtn{position:absolute;right:24px;bottom:calc(180px + env(safe-area-inset-bottom));
+    width:58px;height:58px;border-radius:50%;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(16,20,28,.82);border:2px solid #39415a;
+    color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    pointer-events:auto;user-select:none;z-index:6}
+  #wavebtn.on{display:flex}
+  #wavebtn.ready{border-color:currentColor;box-shadow:0 0 12px -2px currentColor}
+  #wavebtn i{font-style:normal;font-size:20px;line-height:1}
+  #wavebtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
+    font-weight:700;margin-top:1px}
   #adbar b{color:var(--dim);font-weight:600;letter-spacing:.14em;font-size:12px;
     border:1px solid var(--line);padding:1px 5px;margin-right:8px}
   /* バナーに隠れないよう、対象画面の下だけ余白を足す */
@@ -620,6 +635,7 @@
   <div id="durtag"></div>
   <div id="guardbtn">🛡</div>
   <div id="ultbtn"><i id="ult-icon">✹</i><b id="ult-nm"></b><s id="ult-cd"></s></div>
+  <div id="wavebtn"><i>〓</i><s id="wave-cd"></s></div>
   <div id="prompt"></div>
   <div id="bagbtn">🎒<span id="bagcount">0</span></div>
   <div id="statbtn">🧍</div>
@@ -2303,6 +2319,15 @@ function canJoin(a){
 }
 const PARTY_MAX = PARTY_BASE;    // 旧名。partyMax() を使うこと（枠は伸びる）
 
+/* ---------- 衝撃波（リキャスト技）の調整値 ----------
+   大技（ULT・CD 24〜40秒の切り札）とは別枠にする。こちらは押して当てる技。
+   測定で分かったのは「ボス戦の実効ダメージが立ち殴りの3分の1」という
+   **手数**の問題だったので、下がりながらでも出せることに意味がある。 */
+const WAVE_CD    = 6;      // リキャスト（秒）
+const WAVE_MUL   = 4.0;    // 武器攻撃力に対する倍率
+const WAVE_REACH = 3.4;    // 前方への届き（マス）
+const WAVE_ARC   = 1.5;    // 扇の広さ（ラジアン。約86度）
+
 /* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
 /* 対価はSP（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
 const UPGRADES=[
@@ -2348,7 +2373,70 @@ const UPGRADES=[
    hidden:()=>greatKills() < PARTY_SLOT_AT,
    step:'連れて行ける仲間 +1',
    desc:'同じ職は3人まで／上位職は1人まで'},
+
+  /* ==========================================================
+     ここから下は「数値ではない物」。段（tier）で解禁する。
+     ----------------------------------------------------------
+     測定から出た結論（`claude/abyss-死にゲー化-第2歩` 参照）:
+
+       第5階層の中ボス  SP130 で 倒しきる/倒される＝1.06 …… あと6%
+       第10階層の大ボス SP450 で                     2.84 …… 2.8倍
+
+     5階の壁は数値ノードで越えられる位置にある。10階は越えられない。
+     **つまりここの5つは10階のための道具**で、比を下げる効き方はこう:
+
+       不屈（生きている時間が倍）      ÷2.00
+       衝撃波（火力 +25%）             ÷1.25
+       治癒（10秒ごとに最大HPの一部）  ÷1.12
+       不動（被ダメ -8%／既存）        ÷1.09
+                       2.84 → 1.42 → 1.14 → 1.02 → 0.93 ✓
+
+     4つ全部で、ようやく 1.0 を切る。どれか1つ削ると届かない。
+
+     段の割り当てで一点だけ直したことがある。当初案は第2段を
+     「5階の中ボス撃破」で開ける形だったが、そこに不屈を置くと
+     **5階を越える道具が5階を越えた後にしか手に入らない**という
+     循環になる。だから5階までに要る物（瞬足）は第1段に置く。 */
+
+  {id:'dash',   nm:'瞬足',  max:1, shard:30,  tier:1,
+   step:'ダッシュを覚える',
+   desc:'画面を短くタップ。出際は攻撃を1回だけ消せる'},
+
+  {id:'revive', nm:'不屈',  max:1, shard:200, tier:2,
+   step:'倒れても一度だけ立ち上がる',
+   desc:'探索1回につき一度／HPは全快で戻る'},
+
+  {id:'wave',   nm:'衝撃波', max:1, shard:70, tier:2,
+   step:'技を覚える（'+WAVE_CD+'秒ごと）',
+   desc:'前方をまとめて薙ぐ。下がりながらでも出せる'},
+
+  {id:'regen',  nm:'治癒',  max:3, shard:55,  tier:2,
+   step:'10秒ごとに最大HPの 3% 回復',
+   desc:'道中ではなく、戦いの最中に効く'},
+
+  {id:'escape', nm:'脱出',  max:1, shard:180, tier:3,
+   step:'どの階の穴からでも帰れる',
+   desc:'探索1回につき一度／戦利品を抱えたまま引き返せる'},
 ];
+
+/* ---------- 段（tier）----------
+   潜って壁を越えると次の段が開く。SPが貯まる（連続量）とは別に、
+   **踏破そのものが解禁になる**（離散量）という2本目の動機を作る。
+   数値だけを買い続ける形だと、5回も死ぬ前に伸びが見えなくなる。
+
+   S.deepest は「到達した階」。第5階層の中ボスを倒して降りると 6 になる。 */
+const UPG_TIERS = [
+  {t:1, need:0,  nm:'根'},
+  {t:2, need:6,  nm:'幹', via:'第5階層の中ボスを倒す'},
+  {t:3, need:11, nm:'枝', via:'第10階層の大ボスを倒す'},
+  {t:4, need:21, nm:'梢', via:'第20階層の大ボスを倒す'},
+];
+function upgTier(u){ return u.tier || 1; }
+function tierDef(t){ return UPG_TIERS.find(x=>x.t===t) || UPG_TIERS[0]; }
+function tierOpen(t){ return (S.deepest||1) >= tierDef(t).need; }
+/* 開いていない段は**隠さずに錠を見せる。** 何が待っているか分からないと、
+   死に戻る理由が「SPが少し増える」だけになる。 */
+function upgLocked(u){ return !tierOpen(upgTier(u)); }
 /* ---------- レリック（遺物） ----------
    ここまでの成長は、どれも「死ぬと消える」か「数字が増える」かのどちらかだった。
    恩寵はキャラが死ねば消え、能力強化は全部が能力値の底上げで、
@@ -4370,9 +4458,25 @@ function nextPortalDepth(depth){
 /* HP は倍にした。第15・20階層のボスが**雑魚の群れより先に溶けて**いて、
    「壁」としての役目を果たしていなかった（報告）。
    攻撃力は据え置き——硬さは緊張になるが、痛さは理不尽になりやすい。 */
+/* ---------- 中ボスの重さは「1回目で負け、3回目で勝てる」に合わせてある ----------
+   第5階層の中ボスは、この game で最初に立つ壁。ここを測って合わせた。
+   `_wall.mjs` の「倒しきる秒数 ÷ 部屋で倒される秒数」で見ると:
+
+     累計SP   0 …… 1.7   （1回目。まず勝てない）
+     累計SP 130 …… 1.0   （2〜3回死んだあたり。腕前で決まる）
+
+   1.0 ちょうどに置いているのは、**ここを運や数値ではなく腕前の分かれ目**に
+   したいから。18 のままだと 130 でも 1.06 で、上手く踏んでも越えられない。
+   中ボスは第15・25・35階層にも出るが、そこでは主人公の伸びが勝っているので
+   この 8% は問題にならない。合わせているのは第5階層である。 */
 const BOSS_STATS={
-  mid:  {nm:'長', hp:18, atk:1.45, def:1.7, r:0.85, xp:14, gold:9,  drops:2, ilvl:3},
-  great:{nm:'王', hp:40, atk:1.95, def:2.2, r:1.25, xp:34, gold:22, drops:4, ilvl:6},
+  mid:  {nm:'長', hp:16.5, atk:1.45, def:1.7, r:0.85, xp:14, gold:9,  drops:2, ilvl:3},
+  /* 大ボスも同じやり方で合わせた。第10階層が2枚目の壁になる。
+       累計SP 450（不屈まで開けた頃）…… 1.1 前後。まだ勝てない
+       累計SP 550〜600 ……………………… 1.0 を切る
+     40 のままだと 450 で 1.29、600 でようやく 0.96 で、
+     「さらに3回死んで10階」に対して1周ぶん遠かった。 */
+  great:{nm:'王', hp:34, atk:1.95, def:2.2, r:1.25, xp:34, gold:22, drops:4, ilvl:6},
   // 第50階層の主。ここまでの全部（属性・盾・仲間・恩寵）を使い切らせるための壁。
   /* 大ボスのHPを倍にしたぶん、主も一緒に引き上げる。
      ここを据え置くと「第40階層の王と大差ない主」になり、
@@ -5675,6 +5779,26 @@ function enemyLevelAt(depth){
   if(depth < ENEMY_HARD_FROM) return base;
   return base + (Math.floor((depth-ENEMY_HARD_FROM)/ENEMY_STEP)+1)*ENEMY_STEP_LV;
 }
+
+/* ---------- 序盤の牙 ----------
+   測定で分かったこと（`_balance.mjs` の階ごとの記録）:
+   **第1〜4階層では誰も削られていなかった。** 第5階層に入る時点でHPは 91%
+   （能力強化ゼロでも 80%）で、そこから中ボスの一戦だけで 8% まで落ちる。
+
+   つまり曲線ではなく崖だった。1回目の潜行で必ず5階に着いてしまい、
+   そこから何度死んでも5階で止まる。「2回死んで5階、さらに3回で10階」という
+   死にゲーの形にするなら、**まず5階に着くまでに死ぬ理由が要る。**
+
+   レベル式そのものを触ると深層まで巻き添えになる（第50階層は lv 80）。
+   序盤にだけ乗って、第6階層で消える倍率にしてある。
+   HPではなく攻撃力に掛けるのは、**倒せなさではなく削られ方**を作りたいから——
+   硬くすると1階が長くなるだけで、緊張は生まれない。 */
+const BITE_UNTIL = 6;      // ここで倍率が 1.0 に戻る
+const BITE_AT_F1 = 2.0;   // 第1階層の倍率
+function earlyBite(depth){
+  if(depth >= BITE_UNTIL) return 1;
+  return 1 + (BITE_AT_F1 - 1) * (BITE_UNTIL - depth) / (BITE_UNTIL - 1);
+}
 /* ---------- 階層に見合わない弱さを出さない ----------
    系統の解禁は minDepth だけで決まっていたので、
    **第20階層でも「乾」（第1階層の系統）がそのまま出ていた。**
@@ -5714,6 +5838,7 @@ function spawnEnemies(fl, depth){
        第10階層 lv 13 → 17／第20階層 lv 22 → 32／第40階層 lv 45 → 68 */
   const lv = enemyLevelAt(depth) + (hasCurse('call') ? 4 : 0);
   const curseMs = hasCurse('torrent') ? 1.30 : 1;   // 呪い「奔流」
+  const bite = earlyBite(depth);                     // 序盤の牙（下の定義を参照）
   const fams = floorFamilies(depth);      // 階層ごとに系統を絞る（序盤は1種類）
   for(let i=0;i<count;i++){
     const r = pick(fl.rooms.filter(r=>r!==fl.start)) || fl.rooms[0];
@@ -5737,7 +5862,7 @@ function spawnEnemies(fl, depth){
       /* 精鋭（金の輪）。2.4倍では**深層だと雑魚2体ぶんでしかなかった。**
          倒すのに手間が要る＝立ち止まる相手、として成立する重さにする。 */
       maxHp: Math.round((26+lv*11)*a.hp*(elite?EM.hp:1)),
-      atkV:  (5+lv*2.6)*a.atk*(elite?EM.atk:1),
+      atkV:  (5+lv*2.6)*a.atk*(elite?EM.atk:1)*bite,
       def:   lv*1.6*(elite?EM.def:1),
       res:   fam.res, dt: fam.atk,      // 系統が耐性と攻撃属性を決める
       st:{}, bu:{},
@@ -7129,6 +7254,47 @@ function tickHazards(dt){
      移動しか無いいまの操作系では、ただ引き撃ちの理由が増えるだけになる。 */
 }
 
+/* ==================== 衝撃波（リキャスト技） ====================
+   能力強化「衝撃波」で覚える。大技（ULT）とは**別枠**にする——
+   大技は CD 24〜40秒の切り札で、抱えたまま死ぬ物。こちらは 8 秒で気軽に押す物。
+
+   なぜ火力ノードではなくこの形なのか:
+   測定で出た第5階層の負け方は「立ち止まって殴り合えば互角（比1.06）なのに、
+   実際の走行では 24 秒かけて 44% しか削れない」だった。差は**手数**で、
+   予兆のたびに下がっている時間がまるごとダメージにならない。
+
+   だから、下がりながらでも出せて、こちらの間合いより前へ届く技を置く。
+   同じ「+25%」でも、火力ノードは殴れている時間にしか乗らないが、
+   これは**殴れていない時間に乗る**。比への効き方が違う。
+
+   狙いを付ける操作は要らない（大技と同じ作法）。向いている方へ出る。 */
+function waveReady(){
+  if(!upgLv('wave')) return false;
+  if(hasCurse('silence')) return false;            // 呪い「静寂」
+  return S.screen==='game' && !!S.run && !!S.hero && (P.waveCd||0)<=0;
+}
+function fireWave(){
+  if(!waveReady()) return false;
+  if(frozenNow()){ log('凍りついて動けない'); return false; }
+  if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
+  const st = stats(S.hero);
+  P.waveCd = WAVE_CD;
+  const ang = Math.atan2(P.diry||0, P.dirx||1);
+  const half = WAVE_ARC/2;
+  W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:0.26, max:0.26,
+             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st), self:true});
+  feelKick(3.4, .18);
+  nearEnemies(P.x, P.y, WAVE_REACH+1).forEach(e=>{
+    if(e.dead) return;
+    const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
+    if(d > WAVE_REACH+e.r) return;
+    const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+    if(da > half) return;
+    hitEnemy(e, st, WAVE_MUL);
+  });
+  return true;
+}
+
 /* ---------- 大技の発動 ----------
    どれも「押した瞬間にその場で完結する」。狙いを付ける操作は要らない。
    向きが要る技（瞬歩・業火）は、直前の移動方向をそのまま使う。 */
@@ -7705,6 +7871,27 @@ function tickRelics(dt){
       }
     }
   }
+  /* ---------- 能力強化「治癒」 ----------
+     遺物の継続回復とは別枠で持つ。同じ枠に足すと、片方を伸ばしたときに
+     もう片方の意味が薄れる（不動と護符の軽減を分けてあるのと同じ理由）。
+
+     間隔を 10 秒より延ばさないのは、**戦闘中に乗る回数**が価値だから。
+     測定では第5階層のボス戦が 20〜25 秒なので、10 秒なら2回乗る。
+     15 秒にすると1回になり、価値が半分ではなく「無いのと大差ない」になる。
+     道中では減らないことも測ってあるので、ここは道中の回復ではない。 */
+  const rgLv = upgLv('regen');
+  if(rgLv > 0 && !hasCurse('hunger')){
+    S.run.upgRegenT = (S.run.upgRegenT||0) + dt;
+    if(S.run.upgRegenT >= UPG_REGEN_EVERY){
+      S.run.upgRegenT = 0;
+      const st2 = stats(S.hero);
+      const amt = Math.max(1, Math.round(st2.maxHp * rgLv * UPG_REGEN_PCT / 100));
+      if(S.hero.hpNow < st2.maxHp){
+        S.hero.hpNow = Math.min(st2.maxHp, S.hero.hpNow + amt);
+        pop(P.x, P.y-0.5, amt, '#7fe0c0', '+');
+      }
+    }
+  }
   // 伴影：主人公の周りを回り、近くの敵を撃つ
   const n=relicSum('wisp');
   P.wisps = P.wisps || [];
@@ -7729,6 +7916,8 @@ function tickRelics(dt){
   });
 }
 const RELIC_WISP_CD=1.9, RELIC_WISP_RANGE=5.0, RELIC_WISP_MULT=0.5;
+const UPG_REGEN_EVERY = 10;   // 治癒の間隔（秒）
+const UPG_REGEN_PCT   = 3;    // 1段あたり、最大HPの何％戻すか
 const BLINK_SEC = 0.28;      // 瞬歩が走り抜けるのにかける秒数
 
 /* ---------- 鞘無し（周回刃）の毎フレーム処理 ----------
@@ -7956,13 +8145,28 @@ function grantXp(total){
   mates.forEach(a=>addXp(a, share, false));
   return share;
 }
+const LEVEL_HEAL_PCT = 35;   // レベルアップで戻る量（最大HPに対する％）
 function addXp(h, amount, isPlayer){
   // 研鑽の恩寵。受け取る本人の恩寵で伸びる（パーティ全体の分配とは別勘定）
   h.xp += amount * (1 + boonSum(h,'xp')/100);
   while(h.xp >= xpNeed(h.lv)){
     h.xp -= xpNeed(h.lv); h.lv++;
     h.str+=1; h.dex+=1; h.vit+=1;
-    h.hpNow = isPlayer ? stats(h).maxHp : allyStats(h).maxHp;
+    /* ---------- レベルアップの回復は一部だけ ----------
+       ここが全回復だったせいで、**序盤に消耗という概念が存在しなかった。**
+       第1〜4階層はちょうど1階につき1回上がるので、どれだけ削られても
+       階を移る前に満タンに戻る。測定でも、第4階層で 71% まで落ちた体が
+       第5階層に 89% で入っていた——中身は「回復した」ではなく「上がった」。
+
+       死にゲーにするなら、悪い1階の記憶が次の階まで残る必要がある。
+       ただしレベルアップは этой game で一番はっきりした前進なので、
+       手応えは残す。最大HPの一部を戻す形にして、
+       **良いことは起きるが、失点は消えない**という重さにしてある。
+
+       深層では相対的に強い回復になる（レベルが上がりにくいので
+       1回あたりの価値が上がる）。そこは意図どおり。 */
+    const lvHeal = isPlayer ? stats(h).maxHp : allyStats(h).maxHp;
+    h.hpNow = Math.min(lvHeal, h.hpNow + lvHeal * LEVEL_HEAL_PCT / 100);
     log(isPlayer ? ('LEVEL UP! Lv.'+h.lv) : (h.name+' が Lv.'+h.lv+' になった'));
     onLevelUp(h, isPlayer);
   }
@@ -8859,6 +9063,26 @@ function die(){
   if(godMode()){ S.hero.hpNow = stats(S.hero).maxHp; return; }
   // 不死鳥の恩寵。1回の探索につき1度だけ、死なずに立ち上がる。
   if(tryPhoenix(S.hero, true)) return;
+  /* ---------- 能力強化「不屈」 ----------
+     測定でいちばん効く手段。生きていられる時間がそのまま倍になるので、
+     「倒しきる秒数 ÷ 倒される秒数」を **÷2** する——他のどのノードとも桁が違う。
+
+     **HPは全快で戻す。** 40% で戻す案もあったが、それだと生存が 1.4 倍に
+     しかならず、第10階層の 2.84 が 2.03 までしか下がらない。
+     治癒・衝撃波・不動を全部積んでも 1.33 で、越えられない。
+
+     広告の蘇生とは役割を分けてある。こちらは**主人公**が立ち上がる物で、
+     広告は**仲間**を立たせる物（reviveFallen）。並存する。 */
+  if(upgLv('revive') && !S.run.upgRevUsed){
+    S.run.upgRevUsed = true;
+    S.hero.hpNow = stats(S.hero).maxHp;
+    P.invuln = Math.max(P.invuln||0, 2.2);   // 立ち上がった直後に即死しない
+    feelKick(6, .35);
+    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.4, life:0.7, maxLife:0.7, col:'#e5d18c'});
+    W.pops.push({x:P.x, y:P.y-0.8, txt:'不屈', c:'#e5d18c', life:1.2, max:1.2});
+    log('不屈 — 立ち上がった');
+    return;
+  }
   S.deaths++;
 
   /* ---------- レジェンドだけは戻ってくる ----------
@@ -9132,8 +9356,20 @@ function returnToTown(){
   /* 入口は一箇所にまとめる。画面のボタンを消すだけだと、
      別の場所から呼ばれたときに静かにポータル階以外から帰れてしまう。 */
   if(!returnPortalAt(S.run.depth)){
-    log('ここからは戻れない。第'+nextPortalDepth(S.run.depth)+'階層の帰還ポータルまで');
-    return;
+    /* ---------- 能力強化「脱出」 ----------
+       いまは5階ごとの穴でしか帰れないので、「あと1階」の欲と
+       「引き返す」の怖さが釣り合っていない。どこの穴からでも一度だけ
+       帰れる権利があると、**戦利品を抱えたまま撤退する判断**が生まれる。
+
+       到達階には効かない（比を下げない）。効くのは持ち帰りの方で、
+       死ぬ回数が増えるほどこの権利の値打ちが上がる——死にゲーと相性がいい。 */
+    if(upgLv('escape') && !S.run.escapeUsed){
+      S.run.escapeUsed = true;
+      log('脱出 — 道を開いた');
+    }else{
+      log('ここからは戻れない。第'+nextPortalDepth(S.run.depth)+'階層の帰還ポータルまで');
+      return;
+    }
   }
   S.gold += S.run.gold;
   // 黒鉄も生きて帰って初めて口座に入る
@@ -9378,7 +9614,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')) continue;
+    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
       if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
@@ -9420,7 +9656,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#guardbtn,#dbgbtn,#partybar')));
+      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -9443,6 +9679,8 @@ addEventListener('touchend',touchEnd,{passive:true, capture:true});
 addEventListener('touchcancel',touchEnd,{passive:true, capture:true});
 bindTap(el('prompt'), interact);
 bindTap(el('ultbtn'), ()=>{ fireUlt(); });
+/* 通常技のボタン。大技と同じ作法で、押した瞬間にその場で完結する。 */
+bindTap(el('wavebtn'), ()=>{ fireWave(); });
 
 /* 盾のボタンは「押しているあいだ」構える。bindTap（離したら発火）では
    構えっぱなしにできないので、押下と離しを直に拾う。
@@ -9744,8 +9982,14 @@ function openStairs(){
          +nextPortalDepth(S.run.depth)+'階層の帰還ポータル</span>')
     +zoneLine+intrLine;
   /* 帰れるのはポータル階だけ。**押せないボタンを残さずに、消す。**
-     いつでも帰れるなら、どこまで潜るかは決断ではなくただの気分になる。 */
-  el('st-ret').style.display = safe ? '' : 'none';
+     いつでも帰れるなら、どこまで潜るかは決断ではなくただの気分になる。
+
+     能力強化「脱出」を持っていて、まだ使っていない探索なら、
+     ポータル階でなくても出す。文言を変えて**一度きり**だと分かるようにする。 */
+  const canEscape = !safe && upgLv('escape') && !S.run.escapeUsed;
+  el('st-ret').style.display = (safe || canEscape) ? '' : 'none';
+  el('st-ret').textContent = canEscape ? '脱出して街へ戻る（一度きり）'
+                                       : '街へ帰還（戦利品を確定）';
   // 底では「さらに深く潜る」も同じ理由で消す。押せない選択肢を置き土産にしない。
   el('st-down').style.display = bottom ? 'none' : '';
   /* 巡回者に見つかっているあいだは、緑（既定の選択肢）を「帰還」に付け替える。
@@ -9934,6 +10178,7 @@ function update(dt){
   S.run.ft = (S.run.ft||0) + dt;
   tickIntruder();                     // 居座りに顔をつける
   P.ultCd = Math.max(0, (P.ultCd||0) - dt);
+  P.waveCd = Math.max(0, (P.waveCd||0) - dt);   // リキャスト技「衝撃波」
   tickHazards(dt);
   if(!S.hero || !S.run) return;
   P.invuln = Math.max(0, (P.invuln||0) - dt);
@@ -11812,6 +12057,18 @@ function updateHUD(){
     hset('ult-cd.t', ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s', v=>el('ult-cd').textContent=v);
   }else ub.classList.remove('on');
 
+  /* 通常技のボタン。覚えるまでは出さない——押せないボタンを常に置いておくより、
+     覚えた瞬間に現れるほうが「何かできるようになった」が伝わる。
+     大技のように名前は出さない。技が1つしかないので、名札は場所を食うだけ。 */
+  const wb=el('wavebtn');
+  if(upgLv('wave')){
+    const wr=(P.waveCd||0)<=0;
+    wb.classList.add('on');
+    wb.classList.toggle('ready', wr);
+    hset('wavebtn.col', wr ? '#8fd8ff' : '', v=>wb.style.color=v);
+    hset('wave-cd.t', wr ? '' : Math.ceil(P.waveCd)+'s', v=>el('wave-cd').textContent=v);
+  }else wb.classList.remove('on');
+
   /* 盾のボタン。**盾を装備しているときだけ出す。**
      以前は「盾を持てば何かできる」と伝えるために無くてもグレーで置いていたが、
      押せないボタンが常に1つ画面にあるほうが邪魔だった。盾の説明は遊び方にある。
@@ -12212,6 +12469,17 @@ function rerollShop(){
 function upgradeHTML(u){
   const lv=upgLv(u.id), maxed=lv>=u.max, cost=upgCost(u,lv);
   const afford=(S.shards||0)>=cost;
+  /* 開いていない段は**錠を見せる。** 隠すと、死に戻る理由が
+     「SPが少し増える」だけになる。何が待っているかを先に見せておくと、
+     もう一度潜る理由が「あの錠を開けに行く」に変わる。 */
+  if(upgLocked(u)){
+    const t=tierDef(upgTier(u));
+    return `<div class="item" data-upg="${u.id}" style="border-left-color:#3a4152;opacity:.72">
+      <div class="nm" style="color:#5c6479">🔒 ${u.nm}</div>
+      <div class="af" style="color:#5c6479">${u.step}</div>
+      <div class="af" style="color:#c9a06a;font-size:12px">${t.via}と開く</div>
+    </div>`;
+  }
   const col = maxed?'#4a9d6e' : afford?'#e6e9f0' : '#5c6479';
   return `<div class="item" data-upg="${u.id}" style="border-left-color:${maxed?'#4a9d6e':'#5b8dd6'}">
     <div class="nm" style="color:${col}">${u.nm} <span style="font-size:12px;color:var(--dim)">Lv.${lv}/${u.max}</span></div>
@@ -13468,6 +13736,9 @@ function townTap(e){
   if(ub){
     const u=UPGRADES.find(x=>x.id===ub.dataset.upg), lv=upgLv(u.id);
     if(lv>=u.max) return;
+    /* 段が開いていなければ買えない。押したときに何も起きないと
+       壊れているように見えるので、開ける条件を言う。 */
+    if(upgLocked(u)){ log(tierDef(upgTier(u)).via+'と開く'); return; }
     const cost=upgCost(u,lv);
     if((S.shards||0)<cost) return;
     S.shards-=cost; S.upg[u.id]=lv+1;
@@ -15032,5 +15303,22 @@ initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
 <script src="game-feel.js"></script>
+<script>
+/* ---------- ダッシュの解禁 ----------
+   ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
+   ここでやるのは**覚えるまで踏めなくする**ことだけ。
+   演出のファイルには触らない——担当が分かれているので、
+   向こうの都合で作り直されたときに、この一行が巻き添えで消えないようにする。
+
+   game-feel.js は index.html の後に読み込まれるので、包むのはここでしかできない。
+   （本体の <script> の中で書くと、まだ tapDash が存在しない。） */
+if(typeof tapDash === 'function'){
+  const _tapDashBase = tapDash;
+  tapDash = function(){
+    if(!upgLv('dash')) return false;
+    return _tapDashBase.apply(this, arguments);
+  };
+}
+</script>
 </body>
 </html>

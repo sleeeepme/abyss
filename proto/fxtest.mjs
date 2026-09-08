@@ -296,7 +296,18 @@ R.levelUp = await pg.evaluate(()=>{
   const bannerShown=!!_banner && _banner.title==='Lv.'+lv1;
   const bannerSub=_banner?_banner.sub:'';
   const glow=document.getElementById('hpfill').style.boxShadow;
-  const full=S.hero.hpNow===stats(S.hero).maxHp;
+  /* ---------- 上がっても全快はしない ----------
+     以前はここで全回復していた。そのせいで**序盤に消耗という概念が無かった**——
+     第1〜4階層はちょうど1階に1回上がるので、どれだけ削られても
+     階を移る前に満タンに戻っていた（測定で、第4階層で 71% まで落ちた体が
+     第5階層に 89% で入っていた）。
+
+     いまは最大HPの LEVEL_HEAL_PCT ぶんだけ戻る。
+     見るのは2つ。**戻ること**と、**戻りきらないこと。** */
+  const mx=stats(S.hero).maxHp;
+  const healed=S.hero.hpNow > Math.round(mx*0.3);
+  const notFull=S.hero.hpNow < mx;
+  const gained=Math.round((S.hero.hpNow - Math.round(mx*0.3)) / mx * 100);
   let threw=null;
   try{ for(let i=0;i<8;i++){ draw(); updateHUD(); } }catch(e){ threw=e.message; }
 
@@ -307,18 +318,23 @@ R.levelUp = await pg.evaluate(()=>{
   a.xp=xpNeed(a.lv);
   addXp(a, 1, false);
   const allyRing=W.fx.filter(f=>f.t==='levelup').length;
-  return {lv0, lv1, ring, pop, bannerShown, bannerSub, glow, full, threw, allyRing,
+  return {lv0, lv1, ring, pop, bannerShown, bannerSub, glow, threw, allyRing,
+          gainedPct:gained, healPct:LEVEL_HEAL_PCT,
           ringShown: ring===1,
           popShown: pop===1,
-          /* 全快したことは文章で言わない。HPバーが一気に満ちて光るので見れば分かる。
+          /* 回復量は文章で言わない。HPバーが伸びて光るので見れば分かる。
              分かることを重ねて書くと、Lv がいくつになったかが読み飛ばされる。 */
           bannerHasNoHealText: bannerSub==='',
           barGlows: !!glow,
-          healedToFull: full,
+          healsSome: healed,
+          // **ここが本題。** 全快すると序盤の消耗が毎階リセットされる
+          doesNotHealToFull: notFull,
+          // 定数どおりの量か（±2% は丸めのぶん）
+          matchesConstant: Math.abs(gained - LEVEL_HEAL_PCT) <= 2,
           allyAlsoShows: allyRing===1,
           drawsFine: threw===null,
           ok: lv1===lv0+1 && ring===1 && pop===1 && bannerShown
-              && bannerSub==='' && !!glow && full
+              && bannerSub==='' && !!glow && healed && notFull
               && allyRing===1 && threw===null};
 });
 
