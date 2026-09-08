@@ -122,12 +122,35 @@ function drawFeelRipples(camX,camY){
     }
   }ctx.restore();
 }
+/* 画面外周の暗がり。**1枚焼いて貼るだけにする。**
+   放射グラデーションで全画面を毎フレーム塗り直すと、画面ぶんの画素を
+   1枚まるごと計算し直すことになる。実測で 15fps ぶん（26階 38→55）。
+
+   これがJSのプロファイルに出てこないのが厄介なところで、
+   このフレーム内の記録時間は 0.01ms しかない。塗りはJSが返ったあとに乗る。
+   draw が 4.2ms、update が 0.8ms、残り 74% が「空き」に見えていた。
+
+   模様は画面サイズが変わらない限り動かないので、焼いておける。 */
+const feelVignetteCanvas=document.createElement('canvas');
+let feelVignetteKey='';
 function drawFeelVignette(){
-  ctx.save();const w=innerWidth,h=innerHeight;
-  ctx.translate(w/2,h/2);ctx.scale(w/2,h/2);
-  const g=ctx.createRadialGradient(0,0,.25,0,0,1.35);
-  g.addColorStop(0,'#02070b00');g.addColorStop(.55,'#02070b25');g.addColorStop(1,'#02070bae');
-  ctx.fillStyle=g;ctx.fillRect(-1,-1,2,2);ctx.restore();
+  const w=innerWidth,h=innerHeight;
+  /* 拡大率は index.html 側（resize）が掛けている物をそのまま読む。
+     ここで 1 に決め打つと、DPR ぶん小さく貼って画面の一部しか覆わない。 */
+  const s=ctx.getTransform().a || 1;
+  const key=w+'x'+h+'@'+s;
+  if(feelVignetteKey!==key){
+    feelVignetteKey=key;
+    const cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
+    feelVignetteCanvas.width=cw; feelVignetteCanvas.height=ch;
+    const a=feelVignetteCanvas.getContext('2d');
+    a.setTransform(1,0,0,1,0,0); a.clearRect(0,0,cw,ch);
+    a.translate(cw/2,ch/2); a.scale(cw/2,ch/2);
+    const g=a.createRadialGradient(0,0,.25,0,0,1.35);
+    g.addColorStop(0,'#02070b00');g.addColorStop(.55,'#02070b25');g.addColorStop(1,'#02070bae');
+    a.fillStyle=g; a.fillRect(-1,-1,2,2);
+  }
+  ctx.save(); ctx.drawImage(feelVignetteCanvas,0,0,w,h); ctx.restore();
 }
 const feelFlashCanvas=document.createElement('canvas');
 const feelAmbientCache=new Map();
