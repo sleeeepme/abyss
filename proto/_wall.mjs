@@ -32,9 +32,9 @@ const arg = (k, d) => {
 const SP_LIST = arg('sp', '0,130,300,450').split(',').map(Number);
 const SEEDS   = +arg('seeds', 8);
 const DEPTH   = +arg('depth', 5);
-/* 段（tier）の解禁具合。キーストーンは段2以降にあるので、
-   1 のままだと不屈も衝撃波も無い世界を測ることになる。 */
-const DEEPEST = +arg('deepest', 1);
+/* 段の解禁具合。倒したボスの最深階（S.bossClear）で指定する。
+   0 のままだと不屈も衝撃波も無い世界を測ることになる。 */
+const DEEPEST = +arg('tier', 0);
 /* 何回ぶん装備を引くか。多くするほど「その階で出うる最良」に近づく。
    実際に潜って着いた人の装備は最良ではないので、
    **実測の攻撃力（_balance の 5F 行）に合う回数**で測らないと
@@ -75,7 +75,7 @@ const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
      _balance.mjs の実測では 5F 到達時が Lv4.3・攻撃20前後だったので、
      そこへ寄せる。 */
   const arrive = (sp, seed) => {
-    S.deepest = deep;                       // loadout より先に（段の判定が見る）
+    S.bossClear = deep;                     // loadout より先に（段の判定が見る）
     S.salt = seed; S.runs = 0; S.upg = loadout(sp); S.deaths = 0;
     S.hero = newHero(); S.grave = null;
     startRun(depth); setScreen('game'); S.hero.party = [];
@@ -179,7 +179,7 @@ const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
 const med = a => { const v = [...a].sort((x, y) => x - y); return v[Math.floor(v.length / 2)]; };
 const pad = (s, n) => String(s).padEnd(n);
 
-console.log(`\n=== 第${DEPTH}階の一戦（シード ${SEEDS} 本の中央値 / 段は deepest=${DEEPEST}）===\n`);
+console.log(`\n=== 第${DEPTH}階の一戦（シード ${SEEDS} 本の中央値 / 段は tier=${DEEPEST}）===\n`);
 console.log(pad('SP', 5) + pad('ボスHP', 9) + pad('こちらHP', 10) + pad('攻撃', 7)
           + pad('倒しきる', 10) + pad('倒される', 10) + pad('部屋で', 9) + 'あと何倍要るか');
 console.log('-'.repeat(78));

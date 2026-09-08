@@ -39,13 +39,13 @@ const FILE     = arg('file', 'proto/index.html');   // 別案を測るとき用
 /* --dash: 予兆の切れ際にダッシュを踏んでジャスト回避を狙う操縦。
    上手い人の側の値を出すために使う。既定は踏まない（下手な人の側）。 */
 const DASH     = process.argv.includes('--dash');
-/* --deepest: 段（tier）の解禁具合。S.deepest をここに固定して測る。
-   キーストーンは段2以降にあるので、これを 1 のままにすると
+/* --tier: 段の解禁具合。倒したボスの最深階（S.bossClear）を固定して測る。
+   キーストーンは段2以降にあるので、これを 0 のままにすると
    **不屈も衝撃波も持っていない世界**を測ることになる。
-     1  … まだ第5階層を越えていない（段1のみ）
-     6  … 中ボスを越えた（段2が開く）
-     11 … 大ボスを越えた（段3が開く） */
-const DEEPEST  = +arg('deepest', 1);
+     0  … まだ中ボスを倒していない（段1のみ）
+     5  … 第5階層の中ボスを倒した（段2が開く）
+     10 … 第10階層の大ボスを倒した（段3が開く） */
+const DEEPEST  = +arg('tier', 0);
 
 const b   = await chromium.launch();
 const ctx = await b.newContext({ ...devices['iPhone 13'], hasTouch: true, isMobile: true });
@@ -92,7 +92,7 @@ await pg.evaluate(() => {
           const u = UPGRADES.find(x => x.id === id);
           const lv = up[id] || 0;
           if (lv >= u.max) continue;
-          // 段が開いていない物は買えない。開き具合は S.deepest で決まる。
+          // 段が開いていない物は買えない。開き具合は S.bossClear で決まる。
           if (typeof upgLocked === 'function' && upgLocked(u)) continue;
           const c = upgCost(u, lv);
           if (c > left) continue;
@@ -185,11 +185,11 @@ await pg.evaluate(() => {
     /* 1本走らせる。死ぬか、上限階に届くか、詰むまで。 */
     run(seed, sp, maxDepth, cap, opt) {
       opt = opt || {};
-      S.deepest = opt.deepest || 1;   // loadout より先に。段の判定がこれを見る
+      S.bossClear = opt.tier || 0;    // loadout より先に。段の判定がこれを見る
       const lo = this.loadout(sp, opt);
       S.salt = seed;
       S.runs = 0;
-      S.deepest = opt.deepest || 1;   // 段の解禁具合を固定して測る
+
       S.upg = lo.up;
       S.deaths = 0;
       S.hero = newHero();
@@ -418,7 +418,7 @@ for (const sp of SP_LIST) {
   let warned = false;
   for (let s = 0; s < SEEDS; s++) {
     const r = await pg.evaluate(([seed, sp, md, cap, opt]) => BAL.run(seed, sp, md, cap, opt),
-      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, deepest: DEEPEST }]);
+      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, tier: DEEPEST }]);
     if (r.missing && r.missing.length && !warned) {
       warned = true;
       console.log('\n  ⚠ 買う順に入っていない項目:', r.missing.join(','),

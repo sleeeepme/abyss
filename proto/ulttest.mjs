@@ -95,7 +95,17 @@ R.gen = await pg.evaluate(()=>{
           from:HAZARD_FROM_DEPTH,
           noneBefore10: at(5).avgTiles===0 && at(9).avgTiles===0,
           appearsAt10: at(12).avgTiles>0,
-          growsWithDepth: at(45).avgTiles>at(12).avgTiles,
+          /* ---------- 「深いほど広い」は、もう成り立たない ----------
+             水の層（第11〜20階層）だけ、覆う量を意図して倍にしてある
+             （HAZ_COVER_MUL.sump）。避けて通れる池では「水の中の戦い」に
+             ならないためで、そのうえ深さを3段に彫ってある。
+             結果、第12階層のほうが第45階層より水面が広い。
+
+             ここで守りたいのは「深いほど数字が大きい」ではなく、
+             **どの層にもその層ぶんの床がある**こと。単調増加のほうを
+             固定していると、層ごとの設計を入れるたびに嘘になる。 */
+          everyZoneHasHazard: [12,25,35,45].every(d=>at(d).avgTiles>0),
+          waterIsWidest: at(12).avgTiles > at(25).avgTiles,
           neverOnStair: at(12).onStair===0 && at(35).onStair===0 && at(45).onStair===0,
           // 層の並びが 石/水/根/跡/鍛冶場/白 になったので、深度ごとの種類も変わる
           zoneThemed: at(25).kinds[0]==='spore' && at(35).kinds[0]==='slick' && at(45).kinds[0]==='lava'};

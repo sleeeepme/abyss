@@ -329,9 +329,19 @@
   #durtag .brk{color:#ff6a5a}
   @keyframes durpulse{0%,100%{opacity:1}50%{opacity:.45}}
   #durtag.crit{animation:durpulse 1s infinite;border-color:#c4433f}
-  #prompt{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));
+  /* ---------- 操作の札 ----------
+     以前は大技ボタンと同じ高さ（96px）に置いていた。**そこは親指の通り道**で、
+     文字が長くて2行に折り返すと札が縦に伸び、移動しようと置いた指が
+     札に吸われて動けなくなる（報告）。札は pointer-events:auto なので、
+     重なった時点で下のキャンバスへタッチが抜けない。
+
+     2つで直す。**折り返さない**（nowrap）ことと、
+     ボタンの列より上へ逃がすこと（大技は 96〜170px を占める）。
+     入れる文言のほうも短く保つこと——長い札は、狭くしても結局はみ出す。 */
+  #prompt{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(182px + env(safe-area-inset-bottom));
     pointer-events:auto;display:none;background:#232a38;border:1px solid var(--line);border-radius:9px;
-    padding:10px 18px;font-size:12px;font-weight:600}
+    padding:10px 18px;font-size:12px;font-weight:600;
+    white-space:nowrap;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis}
   #kb{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));font-size:12px;color:#6b7488;line-height:1.6}
   /* 右上は「開く物」の列。上に詰めすぎると、階層・所持金の行に
      🎒 の個数バッジが重なる（実際に重なった）ので、その下から始める。 */
@@ -483,6 +493,11 @@
   <div class="grid" id="shop"></div>
   <div style="height:8px"></div>
   <button class="ghost" id="btn-reroll">品揃えを入れ替える</button>
+
+  <h2>黒鉄 <span style="color:var(--dim);font-weight:400;font-size:12px">掘るより高い</span></h2>
+  <p class="sub">鍛冶に要る物を金で買える。掘って持ち帰るほうが安いが、
+    <b>あと1つだけ足りない</b>ときに潜り直さずに済む。</p>
+  <div class="grid" id="oreshop"></div>
 
   <h2>修理 <span style="color:var(--dim);font-weight:400;font-size:12px">タップで個別修理</span></h2>
   <p class="sub">耐久が0になった装備は性能を失う（＝破損）。ここで直せば元に戻る。</p>
@@ -1304,7 +1319,7 @@ const FAMILY=[
    res:{}},
   {id:'undead',nm:'フォーセイクン', reg:'損', col:'#b9b3a0', minDepth:4,  atk:'slash',
    res:{slash:40, blunt:-35, frost:30, fire:-20}},
-  {id:'slime', nm:'ボグ',   reg:'滞', col:'#6f9a4a', minDepth:7,  atk:'blunt',
+  {id:'slime', nm:'ボグ',   reg:'滞', col:'#6f9a4a', minDepth:6,  atk:'blunt',
    res:{pierce:55, slash:-25, fire:-30, shock:25}},
   {id:'armor', nm:'ルイン', reg:'築', col:'#7d8794', minDepth:11, atk:'pierce',
    res:{slash:35, pierce:30, blunt:-40, shock:-25}},
@@ -1366,7 +1381,18 @@ function aberrantName(zoneId, archId){
    解禁されている系統を全部混ぜると、序盤から色とりどりの敵が並んで
    何に何が効くのか学習できない。1階層あたりの系統を絞ると、
    フロアごとに「今回は屍骸の階」と読めるようになる。 */
-function famSlotsAt(depth){ return clamp(1+Math.floor((depth-1)/9), 1, 4); }
+/* ---------- 第6階層で2つ目の系統を開ける ----------
+   以前は `(depth-1)/9` で、第9階層まで系統が1つしか出なかった。
+   そのせいで**中ボスを越えた直後の第6階層に新しさが無い**（報告）。
+   節目を越えたのに、次の階が前の階と同じ顔をしている。
+
+   ボグ（緑）の解禁も第7階層から第6階層へ動かしてある。
+   枠が2つ開くのと解禁が同じ階に来るので、扉を越えた次の階で
+   **見たことのない色が混じる。**
+
+   刻みは9階のままにして、起点だけずらした:
+     第1〜5階層 1系統 ／ 6〜14 で2 ／ 15〜23 で3 ／ 24以降 4 */
+function famSlotsAt(depth){ return clamp(1+Math.floor((depth+3)/9), 1, 4); }
 /* その階層に出る系統を決める。深いほど新しい系統が出やすいよう重み付けする。 */
 function floorFamilies(depth){
   let avail = FAMILY.filter(f=>f.minDepth<=depth);
@@ -2327,6 +2353,7 @@ const WAVE_CD    = 6;      // リキャスト（秒）
 const WAVE_MUL   = 4.0;    // 武器攻撃力に対する倍率
 const WAVE_REACH = 3.4;    // 前方への届き（マス）
 const WAVE_ARC   = 1.5;    // 扇の広さ（ラジアン。約86度）
+const BLOOM_EVERY = 2;     // 大技「生気」が体を戻す間隔（秒）
 
 /* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
 /* 対価はSP（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
@@ -2398,8 +2425,8 @@ const UPGRADES=[
      **5階を越える道具が5階を越えた後にしか手に入らない**という
      循環になる。だから5階までに要る物（瞬足）は第1段に置く。 */
 
-  {id:'dash',   nm:'瞬足',  max:1, shard:30,  tier:1,
-   step:'ダッシュを覚える',
+  {id:'dash',   nm:'瞬足',  max:5, shard:30,  tier:1,
+   step:'ダッシュ（段ごとに 距離+ / 待ち- / 回避受付+）',
    desc:'画面を短くタップ。出際は攻撃を1回だけ消せる'},
 
   {id:'revive', nm:'不屈',  max:1, shard:200, tier:2,
@@ -2424,16 +2451,18 @@ const UPGRADES=[
    **踏破そのものが解禁になる**（離散量）という2本目の動機を作る。
    数値だけを買い続ける形だと、5回も死ぬ前に伸びが見えなくなる。
 
-   S.deepest は「到達した階」。第5階層の中ボスを倒して降りると 6 になる。 */
+   見るのは S.bossClear（＝倒したボスの最深階）。**S.deepest ではない。**
+   deepest は「降りた階」なので、中ボスを倒してその場で帰ると増えない——
+   勝ったのに何も開かない、という形になる。 */
 const UPG_TIERS = [
   {t:1, need:0,  nm:'根'},
-  {t:2, need:6,  nm:'幹', via:'第5階層の中ボスを倒す'},
-  {t:3, need:11, nm:'枝', via:'第10階層の大ボスを倒す'},
-  {t:4, need:21, nm:'梢', via:'第20階層の大ボスを倒す'},
+  {t:2, need:5,  nm:'幹', via:'第5階層の中ボスを倒す'},
+  {t:3, need:10, nm:'枝', via:'第10階層の大ボスを倒す'},
+  {t:4, need:20, nm:'梢', via:'第20階層の大ボスを倒す'},
 ];
 function upgTier(u){ return u.tier || 1; }
 function tierDef(t){ return UPG_TIERS.find(x=>x.t===t) || UPG_TIERS[0]; }
-function tierOpen(t){ return (S.deepest||1) >= tierDef(t).need; }
+function tierOpen(t){ return (S.bossClear||0) >= tierDef(t).need; }
 /* 開いていない段は**隠さずに錠を見せる。** 何が待っているか分からないと、
    死に戻る理由が「SPが少し増える」だけになる。 */
 function upgLocked(u){ return !tierOpen(upgTier(u)); }
@@ -2656,7 +2685,9 @@ const HAZARDS={
 const ZONE_HAZARD = {stone:'grit', sump:'water', root:'spore', ruin:'slick', furnace:'lava', pale:'void_'};
 /* 覆う割合の層ごとの倍率。水の層だけは**広く**取る——
    点在する池では避けて通れてしまい、「水の中の戦い」にならない。 */
-const HAZ_COVER_MUL = {sump:4.0};
+/* 水の層は 4.0 → 8.0。**避けて通れる池では「水の中の戦い」にならない。**
+   深さを3段に分けたので、広いほど「浅瀬を渡るか、遠回りするか」の判断が増える。 */
+const HAZ_COVER_MUL = {sump:8.0};
 const HAZARD_FROM_DEPTH = 10;    // ここから出はじめる
 function hazardKindFor(zoneId){ return ZONE_HAZARD[zoneId] || 'poison'; }
 function hazardDef(k){ return HAZARDS[k] || HAZARDS.poison; }
@@ -2703,7 +2734,11 @@ function spawnHazards(fl, depth){
   while(placed<want && guard++<900 && rooms.length){
     const r=pick(rooms);
     const cx=r.x+ri(1,Math.max(1,r.w-2)), cy=r.y+ri(1,Math.max(1,r.h-2));
-    const rad=rf(0.9, 2.1);
+    /* 水だけ池を大きく取る。**小さい池には深さが作れない。**
+       半径2の円は、どのマスも縁から2マス以内なので、彫っても浅瀬しか出ない
+       （実測: 淵が1マスも生まれなかった）。覆う総量は want で頭打ちなので、
+       大きくすると池の数が減るだけ——「広い水面が数ヶ所」という形になる。 */
+    const rad = kind==='water' ? rf(2.6, 5.0) : rf(0.9, 2.1);
     for(let y=Math.floor(cy-rad); y<=Math.ceil(cy+rad); y++)
     for(let x=Math.floor(cx-rad); x<=Math.ceil(cx+rad); x++){
       if(x<1||y<1||x>=fl.W-1||y>=fl.H-1) continue;
@@ -2714,7 +2749,125 @@ function spawnHazards(fl, depth){
       g[y][x]=1; placed++;
     }
   }
-  return placed ? {kind, g, n:placed} : null;
+  if(!placed) return null;
+  /* ---------- 水だけ、深さを彫る ----------
+     置いた池の**縁からの距離**で段を決める。縁が浅瀬、中ほどが深み、
+     一番奥だけが淵。深い場所を乱数で散らすと飛び石になって、
+     「浅い所を選んで渡る」という判断が成立しない。
+
+     縁からの距離は、水でない隣を種にした簡単な波及で出す（BFS 相当）。
+     穴の周りは上のループで既に空けてあるので、ここでは触らない。 */
+  if(kind === 'water'){
+    const dist = Array.from({length:fl.H}, ()=>new Int16Array(fl.W).fill(-1));
+    const qx=[], qy=[];
+    for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){
+      if(!g[y][x]) continue;
+      // 水でない（または盤外の）隣が1つでもあれば、そこが縁
+      let edge=false;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||ny<0||nx>=fl.W||ny>=fl.H || !g[ny][nx]){ edge=true; break; }
+      }
+      if(edge){ dist[y][x]=0; qx.push(x); qy.push(y); }
+    }
+    for(let h=0; h<qx.length; h++){
+      const x=qx[h], y=qy[h], d=dist[y][x];
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||ny<0||nx>=fl.W||ny>=fl.H) continue;
+        if(!g[ny][nx] || dist[ny][nx]>=0) continue;
+        dist[ny][nx]=d+1; qx.push(nx); qy.push(ny);
+      }
+    }
+    for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){
+      if(!g[y][x]) continue;
+      const d=dist[y][x];
+      g[y][x] = d>=WATER_TIER_AT[1] ? 3 : d>=WATER_TIER_AT[0] ? 2 : 1;
+    }
+    /* ---------- 淵で階を割らない ----------
+       穴（階段）の周りを空けるだけでは足りない。**大きな池は、部屋と部屋を
+       つなぐ通路そのものを塞ぐ**ことがある。実際、巡回者が主人公へ辿り着けない
+       階が 30 本中 8 本出た（intrtest.intrPathing）。
+       主人公だけの話ではない——敵も仲間も巡回者も、同じ床を歩いている。
+
+       なので「歩ける床が1つながりであること」を作り終わってから確かめて、
+       割れていたら淵を深み（渡れる）に戻す。距離で決め打つのではなく、
+       **繋がるまで戻す**。池の形は毎回違うので、決め打ちでは必ず取りこぼす。 */
+    const solidReach = () => {
+      const seen = Array.from({length:fl.H}, ()=>new Uint8Array(fl.W));
+      const sx0=Math.floor(fl.stair.x), sy0=Math.floor(fl.stair.y);
+      const qx=[sx0], qy=[sy0]; seen[sy0][sx0]=1;
+      for(let h=0; h<qx.length; h++){
+        const x=qx[h], y=qy[h];
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+          const nx=x+dx, ny=y+dy;
+          if(nx<0||ny<0||nx>=fl.W||ny>=fl.H||seen[ny][nx]) continue;
+          if(!tileWalk(fl,nx,ny) || g[ny][nx]===3) continue;
+          seen[ny][nx]=1; qx.push(nx); qy.push(ny);
+        }
+      }
+      return seen;
+    };
+    for(let pass=0; pass<12; pass++){
+      const seen = solidReach();
+      // 届いていない「歩ける床」に隣接する淵を、渡れる深みへ戻す
+      let opened = 0;
+      for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){
+        if(g[y][x]!==3) continue;
+        let touchesLost=false, touchesFound=false;
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+          const nx=x+dx, ny=y+dy;
+          if(nx<0||ny<0||nx>=fl.W||ny>=fl.H||!tileWalk(fl,nx,ny)) continue;
+          if(g[ny][nx]===3) continue;
+          if(seen[ny][nx]) touchesFound=true; else touchesLost=true;
+        }
+        if(touchesLost && touchesFound){ g[y][x]=2; opened++; }
+      }
+      // 取り残しが無くなったら終わり
+      let lost=0;
+      for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++)
+        if(tileWalk(fl,x,y) && g[y][x]!==3 && !seen[y][x]) lost++;
+      if(!lost) break;
+      /* 隣り合っていない孤島は上の手当てでは開かない。
+         その回で1マスも開けられなかったら、淵をすべて深みへ落として諦める——
+         **繋がっていない階を出すくらいなら、淵が無いほうがまだいい。** */
+      if(!opened){
+        for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++) if(g[y][x]===3) g[y][x]=2;
+        break;
+      }
+    }
+    // 穴の上とその隣は、深みも置かない（降りる導線を最後に確保する）
+    for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){
+      if(g[y][x]<2) continue;
+      if(Math.hypot(x+0.5-fl.stair.x, y+0.5-fl.stair.y) < 3.0) g[y][x]=1;
+    }
+  }
+  return {kind, g, n:placed};
+}
+/* ---------- 水の深さ ----------
+   水の層だけ、g に 1/2/3 を入れる（他のハザードは 1 のまま）。
+   0/1 の真偽で読んでいる場所はそのまま動く——**深さは足す情報**であって、
+   既存の「そこがハザードかどうか」を置き換えない。
+
+     1 浅瀬 … 足を取られる
+     2 深み … かなり遅くなる
+     3 淵   … 底が無い。根の層の踏み外しと同じ扱いで落ちる
+
+   深さは池の**中心ほど深い**。縁から入って、進むほど重くなる形にしたい。
+   一様に散らすと、深い場所が飛び石のように現れて理不尽になる。 */
+const WATER_SLOW = [0, 0.30, 0.62, 0.62];   // 段ごとの減速（0段目は使わない）
+const WATER_DEEP = 3;                        // この段は落ちる
+/* 縁から何マス目で段が上がるか。[深みになる距離, 淵になる距離] */
+const WATER_TIER_AT = [2, 3];
+function hazTier(x,y){
+  const h=W.haz; if(!h) return 0;
+  const gx=Math.floor(x), gy=Math.floor(y);
+  if(gx<0||gy<0||!h.g[gy]) return 0;
+  return h.g[gy][gx]|0;
+}
+/* そこが「落ちる水」か。根の層の踏み外しと同じ扱いにする。 */
+function waterVoidAt(x,y){
+  return !!(W.haz && W.haz.kind==='water' && hazTier(x,y) >= WATER_DEEP);
 }
 function hazardAt(x,y){
   const h=W.haz; if(!h) return null;
@@ -3071,7 +3224,15 @@ const BUILDINGS=[
    desc:'持ち帰れる量が増える'},
 ];
 function bldLv(id){ return (S.bld&&S.bld[id])||0; }
-function bldCost(b,lv){ return Math.round(b.base*Math.pow(lv+1,1.9)); }
+/* ---------- 街開発の値段は強く跳ねさせる ----------
+   1.9 だと5施設をカンストして計 40,327 G。第30階層まで潜れるようになった頃には
+   1周の帰還報酬だけで数千入るので、**後半に金の行き先が無くなる**（報告）。
+
+   2.4 にすると総額 80,383 G。倍の開きが出るのは最後の1〜2段で、
+   序盤（Lv1〜2）の値段はほとんど変わらない——**上げ始めは軽いまま、
+   上げ切るのは遠い**という形にしたい。金は「潜り続ける理由」であって、
+   序盤の関門にはしたくない。 */
+function bldCost(b,lv){ return Math.round(b.base*Math.pow(lv+1,2.4)); }
 /* 各施設の効果。参照側はここだけ見る。 */
 function repairDiscount(){ return 1 - bldLv('forge')*0.12; }
 function durBonus(){       return 1 + bldLv('forge')*0.08; }
@@ -3508,6 +3669,8 @@ const ALLY_RAR_MAX = 1;       // 仲間の装備は Uncommon 止まり（Rare �
    増えた手数のぶんだけプールを膨らませて、「分配されるが総量は増える」に着地させる。 */
 const XP_PARTY_BONUS = 0.15;
 const NPC_CHANCE = 0.42;      // 1階層に NPC が現れる確率
+/* 加入前だけ効く被ダメージ軽減（％）。駆け寄る時間を作るためのもの。 */
+const NPC_GUARD_DR = 55;
 
 /* evade = 回避率(%)。当たれば 0 ダメージ。
      近接の仲間が「相手がいる限り前に出続ける」だけだと即死するので、
@@ -3645,6 +3808,24 @@ const ULTS=[
   {id:'ruin',  nm:'崩落', icon:'✧', col:'#c98adf', cd:40,
    desc:lv=>`画面内の全ての敵に ATK×${(2.2+lv*0.5).toFixed(1)}。ボスには半減`,
    at:5},
+
+  /* ---------- 支える側の技 ----------
+     ここまでの5つは全部「相手をどうにかする」技だった。守護だけが例外だが、
+     それも被ダメージを削るだけで、**減った体を戻す手段が技の側に1つも無い。**
+     死にゲーにして殴られる回数が増えたぶん、選べる方向として要る。
+
+     同じ `at` に置いてある——大ボスを1体倒すたびに、攻める技と支える技が
+     1つずつ開く。枠は1つのままなので、**開くたびに選び直す**ことになる。
+     数を増やすのではなく、迷いを増やすほうの足し方にしてある。 */
+  {id:'aegis', nm:'鉄壁', icon:'▣', col:'#8fc7ff', cd:28,
+   desc:lv=>`${(7+lv*0.9).toFixed(0)}秒 パーティ全員の防御力 ×${(1.6+lv*0.22).toFixed(1)}`,
+   at:1},
+  {id:'rally', nm:'号令', icon:'✚', col:'#7fe0c0', cd:32,
+   desc:lv=>`パーティ全員のHPを最大値の ${(22+lv*5)}% 回復`,
+   at:2},
+  {id:'bloom', nm:'生気', icon:'❦', col:'#a9d86a', cd:30,
+   desc:lv=>`${(10+lv*1.5).toFixed(0)}秒 パーティ全員が2秒ごとに最大HPの ${(2+lv*0.5).toFixed(1)}% 回復`,
+   at:3},
 ];
 const ULT_MAX_LV = 5;
 function ultDef(id){ return ULTS.find(u=>u.id===id); }
@@ -4060,9 +4241,19 @@ function greatKills(){ return S.greatKills||0; }
 function unlockedJobs(){
   return JOBS.concat(ELITE_JOBS.filter(j=>greatKills() >= j.at));
 }
-/* 出現の重み。既存ジョブは 1.0、上位ジョブは weight のぶんだけ出にくい。 */
+/* 出現の重み。既存ジョブは 1.0、上位ジョブは weight のぶんだけ出にくい。
+   ---------------------------------------------------------------
+   **上位職は、同じ職が隊にいるあいだ出さない。** 上位職は1人までという
+   決まり（allyCanJoin の jobCount 制限）が既にあるので、出しても
+   加入できない——「聖騎士を見つけたのに連れて行けない」という
+   空振りになるだけで、しかも上位職が出る枠を1つ食い潰す。
+   出会いの側で先に外しておく。 */
 function pickJob(){
-  const pool=unlockedJobs();
+  const pool=unlockedJobs().filter(j=>{
+    if(!ELITE_JOBS.includes(j)) return true;
+    return !party().some(a=>a && !a.dead && a.job===j.id);
+  });
+  if(!pool.length) return JOBS[0];
   const tot=pool.reduce((a,j)=>a+(j.weight||1), 0);
   let x=rnd()*tot;
   for(const j of pool){ x-=(j.weight||1); if(x<=0) return j; }
@@ -4652,6 +4843,7 @@ function gachaNextBand(){
 /* ---------- ステート ---------- */
 const S={
   stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1, deaths:0, runs:0,
+  bossClear:0,           // 倒したボスの最深階。能力強化の段はこれで開く
   /* ---------- 生成の塩 ----------
      階層の生成は S.runs と depth だけを種にしていた。決定的なのは良い
      （同じ探索で同じ階へ戻れば同じ地形になる）が、**初回だけは誰がやっても
@@ -4949,7 +5141,11 @@ function stats(h){
        カンストしても 3→5 にしかならず、100 の一撃が 87→83 で終わっていた。
        減衰は def/(def+50+10*敵レベル) なので、浅いところほど効き、
        深くなると薄れる——序盤を支えるための項目として、それでいい。 */
-    def:   (bDef + a.def + vit*0.6 + U('def')*4) * (1 + B('def')/100) * SA * (1 + DN.def/100),
+    /* 大技「鉄壁」。**掛け算**で乗せる。防御は元が小さいので、
+       加算で乗せても一撃の目減りがほとんど変わらない（鉄皮のコメント参照）。
+       時間限定の切り札なので、ここは思い切って倍率にしてある。 */
+    def:   (bDef + a.def + vit*0.6 + U('def')*4) * (1 + B('def')/100) * SA * (1 + DN.def/100)
+           * ((S.run && S.run.aegis) ? S.run.aegis.mul : 1),
     crit:  clamp(4 + dex*0.5 + a.critPct + U('crit')*4 + B('crit'), 0, 75),
     // 遺物は主人公本人にだけ乗る（口座に残る物なので、渡す概念が無い）
     ms:    BASE_MOVE_SPEED * (1 + a.msPct/100) * (1 + U('ms')*0.05)
@@ -6169,7 +6365,12 @@ function intruderField(){
       const nx=cx+DX[k], ny=cy+DY[k];
       if(nx<0||ny<0||nx>=w||ny>=h) continue;
       const ni=ny*w+nx;
-      if(d[ni]>=0 || !tileWalk(fl,nx,ny)) continue;
+      /* **淵は通らない。** 巡回者は落ちない側（canFall なし）なので、
+         道として引いておいて実際には踏めない、という食い違いが起きる。
+         第17階層（水の層）で 30本中8本が主人公へ辿り着けなくなっていた——
+         道は引けているのに、その1マスが越えられずに縁で足踏みする。
+         引く側と歩く側で、同じ物を見ておく必要がある。 */
+      if(d[ni]>=0 || !tileWalk(fl,nx,ny) || waterVoidAt(nx+0.5,ny+0.5)) continue;
       d[ni]=nd; q[qt++]=ni;
     }
   }
@@ -6534,6 +6735,7 @@ function enterFloor(depth){
   // 同じ深さの階に入り直したとき、別の間取りの経路を使い回してしまう。
   _intrKey = '';
   P.invuln = 0; S.run.ward = null;    // 無敵と守護は階層をまたがない
+  S.run.aegis = null; S.run.bloom = null;   // 鉄壁・生気も同じく持ち越さない
   P.fallAnim = null; P.fallBlink = 0; // 落下演出も同様（跨ぐと違う階で消え続ける）
   S.run.hinted = false;
 
@@ -6663,8 +6865,14 @@ function solid(x,y){
 /* 縁（穴）かどうか。solid とは分けてある——弾も視線もここは越えるので、
    「通れない」ではなく「立てない」を表す述語が要る。 */
 function pitAt(x,y){
-  const f=W.fl; if(!f || !f.pit) return false;
   if(!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  /* ---------- 水の層の淵も「穴」として扱う ----------
+     根の層の踏み外しと同じ道を通す。ここに寄せることで、
+     落ちる／落ちない を判断している場所（歩ける判定・敵の足止め・
+     落下処理・戻り先の探索）を**1つも書き足さずに**そのまま使える。
+     別扱いにすると、そのうちどれかを直し忘れる。 */
+  if(waterVoidAt(x,y)) return true;
+  const f=W.fl; if(!f || !f.pit) return false;
   const gx=Math.floor(x), gy=Math.floor(y);
   if(gx<0||gy<0||gx>=f.W||gy>=f.H) return false;
   return f.g[gy][gx]===T.PIT;
@@ -7139,7 +7347,13 @@ function onGreatBossDown(e){
 const HAZ_TICK = 0.5;            // この間隔でまとめてダメージを入れる（毎フレームは重い）
 function hazardSlowAt(x,y){
   const h=hazardAt(x,y);
-  return h ? (1 - (h.slow||0)) : 1;
+  if(!h) return 1;
+  // 水だけは深さで重さが変わる。他は定義どおりの一律。
+  if(W.haz && W.haz.kind==='water'){
+    const t=Math.min(WATER_SLOW.length-1, hazTier(x,y));
+    return 1 - (WATER_SLOW[t]||0);
+  }
+  return 1 - (h.slow||0);
 }
 /* ---------- 踏み外し（根の層） ----------
    壁の代わりに縁がある層。落ちても即死にはしない——即死にすると
@@ -7164,7 +7378,10 @@ function fallBack(e){
   W.fx.push({t:'ultring', x:p.x, y:p.y, r:0, max:2.2, life:0.35, maxLife:0.35, col:'#c0e07f'});
 }
 function tickPits(dt){
-  if(!W.fl || !W.fl.pit || !S.run || !S.hero) return;
+  /* 穴のある階（根の層）だけでなく、**淵のある水の階**でも回す。
+     ここを W.fl.pit で切っていたせいで、水の淵に立っても何も起きなかった。 */
+  const anyVoid = (W.fl && W.fl.pit) || (W.haz && W.haz.kind==='water');
+  if(!anyVoid || !S.run || !S.hero) return;
   // 主人公。落下演出の最中はその場で沈むだけ——動かさない、操作も受け付けない。
   if(P.fallAnim){
     P.fallAnim.t += dt;
@@ -7378,6 +7595,34 @@ function fireUlt(){
     S.run.ward = {t:dur, cut};
     S.run.pst = {};
     livingParty().forEach(a=>{ a.st={}; });
+    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
+
+  }else if(u.id==='aegis'){
+    /* 防御そのものを掛け算する。守護（被ダメージを削る）とは別枠なので、
+       両方は乗らない——枠が1つしかないので、そもそも同時には持てない。 */
+    const dur = 7 + lv*0.9, mul = 1.6 + lv*0.22;
+    S.run.aegis = {t:dur, mul};
+    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.4, life:0.5, maxLife:0.5, col:u.col});
+    livingParty().forEach(a=>W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:1.6,
+                                        life:0.45, maxLife:0.45, col:u.col}));
+
+  }else if(u.id==='rally'){
+    const pct = (22 + lv*5) / 100;
+    const heal = ent => {
+      const mx = (ent===S.hero) ? stats(ent).maxHp : allyStats(ent).maxHp;
+      const amt = Math.max(1, Math.round(mx*pct));
+      if(ent.hpNow >= mx) return;
+      ent.hpNow = Math.min(mx, ent.hpNow + amt);
+      pop(ent.x!==undefined?ent.x:P.x, (ent.y!==undefined?ent.y:P.y)-0.5, amt, '#7fe0c0', '+');
+    };
+    heal(S.hero); livingParty().forEach(heal);
+    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.8, life:0.5, maxLife:0.5, col:u.col});
+
+  }else if(u.id==='bloom'){
+    /* 一定時間の自動回復。号令（その場で戻す）との違いは、
+       **戦い続けているあいだ効く**こと。押す位置が変わる。 */
+    const dur = 10 + lv*1.5, pct = 2 + lv*0.5;
+    S.run.bloom = {t:dur, pct, tick:0};
     W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
 
   }else if(u.id==='ruin'){
@@ -8060,6 +8305,18 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
   const r = resolveDamage(target, [{type, amount: boltDmg ?? e.atkV}], lv);
   a.st=target.st; a.bu=target.bu;
   let dm = r.total;
+  /* ---------- 加入前は硬い ----------
+     気づいてから主人公が着くまでのあいだ、この人は1人で耐えている。
+     序盤の敵を強くしてから、**話しかける前に死ぬ**ようになった（報告）。
+
+     見つけた人に駆け寄る、という場面そのものを守りたいので、
+     加入するまでのあいだだけ受けるダメージを削る。
+     加入した瞬間に消える——連れ歩く仲間が硬いのは別の話で、
+     そこを混ぜると隊の強さの設計が狂う。
+
+     不死身にはしない。間に合わなければ死ぬ、は残す。
+     残すからこそ「助けに行くか、見捨てるか」が判断になる。 */
+  if(a.npc) dm = Math.max(1, Math.round(dm * (1 - NPC_GUARD_DR/100)));
   // 盾持ちのジョブは常時軽減（構える操作が無いぶん、控えめな固定値）
   if(st.hasShield && st.block>0){ dm=Math.max(1, Math.round(dm*(1-st.block/200))); damageAllyGear(a,'shield',1); }
   /* 当たった攻撃は必ず 1 以上通す。
@@ -8159,7 +8416,7 @@ function addXp(h, amount, isPlayer){
        第5階層に 89% で入っていた——中身は「回復した」ではなく「上がった」。
 
        死にゲーにするなら、悪い1階の記憶が次の階まで残る必要がある。
-       ただしレベルアップは этой game で一番はっきりした前進なので、
+       ただしレベルアップはこの game で一番はっきりした前進なので、
        手応えは残す。最大HPの一部を戻す形にして、
        **良いことは起きるが、失点は消えない**という重さにしてある。
 
@@ -8284,6 +8541,14 @@ function killEnemy(e, byAlly){
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
                     it:genItem(S.run.depth+cfg.ilvl, st.mf+40, S.run.depth)});
     S.run.bossAlive=false;
+    /* ---------- 段（tier）の解禁は「倒したこと」で記録する ----------
+       最初これを S.deepest（＝到達した階）で見ていたが、それは**降りないと**
+       増えない。第5階層の中ボスを倒してその場のポータルで帰ると、
+       deepest は 5 のままで段が開かなかった——**勝ったのに何も開かない。**
+       開ける条件として言っているのは「倒すと開く」なので、倒した側を数える。
+
+       口座側の記録（S.hero ではなく S）なので、死んでも消えない。 */
+    S.bossClear = Math.max(S.bossClear||0, S.run.depth);
     log(e.name+'を撃破');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.9,max:0.9});
     /* ---------- 第50階層の主を倒した褒賞 ----------
@@ -10183,6 +10448,26 @@ function update(dt){
   if(!S.hero || !S.run) return;
   P.invuln = Math.max(0, (P.invuln||0) - dt);
   if(S.run.ward){ S.run.ward.t -= dt; if(S.run.ward.t<=0) S.run.ward=null; }
+  // 大技「鉄壁」。防御を掛け算する（stats の def が見る）
+  if(S.run.aegis){ S.run.aegis.t -= dt; if(S.run.aegis.t<=0) S.run.aegis=null; }
+  /* 大技「生気」。2秒ごとに、主人公と仲間の体を戻す。
+     毎フレーム少しずつ戻す形にすると数字が読めないので、刻んで出す。 */
+  if(S.run.bloom){
+    const bl=S.run.bloom;
+    bl.t -= dt; bl.tick += dt;
+    if(bl.tick >= BLOOM_EVERY){
+      bl.tick = 0;
+      const heal = ent => {
+        const mx = (ent===S.hero) ? stats(ent).maxHp : allyStats(ent).maxHp;
+        if(ent.hpNow >= mx || ent.hpNow <= 0) return;
+        const amt = Math.max(1, Math.round(mx*bl.pct/100));
+        ent.hpNow = Math.min(mx, ent.hpNow + amt);
+        pop(ent===S.hero?P.x:ent.x, (ent===S.hero?P.y:ent.y)-0.5, amt, '#a9d86a', '+');
+      };
+      heal(S.hero); livingParty().forEach(heal);
+    }
+    if(bl.t<=0) S.run.bloom=null;
+  }
   if(!S.run.hinted && stairHint()>0){
     S.run.hinted=true;
     log('▼ 穴の気配がする');
@@ -10594,7 +10879,33 @@ function draw(){
         if(sx<-TS||sy<-TS||sx>innerWidth||sy>innerHeight) continue;
         // 脈打たせる。動いていないと「ただの色違いの床」に見えて踏んでしまう。
         if(['water','poison','spore','slick','lava'].includes(W.haz.kind)){
-          drawLivingLiquid(hz,sx,sy,x,y,t); continue;
+          drawLivingLiquid(hz,sx,sy,x,y,t);
+          /* ---------- 深さを色で言う ----------
+             減速も落下も、踏んでからでは遅い。**入る前に読めないと判断にならない。**
+             水面そのものの描き方（波・屈折・水草）は演出側の担当なので触らず、
+             上から暗さを重ねるだけにしてある。深いほど暗い、という一本の規則。
+
+             淵（3段目）だけは縁も描く。ここは減速ではなく落ちる場所で、
+             「重い水」と「底が無い水」を暗さの差だけで区別させるのは酷なため。 */
+          const tier = row[x]|0;
+          if(W.haz.kind==='water' && tier>1){
+            ctx.save();
+            ctx.fillStyle='#04121c';
+            ctx.globalAlpha = tier>=WATER_DEEP ? 0.52 : 0.26;
+            ctx.fillRect(sx, sy, TS+1, TS+1);
+            if(tier>=WATER_DEEP){
+              const q=Math.max(1,Math.round(TS/16));
+              ctx.globalAlpha=0.5; ctx.fillStyle=hz.edge;
+              // 縁が水でない側にだけ線を引く＝淵の輪郭がそのまま出る
+              const deep=(gx,gy)=>{ const r2=W.haz.g[gy]; return r2 && (r2[gx]|0)>=WATER_DEEP; };
+              if(!deep(x,y-1)) ctx.fillRect(sx,sy,TS,q);
+              if(!deep(x,y+1)) ctx.fillRect(sx,sy+TS-q,TS,q);
+              if(!deep(x-1,y)) ctx.fillRect(sx,sy,q,TS);
+              if(!deep(x+1,y)) ctx.fillRect(sx+TS-q,sy,q,TS);
+            }
+            ctx.restore();
+          }
+          continue;
         }
         const puls = 0.5 + 0.5*Math.sin(t*1.6 + (x*0.7 + y*1.1));
         ctx.fillStyle = hz.col;
@@ -12201,13 +12512,13 @@ function updateHUD(){
   else if(onStair()) prText = S.run.bossAlive ? '✕ ボスを倒すまで進めない'
                    : (returnPortalAt(S.run.depth)?'▼ 帰還ポータル':'▼ 穴を降りる');
   else if(nearNpc()) prText = (W.npc.awake && W.npc.tgt)
-      ? '◆ '+W.npc.name+'を助けて連れて行く'
+      ? '◆ '+W.npc.name+'を助ける'
       : '◆ '+W.npc.name+'に話しかける';
   else if(nearEvent()){ const d=eventDef(W.ev.id); prText = d.icon+' '+d.nm+'を調べる'; }
   else if(nearMerchant()) prText = '🎒 商人と取引する';
-  else if(nearForge()) prText = '⚒ 鍛冶場で鍛える／直す';
+  else if(nearForge()) prText = '⚒ 鍛冶場で鍛える';
   else if(nearTrial()) prText = '🗿 試練の石碑に触れる';
-  else if(nearOre()) prText = '⛏ '+oreDef(nearOre().grade).nm+'を掘る（立ち止まる）';
+  else if(nearOre()) prText = '⛏ '+oreDef(nearOre().grade).nm+'を掘る';
   hset('prompt.disp', prText!==null?'block':'none', v=>pr.style.display=v);
   if(prText!==null) hset('prompt.t', prText, v=>pr.textContent=v);
 
@@ -13466,9 +13777,32 @@ function repairHTML(it){
     <div class="af" style="color:${afford?'#d6b34a':'#5c6479'};font-weight:700">修理 ${cost} G</div>
   </div>`;
 }
+/* ---------- 黒鉄を金で買う ----------
+   後半に金の行き先が無くなる（報告）。街開発の値段を跳ねさせただけでは
+   カンストした先が空くので、**いくらでも吸う口**を1つ置く。
+
+   値段は掘るより高くしてある。ここが安いと、鉱脈を掘る意味も、
+   深く潜って良い鉱石を探す意味も消える——**金で時間を買う**のであって、
+   潜行を置き換える物ではない。だから「あと1つ足りない」を埋める使い方に
+   落ち着くくらいの値段にする。
+
+   玉鋼は売らない。レジェンド専用で、最深部の苔玉だけが落とす物なので、
+   ここに並べるとその一点物の重さが消える。 */
+const ORE_PRICE = {raw:190, fine:620, deep:1900};
+function oreShopHTML(o){
+  const price = ORE_PRICE[o.id];
+  if(!price) return '';
+  const afford = S.gold >= price;
+  return `<div class="item" data-orebuy="${o.id}" style="border-left-color:${o.col};opacity:${afford?1:0.55}">
+    <div class="nm" style="color:${afford?o.col:'#5c6479'}">${o.icon} ${o.nm}
+      <span style="font-size:12px;color:var(--dim)">所持 ${oreHave(o.id)}</span></div>
+    <div class="af" style="color:${afford?'#e6e9f0':'#5c6479'}">${price} G　<span style="color:#7b8398">1つ買う</span></div>
+  </div>`;
+}
 function renderShop(){
   if(!S.shop.length) rerollShop();
   goldLabel('shop-gold');
+  el('oreshop').innerHTML = ORES.filter(o=>ORE_PRICE[o.id]).map(oreShopHTML).join('');
   el('shop').innerHTML = S.shop.length? S.shop.map(shopHTML).join('') : '<div class="empty">売り切れ</div>';
   el('btn-reroll').textContent = `品揃えを入れ替える（${Math.max(20, Math.round(S.deepest*6))} G）`;
 
@@ -13701,7 +14035,7 @@ function townTap(e){
   if(!isMenu(S.screen)) return;
   if(!e.target || !e.target.closest) return;
   // 何にも当たっていないタップでは _lastTap を消費しない
-  if(!e.target.closest('[data-back],[data-depth],[data-upg],[data-bld],[data-buy],[data-fix],.item')) return;
+  if(!e.target.closest('[data-back],[data-depth],[data-upg],[data-bld],[data-buy],[data-orebuy],[data-fix],.item')) return;
   if(!tapAccepted(e)) return;
   if(e.type==='touchend' && e.cancelable) e.preventDefault();
 
@@ -13791,6 +14125,16 @@ function townTap(e){
     if(S.gold<cost) return;
     S.gold-=cost; S.bld[b.id]=lv+1;
     if(b.id==='market') rerollShop();     // 品揃えの枠が増えるので引き直す
+    redraw(); return;
+  }
+
+  // 鉱石を買う → 口座（S.ore）へ直接入る。倉庫の枠は食わない
+  const ob=e.target.closest('[data-orebuy]');
+  if(ob){
+    const id=ob.dataset.orebuy, price=ORE_PRICE[id];
+    if(!price || S.gold<price) return;
+    S.gold-=price;
+    S.ore=S.ore||{}; S.ore[id]=(S.ore[id]||0)+1;
     redraw(); return;
   }
 
@@ -15032,7 +15376,7 @@ bindTap(el('btn-fixall'), ()=>{
 bindTap(el('btn-reset'), ()=>{
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
-  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
@@ -15312,11 +15656,41 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 
    game-feel.js は index.html の後に読み込まれるので、包むのはここでしかできない。
    （本体の <script> の中で書くと、まだ tapDash が存在しない。） */
+/* ---------- 段ごとの伸び ----------
+   踏んだあとの3つの値を、覚えた段で書き換える。
+     距離     … 抜けられる間合いが広がる
+     待ち     … 続けて踏めるようになる
+     回避受付 … 出際に消せる猶予。ここが一番「上手くなった」に効く
+
+   演出側の tapDash は「1段ぶんの値」で書いてあるので、
+   **踏ませてから上書きする**。向こうのファイルに段の概念を持ち込まない。
+   距離だけは踏んだ結果（P.dash.x1/y1）を伸ばす必要があるので、
+   壁と穴の判定を本体の standable でやり直している。 */
+const DASH_CD    = [.80, .72, .64, .56, .46];   // 待ち（秒）
+const DASH_DIST  = [2.4, 2.8, 3.2, 3.6, 4.2];   // 抜ける距離（マス）
+const DASH_JUST  = [.12, .14, .16, .18, .21];   // ジャスト回避の受付（秒）
+function dashLv(){ return Math.min(5, upgLv('dash')); }
 if(typeof tapDash === 'function'){
   const _tapDashBase = tapDash;
   tapDash = function(){
-    if(!upgLv('dash')) return false;
-    return _tapDashBase.apply(this, arguments);
+    const lv = dashLv();
+    if(!lv) return false;
+    if(!_tapDashBase.apply(this, arguments)) return false;
+    const i = lv - 1;
+    FEEL.dashCd = DASH_CD[i];
+    FEEL.just   = DASH_JUST[i];
+    if(P.dash && lv > 1){
+      const dx = P.dirx, dy = P.diry, r = P.r || .32;
+      let gx = P.dash.x1, gy = P.dash.y1;
+      for(let d = .08; d <= DASH_DIST[i]; d += .08){
+        const x = P.dash.x0 + dx*d, y = P.dash.y0 + dy*d;
+        // 体の四隅を見る。中心だけだと、幅のある体が壁にめり込む。
+        if(![[-r,-r],[r,-r],[-r,r],[r,r],[0,0]].every(([ox,oy])=>standable(x+ox, y+oy))) break;
+        gx = x; gy = y;
+      }
+      P.dash.x1 = gx; P.dash.y1 = gy;
+    }
+    return true;
   };
 }
 </script>
