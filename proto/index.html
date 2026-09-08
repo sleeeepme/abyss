@@ -10484,7 +10484,8 @@ function draw(){
   W.enemies.forEach(e=>{
     if(e.dead && e.pixelBurst) return;
     // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
-    const sx=e.x*TS-camX, sy=e.y*TS-camY-hopLift(e);
+    const motion=feelEntityOffset(e);
+    const sx=e.x*TS-camX+motion.x, sy=e.y*TS-camY-hopLift(e)+motion.y;
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;

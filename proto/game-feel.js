@@ -1,26 +1,29 @@
 /* Presentation and timing feedback. Combat formulas, AI and rewards stay in index.html. */
 const updateSimulation=update, resolveEnemyDeath=killEnemy, drawShotBase=drawShot;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
-  normalMoveSpeed:3,bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
+  normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
+  bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
   motion:new WeakMap(),motes:[],ripples:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
 const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
 // Deterministic decoration noise is independent of combat / loot RNG.
 function feelHash(x,y,s=0){let n=Math.imul(x+17,374761393)^Math.imul(y+31,668265263)^Math.imul((S.run?.depth||1)+s,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;}
 function feelDecorAt(x,y,Z){return feelHash(x,y)<(Z.id==='root'?.30:Z.id==='stone'?.23:.16);}
-function feelMotion(e){let m=FEEL.motion.get(e);if(!m){m={speed:0,phase:0,flash:0,crit:0,step:0};FEEL.motion.set(e,m);}return m;}
+function feelMotion(e){let m=FEEL.motion.get(e);if(!m){m={speed:0,phase:0,flash:0,crit:0,step:0,recoil:0,recoilX:0,recoilY:0};FEEL.motion.set(e,m);}return m;}
 function feelEntityOffset(e){
   if(FEEL_REDUCED.matches)return {x:0,y:0};
   const m=feelMotion(e),s=clamp(m.speed/FEEL_TUNING.normalMoveSpeed,0,1);
-  return {x:Math.sin(m.phase)*s*.65,y:-Math.abs(Math.sin(m.phase))*s*1.8};
+  const recoil=(m.recoil/FEEL_TUNING.recoilSeconds)**2*TS;
+  return {x:Math.sin(m.phase)*s*.65+m.recoilX*recoil,
+    y:-Math.abs(Math.sin(m.phase))*s*1.8+m.recoilY*recoil};
 }
 function feelBlink(e){const m=feelMotion(e);return m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;}
 function feelImpact(e,src,crit){
   const m=feelMotion(e);m.flash=.22;m.crit=crit?.25:0;
-  // Small real displacement, radius-tested, with no accidental shove into a pit.
+  // Replace the visual recoil on each hit; never accumulate or change simulation coordinates.
   const dx=src?e.x-src.x:-(e.dirx||1),dy=src?e.y-src.y:-(e.diry||0),n=Math.hypot(dx,dy)||1;
-  const probe={x:e.x,y:e.y,r:e.cr||e.r||.32,canFall:false};
-  moveEnt(probe,dx/n*(e.boss?.035:.09),dy/n*(e.boss?.035:.09));e.x=probe.x;e.y=probe.y;
+  const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
+  m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
   if(crit)feelKick(FEEL_TUNING.criticalShake,.19);
 }
@@ -221,6 +224,10 @@ function popPlayerDamage(damage,col,dot=false){
 function updateFeel(dt){
   syncFeel(); FEEL.time+=dt; FEEL.kick=Math.max(0,FEEL.kick-dt);
   FEEL.dashCd=Math.max(0,FEEL.dashCd-dt);
+  for(const e of new Set([P,...livingParty(),...(W.npc?[W.npc]:[]),...W.enemies])){
+    const m=FEEL.motion.get(e);
+    if(m)m.recoil=Math.max(0,m.recoil-dt);
+  }
   FEEL.step=feelMotion(P).phase;
   let dx=P.moving?P.mvx:(P.dirx||1), dy=P.moving?P.mvy:(P.diry||0);
   if(P.dash){const n=Math.hypot(P.dash.x1-P.dash.x0,P.dash.y1-P.dash.y0)||1;dx=(P.dash.x1-P.dash.x0)/n;dy=(P.dash.y1-P.dash.y0)/n;}

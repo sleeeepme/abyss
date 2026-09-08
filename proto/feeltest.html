@@ -118,10 +118,28 @@ frame.onload=async()=>{
       P.guard=true;P.guardStart=nowSec();const hp=S.hero.hpNow;hitPlayer(null,10,'blunt',1);
       const ok=hp===S.hero.hpNow&&FEEL.slow>0&&W.pops.some(p=>p.txt==='PARRY');P.guard=false;return ok;
     });
-    check('Critical hit flashes enemy, recoils safely and shakes harder',()=>{
+    check('Critical hit flashes enemy and shakes harder without moving its position',()=>{
       fresh();enterFloor(1);syncFeel();const e=W.enemies.find(e=>!e.boss&&!e.undying);e.hp=e.maxHp=1e6;e.aff=[];
-      P.x=e.x-.5;P.y=e.y;hitEnemy(e,stats(S.hero),1,{forceCrit:true});
-      return feelMotion(e).crit>0&&FEEL.strength>=FEEL_TUNING.criticalShake&&standable(e.x,e.y);
+      P.x=e.x-.5;P.y=e.y;const x=e.x,y=e.y;hitEnemy(e,stats(S.hero),1,{forceCrit:true});
+      return feelMotion(e).crit>0&&FEEL.strength>=FEEL_TUNING.criticalShake&&e.x===x&&e.y===y&&feelMotion(e).recoil>0;
+    });
+    check('Repeated impacts only offset rendering and settle after 0.2 seconds',()=>{
+      fresh();enterFloor(1);syncFeel();
+      const e=W.enemies.find(e=>!e.boss&&!e.undying);
+      const a=makeAlly(1,S.hero,'warrior');a.x=P.x+1;a.y=P.y;S.hero.party=[a];
+      for(const actor of [P,a,e]){
+        const x=actor.x,y=actor.y,src={x:x-1,y};
+        for(let i=0;i<20;i++)feelImpact(actor,src,false);
+        if(actor.x!==x||actor.y!==y)return false;
+        const start=feelEntityOffset(actor).x;
+        if(!FEEL_REDUCED.matches&&Math.abs(start-.09*TS)>.001)return false;
+        updateFeel(.1);const halfway=feelEntityOffset(actor).x;
+        updateFeel(.1);
+        if(feelEntityOffset(actor).x!==0||feelEntityOffset(actor).y!==0)return false;
+        if(!FEEL_REDUCED.matches&&!(halfway>0&&halfway<start))return false;
+      }
+      e.boss=true;feelImpact(e,{x:e.x-1,y:e.y},false);
+      return FEEL_REDUCED.matches||Math.abs(feelEntityOffset(e).x-.035*TS)<.001;
     });
     check('Actual slow movement produces less bob; walking emits dust',()=>{
       const r=fresh();P.x=r.x+2.5;P.y=r.y+2.5;stickDx=.3;
