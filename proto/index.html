@@ -378,7 +378,7 @@
   /* ---------- 街（ハブ） ----------
      背景はループアニメ（docs/HUB_BACKGROUND_HANDOFF.md）を敷き、
      UIはその上に重ねる絶対配置の別レイヤー。背景側は pointer-events を持たない。
-     #hub-bgwrap の中で #hubbg を「整数倍率・中央寄せのcontain」でJSが配置する。 */
+     #hub-bgwrap の中で #hubbg を「整数倍率・中央寄せのcover（画面いっぱい）」でJSが配置する。 */
   #hub-bgwrap{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;
     background:#0b0d12;z-index:0}
   #hubbg{position:absolute;image-rendering:pixelated;width:171px;height:300px}
@@ -395,36 +395,54 @@
   .hub-id .res b{color:#d6b34a;font-weight:700}
   .hub-id .res i{font-style:normal;color:#8fd8ff;font-weight:700}
   .hub-id .grave{margin-top:3px;font-size:12px;color:#7fe0c0;font-weight:700}
-  .hub-corner{position:relative;width:auto;flex:0 0 auto;display:flex;flex-direction:column;
-    align-items:center;gap:2px;padding:9px 15px;background:rgba(22,26,35,.82);
+  /* ガチャ／酒場／店（hub-corner）と慰霊碑〜鍛冶屋（hub-mini）は
+     同じ大きさの正方形ボタンに揃える。役割が違っても押しやすさは同じにしたい。 */
+  .hub-corner,.hub-mini{position:relative;flex:0 0 auto;width:64px;height:64px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:4px;background:rgba(22,26,35,.82);
     border:1px solid var(--line);border-radius:12px}
-  .hub-corner i{font-style:normal;font-size:22px;line-height:1}
-  .hub-corner b{font-size:12px;font-weight:700}
+  .hub-corner i,.hub-mini i{font-style:normal;font-size:20px;line-height:1}
+  .hub-corner b,.hub-mini b{font-size:10.5px;font-weight:700;line-height:1.2;text-align:center}
   .hub-plaza{position:relative;flex:1;min-height:0}
   .hub-dive{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
     display:flex;flex-direction:column;align-items:center;gap:4px;z-index:2;
     width:auto;background:none;border:none;padding:0;
     text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.8)}
-  .hub-dive .tri{width:0;height:0;
-    border-left:15px solid transparent;border-right:15px solid transparent;
-    border-bottom:26px solid #d0453a;
+  /* 三角形の代わりに、覗き込む穴を象ったピン型マーカー。
+     縁は琥珀、中心の穴は暗く落として「潜る先」を暗示する。 */
+  .hub-dive .tri{width:34px;height:42px;
     filter:drop-shadow(0 0 8px rgba(208,69,58,.65))}
   .hub-dive b{font-size:15px;font-weight:700;color:#fff}
   .hub-ava{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:2px;width:auto;background:none;border:none;padding:0}
   .hub-ava .glyph{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:19px;background:rgba(18,20,28,.8);border:2px solid var(--line)}
+  /* 実キャラアート版。円い台座（職業色の縁）の上に、台座より一回り大きい
+     キャラ絵を重ねて立たせる。台座からはみ出すぶんが「浮いて見える」ので、
+     はみ出す量はキャラ絵とほぼ同じにして違和感を抑えている。 */
+  .hub-ava-pad{position:relative;width:38px;height:38px;border-radius:50%;
+    background:rgba(18,20,28,.8);border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;overflow:visible}
+  .hub-ava-wrap{display:block;animation:hubWander 3.2s ease-in-out infinite}
+  .hub-ava-art{display:block;width:50px;height:50px;image-rendering:pixelated;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.6));
+    animation:hubHop 1.7s ease-in-out infinite}
+  @keyframes hubWander{
+    0%{transform:translateX(-3px) scaleX(-1)}
+    48%{transform:translateX(0) scaleX(-1)}
+    52%{transform:translateX(0) scaleX(1)}
+    100%{transform:translateX(3px) scaleX(1)}
+  }
+  @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-5px)}}
+  @media (prefers-reduced-motion: reduce){
+    .hub-ava-wrap,.hub-ava-art{animation:none}
+  }
   .hub-ava .nm{font-size:11px;font-weight:700;white-space:nowrap;max-width:72px;
     overflow:hidden;text-overflow:ellipsis;
     text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.75)}
   .hub-bottom{display:flex;flex-direction:column;gap:8px}
   .hub-row2{display:flex;justify-content:space-between;gap:10px}
-  .hub-row5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-  .hub-mini{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;
-    gap:2px;padding:8px 4px;background:rgba(22,26,35,.82);border:1px solid var(--line);
-    border-radius:10px}
-  .hub-mini i{font-style:normal;font-size:18px;line-height:1}
-  .hub-mini b{font-size:11px;font-weight:700;line-height:1.25;text-align:center}
+  .hub-row5{display:flex;justify-content:space-between;gap:6px}
   /* 数の通知はバッジ1つだけに絞る。0件なら出さない（常設のUIに見せない） */
   .hub-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;border-radius:9px;
     background:#c4433f;color:#fff;font-size:11px;font-weight:700;font-style:normal;line-height:17px;
@@ -496,7 +514,15 @@
     </div>
 
     <div class="hub-plaza">
-      <button class="hub-dive" id="btn-dive"><i class="tri"></i><b>アビスへ潜る</b></button>
+      <button class="hub-dive" id="btn-dive">
+        <svg class="tri" viewBox="0 0 32 40" aria-hidden="true">
+          <path d="M16 1.5C7.9 1.5 1.5 7.9 1.5 15.8c0 10.6 12.2 21.6 13.8 23 .4.35.95.35 1.4 0 1.6-1.4 13.8-12.4 13.8-23C30.5 7.9 24.1 1.5 16 1.5z"
+                fill="#d0453a" stroke="#7a221c" stroke-width="1.3"/>
+          <circle cx="16" cy="15.8" r="6.6" fill="#170c0c"/>
+          <circle cx="16" cy="15.8" r="6.6" fill="none" stroke="#f2b26b" stroke-width="1.3" opacity=".85"/>
+        </svg>
+        <b>アビスへ潜る</b>
+      </button>
       <div id="hub-avatars"></div>
     </div>
 
@@ -10799,14 +10825,15 @@ function hubReducedMotion(){
   try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
 }
 let _hubBgRaf=null, _hubBgT0=0;
-/* 「整数倍率を優先し、画面比率が違う場合は中央寄せのcontain表示を基準とする」
-   （承認された構図を切らないため、coverでの切り取りはしない）。 */
+/* 比率を保ったまま画面いっぱいに敷く（cover）。整数倍率を保つため
+   ceil を使う——floor だと縦横どちらかで敷ききれず、帯が残ってしまう。
+   はみ出す分は #hub-bgwrap の overflow:hidden で切り取り、中央寄せにする。 */
 function layoutHubBg(){
   const c=el('hubbg'); if(!c) return;
   const wrap=c.parentElement;
   const cw=wrap.clientWidth||1, ch=wrap.clientHeight||1;
   c.width=HUB_BG.fw; c.height=HUB_BG.fh;
-  const scale=Math.max(1, Math.floor(Math.min(cw/HUB_BG.fw, ch/HUB_BG.fh)));
+  const scale=Math.max(1, Math.ceil(Math.max(cw/HUB_BG.fw, ch/HUB_BG.fh)));
   const dw=HUB_BG.fw*scale, dh=HUB_BG.fh*scale;
   c.style.width=dw+'px'; c.style.height=dh+'px';
   c.style.left=Math.round((cw-dw)/2)+'px';
@@ -13571,6 +13598,13 @@ function hubPlazaPoints(n){
   }
   return pts;
 }
+/* キャラごとにアニメの位相をずらす軽いハッシュ。
+   毎回ランダムにすると renderHubPlaza() が呼ばれるたび（状態が変わるたび）に
+   動きが飛んで見えるので、個体のID/名前から**毎回同じ位相**を作る。 */
+function hubAnimSeed(key){
+  let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))|0;
+  return Math.abs(h);
+}
 function renderHubPlaza(){
   const box=el('hub-avatars'); if(!box || !S.hero) return;
   const members=[S.hero, ...livingParty()];
@@ -13578,12 +13612,26 @@ function renderHubPlaza(){
   box.innerHTML=members.map((m,i)=>{
     const isHero=(m===S.hero);
     const col=isHero ? '#e8c95a' : jobDef(m.job).col;
-    const glyph=isHero ? '🧍' : hubGlyph(m.job);
     const nm=isHero ? m.name : allyFullName(m);
     const p=pts[i];
+    const seedKey=isHero?'hero':String(m.uidA);
+    const seed=hubAnimSeed(seedKey);
+    const wd=-(seed%320)/100, hd=-((seed>>3)%170)/100;   // 負のdelayでループ位相をその場でずらす
+    /* 実キャラアートがあれば置き換える。無ければ（未制作ジョブ等）従来の色付き絵文字へ戻す。
+       CharacterArt は index.html 冒頭で base64 済みの Image を持っているので、
+       .image() が返す Image の .src をそのまま <img> に流用する（読み込み直しなし）。 */
+    const artKey = isHero ? CharacterArt.heroKey(m) : CharacterArt.allyKey(m);
+    const im = CharacterArt.image(artKey);
+    const body = im
+      ? `<span class="hub-ava-pad" style="border-color:${col}">
+           <span class="hub-ava-wrap" style="animation-delay:${wd}s">
+             <img class="hub-ava-art" src="${im.src}" style="animation-delay:${hd}s" alt="">
+           </span>
+         </span>`
+      : `<span class="glyph" style="border-color:${col};color:${col}">${isHero?'🧍':hubGlyph(m.job)}</span>`;
     return `<button class="hub-ava" data-hubava="${isHero?'hero':m.uidA}"
       style="left:${p.x}%;top:${p.y}%">
-      <span class="glyph" style="border-color:${col};color:${col}">${glyph}</span>
+      ${body}
       <span class="nm">${nm}</span></button>`;
   }).join('');
 }
