@@ -29,14 +29,34 @@ R.water = await pg.evaluate(()=>{
   };
   const sump=cover(13), ruin=cover(35);
   const w=hazardDef('water');
-  return {sump, ruin, slow:w.slow, dps:w.dps,
+  /* 深さの3段が、どの階でも揃っていること。
+     水面を歩ける床の3割まで広げ、縁からの距離で 浅瀬/深み/淵 を彫ってある。 */
+  const tiers=(d)=>{
+    RNG=mulberry32(d*104729); const fl=genFloor(d);
+    const hz=spawnHazards(fl,d); const c={1:0,2:0,3:0};
+    if(hz) for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){
+      const v=hz.g[y][x]|0; if(v) c[v]++;
+    }
+    return c;
+  };
+  const t13=tiers(13);
+  return {sump, ruin, slow:w.slow, dps:w.dps, t13,
           isWater: sump.kind==='water',
           wide: sump.pct > ruin.pct*1.2,
           slowsYou: w.slow>0.2,
-          hurtsEverySecond: w.dps>0,
+          /* ---------- 水は踏んでいるだけでは削らない ----------
+             以前はここで「毎秒削ること」を固定していた。dps 4 を持たせていたので。
+
+             水面を歩ける床の3割まで広げ、深さで足を止めるようにしたので、
+             そこに継続ダメージまで乗せると**避けようのない目減り**が
+             階の3割で常に走る。危険は「遅くなること（囲まれる）」と
+             「淵に落ちること」で足りている。 */
+          noChipDamage: w.dps===0,
+          hasAllThreeTiers: t13[1]>0 && t13[2]>0 && t13[3]>0,
           // 通れなくはしない（半分を超えると、避ける判断そのものが消える）
           notFlooded: sump.pct < 50,
-          ok: sump.kind==='water' && sump.pct>ruin.pct*1.2 && w.slow>0.2 && w.dps>0};
+          ok: sump.kind==='water' && sump.pct>ruin.pct*1.2 && w.slow>0.2
+              && w.dps===0 && t13[1]>0 && t13[2]>0 && t13[3]>0 && sump.pct<50};
 });
 
 /* 1-b. 水の中でだけ速くなる敵。**水の外では 1 に戻る**——

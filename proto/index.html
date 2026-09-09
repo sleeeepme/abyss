@@ -2676,8 +2676,14 @@ const HAZARDS={
   /* 水。**痛みは軽く、足の重さで効かせる。**
      この層は水面が広いので、溶岩と同じ削り方をすると通り抜けるだけで死ぬ。
      遅くなること自体が危険（囲まれる）なので、dps は控えめでいい。 */
-  water: {nm:'水',     col:'#2f5f7f', edge:'#7fd0e0', dt:'frost',  dps:4,  st:null,
-          slow:0.35, glow:false, desc:'足を取られ、冷える'},
+  /* 水。**踏んでいるだけでは削らない。**
+     以前は dps 4 を持たせていたが、水面を歩ける床の3割まで広げ、
+     深さで足を止めるようにしたので、そこに継続ダメージまで乗せると
+     「渡るだけで削られる床」が階の3割を占めることになる。
+     危険は**遅くなること**（囲まれる）と**淵に落ちること**で足りている。
+     dps を残すと、避けようのない目減りが常に走って判断が消える。 */
+  water: {nm:'水',     col:'#2f5f7f', edge:'#7fd0e0', dt:'frost',  dps:0,  st:null,
+          slow:0.35, glow:false, desc:'足を取られる。深みは底が無い'},
   void_: {nm:'虚',     col:'#2a2340', edge:'#a07fe0', dt:'arcane', dps:14, st:'stagger',
           slow:0.25, glow:true,  desc:'引きずり込まれる'},
 };
@@ -8161,6 +8167,28 @@ function tickRelics(dt){
   });
 }
 const RELIC_WISP_CD=1.9, RELIC_WISP_RANGE=5.0, RELIC_WISP_MULT=0.5;
+/* ---------- 水面の屈折に渡す1枚 ----------
+   本体キャンバスの、いま描き終わっている内容（＝水の下にある床と装飾）を
+   丸ごと控える。演出側（drawLivingLiquid）はこれを読む。
+   1フレームに1回。以前は水1マスごとに読み戻していた。 */
+const feelWaterFrame = document.createElement('canvas');
+let feelWaterFrameOk = false;
+function snapWaterFrame(){
+  feelWaterFrameOk = false;
+  if(typeof FEEL_REDUCED === 'object' && FEEL_REDUCED.matches) return;
+  const w = cv.width, h = cv.height;
+  if(w<1 || h<1) return;
+  if(feelWaterFrame.width!==w || feelWaterFrame.height!==h){
+    feelWaterFrame.width = w; feelWaterFrame.height = h;
+  }
+  const a = feelWaterFrame.getContext('2d');
+  a.setTransform(1,0,0,1,0,0);
+  a.clearRect(0,0,w,h);
+  a.drawImage(cv, 0, 0);
+  feelWaterFrameOk = true;
+}
+/* 水面を「生きた」描き方にする半径（マス）。外側は色で置く。 */
+const LIQUID_LIVE_R = 6;
 const UPG_REGEN_EVERY = 10;   // 治癒の間隔（秒）
 const UPG_REGEN_PCT   = 3;    // 1段あたり、最大HPの何％戻すか
 const BLINK_SEC = 0.28;      // 瞬歩が走り抜けるのにかける秒数
@@ -10869,6 +10897,22 @@ function draw(){
   if(W.haz){
     const hz=hazardDef(W.haz.kind);
     const t=performance.now()/1000;
+    /* 水面の屈折のために、**この時点の画面を1枚だけ控える。**
+       演出側は1マスごとに本体キャンバスから読み戻していた。
+       水を歩ける床の3割まで広げたので、1フレームに 66 回読み戻すことになり、
+       第13階層で 34.6fps まで落ちていた（報告）。
+
+       実測での内訳:
+         そのまま                draw 18.7ms
+         屈折を丸ごと切る          draw  5.7ms
+         読み戻しだけ切る（帯は残す） draw  6.4ms
+       つまり**帯の描画は 0.6ms、読み戻しが 12.3ms。** 本体キャンバスからの
+       読み戻しは1回ごとに描画の同期を強いるので、回数がそのまま効く。
+
+       ここで1枚控えておけば、演出側はそこから読める＝読み戻しは1回で済む。
+       控えるのは水を描く直前なので、中身は床と装飾——
+       つまり「水の下にある物」で、屈折させたいものと一致する。 */
+    if(W.haz.kind==='water') snapWaterFrame();
     // 描くのは画面に映っている範囲だけ（地形本体のループと同じ x0..x1/y0..y1）。
     // 階層全体（最大96×96）を毎フレーム舐めていたのを、可視範囲に絞る。
     for(let y=y0;y<=y1;y++){
@@ -10879,6 +10923,29 @@ function draw(){
         if(sx<-TS||sy<-TS||sx>innerWidth||sy>innerHeight) continue;
         // 脈打たせる。動いていないと「ただの色違いの床」に見えて踏んでしまう。
         if(['water','poison','spore','slick','lava'].includes(W.haz.kind)){
+          /* ---------- 手の届く範囲だけ、生きた水面にする ----------
+             水面1マスの描画は、屈折の帯を16本重ねる。水を歩ける床の3割まで
+             広げたので、画面に 68 マス出ることがあり、1フレームで 1,000 回以上の
+             半透明の重ね塗りになる。JSの時間ではなく**塗り**で落ちる
+             （実測: draw 12ms に対して rAF の空きが 17ms）。
+
+             遠くの水は、明かりが届かず既に暗い。そこで波や屈折を読める人はいない。
+             近くだけ本気で描いて、遠くは色で置く。境目が出ないよう、
+             明かりの届く距離（zone.lightR）に合わせてある。 */
+          const near = W.haz.kind!=='water'
+                    || Math.hypot(x+0.5-P.x, y+0.5-P.y) <= LIQUID_LIVE_R;
+          if(!near){
+            const lit2=clamp(1.3-Math.hypot(x+0.5-P.x,y+0.5-P.y)/W.fl.zone.lightR,.30,1);
+            ctx.save();
+            ctx.fillStyle=shade(hz.col, lit2*0.8); ctx.globalAlpha=.85;
+            ctx.fillRect(sx,sy,TS+1,TS+1);
+            const tier2=row[x]|0;
+            if(tier2>1){ ctx.fillStyle='#04121c';
+              ctx.globalAlpha = tier2>=WATER_DEEP ? 0.62 : 0.30;
+              ctx.fillRect(sx,sy,TS+1,TS+1); }
+            ctx.restore();
+            continue;
+          }
           drawLivingLiquid(hz,sx,sy,x,y,t);
           /* ---------- 深さを色で言う ----------
              減速も落下も、踏んでからでは遅い。**入る前に読めないと判断にならない。**
@@ -10887,22 +10954,20 @@ function draw(){
 
              淵（3段目）だけは縁も描く。ここは減速ではなく落ちる場所で、
              「重い水」と「底が無い水」を暗さの差だけで区別させるのは酷なため。 */
+          /* ---------- 深さを色で言う ----------
+             減速も落下も、踏んでからでは遅い。**入る前に読めないと判断にならない。**
+             水面そのものの描き方（波・屈折・水草）は演出側の担当なので触らず、
+             上から暗さを重ねるだけにしてある。深いほど暗い、という一本の規則。
+
+             **輪郭線は引かない。** 淵にだけ枠を描いていたが、
+             壁や部屋の縁と同じ見え方になって「囲まれた別の床」に読めていた（報告）。
+             線で囲うより、暗さの差を開けたほうが「同じ水の、深い所」として伝わる。 */
           const tier = row[x]|0;
           if(W.haz.kind==='water' && tier>1){
             ctx.save();
             ctx.fillStyle='#04121c';
-            ctx.globalAlpha = tier>=WATER_DEEP ? 0.52 : 0.26;
+            ctx.globalAlpha = tier>=WATER_DEEP ? 0.62 : 0.30;
             ctx.fillRect(sx, sy, TS+1, TS+1);
-            if(tier>=WATER_DEEP){
-              const q=Math.max(1,Math.round(TS/16));
-              ctx.globalAlpha=0.5; ctx.fillStyle=hz.edge;
-              // 縁が水でない側にだけ線を引く＝淵の輪郭がそのまま出る
-              const deep=(gx,gy)=>{ const r2=W.haz.g[gy]; return r2 && (r2[gx]|0)>=WATER_DEEP; };
-              if(!deep(x,y-1)) ctx.fillRect(sx,sy,TS,q);
-              if(!deep(x,y+1)) ctx.fillRect(sx,sy+TS-q,TS,q);
-              if(!deep(x-1,y)) ctx.fillRect(sx,sy,q,TS);
-              if(!deep(x+1,y)) ctx.fillRect(sx+TS-q,sy,q,TS);
-            }
             ctx.restore();
           }
           continue;

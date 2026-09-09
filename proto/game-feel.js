@@ -426,12 +426,18 @@ function drawLivingLiquid(hz,sx,sy,gx,gy,time){
   if(!FEEL_REDUCED.matches){
     // Refract the already drawn submerged detail in 2-pixel strips. Characters / HUD
     // are drawn later, so only the liquid surface and its submerged objects distort.
+    /* 読み戻し元は、本体が1フレームに1枚だけ控えている画面（feelWaterFrame）。
+       ここで本体キャンバス（cv）から直接読むと、**水1マスごとに描画の同期**が
+       起きる。水面を広げたあと、第13階層で 1フレーム 66 回になり
+       draw が 18.7ms（34.6fps）まで伸びていた。帯の描画そのものは 0.6ms で、
+       残りは全部この読み戻しだった。控えが無いときは今までどおり cv から読む。 */
+    const src=(typeof feelWaterFrame!=='undefined' && feelWaterFrameOk) ? feelWaterFrame : cv;
     const tr=ctx.getTransform();feelWaterCtx.clearRect(0,0,32,32);
-    feelWaterCtx.drawImage(cv,sx*tr.a+tr.e,sy*tr.d+tr.f,TS*tr.a,TS*tr.d,0,0,32,32);
+    feelWaterCtx.drawImage(src,sx*tr.a+tr.e,sy*tr.d+tr.f,TS*tr.a,TS*tr.d,0,0,32,32);
     ctx.globalAlpha=.65;ctx.imageSmoothingEnabled=false;
-    for(let row=0;row<32;row+=2){
+    for(let row=0;row<32;row+=4){
       const shift=Math.round(Math.sin((gy*32+row)*.16+phase*1.6+gx*.3))*q;
-      ctx.drawImage(feelWaterSample,0,row,32,2,sx+shift,sy+row*TS/32,TS,TS/16);
+      ctx.drawImage(feelWaterSample,0,row,32,4,sx+shift,sy+row*TS/32,TS,TS/8);
     }
   }
   ctx.restore();
