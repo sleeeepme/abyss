@@ -404,38 +404,33 @@
   .hub-corner i,.hub-mini i{font-style:normal;font-size:20px;line-height:1}
   .hub-corner b,.hub-mini b{font-size:10.5px;font-weight:700;line-height:1.2;text-align:center}
   .hub-plaza{position:relative;flex:1;min-height:0}
-  .hub-dive{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
-    display:flex;flex-direction:column;align-items:center;gap:4px;z-index:2;
+  /* 「アビスへ潜る」は階段を上りきった先の門のあたりに置く（階段の途中ではなく上端）。 */
+  .hub-dive{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2;
     width:auto;background:none;border:none;padding:0;
     text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.8)}
-  /* 三角形の代わりに、覗き込む穴を象ったピン型マーカー。
-     縁は琥珀、中心の穴は暗く落として「潜る先」を暗示する。 */
-  .hub-dive .tri{width:34px;height:42px;
-    filter:drop-shadow(0 0 8px rgba(208,69,58,.65))}
+  /* 白い▼。押せることが伝わるよう、常にゆっくり上下に揺らしておく
+     （静止画だと石段に埋もれて気付かれにくいため）。 */
+  .hub-dive .tri{font-size:22px;line-height:1;color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.85);
+    animation:hubDiveBob 1.6s ease-in-out infinite}
   .hub-dive b{font-size:15px;font-weight:700;color:#fff}
+  @keyframes hubDiveBob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
   .hub-ava{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
-    align-items:center;gap:2px;width:auto;background:none;border:none;padding:0}
+    align-items:center;gap:2px;width:auto;background:none;border:none;padding:0;
+    transition:left 2s ease-in-out,top 2s ease-in-out}
   .hub-ava .glyph{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:19px;background:rgba(18,20,28,.8);border:2px solid var(--line)}
-  /* 実キャラアート版。円い台座（職業色の縁）の上に、台座より一回り大きい
-     キャラ絵を重ねて立たせる。台座からはみ出すぶんが「浮いて見える」ので、
-     はみ出す量はキャラ絵とほぼ同じにして違和感を抑えている。 */
-  .hub-ava-pad{position:relative;width:38px;height:38px;border-radius:50%;
-    background:rgba(18,20,28,.8);border:2px solid var(--line);
-    display:flex;align-items:center;justify-content:center;overflow:visible}
-  .hub-ava-wrap{display:block;animation:hubWander 3.2s ease-in-out infinite}
+  /* 実キャラアート版。台座は置かず、キャラ絵だけを広場に立たせる。
+     影は付けない（見下ろし視点の背景に、絵ごとの落射影が乗ると足元が濁るため）。
+     向き（scaleX）と歩行中の弾みはJS側（hubWander）が実移動に合わせて操作する。 */
+  .hub-ava-wrap{display:block;transition:transform .2s ease}
   .hub-ava-art{display:block;width:50px;height:50px;image-rendering:pixelated;
-    filter:drop-shadow(0 2px 2px rgba(0,0,0,.6));
     animation:hubHop 1.7s ease-in-out infinite}
-  @keyframes hubWander{
-    0%{transform:translateX(-3px) scaleX(-1)}
-    48%{transform:translateX(0) scaleX(-1)}
-    52%{transform:translateX(0) scaleX(1)}
-    100%{transform:translateX(3px) scaleX(1)}
-  }
   @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-5px)}}
   @media (prefers-reduced-motion: reduce){
-    .hub-ava-wrap,.hub-ava-art{animation:none}
+    .hub-ava-art{animation:none}
+    .hub-ava,.hub-ava-wrap,.hub-dive .tri{transition:none;animation:none}
   }
   .hub-ava .nm{font-size:11px;font-weight:700;white-space:nowrap;max-width:72px;
     overflow:hidden;text-overflow:ellipsis;
@@ -515,12 +510,7 @@
 
     <div class="hub-plaza">
       <button class="hub-dive" id="btn-dive">
-        <svg class="tri" viewBox="0 0 32 40" aria-hidden="true">
-          <path d="M16 1.5C7.9 1.5 1.5 7.9 1.5 15.8c0 10.6 12.2 21.6 13.8 23 .4.35.95.35 1.4 0 1.6-1.4 13.8-12.4 13.8-23C30.5 7.9 24.1 1.5 16 1.5z"
-                fill="#d0453a" stroke="#7a221c" stroke-width="1.3"/>
-          <circle cx="16" cy="15.8" r="6.6" fill="#170c0c"/>
-          <circle cx="16" cy="15.8" r="6.6" fill="none" stroke="#f2b26b" stroke-width="1.3" opacity=".85"/>
-        </svg>
+        <span class="tri" aria-hidden="true">▼</span>
         <b>アビスへ潜る</b>
       </button>
       <div id="hub-avatars"></div>
@@ -12912,6 +12902,9 @@ function setScreen(s){
   syncAdBar();
   // 街の背景ループ。離れたら止め、戻ったときに二重で作らない。
   if(s==='town') startHubBg(); else stopHubBg();
+  // 広場のランダム徘徊も同様に、街を離れたら止める（残ったタイマーが
+  // 消えた要素を触りにいかないように）。
+  if(s==='town') startHubWander(); else stopHubWander();
 }
 /* ---------- 苔玉の1行 ----------
    6層ぶん通う話なので、**どこまで進んでいるか**が見えないと積み上がらない。
@@ -13582,13 +13575,14 @@ const uds=unlockedDepths();
 }
 
 /* ---------- 街の広場：現在のパーティ ----------
-   主人公＋生きている仲間を円形に配置する。タップで
+   主人公＋生きている仲間を最初は楕円に均等配置し、そこから先は
+   ランダムにウロウロさせる（hubWander、後述）。タップで
    主人公はステータス画面、仲間は装備・技のモーダルへ（どちらも既存の入口を使い回す）。 */
 const JOB_GLYPH={warrior:'⚔️',knight:'🛡️',hunter:'🏹',mage:'🪄',rogue:'🗡️',priest:'✨',
                  paladin:'🛡️',summoner:'🔮',archmage:'⭐'};
 function hubGlyph(jobId){ return JOB_GLYPH[jobId] || '❖'; }
 /* 人数ぶんを楕円へ均等配置。0番（主人公）は下寄り＝手前に来るよう90°から始める。
-   1人だけなら広場の中央に置く。 */
+   1人だけなら広場の中央に置く。**これは初期配置だけ**——以降は hubWander が動かす。 */
 function hubPlazaPoints(n){
   if(n<=1) return [{x:50,y:56}];
   const cx=50, cy=54, rx=30, ry=23, pts=[];
@@ -13605,9 +13599,88 @@ function hubAnimSeed(key){
   let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))|0;
   return Math.abs(h);
 }
+/* ---------- 広場のランダム徘徊（hubWander） ----------
+   背景アート（docs/HUB_BACKGROUND_HANDOFF.md）の実測に基づく、
+   .hub-plaza を基準にした％座標。柱の上のような「歩いたら不自然な場所」を
+   避けて、歩ける範囲（HUB_WALK＝楕円）の中だけをランダムに移動させる。
+   実測方法：iPhone 13相当のビューポートで #hubbg と .hub-plaza の
+   getBoundingClientRect() を取り、cover表示の倍率・オフセットから
+   背景アート内の柱4本の位置を .hub-plaza に対する％へ逆算した。 */
+const HUB_WALK = {cx:50, cy:71, rx:31, ry:17};
+const HUB_PILLARS = [
+  {x:22, y:59, rx:9, ry:8}, {x:78, y:59, rx:9, ry:8},
+  {x:22, y:96, rx:9, ry:8}, {x:78, y:96, rx:9, ry:8},
+];
+function hubOnPillar(x,y){
+  return HUB_PILLARS.some(p=>{
+    const dx=(x-p.x)/p.rx, dy=(y-p.y)/p.ry;
+    return dx*dx+dy*dy < 1;
+  });
+}
+/* 柱を避け、他のキャラの行き先ともある程度離れた点を探す。
+   何度か試して見つからなければ（狭い・人数が多い等）最後の候補で妥協する
+   ——探索を無限に続けて処理落ちさせないため。 */
+function hubRandPoint(avoid){
+  let best=null;
+  for(let tries=0; tries<14; tries++){
+    const ang=Math.random()*Math.PI*2, r=Math.sqrt(Math.random());
+    const x=HUB_WALK.cx + Math.cos(ang)*HUB_WALK.rx*r;
+    const y=HUB_WALK.cy + Math.sin(ang)*HUB_WALK.ry*r;
+    if(hubOnPillar(x,y)) continue;
+    best={x,y};
+    const tooClose=(avoid||[]).some(o=>Math.hypot(x-o.x,(y-o.y)*1.4)<12);
+    if(!tooClose) return best;
+  }
+  return best || {x:HUB_WALK.cx, y:HUB_WALK.cy};
+}
+let _hubWanderTimers=[];
+function stopHubWander(){ _hubWanderTimers.forEach(clearTimeout); _hubWanderTimers=[]; }
+/* 街に入るたび（＝広場のボタンを作り直すたび）に呼ぶ。
+   キャラは静止画一枚しか無いので「移動」で歩いている感を出す：
+   left/top をCSS transitionで滑らかに動かし、移動方向で
+   .hub-ava-wrap を左右反転させる。跳ねる動き自体は常時のCSSアニメ（hubHop）に任せる。 */
+function startHubWander(){
+  stopHubWander();
+  if(hubReducedMotion()) return;               // 動きを減らす設定では徘徊させない
+  const btns=[...document.querySelectorAll('#hub-avatars .hub-ava')];
+  const targets=btns.map(b=>({x:+b.dataset.px||50, y:+b.dataset.py||60}));
+  btns.forEach((btn,i)=>{
+    const step=()=>{
+      const cur={x:+btn.dataset.px, y:+btn.dataset.py};
+      const tgt=hubRandPoint(targets.filter((_,j)=>j!==i));
+      targets[i]=tgt;
+      const dist=Math.hypot(tgt.x-cur.x, tgt.y-cur.y);
+      const dur=clamp(dist/9, 1.6, 5.5);        // 距離に応じた所要時間。速すぎ・遅すぎを抑える
+      btn.style.transitionDuration=dur+'s';
+      btn.style.left=tgt.x+'%'; btn.style.top=tgt.y+'%';
+      btn.dataset.px=tgt.x; btn.dataset.py=tgt.y;
+      if(Math.abs(tgt.x-cur.x)>0.6){
+        const wrap=btn.querySelector('.hub-ava-wrap');
+        if(wrap) wrap.style.transform='scaleX('+(tgt.x>=cur.x?1:-1)+')';
+      }
+      const dwell=900 + Math.random()*2400;     // 着いたらしばらく立ち止まる
+      _hubWanderTimers.push(setTimeout(step, dur*1000 + dwell));
+    };
+    const start=260 + i*280 + Math.random()*900; // 全員同時に動き出さないようずらす
+    _hubWanderTimers.push(setTimeout(step, start));
+  });
+}
 function renderHubPlaza(){
   const box=el('hub-avatars'); if(!box || !S.hero) return;
   const members=[S.hero, ...livingParty()];
+  const key=members.map(m=>m===S.hero?'hero':m.uidA).join(',');
+  if(box.dataset.hubKey===key){
+    /* 構成は変わっていない。徘徊中の位置・タイマーを壊さないよう
+       innerHTMLは触らず、名前だけ最新化する。 */
+    members.forEach(m=>{
+      const isHero=(m===S.hero);
+      const btn=box.querySelector(`[data-hubava="${CSS.escape(isHero?'hero':String(m.uidA))}"]`);
+      const nm=btn && btn.querySelector('.nm');
+      if(nm) nm.textContent = isHero ? m.name : allyFullName(m);
+    });
+    return;
+  }
+  box.dataset.hubKey=key;
   const pts=hubPlazaPoints(members.length);
   box.innerHTML=members.map((m,i)=>{
     const isHero=(m===S.hero);
@@ -13616,24 +13689,24 @@ function renderHubPlaza(){
     const p=pts[i];
     const seedKey=isHero?'hero':String(m.uidA);
     const seed=hubAnimSeed(seedKey);
-    const wd=-(seed%320)/100, hd=-((seed>>3)%170)/100;   // 負のdelayでループ位相をその場でずらす
+    const hd=-((seed>>3)%170)/100;   // 負のdelayで跳ねの位相をその場でずらす
     /* 実キャラアートがあれば置き換える。無ければ（未制作ジョブ等）従来の色付き絵文字へ戻す。
        CharacterArt は index.html 冒頭で base64 済みの Image を持っているので、
-       .image() が返す Image の .src をそのまま <img> に流用する（読み込み直しなし）。 */
+       .image() が返す Image の .src をそのまま <img> に流用する（読み込み直しなし）。
+       台座（円い背景）は置かない——影も付けない。キャラ絵だけを広場に立たせる。 */
     const artKey = isHero ? CharacterArt.heroKey(m) : CharacterArt.allyKey(m);
     const im = CharacterArt.image(artKey);
     const body = im
-      ? `<span class="hub-ava-pad" style="border-color:${col}">
-           <span class="hub-ava-wrap" style="animation-delay:${wd}s">
-             <img class="hub-ava-art" src="${im.src}" style="animation-delay:${hd}s" alt="">
-           </span>
+      ? `<span class="hub-ava-wrap">
+           <img class="hub-ava-art" src="${im.src}" style="animation-delay:${hd}s" alt="">
          </span>`
       : `<span class="glyph" style="border-color:${col};color:${col}">${isHero?'🧍':hubGlyph(m.job)}</span>`;
     return `<button class="hub-ava" data-hubava="${isHero?'hero':m.uidA}"
-      style="left:${p.x}%;top:${p.y}%">
+      data-px="${p.x}" data-py="${p.y}" style="left:${p.x}%;top:${p.y}%">
       ${body}
       <span class="nm">${nm}</span></button>`;
   }).join('');
+  startHubWander();
 }
 bindRowTap(el('hub-avatars'), '[data-hubava]', (t)=>{
   const id=t.dataset.hubava;
