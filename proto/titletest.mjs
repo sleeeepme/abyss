@@ -114,10 +114,10 @@ R.noReAsk = await pg.evaluate(l=>{
           ok: !on('m-name') && S.screen==='town' && l.includes('続ける')};
 }, startLabel);
 
-// 4-b. データ全消去でタイトルに戻り、名前も消える
+// 4-b. データ全消去（デバッグメニューに移設）でタイトルに戻り、名前も消える
 await pg.waitForTimeout(800);
-await pg.evaluate(()=>{ S.deepest=30; S.deaths=5; S.name='ヨシダ'; });
-await tap('#btn-reset');
+await pg.evaluate(()=>{ S.deepest=30; S.deaths=5; S.name='ヨシダ'; openDebug(); });
+await tap('#dbg-reset');
 R.resetToTitle = await pg.evaluate(()=>{
   return {screen:S.screen, nameCleared: !S.name, heroCleared: !S.hero, deepest:S.deepest,
           ok: S.screen==='title' && !S.name && !S.hero && S.deepest===1};

@@ -406,10 +406,11 @@ R.shardUI = await pg.evaluate(()=>{
           shardsRun:S.shardsRun};
 });
 
-// 4-f. 新規プレイで秘石はリセットされる
+// 4-f. 新規プレイで秘石はリセットされる（「データ全消去」はデバッグメニューへ移設済み）
 R.shardReset = await pg.evaluate(()=>{
   S.shards=777; S.shardsRun=42;
-  document.getElementById('btn-reset').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  openDebug();
+  document.getElementById('dbg-reset').dispatchEvent(new MouseEvent('click',{bubbles:true}));
   return {after:S.shards, run:S.shardsRun, zeroed:S.shards===0&&S.shardsRun===0};
 });
 

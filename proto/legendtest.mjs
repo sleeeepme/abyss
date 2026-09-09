@@ -161,14 +161,14 @@ R.neverDropsADuplicate = await pg.evaluate(()=>{
 });
 
 /* 一度手にした物は、全消去（初期化）を跨いでも二度と出ない。
-   S.legendEverOwned は btn-reset で触らない恒久記録——それが本当に
-   効いているかを、実際にリセットボタンを押して確かめる。 */
+   S.legendEverOwned はデバッグメニューの「データ全消去」（#dbg-reset）で
+   触らない恒久記録——それが本当に効いているかを、実際にボタンを押して確かめる。 */
 R.neverReturnsAfterReset = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={}; startRun(45); S.hero.party=[];
   S.stash=[]; S.legendStash=[]; S.run.loot=[]; S.grave=null; S.legendEverOwned=[];
   const first=rollNewLegend();               // 1本引く→恒久記録に載る
   const beforeReset=[...(S.legendEverOwned||[])];
-  el('btn-reset').click();                    // 全消去
+  openDebug(); el('dbg-reset').click();        // 全消去
   const afterReset=[...(S.legendEverOwned||[])];
   const stashWiped = S.stash.length===0 && S.legendStash.length===0;
   // リセット後、新しい冒険者でも同じ物は引けない

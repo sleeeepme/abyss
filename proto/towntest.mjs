@@ -1,7 +1,8 @@
-// 拠点の整理。
-//   ・遊び方ボタンを畳み、ステータスを別画面へ
-//   ・「開始階層」を冒頭へ
-//   ・「ダンジョンへ潜る」をバナーの上に画面固定
+// 拠点の整理（広場UI）。
+//   ・能力値・装備・潜在・仲間・呪いはステータス画面（別画面）のまま
+//   ・拠点は背景アニメ＋広場のパーティ＋アイコンボタン＋バッジの1枚レイアウト
+//   ・「アビスへ潜る」は広場中央。中継地点が2つ以上あるときだけ階層選択モーダルを挟む
+//   ・「データ全消去」はデバッグメニューへ移設、拠点からは削除
 //   ・倉庫の装備タップで、着せる相手を選ぶ
 import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
@@ -10,17 +11,23 @@ const R={};
 /* ================= 1. 拠点に残す物・追い出す物 ================= */
 
 /* 1-a. 能力値・装備・潜在・仲間・呪いは拠点から出た。
-       ここに全部を積んでいたときは、潜るまでに5回スクロールが要った。 */
+       ここに全部を積んでいたときは、潜るまでに5回スクロールが要った。
+       旧「ステータス」ボタンと文字メニューも廃止し、広場のアイコン群に置き換えた。 */
 R.townIsThin = await pg.evaluate(()=>{
   setScreen('town');
   const t=el('scr-town');
   const gone=['#charcard','#equipped','#town-boons','#town-party','#town-curses']
     .filter(sel=>!!t.querySelector(sel));
+  // R の真偽値は「true = 期待どおり」に揃える約束なので、
+  // 「消えているべき物」はここへまとめ、hasBg 等の陽性チェックとは分ける。
+  const oldUiGone=['.menu','#btn-go-char','#btn-reset'].filter(sel=>!!t.querySelector(sel));
   return {leftovers:gone,
-          hasStartDepth: !!t.querySelector('#startdepth'),
-          hasMenu: !!t.querySelector('.menu'),
-          hasStatusBtn: !!t.querySelector('#btn-go-char'),
-          ok: gone.length===0 && !!t.querySelector('#startdepth') && !!t.querySelector('#btn-go-char')};
+          oldUiGone,
+          hasBg: !!t.querySelector('#hub-bgwrap canvas#hubbg'),
+          hasPlaza: !!t.querySelector('.hub-plaza'),
+          hasDive: !!t.querySelector('#btn-dive'),
+          ok: gone.length===0 && oldUiGone.length===0 && !!t.querySelector('#hub-bgwrap canvas#hubbg')
+              && !!t.querySelector('.hub-plaza') && !!t.querySelector('#btn-dive')};
 });
 
 // 1-b. 遊び方の「？」は拠点から消えている（タイトルへ移した）
@@ -30,13 +37,16 @@ R.noHelpButton = await pg.evaluate(()=>{
   return {removedFromTown: !inTown, onTitle, ok: !inTown && onTitle};
 });
 
-// 1-c. 開始階層が拠点の冒頭に来る（メニューより前）
-R.startDepthFirst = await pg.evaluate(()=>{
-  const t=el('scr-town');
-  const kids=[...t.children];
-  const sd=kids.findIndex(x=>x.id==='startdepth' || x.querySelector&&x.querySelector('#startdepth'));
-  const menu=kids.findIndex(x=>x.classList.contains('menu'));
-  return {startIdx:sd, menuIdx:menu, ok: sd>=0 && menu>=0 && sd<menu};
+/* 1-c. 開始階層のウインドウ（#m-depthsel）は拠点の外側に独立している。
+       中身の #startdepth はそちらが実体を持ち、拠点画面自体には無い。
+       「データ全消去」はデバッグメニュー（#m-debug）側に移設されている。 */
+R.startDepthInModal = await pg.evaluate(()=>{
+  const t=el('scr-town'), m=el('m-depthsel');
+  return {notInTown: !t.querySelector('#startdepth'),
+          inModal: !!m.querySelector('#startdepth'),
+          resetInDebug: !!el('m-debug').querySelector('#dbg-reset'),
+          ok: !t.querySelector('#startdepth') && !!m.querySelector('#startdepth')
+              && !!el('m-debug').querySelector('#dbg-reset')};
 });
 
 // 1-d. 追い出した物はステータス画面にちゃんとある（消したのではなく移した）
@@ -49,42 +59,86 @@ R.charHasAll = await pg.evaluate(()=>{
           ok: missing.length===0 && el('charcard').innerHTML.length>50};
 });
 
-/* ================= 2. 「潜る」の固定バー ================= */
+/* ================= 2. 広場：パーティ・「潜る」・バッジ ================= */
 
-// 2-a. 拠点でだけ出て、バナーの上に乗る
-R.diveBar = await pg.evaluate(()=>{
-  setScreen('town');
-  const d=el('divebar'), a=el('adbar');
-  const onTown=d.classList.contains('on');
-  const db=d.getBoundingClientRect(), ab=a.getBoundingClientRect();
-  return {onTown, above: db.bottom <= ab.top+1,
-          fixed: getComputedStyle(d).position==='fixed',
-          hasButton: !!d.querySelector('#btn-dive'),
-          ok: onTown && db.bottom<=ab.top+1 && getComputedStyle(d).position==='fixed'};
+/* 2-a. 中継地点が1つしか無ければ、「アビスへ潜る」は即座に潜る
+       （選ぶ余地が無い1択の窓は、ただの手間）。 */
+R.diveDirectWhenSingle = await pg.evaluate(()=>{
+  S.beacons=[]; S.run=null;
+  setScreen('town'); renderTown();
+  el('btn-dive').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const stayedClosed = !el('m-depthsel').classList.contains('on');
+  const dove = S.screen==='game';
+  if(dove) setScreen('town');
+  S.run=null;
+  return {unlocked: unlockedDepths().length, stayedClosed, dove,
+          ok: stayedClosed && dove};
 });
 
-// 2-b. 他の画面では出さない
-R.diveHidden = await pg.evaluate(()=>{
-  const off=[];
-  ['char','shop','stash','upg','title'].forEach(k=>{
-    setScreen(k);
-    if(el('divebar').classList.contains('on')) off.push(k);
-  });
-  setScreen('town');
-  return {shownOn:off, ok: off.length===0};
+/* 2-b. 中継地点が2つ以上あれば、階層選択のウインドウが開く。
+       「この階層から潜る」を押すまでは潜らない。 */
+R.diveOpensModalWhenMultiple = await pg.evaluate(()=>{
+  S.beacons=[5,10]; S.run=null;
+  setScreen('town'); renderTown();
+  el('btn-dive').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const opened = el('m-depthsel').classList.contains('on');
+  const stillTown = S.screen==='town';
+  el('ds-go').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const closed = !el('m-depthsel').classList.contains('on');
+  const dove = S.screen==='game';
+  if(dove) setScreen('town');
+  S.run=null; S.beacons=[];
+  return {unlocked:2, opened, stillTown, closed, dove,
+          ok: opened && stillTown && closed && dove};
 });
 
-/* 2-c. 固定バーの下に本文が潜り込まない。
-       重なると「見えているのに押せないボタン」ができる（実際に一度作っている）。 */
-R.noOverlap = await pg.evaluate(()=>{
-  setScreen('town');
-  const t=el('scr-town');
-  t.scrollTop = t.scrollHeight;                 // 一番下まで送る
-  const last=el('btn-reset').getBoundingClientRect();
-  const bar=el('divebar').getBoundingClientRect();
-  return {resetBottom:Math.round(last.bottom), barTop:Math.round(bar.top),
-          clear: last.bottom <= bar.top+1,
-          ok: last.bottom <= bar.top+1};
+// 2-c. 「閉じる」を押せば潜らずにモーダルだけ閉じる
+R.diveModalCancelable = await pg.evaluate(()=>{
+  S.beacons=[5,10]; S.run=null;
+  setScreen('town'); renderTown();
+  el('btn-dive').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  el('ds-close').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const closed = !el('m-depthsel').classList.contains('on');
+  const stillTown = S.screen==='town';
+  S.beacons=[];
+  return {closed, stillTown, ok: closed && stillTown};
+});
+
+/* 2-d. 広場にはパーティ全員（主人公＋生存仲間）がタップ可能なアバターとして並ぶ。
+       主人公はステータス画面、仲間は装備モーダルへ（どちらも既存の入口を使い回す）。 */
+R.plazaAvatarsTappable = await pg.evaluate(()=>{
+  S.hero.party=[];
+  const a=TH.ally(10,'priest',10); a.slot=0;
+  uniqueAllyName(a,party()); S.hero.party=[a];
+  setScreen('town'); renderTown();
+  const avas=[...document.querySelectorAll('#hub-avatars [data-hubava]')];
+  const count=avas.length;
+  const heroBtn=avas.find(x=>x.dataset.hubava==='hero');
+  heroBtn.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const wentChar = S.screen==='char';
+  setScreen('town'); renderTown();
+  const allyBtn=[...document.querySelectorAll('#hub-avatars [data-hubava]')]
+    .find(x=>x.dataset.hubava===String(a.uidA));
+  allyBtn.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const openedEquip = el('m-allyeq').classList.contains('on') && S.screen==='allyeq';
+  closeAllyEquip(); setScreen('town');
+  return {count, wentChar, openedEquip,
+          ok: count===2 && wentChar && openedEquip};
+});
+
+/* 2-e. 数の通知が要るボタンだけバッジが立ち、0件のものは隠れる。
+       通知の要らない倉庫にはバッジ用の要素自体を置いていない。 */
+R.badgesReflectCounts = await pg.evaluate(()=>{
+  S.gachaLeft=3;
+  S.fallen=[]; S.tavernPool=null;
+  setScreen('town'); renderTown();
+  const shown = id => el(id) && getComputedStyle(el(id)).display!=='none';
+  const gachaOn = shown('badge-gacha');
+  S.gachaLeft=0;
+  renderTown();
+  const gachaOff = !shown('badge-gacha');
+  const noStashBadge = !el('badge-stash');
+  return {gachaOn, gachaOff, noStashBadge, ok: gachaOn && gachaOff && noStashBadge};
 });
 
 /* ================= 3. 倉庫：誰に着せるか ================= */
