@@ -1944,7 +1944,10 @@ function potentialOf(it){ return ((it&&it.aff)||[]).find(a=>a.t==='pt') || null;
 /* 表示は通常の接頭辞・接尾辞と見分けられるよう◆を頭に付け、
    色は潜在自身のレア度（RARCOL）で塗る——装備本体のレア度色とは別。 */
 function potentialLine(a){
-  return `<span style="color:${RARCOL[a.tier]}">◆ 潜在: ${STATNM[a.stat].replace('%v',a.v)}</span>`;
+  // 表示は「◆ 潜在:」のラベルを付けず、潜在自身のレア度色でもなく、
+  // 常に緑（既存のRARCOL[1]と同じ緑）で統一する——ユーザー指摘により、
+  // Common色（薄いグレー）だと見落としやすかったための変更。
+  return `<span style="color:#6cc24a">${STATNM[a.stat].replace('%v',a.v)}</span>`;
 }
 
 /* これ以下のレア度は鑑定済みで落ちる。Rare(2) 以上が未鑑定＝現地では装備できない。 */
@@ -2445,8 +2448,8 @@ function affLines(it){
   it.aff.forEach(a=>{
     // 装飾品の付帯は専用の書き方をする（状態異常や隊の強化は %v では書けない）
     if(a.t==='c'){ L.push(charmAffLine(a)); return; }
-    // 潜在も専用の書き方（◆＋潜在自身のレア度色）にして、接頭辞・接尾辞と見分けられるようにする
-    if(a.t==='pt'){ L.push(potentialLine(a)); return; }
+    // 潜在は耐久の下にまとめて出す（下記）ので、ここではスキップする
+    if(a.t==='pt'){ return; }
     L.push(STATNM[a.stat].replace('%v',a.v));
     // 2つめの効果を持つ接頭辞（疾き）。書かないと、付いていることが伝わらない。
     if(a.stat2 && STATNM[a.stat2]) L.push(STATNM[a.stat2].replace('%v',a.v2));
@@ -2458,6 +2461,9 @@ function affLines(it){
     L.push('<span style="color:var(--dim);font-size:12px">壊れない／死んでも失わない／玉鋼で鍛える</span>');
   }
   if(it.durMax) L.push(durLine(it));
+  // 潜在は耐久のすぐ下（レジェンドは付帯しないのでここには来ない）
+  const pot=potentialOf(it);
+  if(pot) L.push(potentialLine(pot));
   return L;
 }
 function itemSubLine(it){
