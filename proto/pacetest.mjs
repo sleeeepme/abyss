@@ -63,7 +63,7 @@ R.rates = await pg.evaluate(()=>{
 // 1-c. ガチャ産は必ず武器で、必ず鑑定済み。接辞の本数がレア度と整合している
 R.shape = await pg.evaluate(()=>{
   RNG=mulberry32(4242); S.lastDepth=25;
-  let allWeapon=true, allIdent=true, affixOk=true, n=0;
+  let allWeapon=true, allIdent=true, affixOk=true, potOk=true, n=0;
   for(let i=0;i<800;i++){
     S.gachaLeft=1;
     const g=rollGacha();
@@ -72,12 +72,17 @@ R.shape = await pg.evaluate(()=>{
     if(g.item.slot!=='weapon') allWeapon=false;
     if(!g.item.ident) allIdent=false;
     const r=RARITY[g.item.rar];
-    if(g.item.aff.length>r.aff[1]) affixOk=false;              // 上限は必ず守る
-    if(g.item.rar===0 && g.item.aff.length!==0) affixOk=false;  // Common は接辞なし
-    const ids=g.item.aff.map(a=>a.id);
+    // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠で必ず1つ付くおまけなので、
+    // レア度上限／Commonゼロ接辞のチェックからは除外する
+    const baseAff=g.item.aff.filter(a=>a.t!=='pt');
+    const potAff=g.item.aff.filter(a=>a.t==='pt');
+    if(baseAff.length>r.aff[1]) affixOk=false;              // 上限は必ず守る
+    if(g.item.rar===0 && baseAff.length!==0) affixOk=false;  // Common は接頭辞・接尾辞なし
+    if(potAff.length!==1) potOk=false;                       // ガチャ武器（非レジェンド）には必ず潜在が1つ
+    const ids=baseAff.map(a=>a.id);
     if(new Set(ids).size!==ids.length) affixOk=false;           // 接辞の重複なし
   }
-  return {weapons:n, allWeapon, allIdent, affixOk};
+  return {weapons:n, allWeapon, allIdent, affixOk, potOk};
 });
 
 // 1-d. 引ける回数の上限は変わっていない

@@ -13,6 +13,11 @@ const PARTY = `
   /* 10階ごとは大広間（ボス戦だけの階）。壁も通路も無い一部屋なので、
      隊列の揺れはここでは測れない。普通の階で測る。 */
   startRun(9); S.hero.party=[]; W.ores.length=0;
+  /* 潜在の導入で、この階の床の落とし物生成（今は捨てる W.ores 含む）が消費する乱数の
+     個数が変わった。ここで見たいのは隊列維持の仕掛けそのものであって、床の落とし物が
+     何個乱数を消費したかではないので、仲間を作る直前で乱数列を仕切り直しておく
+     （既存の他テストにも RNG=mulberry32(seed) で決定的にする例が多数ある、同じ手筋）。 */
+  RNG=mulberry32(20260910);
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
     a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99;
     /* ---------- 個体差を止める ----------
@@ -25,7 +30,13 @@ const PARTY = `
        （実際に落ちた。同じ検証が 30 サンプルで通り 125 サンプルで落ちた）。
 
        真ん中の値に固定して、**個体差ではなく仕掛けを見る。** */
-    a.msJit=1; a.keepJit=1; a.cdJit=1; a.wobble=0.20; a.seed=i*2.1; }
+    a.msJit=1; a.keepJit=1; a.cdJit=1; a.wobble=0.20; a.seed=i*2.1;
+    /* 装備の潜在（buildItem/genBaseItemが必ず1つ付ける、強化系のおまけ効果）も
+       同じ理由で止める。以前はCommon〜Uncommon止まりの仲間装備は接辞ゼロで
+       速度系のぶれを生まなかったが、潜在の導入でそこにも個体差が乗るようになった。
+       ここで見たいのは隊列維持の仕掛けそのものなので、装備側の乱数も真ん中（ゼロ）に均す。 */
+    for(const k of ['weapon','armor','shield','accessory']){ if(a.equip[k]) a.equip[k].aff=[]; }
+    a.hpNow=allyStats(a).maxHp*99; }
 `;
 const shake = (label, setup)=>pg.evaluate(async ({label,setup})=>{
   eval(setup);
@@ -111,8 +122,12 @@ R.orbit = await pg.evaluate(async ()=>{
   S.hero=newHero(); S.upg={hp:8}; S.hero.lv=22;
   S.hero.str=26;S.hero.dex=26;S.hero.vit=26;
   startRun(9); S.hero.party=[]; W.ores.length=0;
+  // 潜在の導入ぶんの乱数消費を仕切り直す（PARTY側の同種の対処と同じ理由）
+  RNG=mulberry32(20260910);
   for(let i=0;i<3;i++){ const a=makeAlly(10,S.hero); a.x=P.x+rf(-0.4,0.4); a.y=P.y+rf(-0.4,0.4);
-    a.slot=i; uniqueAllyName(a,party()); S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
+    a.slot=i; uniqueAllyName(a,party());
+    for(const k of ['weapon','armor','shield','accessory']){ if(a.equip[k]) a.equip[k].aff=[]; }
+    S.hero.party.push(a); a.hpNow=allyStats(a).maxHp*99; }
   W.enemies.forEach(e=>{e.dead=true});
   const e=W.enemies[0]; e.dead=false; e.hp=e.maxHp=99999; e.atkV=0; e.ms=0;
   e.x=P.x+4.3; e.y=P.y; W.enemies=[e];

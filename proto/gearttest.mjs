@@ -342,9 +342,11 @@ R.plateSpeedPenalty = await pg.evaluate(()=>{
   // Common(rar 0, aff:[0,0]) で強制生成——接頭辞・接尾辞の速度系affixが
   // 紛れ込むと、防具種そのものの効果を測れなくなる
   const plate = buildItem(BASES.find(b=>b.id==='plate'), RARITY[0], 10); plate.ident=true;
+  plate.aff=[];   // 潜在（buildItemが必ず1つ付ける）も含めて接辞ゼロに戻し、防具種そのものの効果だけを見る
   S.hero.equip.armor = plate;
   const withPlate = stats(S.hero);
   const leather = buildItem(BASES.find(b=>b.id==='leather'), RARITY[0], 10); leather.ident=true;
+  leather.aff=[];
   S.hero.equip.armor = leather;
   const withLeather = stats(S.hero);
   return {bareMs:+bare.ms.toFixed(3), plateMs:+withPlate.ms.toFixed(3), leatherMs:+withLeather.ms.toFixed(3),

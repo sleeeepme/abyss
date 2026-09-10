@@ -209,16 +209,26 @@ R.pristine = await pg.evaluate(()=>{
 
 // 2-f. 旗印：味方全員に乗る（持ち主だけではない）
 R.banner = await pg.evaluate(()=>{
+  /* このファイルは主人公オブジェクトを使い回す（install()で作った1体のまま）ので、
+     ここまでの節で主人公の装備・恩寵が何であってもおかしくない。以前は共有状態でも
+     たまたま問題が出なかったが、潜在の導入で装備の乱数の幅が広がり、共有された
+     主人公の状態次第でsoftCap（仲間は主人公より弱いという圧縮）が飽和して
+     旗印の上乗せぶんが見えなくなることがある。ここで見たいのは旗印が持ち主以外にも
+     配られる仕組みそのものなので、主人公を作り直してクリーンな状態から測る。 */
+  S.hero=newHero();
   TH.run(1,{seed:19}); TH.floor(16);
-  const a=makeAlly(16,S.hero); a.hpNow=allyStats(a).maxHp;
+  const a=makeAlly(16,S.hero);
+  // 装備の潜在（buildItem/genBaseItemが必ず1つ付ける）も、同じ理由で仲間側は消しておく。
+  for(const k of ['weapon','armor','shield','accessory']){ if(a.equip[k]) a.equip[k].aff=[]; }
+  a.hpNow=allyStats(a).maxHp;
   uniqueAllyName(a,party()); S.hero.party.push(a);
   S.hero.boons=[];
-  const before={ally:+allyStats(a).atk.toFixed(2), hp:allyStats(a).maxHp};
+  const before={ally:+allyStats(a).atk.toFixed(4), hp:allyStats(a).maxHp};
   S.hero.boons=[{id:'banner', rar:'epic'}];
-  const after={ally:+allyStats(a).atk.toFixed(2), hp:allyStats(a).maxHp};
+  const after={ally:+allyStats(a).atk.toFixed(4), hp:allyStats(a).maxHp};
   // 仲間が持っていても全員に配られる
   S.hero.boons=[]; a.boons=[{id:'banner', rar:'epic'}];
-  const fromAlly=+allyStats(a).atk.toFixed(2);
+  const fromAlly=+allyStats(a).atk.toFixed(4);
   a.boons=[];
   return {before, after, fromAlly,
           liftsAllies: after.ally>before.ally && after.hp>before.hp,

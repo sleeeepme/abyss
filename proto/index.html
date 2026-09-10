@@ -1899,6 +1899,54 @@ const RARITY=[
 
 /* :root の --c-* と同じ並び・同じ値。canvas と inline style はこちらを見る。 */
 const RARCOL = ['#c8ced9','#6cc24a','#5b8dd6','#a97fe0','#c4433f','#e8c95a'];
+
+/* ==================== 装備の潜在 ====================
+   レジェンドを除く全ての装備に、必ず1つランダムな潜在（強化系のおまけ効果）が付く。
+   コモンの白装備にも付く——今まで白は接頭辞・接尾辞ゼロで本当に何も付かなかったので、
+   ここが唯一のおまけになる。
+
+   潜在の色（強さ）は装備そのもののレア度とは**別枠で独立に抽選**する。
+   しかも通常のレア度（弱い色ほど多い）とは向きが逆で、**強い色ほど高確率**という
+   指定：緑1%・青3%・紫15%・赤50%（残り31%が無色＝Common枠）。
+   つまり白装備でも紫や赤の強い潜在を引くことがある——装備のレア度と潜在の質は無関係。
+   色の並び・添字は RARITY[0..4]（Common〜Relic）・RARCOL とそのまま共有する。 */
+const POTENTIAL_TIER_W = [31, 1, 3, 15, 50];   // Common/Uncommon/Rare/Unique/Relic
+// 色が上がるほど「強化系の値」も大きくなる。Common=素の値、Relicは約5.5倍。
+const POTENTIAL_SCALE  = [1, 1.6, 2.4, 3.6, 5.5];
+function rollPotentialTier(){
+  const tot=POTENTIAL_TIER_W.reduce((a,b)=>a+b,0);
+  let x=rnd()*tot;
+  for(let i=0;i<POTENTIAL_TIER_W.length;i++){ x-=POTENTIAL_TIER_W[i]; if(x<=0) return i; }
+  return 0;
+}
+// 潜在としてだけ抽選される、素の値幅（Commonぶん）。既存の STATNM がそのまま表示に使える。
+const POTENTIALS=[
+  {id:'pot_dmg',  stat:'dmgPct',  r:[2,4]},
+  {id:'pot_hp',   stat:'hp',      r:[5,9]},
+  {id:'pot_def',  stat:'def',     r:[1,2]},
+  {id:'pot_aspd', stat:'aspdPct', r:[2,4]},
+  {id:'pot_ms',   stat:'msPct',   r:[2,3]},
+  {id:'pot_crit', stat:'critPct', r:[2,3]},
+  {id:'pot_evade',stat:'evade',   r:[2,3]},
+  {id:'pot_all',  stat:'allStat', r:[1,1]},
+  {id:'pot_mf',   stat:'mf',      r:[3,5]},
+  {id:'pot_cdr',  stat:'ultCdr',  r:[2,3]},
+];
+/* buildItem() の中だけから呼ぶ。makeLegend() はここを通らないので、
+   レジェンドには自動的に付帯しない（固有効果を既に持っているため、それでよい）。 */
+function rollPotential(ilvl){
+  const tier=rollPotentialTier();
+  const def=pick(POTENTIALS);
+  const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(ilvl)));
+  return {t:'pt', id:def.id, stat:def.stat, v, tier};
+}
+function potentialOf(it){ return ((it&&it.aff)||[]).find(a=>a.t==='pt') || null; }
+/* 表示は通常の接頭辞・接尾辞と見分けられるよう◆を頭に付け、
+   色は潜在自身のレア度（RARCOL）で塗る——装備本体のレア度色とは別。 */
+function potentialLine(a){
+  return `<span style="color:${RARCOL[a.tier]}">◆ 潜在: ${STATNM[a.stat].replace('%v',a.v)}</span>`;
+}
+
 /* これ以下のレア度は鑑定済みで落ちる。Rare(2) 以上が未鑑定＝現地では装備できない。 */
 const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
@@ -2034,6 +2082,10 @@ function buildItem(base, rar, ilvl){
      指輪と護符は素の防御こそ持つが、それだけでは「同じ枠に同じ物が入り直す」に
      なってしまう。装飾品を選ぶ理由はここで作る。 */
   if(isCharmSlot(it)) it.aff.push(...rollCharmAffs(rar.id, ilvl));
+  /* 潜在。buildItem を通る装備には（スロットを問わず）必ず1つ付く。
+     レジェンドは makeLegend() が別枠で組み立てて buildItem を通らないので、
+     ここには来ない＝自動的に付帯しない。 */
+  it.aff.push(rollPotential(ilvl));
   return it;
 }
 function genItem(ilvl, mf=0, depth){
@@ -2393,6 +2445,8 @@ function affLines(it){
   it.aff.forEach(a=>{
     // 装飾品の付帯は専用の書き方をする（状態異常や隊の強化は %v では書けない）
     if(a.t==='c'){ L.push(charmAffLine(a)); return; }
+    // 潜在も専用の書き方（◆＋潜在自身のレア度色）にして、接頭辞・接尾辞と見分けられるようにする
+    if(a.t==='pt'){ L.push(potentialLine(a)); return; }
     L.push(STATNM[a.stat].replace('%v',a.v));
     // 2つめの効果を持つ接頭辞（疾き）。書かないと、付いていることが伝わらない。
     if(a.stat2 && STATNM[a.stat2]) L.push(STATNM[a.stat2].replace('%v',a.v2));
@@ -14425,11 +14479,16 @@ function rollGacha(){
   // レア度は帯域の抽選結果に合わせて付け替え、接辞の数もそれに揃える
   it.rar = targetRar;
   const need = ri(RARITY[targetRar].aff[0], RARITY[targetRar].aff[1]);
-  if(it.aff.length > need) it.aff.length = need;
-  for(let g=0; it.aff.length<need && g<40; g++){
-    const cand = genItem(ilvl,60).aff.find(a=>!it.aff.some(b=>b.id===a.id));
-    if(cand) it.aff.push(cand);
+  // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠。ここで切り詰め/補充する対象から
+  // 外しておかないと、末尾に積んである潜在が真っ先に切り落とされてしまう。
+  const potAff = it.aff.filter(a=>a.t==='pt');
+  let baseAff  = it.aff.filter(a=>a.t!=='pt');
+  if(baseAff.length > need) baseAff.length = need;
+  for(let g=0; baseAff.length<need && g<40; g++){
+    const cand = genItem(ilvl,60).aff.find(a=>a.t!=='pt' && !baseAff.some(b=>b.id===a.id));
+    if(cand) baseAff.push(cand);
   }
+  it.aff = [...baseAff, ...potAff];    // 潜在は数合わせの結果に関わらず必ず残す
   it.ident=true;                       // ガチャ産は中身が見えないと引く意味がない
   return {kind:'item', item:it};
 }
@@ -15420,8 +15479,10 @@ function resolveEvent(){
     if(rnd()<0.55){
       it.rar = Math.min(RARITY.length-1, it.rar+1);
       const need=ri(RARITY[it.rar].aff[0], RARITY[it.rar].aff[1]);
-      for(let g=0; it.aff.length<need && g<40; g++){
-        const cand=genItem(it.ilvl,40).aff.find(a=>!it.aff.some(b=>b.id===a.id));
+      // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠に数える（gachaの付け替えと同じ理由）
+      const baseCount=()=>it.aff.filter(a=>a.t!=='pt').length;
+      for(let g=0; baseCount()<need && g<40; g++){
+        const cand=genItem(it.ilvl,40).aff.find(a=>a.t!=='pt' && !it.aff.some(b=>b.id===a.id));
         if(cand) it.aff.push(cand);
       }
       S.run.loot.push(it);
