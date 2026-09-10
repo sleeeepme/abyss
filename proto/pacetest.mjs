@@ -78,7 +78,7 @@ R.shape = await pg.evaluate(()=>{
     const potAff=g.item.aff.filter(a=>a.t==='pt');
     if(baseAff.length>r.aff[1]) affixOk=false;              // 上限は必ず守る
     if(g.item.rar===0 && baseAff.length!==0) affixOk=false;  // Common は接頭辞・接尾辞なし
-    if(potAff.length!==1) potOk=false;                       // ガチャ武器（非レジェンド）には必ず潜在が1つ
+    if(potAff.length>1) potOk=false;                         // 潜在は0個か1個のどちらかで、2個以上は付かない（付帯は確率制、必ず1つではない）
     const ids=baseAff.map(a=>a.id);
     if(new Set(ids).size!==ids.length) affixOk=false;           // 接辞の重複なし
   }

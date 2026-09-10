@@ -1901,19 +1901,19 @@ const RARITY=[
 const RARCOL = ['#c8ced9','#6cc24a','#5b8dd6','#a97fe0','#c4433f','#e8c95a'];
 
 /* ==================== 装備の潜在 ====================
-   レジェンドを除く全ての装備に、必ず1つランダムな潜在（強化系のおまけ効果）が付く。
-   コモンの白装備にも付く——今まで白は接頭辞・接尾辞ゼロで本当に何も付かなかったので、
-   ここが唯一のおまけになる。
+   レジェンドを除く全ての装備に、**装備そのもののレア度に応じた確率**で
+   ランダムな潜在（強化系のおまけ効果）が1つ付くことがある（必ず付くわけではない）。
+   付帯確率：白(Common)1%・緑(Uncommon)5%・青(Rare)10%・紫(Unique)25%・赤(Relic)50%
+   （ユーザー確認済み：「白装備は100個に1個」＝装備本体のレア度に対する、そのままの
+   パーセンテージ。重み付き正規化はしない＝白は本当に1/100）。
+   色の並び・添字は RARITY[0..4]（Common〜Relic）とそのまま共有する。
 
-   潜在の色（強さ）は装備そのもののレア度とは**別枠で独立に抽選**する。
-   しかも通常のレア度（弱い色ほど多い）とは向きが逆で、**強い色ほど高確率**という
-   指定：白1%・緑5%・青10%・紫25%・赤50%。
-   つまり白装備でも紫や赤の強い潜在を引くことがある——装備のレア度と潜在の質は無関係。
-   色の並び・添字は RARITY[0..4]（Common〜Relic）・RARCOL とそのまま共有する。
-   （5つの数の合計は91だが、他の重み付き抽選＝RARITYの.w等と同じで合計100は要らない。
-     rollPotentialTier() は合計に対する比率で正規化するので、白1:緑5:青10:紫25:赤50 の
-     比率がそのまま確率になる＝白約1.1%・緑約5.5%・青約11.0%・紫約27.5%・赤約54.9%。） */
-const POTENTIAL_TIER_W = [1, 5, 10, 25, 50];   // Common(白)/Uncommon(緑)/Rare(青)/Unique(紫)/Relic(赤)
+   付いた潜在の「強さ(色)」は、装備本体のレア度とは独立に別抽選する
+   （付帯確率とは別軸）。この強さの分布はユーザーからの明示指定が無いため、
+   通常のレア度と同じ向き＝弱い色ほど多い・強い色ほど珍しい、という素直な分布を
+   デフォルトとして採用した（RARITY[].w と同じ形）。要望があればここを調整する。 */
+const POTENTIAL_ATTACH_P = [0.01, 0.05, 0.10, 0.25, 0.50]; // 装備のレア度(rar.id)ごとの付帯確率。Common/Uncommon/Rare/Unique/Relic
+const POTENTIAL_TIER_W   = [60, 28, 10, 1.8, 0.2];         // 付いた潜在自身の強さ(色)の抽選重み。Common/Uncommon/Rare/Unique/Relic（RARITY[].wと同じ形）
 // 色が上がるほど「強化系の値」も大きくなる。Common=素の値、Relicは約5.5倍。
 const POTENTIAL_SCALE  = [1, 1.6, 2.4, 3.6, 5.5];
 function rollPotentialTier(){
@@ -1936,8 +1936,10 @@ const POTENTIALS=[
   {id:'pot_cdr',  stat:'ultCdr',  r:[2,3]},
 ];
 /* buildItem() の中だけから呼ぶ。makeLegend() はここを通らないので、
-   レジェンドには自動的に付帯しない（固有効果を既に持っているため、それでよい）。 */
-function rollPotential(ilvl){
+   レジェンドには自動的に付帯しない（固有効果を既に持っているため、それでよい）。
+   rarId は装備本体のレア度（rar.id、0=Common〜4=Relic）。付帯確率の抽選に外れたら null を返す。 */
+function rollPotential(ilvl, rarId){
+  if(rnd() >= (POTENTIAL_ATTACH_P[rarId] || 0)) return null;
   const tier=rollPotentialTier();
   const def=pick(POTENTIALS);
   const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(ilvl)));
@@ -2088,10 +2090,11 @@ function buildItem(base, rar, ilvl){
      指輪と護符は素の防御こそ持つが、それだけでは「同じ枠に同じ物が入り直す」に
      なってしまう。装飾品を選ぶ理由はここで作る。 */
   if(isCharmSlot(it)) it.aff.push(...rollCharmAffs(rar.id, ilvl));
-  /* 潜在。buildItem を通る装備には（スロットを問わず）必ず1つ付く。
+  /* 潜在。装備本体のレア度(rar.id)に応じた確率で、スロットを問わず抽選する。
      レジェンドは makeLegend() が別枠で組み立てて buildItem を通らないので、
      ここには来ない＝自動的に付帯しない。 */
-  it.aff.push(rollPotential(ilvl));
+  const pot = rollPotential(ilvl, rar.id);
+  if(pot) it.aff.push(pot);
   return it;
 }
 function genItem(ilvl, mf=0, depth){

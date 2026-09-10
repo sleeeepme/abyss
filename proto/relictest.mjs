@@ -379,7 +379,9 @@ R.trialRewardSlotsFull = await pg.evaluate(()=>{
   const gained = S.relics.length===before+1;
   const newId = gained ? S.relics[S.relics.length-1] : null;
   const equippedRaw = newId ? relicOn(newId) : null;
-  const said = logs[0]||'';
+  // 試練中に別の要因（敵の落とし物・熟練度など）でログが増えることがあるため、
+  // 先頭固定ではなく「未装備」の説明ログがどこかにあるかで見る。
+  const said = logs.find(l=>l.includes('未装備')) || logs[0] || '';
   return {gained, newId, said,
           staysOwned: gained,
           notAutoEquipped: equippedRaw===false,
