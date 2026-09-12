@@ -1,7 +1,7 @@
 /* Presentation and timing feedback. Combat formulas, AI and rewards stay in index.html. */
 const updateSimulation=update, resolveEnemyDeath=killEnemy;
 const ALLY_EFFECT_FX=window.AllyEffectStudy;
-const FEEL_ATTACK_SECONDS=.62;
+const FEEL_ATTACK_SECONDS=.48;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
   bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
@@ -35,7 +35,7 @@ function feelImpact(e,src,crit,dt,elem){
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
   FEEL.hits.push({x:e.x,y:e.y,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally'});
-  if(FEEL.hits.length>80)FEEL.hits.splice(0,FEEL.hits.length-80);
+  if(FEEL.hits.length>32)FEEL.hits.splice(0,FEEL.hits.length-32);
   if(crit)feelKick(FEEL_TUNING.criticalShake,.19);
 }
 function feelSlow(seconds,scale){FEEL.slow=Math.max(FEEL.slow,seconds);FEEL.slowScale=Math.min(FEEL.slowScale,scale);}
@@ -204,21 +204,40 @@ function drawFeelSwing(f,camX,camY){
   const age=Math.max(0,(f.max||FEEL_ATTACK_SECONDS)-f.life);
   const scale=clamp(((f.r||1.4)*TS)/(cfg.reach||35),.65,TS/18);
   ALLY_EFFECT_FX.render(ctx,{kind,age,x:f.x*TS-camX,y:f.y*TS-camY,angle:f.a||0,scale,
-    heavy:kind==='greatsword'||kind==='hammer',hit:true,element:feelElement(f.dt,f.elem)});
+    heavy:kind==='greatsword'||kind==='hammer',hit:true,element:feelElement(f.dt,f.elem),compact:true});
+}
+const feelHitCache=new Map();
+function feelHitImage(element,target,age,scale){
+  const frame=Math.min(14,Math.floor(age*30)),key=element+'|'+target+'|'+frame+'|'+scale.toFixed(2);
+  let im=feelHitCache.get(key);if(im)return im;
+  const size=Math.ceil(96*scale),canvas=document.createElement('canvas');canvas.width=canvas.height=size;
+  const c=canvas.getContext('2d'),anchor=size/2;
+  ALLY_EFFECT_FX.renderElementHit(c,{element,age:frame/30,x:anchor,y:anchor,scale,target,compact:true});
+  im={canvas,anchor};feelHitCache.set(key,im);return im;
 }
 function drawFeelHits(camX,camY){
   if(!ALLY_EFFECT_FX)return;
   const scale=clamp(TS/48,.65,1.5);
-  for(const f of FEEL.hits)ALLY_EFFECT_FX.renderElementHit(ctx,{element:f.element,age:f.age,
-    x:f.x*TS-camX,y:f.y*TS-camY,scale,target:f.target});
+  for(const f of FEEL.hits){const im=feelHitImage(f.element,f.target,f.age,scale);
+    ctx.drawImage(im.canvas,f.x*TS-camX-im.anchor,f.y*TS-camY-im.anchor);}
+}
+const feelProjectileCache=new Map();
+function feelProjectileImage(kind,element,scale){
+  const key=kind+'|'+element+'|'+scale.toFixed(2);let im=feelProjectileCache.get(key);
+  if(im)return im;
+  const age=kind==='bow'?.17:.19,head=kind==='bow'?90:88,pad=Math.ceil(18*scale);
+  const canvas=document.createElement('canvas');canvas.width=Math.ceil((head+28)*scale+pad*2);
+  canvas.height=Math.ceil(52*scale+pad*2);
+  const c=canvas.getContext('2d'),anchorX=pad+head*scale,anchorY=canvas.height/2;
+  ALLY_EFFECT_FX.render(c,{kind,age,x:pad,y:anchorY,angle:0,scale,hit:false,element,compact:true});
+  im={canvas,anchorX,anchorY};feelProjectileCache.set(key,im);return im;
 }
 function drawFeelWeaponShot(f,camX,camY){
   if(!ALLY_EFFECT_FX)return;
   const kind=f.kind==='arrow'?'bow':'magicbolt',a=Math.atan2(f.vy,f.vx),scale=clamp(TS/42,.8,1.5);
-  const age=kind==='bow'?.17:.19,head=kind==='bow'?90:88;
-  const x=f.x*TS-camX-Math.cos(a)*head*scale,y=f.y*TS-camY-Math.sin(a)*head*scale;
-  ALLY_EFFECT_FX.render(ctx,{kind,age,x,y,angle:a,scale,hit:false,
-    element:feelElement(kind==='magicbolt'?'arcane':'pierce',f.elem)});
+  const element=feelElement(kind==='magicbolt'?'arcane':'pierce',f.elem),im=feelProjectileImage(kind,element,scale);
+  ctx.save();ctx.translate(f.x*TS-camX,f.y*TS-camY);ctx.rotate(a);ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(im.canvas,-im.anchorX,-im.anchorY);ctx.restore();
 }
 function drawFeelMagic(f,camX,camY,col){
   const x=f.x*TS-camX,y=f.y*TS-camY,q=Math.max(2,Math.round(TS/16));

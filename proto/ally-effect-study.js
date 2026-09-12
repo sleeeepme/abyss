@@ -153,7 +153,8 @@
   function renderElementHit(c,options){
     const previous=palette,previousPass=glowPass;palette=elements[options.element]||elements.neutral;
     const opacity=options.element==='frost'?.70:1;
-    try{for(const [blur,alpha] of [[8,.38],[2.2,.55],[0,1]]){
+    const passes=options.compact?[[4.5,.52],[0,1]]:[[8,.38],[2.2,.55],[0,1]];
+    try{for(const [blur,alpha] of passes){
       c.save();try{glowPass=blur>0;c.filter=blur?`blur(${blur}px)`:'none';c.globalAlpha*=alpha*opacity;hitCore(c,options);}finally{c.restore();}
     }}finally{palette=previous;glowPass=previousPass;}
   }
@@ -292,7 +293,8 @@
   function render(c,options){
     // Bloom surrounds the flat silhouette; the final pass keeps a sharp core.
     const previous=palette,previousPass=glowPass;palette=elements[options.element]||elements.neutral;
-    try{for(const [blur,alpha] of [[9,.45],[2.5,.60],[0,1]]){
+    const passes=options.compact?[[5,.58],[0,1]]:[[9,.45],[2.5,.60],[0,1]];
+    try{for(const [blur,alpha] of passes){
       c.save();try{glowPass=blur>0;c.filter=blur?`blur(${blur}px)`:'none';c.globalAlpha*=alpha;
         renderCore(c,options);
       }finally{c.restore();}
