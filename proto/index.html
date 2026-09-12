@@ -7283,7 +7283,7 @@ function hitEnemy(e, st, mult, opt){
   const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
-  feelImpact(e,src===S.hero?P:src,!!crit);
+  feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
   // 弱点／耐性は色と記号で即座に見せる。見えないと属性を選ぶ意味が伝わらない。
   // 引き撃ちで減衰した一撃はくすんだ色＋「↓」を付ける。
@@ -7321,8 +7321,8 @@ function healEnt(h, v){
 function meleeSwing(st, ang, mult){
   const range=st.range, halfArc=(st.arc||75)*Math.PI/180;
   // 属性を持たせて描画側で見た目を変える。槍を振れば「刺した」ように見えてほしい。
-  W.fx.push({t:'swing',x:P.x,y:P.y,a:ang,life:0.18,max:0.18,r:range,arc:halfArc,
-             dt:st.dmgType, elem:elemOf(st), self:true});
+  W.fx.push({t:'swing',x:P.x,y:P.y,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
+             dt:st.dmgType, elem:elemOf(st), weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
   nearEnemies(P.x, P.y, range+1).forEach(e=>{
     if(e.dead) return;
     const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
@@ -7435,7 +7435,8 @@ function playerAttack(){
                vx:Math.cos(ang+off)*spd, vy:Math.sin(ang+off)*spd,
                life: st.range/spd+0.05,
                pierce: (isBow?1:2)+(st.projPierce||0),
-               hitIds:new Set(), mult:foot.mul*mult, foot:foot.k, addElem:addElem||null});
+               hitIds:new Set(), mult:foot.mul*mult, foot:foot.k, addElem:addElem||null,
+               elem:(addElem&&addElem.type)||elemOf(st)});
 
     /* レジェンドの散り。テミス（3方向）とカンバンテイン（3方向＋弾ごとに別属性）。
        杖の形（STAFF_SHAPES）の抽選より先に置く——固有名の武器が
@@ -7670,8 +7671,9 @@ function fireWave(){
   P.waveCd = WAVE_CD;
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const half = WAVE_ARC/2;
-  W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:0.26, max:0.26,
-             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st), self:true});
+  W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:FEEL_ATTACK_SECONDS, max:FEEL_ATTACK_SECONDS,
+             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st),
+             weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
   feelKick(3.4, .18);
   nearEnemies(P.x, P.y, WAVE_REACH+1).forEach(e=>{
     if(e.dead) return;
@@ -8452,15 +8454,15 @@ function allyAttack(a, st, tgt){
                vy:Math.sin(ang)*(st.proj==='arrow'?13:8.5),
                life: st.range/(st.proj==='arrow'?13:8.5)+0.05,
                pierce: (st.proj==='arrow'?1:2) + ((st.skills&&st.skills.pierce)||0),
-               hitIds:new Set(),
+               hitIds:new Set(), elem:elemOf(st),
                src:a, crit:forceCrit, mult:foot.mul, foot:foot.k,
                // 魔法使いの「連鎖」。専用技「連鎖強化」でもう1体増える
                chain: (j.sk.id==='chain' ? 1 : 0) + ((st.skills&&st.skills.chain)||0)});
     return;
   }
   const range=st.range, halfArc=(st.arc||75)*Math.PI/180;
-  W.fx.push({t:'swing',x:a.x,y:a.y,a:ang,life:0.18,max:0.18,r:range,arc:halfArc,
-             dt:st.dmgType, elem:elemOf(st), ally:true});
+  W.fx.push({t:'swing',x:a.x,y:a.y,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
+             dt:st.dmgType, elem:elemOf(st), weaponBase:a.equip.weapon&&a.equip.weapon.base, ally:true});
   nearEnemies(a.x, a.y, range+1).forEach(e=>{
     if(e.dead) return;
     const dx=e.x-a.x, dy=e.y-a.y, d=Math.hypot(dx,dy);
@@ -8536,7 +8538,7 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
             pop(e.x, e.y-0.4, Math.round(dm*lc), '#7fe0c0', '+'); }
   }
   a.hpNow -= dm;
-  feelImpact(a,e,false);
+  feelImpact(a,e,false,type,null);
   a.hit = 0.12;
   pop(a.x, a.y-0.4, dm, DTYPE[type]?DTYPE[type].col:'#ff8a80');
   damageAllyGear(a,'armor',DUR.armorPerHit);
@@ -9490,7 +9492,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
 
   dm = Math.max(1, dm);                    // 当たった攻撃は必ず 1 以上通す（仲間と同じ規則）
   S.hero.hpNow-=dm;
-  feelImpact(P,e,false);
+  feelImpact(P,e,false,type,null);
   /* 押し出しは**ダメージが通ったときだけ**。回避やパリイで消えた攻撃は
      ここまで来ない——避けたのに押される、が起きると盾を構える理由が濁る。 */
   if(e && !boltDmg) knockBack(P, e, e.push);
@@ -11984,7 +11986,6 @@ function draw(){
       ctx.beginPath(); ctx.moveTo(f.x*TS-camX,f.y*TS-camY);
       ctx.lineTo(f.x2*TS-camX,f.y2*TS-camY); ctx.stroke();
     }
-    if(f.t==='ashot') drawShot(f, camX, camY, true);   // 仲間の矢・魔弾
     if(f.t==='grave'){
       const p=1-f.life/f.max;
       ctx.strokeStyle='rgba(127,224,192,'+(1-p)+')'; ctx.lineWidth=3;
@@ -12019,13 +12020,11 @@ function draw(){
       drawFeelMagic(f,camX,camY,(DTYPE[f.dt]||DTYPE.arcane).col);
     }
     if(f.t==='feelring') drawFeelRing(f,camX,camY);
-    if(f.t==='pshot'){          // 主人公の矢・魔弾
-      drawShot(f, camX, camY, false);
-    }
   });
 
   // 主人公（候補B・遺跡の斥候）。
   endPixelFx();
+  W.fx.forEach(f=>{if(f.t==='ashot'||f.t==='pshot')drawShot(f,camX,camY,f.t==='ashot');});
   drawEnemyPixels(camX,camY);
   drawFeelMotes(camX,camY);
   const px=innerWidth/2, py=innerHeight/2;
@@ -12088,10 +12087,9 @@ function draw(){
     ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2,3.5);
     ctx.fillStyle=bar.col; ctx.fillRect(bar.sx-bar.R,bar.sy-bar.R-9,bar.R*2*bar.pct,3.5);
   });
-  // 攻撃エフェクト（属性ごとに形が変わる）
-  beginPixelFx();
+  // 採用済みの武器別攻撃と、実属性で決まるヒットエフェクト。
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
-  endPixelFx();
+  drawFeelHits(camX,camY);
   // ダメージ数値
   ctx.font=(TS*0.46)+'px '+FONT; ctx.textAlign='center';
   W.pops.forEach(p=>{
@@ -16136,6 +16134,7 @@ const nojs=el('nojs'); if(nojs && nojs.parentNode) nojs.parentNode.removeChild(n
 initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
+<script src="ally-effect-study.js"></script>
 <script src="game-feel.js"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------

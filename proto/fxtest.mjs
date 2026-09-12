@@ -150,7 +150,37 @@ R.drawShots = await pg.evaluate(()=>{
   return {failures:fails, ok:fails.length===0};
 });
 
-// 2-e. 敵の弾は敵の属性色になる
+// 2-e. 採用した7武器の形と、敵・味方への属性ヒットが本体側で選ばれる
+R.weaponFxIntegration = await pg.evaluate(()=>{
+  const expected={dagger:'dagger',sword:'swordaxe',axe:'swordaxe',mace:'hammer',
+                  spear:'spear',great:'greatsword',bow:'bow',staff:'magicbolt'};
+  const mapped={};
+  for(const [base,kind] of Object.entries(expected))mapped[base]=feelWeaponKind(base,null,
+    base==='bow'?'arrow':base==='staff'?'bolt':null);
+  const failures=[];
+  for(const [base,kind] of Object.entries(expected)){
+    try{drawSwing({t:'swing',x:P.x,y:P.y,a:.4,life:.44,max:FEEL_ATTACK_SECONDS,
+      r:1.8,dt:(BASES.find(b=>b.id===base)||{}).dt,weaponBase:base,elem:'fire'},0,0);}
+    catch(e){failures.push(base+': '+e.message);}
+    if(mapped[base]!==kind)failures.push(base+' mapped to '+mapped[base]);
+  }
+  FEEL.hits=[];
+  const enemy={x:P.x+1,y:P.y,arch:{},dirx:1,diry:0};
+  const ally={x:P.x-1,y:P.y,dirx:-1,diry:0};
+  feelImpact(enemy,P,false,'shock',null);
+  feelImpact(ally,enemy,false,'blunt','frost');
+  try{drawFeelHits(0,0);}catch(e){failures.push('hits: '+e.message);}
+  const hitKinds=FEEL.hits.map(f=>f.element+':'+f.target);
+  return {mapped,hitKinds,failures,
+    rendererLoaded:!!ALLY_EFFECT_FX,
+    allMapped:Object.entries(expected).every(([base,kind])=>mapped[base]===kind),
+    bothTargets:hitKinds.includes('shock:enemy')&&hitKinds.includes('frost:ally'),
+    ok:!!ALLY_EFFECT_FX&&!failures.length
+      &&Object.entries(expected).every(([base,kind])=>mapped[base]===kind)
+      &&hitKinds.includes('shock:enemy')&&hitKinds.includes('frost:ally')};
+});
+
+// 2-f. 敵の弾は敵の属性色になる
 R.boltColor = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(20);
   const seen=new Set();
@@ -163,7 +193,7 @@ R.boltColor = await pg.evaluate(()=>{
           allTyped: bolts.every(f=>!!DTYPE[f.dt])};
 });
 
-// 2-f. 凡例に7属性ぶんの形が並ぶ
+// 2-g. 凡例に7属性ぶんの形が並ぶ
 R.legend = await pg.evaluate(()=>{
   buildLegend();
   const html=el('fxlist').innerHTML;
@@ -174,7 +204,7 @@ R.legend = await pg.evaluate(()=>{
           ok: svgs===DTYPE_IDS.length};
 });
 
-// 2-g. 仲間の攻撃にも属性が乗る
+// 2-h. 仲間の攻撃にも属性が乗る
 R.allySwing = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(6); S.hero.party=[];
   const out={};

@@ -1,10 +1,12 @@
 /* Presentation and timing feedback. Combat formulas, AI and rewards stay in index.html. */
-const updateSimulation=update, resolveEnemyDeath=killEnemy, drawShotBase=drawShot;
+const updateSimulation=update, resolveEnemyDeath=killEnemy;
+const ALLY_EFFECT_FX=window.AllyEffectStudy;
+const FEEL_ATTACK_SECONDS=.62;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
   bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
-  motion:new WeakMap(),motes:[],ripples:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
+  motion:new WeakMap(),motes:[],ripples:[],hits:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
 const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
 // Deterministic decoration noise is independent of combat / loot RNG.
 function feelHash(x,y,s=0){let n=Math.imul(x+17,374761393)^Math.imul(y+31,668265263)^Math.imul((S.run?.depth||1)+s,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;}
@@ -18,13 +20,22 @@ function feelEntityOffset(e){
     y:-Math.abs(Math.sin(m.phase))*s*1.8+m.recoilY*recoil};
 }
 function feelBlink(e){const m=feelMotion(e);return m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;}
-function feelImpact(e,src,crit){
+function feelElement(dt,elem){return elem||(['fire','shock','frost','arcane'].includes(dt)?dt:'neutral');}
+function feelWeaponKind(base,dt,proj){
+  if(proj==='arrow'||base==='bow')return 'bow';
+  if(proj==='bolt'||base==='staff')return 'magicbolt';
+  return ({great:'greatsword',mace:'hammer',spear:'spear',sword:'swordaxe',axe:'swordaxe',dagger:'dagger'})[base]
+    ||(dt==='pierce'?'spear':dt==='blunt'?'hammer':'swordaxe');
+}
+function feelImpact(e,src,crit,dt,elem){
   const m=feelMotion(e);m.flash=.22;m.crit=crit?.25:0;
   // Replace the visual recoil on each hit; never accumulate or change simulation coordinates.
   const dx=src?e.x-src.x:-(e.dirx||1),dy=src?e.y-src.y:-(e.diry||0),n=Math.hypot(dx,dy)||1;
   const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
+  FEEL.hits.push({x:e.x,y:e.y,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally'});
+  if(FEEL.hits.length>80)FEEL.hits.splice(0,FEEL.hits.length-80);
   if(crit)feelKick(FEEL_TUNING.criticalShake,.19);
 }
 function feelSlow(seconds,scale){FEEL.slow=Math.max(FEEL.slow,seconds);FEEL.slowScale=Math.min(FEEL.slowScale,scale);}
@@ -187,35 +198,27 @@ function drawFeelRing(f,camX,camY){
   ctx.restore();
 }
 function drawFeelSwing(f,camX,camY){
-  const p=clamp(1-f.life/f.max,0,1),fade=1-p,dt=f.dt||'slash',a=f.a||0;
-  const x=f.x*TS-camX,y=f.y*TS-camY,r=(f.r||1.4)*TS*.85,q=Math.max(2,Math.round(TS/16));
-  const col=(DTYPE[dt]||DTYPE.slash).col;
-  ctx.save();ctx.globalCompositeOperation='lighter';
-  const dot=(px,py,s,c,alpha)=>{ctx.fillStyle=c;ctx.globalAlpha=alpha;ctx.fillRect(Math.round(px/q)*q,Math.round(py/q)*q,s,s);};
-  if(dt==='fire'){
-    for(let i=0;i<22;i++){const t=i/21,ang=a-(f.arc||1.1)+t*(f.arc||1.1)*2,d=r*(.5+p*.65);dot(x+Math.cos(ang)*d,y+Math.sin(ang)*d-p*TS*.2,q*(1+fade),'#ed8745',fade);if(i%3===0)dot(x+Math.cos(ang)*d,y+Math.sin(ang)*d,q,'#ffe2a2',fade);}
-  }else if(dt==='frost'){
-    for(let i=0;i<12;i++){const ang=a-1+i/11*2,d=r*(.4+p*.8),xx=x+Math.cos(ang)*d,yy=y+Math.sin(ang)*d;dot(xx,yy,q*2,'#91d8ed',fade);dot(xx+q,yy-q,q,'#efffff',fade);}
-  }else if(dt==='shock'){
-    for(let i=0;i<20;i++){const t=i/19,d=r*t,side=Math.sin(i*2.2+p*8)*q*2;dot(x+Math.cos(a)*d-Math.sin(a)*side,y+Math.sin(a)*d+Math.cos(a)*side,q*1.5,i%3?'#e5de91':'#fffad8',fade);}
-  }else if(dt==='arcane'){
-    for(let i=0;i<20;i++){const ang=a+i*Math.PI/10+p*2,d=r*(.4+p*.5);dot(x+Math.cos(ang)*d,y+Math.sin(ang)*d,q*(i%5?1:2),'#c9a3ef',fade);}
-  }else if(dt==='pierce'){
-    const ext=Math.sin(p*Math.PI)*r;
-    for(let i=0;i<12;i++){const d=ext*i/11;dot(x+Math.cos(a)*d,y+Math.sin(a)*d,q*(i>8?2:1),i>9?'#fff3d1':col,fade);}
-  }else if(dt==='blunt'){
-    for(let i=0;i<20;i++){const t=i*2.399,d=r*p*(.4+(i%4)*.15);dot(x+Math.cos(a)*r*.5+Math.cos(t)*d,y+Math.sin(a)*r*.5+Math.sin(t)*d,q*(1+fade),i%3?'#ffe2a7':col,fade);}
-  }else{
-    const half=f.arc||1.3,head=a-half+p*half*2;
-    for(let i=0;i<24;i++){
-      const t=i/23,ang=head-t*half*1.45,rad=r*(.85+.10*Math.sin(t*Math.PI));
-      dot(x+Math.cos(ang)*rad,y+Math.sin(ang)*rad,q*(1.2+(1-t)*1.8),col,fade*(1-t)*.75);
-      if(t<.45)dot(x+Math.cos(ang)*rad,y+Math.sin(ang)*rad,q,'#fff7d6',fade*(1-t));
-    }
-    for(let i=0;i<9;i++){const ang=head-i*.14,d=r*(1+p*.25+i*.018);dot(x+Math.cos(ang)*d,y+Math.sin(ang)*d,q,col,fade*.7);}
-  }
-  if(f.elem)emberBurst(x,y,a,f.arc||1.3,r,p,(DTYPE[f.elem]||DTYPE.fire).col,12);
-  ctx.restore();
+  if(!ALLY_EFFECT_FX)return;
+  const kind=f.weaponKind||feelWeaponKind(f.weaponBase,f.dt),cfg=ALLY_EFFECT_FX.weapons[kind];
+  if(!cfg)return;
+  const age=Math.max(0,(f.max||FEEL_ATTACK_SECONDS)-f.life);
+  const scale=clamp(((f.r||1.4)*TS)/(cfg.reach||35),.65,TS/18);
+  ALLY_EFFECT_FX.render(ctx,{kind,age,x:f.x*TS-camX,y:f.y*TS-camY,angle:f.a||0,scale,
+    heavy:kind==='greatsword'||kind==='hammer',hit:true,element:feelElement(f.dt,f.elem)});
+}
+function drawFeelHits(camX,camY){
+  if(!ALLY_EFFECT_FX)return;
+  const scale=clamp(TS/48,.65,1.5);
+  for(const f of FEEL.hits)ALLY_EFFECT_FX.renderElementHit(ctx,{element:f.element,age:f.age,
+    x:f.x*TS-camX,y:f.y*TS-camY,scale,target:f.target});
+}
+function drawFeelWeaponShot(f,camX,camY){
+  if(!ALLY_EFFECT_FX)return;
+  const kind=f.kind==='arrow'?'bow':'magicbolt',a=Math.atan2(f.vy,f.vx),scale=clamp(TS/42,.8,1.5);
+  const age=kind==='bow'?.17:.19,head=kind==='bow'?90:88;
+  const x=f.x*TS-camX-Math.cos(a)*head*scale,y=f.y*TS-camY-Math.sin(a)*head*scale;
+  ALLY_EFFECT_FX.render(ctx,{kind,age,x,y,angle:a,scale,hit:false,
+    element:feelElement(kind==='magicbolt'?'arcane':'pierce',f.elem)});
 }
 function drawFeelMagic(f,camX,camY,col){
   const x=f.x*TS-camX,y=f.y*TS-camY,q=Math.max(2,Math.round(TS/16));
@@ -231,7 +234,7 @@ function drawFeelMagic(f,camX,camY,col){
 }
 function resetFeel(){
   FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
-  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;
+  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;
   FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
 }
 function syncFeel(){ if(FEEL.floor!==W.fl) resetFeel(); }
@@ -262,6 +265,7 @@ function updateFeel(dt){
   });
   FEEL.motes=FEEL.motes.filter(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=dt*3;return p.life>0;});
   FEEL.ripples=FEEL.ripples.filter(r=>{r.age+=dt;return r.age<.85;});
+  FEEL.hits=FEEL.hits.filter(f=>{f.age+=dt;return f.age<.48;});
   for(const d of W.drops)if(d.feelDrop)d.feelDrop.age=Math.min(1,d.feelDrop.age+dt);
 }
 function beginFeelWorld(){
@@ -518,6 +522,5 @@ function drawEnemyPixels(camX,camY){
 // Render-only replacements: projectile physics and attack damage remain in the simulation.
 drawSwing=drawFeelSwing;
 drawShot=function(f,camX,camY,isAlly){
-  if(f.kind==='arrow')return drawShotBase(f,camX,camY,isAlly);
-  drawFeelMagic(f,camX,camY,isAlly?'#9bd5ff':'#b9a4ff');
+  drawFeelWeaponShot(f,camX,camY);
 };
