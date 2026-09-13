@@ -522,5 +522,92 @@ R.fallAnimNeverSticks = await pg.evaluate(()=>{
           ok: clearedOnEnter && allyDone && heroDone && moved>0.3};
 });
 
+/* 5-d. 落ちている最中に倒れた仲間は、蘇生したらちゃんと戻ってくる。
+   蘇生の入口は4つある（広告・不死鳥・慰霊碑・酒場）が、どれも `a.dead=false` を
+   書くだけ。倒れた時点で fallAnim を落としておかないと、立ち上がった仲間は
+   縮んだまま（描画倍率 0.04）動かない——「歩いていたらキャラが消える」の一形。 */
+R.reviveClearsFallAnim = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  W.enemies.length=0;
+  const a=TH.ally(3,'warrior',10); a.slot=0; S.hero.party=[a];
+  a.x=P.x+1; a.y=P.y;
+  a.fallAnim={t:0, dur:FALL_ANIM_SEC};       // 落ちている最中に
+  a.hpNow=0; downAlly(a);                    // 倒れる
+  const clearedOnDown = !a.fallAnim;
+  /* downAlly は「倒れた」モーダル（openFallen）を開くので、
+     そのままだと update が回らない＝動かないのは蘇生の問題ではない。閉じてから測る。 */
+  closeFallen(); setScreen('game');
+  a.dead=false; a.hpNow=allyStats(a).maxHp;  // 蘇生（どの入口も実質これ）
+  P.x+=4;
+  const bx=a.x, by=a.y;
+  stepSim(1.2);
+  const moved=Math.hypot(a.x-bx, a.y-by);
+  return {clearedOnDown, moved:+moved.toFixed(2),
+          clearedWhenDowned: clearedOnDown,
+          movesAfterRevive: moved>0.3,
+          ok: clearedOnDown && moved>0.3};
+});
+
+/* 5-e. 進まない落下演出は、誰が消し忘れても見張り番が落とす。
+   置き場所が1つ増えるたびに同じ事故が戻ってくるので、出口にも番を置いてある。 */
+R.fallWatchdogRecovers = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  W.enemies.length=0;
+  const a=TH.ally(3,'warrior',10); a.slot=0; S.hero.party=[a];
+  a.x=P.x+1; a.y=P.y;
+  // 誰も進めてくれない fallAnim を手で置く（縁の無い階なので tickPits は触らない）
+  P.fallAnim={t:0, dur:FALL_ANIM_SEC};
+  a.fallAnim={t:0, dur:FALL_ANIM_SEC};
+  stepSim(0.3);
+  const stillThere = !!P.fallAnim && !!a.fallAnim;   // すぐには落とさない
+  stepSim(FALL_ANIM_SEC*FALL_WATCHDOG_MUL + FALL_WATCHDOG_PAD + 0.3);
+  return {heroCleared: !P.fallAnim, allyCleared: !a.fallAnim,
+          notTooEager: stillThere,
+          ok: !P.fallAnim && !a.fallAnim && stillThere};
+});
+
+/* 5-f. 落ちた者の戻し先は、必ず立てる場所。
+   snapToFloor は tileWalk（壁と縁のタイル）しか見ない。だが水の層の**淵**は
+   タイルではなく W.haz.g の深さで決まるので snapToFloor には見えず、
+   実測で**淵から呼ぶと 73 回中 73 回また淵が返っていた。**
+   戻し先が淵だと、落ちて戻されてまた落ちる——その間ずっと描画倍率 0.04＝
+   画面から消えたまま、操作も受け付けない。報告「歩いていたらキャラが消える」。 */
+R.fallLandsOnStandableGround = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=40; startRun(16);
+  let depth=null;
+  for(const d of [16,17,18,19,20]){ enterFloor(d); if(W.haz && W.haz.kind==='water'){ depth=d; break; } }
+  if(!depth) return {skipped:true, oldWouldLandInVoid:1, neverLandsInVoid:true,
+                     escapesTheVoid:true, ok:true};
+  W.enemies.length=0;
+  // 淵のマスすべてから戻し先を引いて、1つでも淵へ戻さないか見る
+  let tries=0, newBad=0, oldBad=0;
+  for(let y=1;y<W.fl.H-1;y++) for(let x=1;x<W.fl.W-1;x++){
+    if((W.haz.g[y] ? (W.haz.g[y][x]|0) : 0) < WATER_DEEP) continue;
+    tries++;
+    if(pitAt(...Object.values(snapToStandable(W.fl,x,y)))) newBad++;
+    if(pitAt(...Object.values(snapToFloor(W.fl,x,y)))) oldBad++;
+  }
+  // 実際に淵へ放り込んで、抜けられることを見る
+  let spot=null;
+  for(let y=1;y<W.fl.H-1 && !spot;y++) for(let x=1;x<W.fl.W-1;x++){
+    if(tileWalk(W.fl,x,y) && (W.haz.g[y] ? (W.haz.g[y][x]|0) : 0) >= WATER_DEEP)
+      { spot={x:x+0.5,y:y+0.5}; break; }
+  }
+  let escaped=true;
+  if(spot){
+    S.hero.hpNow=1e9; P.invuln=0;
+    P.x=spot.x; P.y=spot.y; P.safeX=undefined; P.safeY=undefined;
+    P.fallAnim=null; P.fallBlink=0;
+    stepSim(4, {after:()=>{ S.hero.hpNow=1e9; }});
+    escaped = !pitAt(P.x,P.y);
+  }
+  return {tries, newBad, oldBad, checkedDeepSpot: !!spot,
+          // 昔の探し方なら淵へ戻していた＝この検証は報告された不具合を捕まえる
+          oldWouldLandInVoid: oldBad>0,
+          neverLandsInVoid: newBad===0,
+          escapesTheVoid: escaped,
+          ok: tries>0 && newBad===0 && oldBad>0 && escaped};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

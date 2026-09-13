@@ -7397,7 +7397,8 @@ function enterFloor(depth){
 
   // 仲間は主人公の脇に付いてくる。壁に埋まらないよう床へスナップする。
   livingParty().forEach((a,i)=>{
-    const p = snapToFloor(fl, P.x + Math.cos(i*2.1)*1.2, P.y + Math.sin(i*2.1)*1.2);
+    // 淵（水の層）へ置かないこと。置いた瞬間から落ち続ける
+    const p = snapToStandable(fl, P.x + Math.cos(i*2.1)*1.2, P.y + Math.sin(i*2.1)*1.2);
     a.x=p.x; a.y=p.y; a.atkCd=0; a.swing=0; a.st={}; a.bu={};
     /* ---------- 落下演出も持ち越さない ----------
        主人公の側（P.fallAnim）は上で消しているのに、**仲間のぶんが漏れていた。**
@@ -7499,6 +7500,30 @@ function snapToFloor(fl, x, y){
     }
   }
   return {x:fl.start.cx+0.5, y:fl.start.cy+0.5};
+}
+
+/* ---------- 落ちない床を探す ----------
+   snapToFloor は `tileWalk`（壁と縁のタイル）しか見ない。だが水の層の**淵**は
+   タイルではなく W.haz.g の深さで決まるので、**snapToFloor には見えない。**
+   実測: 淵のマスから snapToFloor を呼ぶと 73 回中 73 回、また淵が返ってきた。
+
+   これが効くのは戻し先——落ちた者を淵へ戻せば、落ちて、戻されて、また落ちる。
+   その間ずっと描画倍率は 0.04（＝画面から消えている）で、操作も受け付けない。
+   「歩いていたらキャラが消えて戻らない」の、いちばん素直な作られ方。
+
+   立てるかどうかの判断は standable（solid でも pit でもない）に通す。
+   pitAt は waterVoidAt を含んでいるので、淵もここで弾かれる。 */
+function snapToStandable(fl, x, y){
+  const gx=clamp(Math.round(x),0,fl.W-1), gy=clamp(Math.round(y),0,fl.H-1);
+  for(let r=0;r<Math.max(fl.W,fl.H);r++){
+    for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+      if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue;   // 外周のみ
+      const nx=gx+dx, ny=gy+dy;
+      if(nx<0||ny<0||nx>=fl.W||ny>=fl.H) continue;
+      if(tileWalk(fl,nx,ny) && standable(nx+0.5, ny+0.5)) return {x:nx+0.5, y:ny+0.5};
+    }
+  }
+  return snapToFloor(fl, x, y);     // 見つからなければ従来どおり（起こらないはず）
 }
 
 /* ---------- ワールド / 主人公 ---------- */
@@ -8070,8 +8095,10 @@ function rememberFooting(e){
   e.safeX=e.x; e.safeY=e.y;
 }
 function fallBack(e){
-  const p = (e.safeX!==undefined && !pitAt(e.safeX,e.safeY))
-          ? {x:e.safeX, y:e.safeY} : snapToFloor(W.fl, e.x, e.y);
+  /* 戻し先は**必ず立てる場所**。snapToFloor だと水の層の淵へ戻してしまい、
+     落ちて戻されてまた落ちる——その間ずっと画面から消えたままになる。 */
+  const safeOk = e.safeX!==undefined && standable(e.safeX, e.safeY);
+  const p = safeOk ? {x:e.safeX, y:e.safeY} : snapToStandable(W.fl, e.x, e.y);
   e.x=p.x; e.y=p.y;
   W.fx.push({t:'ultring', x:p.x, y:p.y, r:0, max:2.2, life:0.35, maxLife:0.35, col:'#c0e07f'});
 }
@@ -9332,6 +9359,17 @@ function damageAllyGear(a, slot, amount){
 /* 仲間が倒れた。ここでロストが確定し、広告での蘇生を 1 度だけ提案する。 */
 function downAlly(a){
   if(a.dead) return;
+  /* ---------- 倒れた時点で落下演出は終わり ----------
+     ここで消しておかないと、**落ちている最中に倒れた仲間**が
+     fallAnim を抱えたまま dead になる。蘇生（広告・不死鳥・慰霊碑・酒場）は
+     どれも `a.dead=false` を書くだけなので、立ち上がった仲間は
+     描画倍率 0.04 のまま、しかも tickAlly が即 return して一歩も動かない
+     ——画面の上では「消えたまま戻らない」。
+
+     **蘇生の入口は4つあるが、倒れる入口はここ1つ。** 入口を数え上げて
+     塞ぐやり方は、経路が1つ増えたときに必ず忘れるので、
+     すべての蘇生が通る手前のここで落としておく。 */
+  a.fallAnim=null; a.fallBlink=0; a.iframe=0;
   /* 加入前の仲間は、蘇生の対象にならない。
      「1人につき1回だけ」の広告蘇生は**連れ歩いた相手**への救済であって、
      まだ名前しか知らない相手に使えると、あらゆる階で保険が効いてしまう。
@@ -10309,6 +10347,10 @@ function nowSec(){ return (performance.now?performance.now():Date.now())/1000; }
 /* ---------- 死亡 / 帰還 ---------- */
 function die(){
   if(!S.hero || !S.run) return;
+  /* 主人公も仲間と同じ（downAlly 参照）。不屈・不死鳥・不滅・広告蘇生は
+     どれも「立ち上がる」だけなので、落下演出を抱えたまま倒れると
+     立ち上がったあとも縮んだまま動けない。倒れる入口のここで落とす。 */
+  P.fallAnim=null; P.fallBlink=0;
   /* 上の3ヶ所で止めているが、ここも塞ぐ。
      入口を数え上げて塞ぐやり方は「1つ増やしたときに忘れる」ので、
      出口にも同じ判定を置いておく。 */
@@ -11410,8 +11452,38 @@ function stepSim(seconds, opt){
   }
   return ran;
 }
+/* ---------- 落下演出の見張り番 ----------
+   落下演出（fallAnim）は「縮んで消えて、戻ってくる」までを持つ状態で、
+   進めるのは tickPits の仕事。だが**進める側に届かない置かれ方**が何度か起きた:
+     ・縁の無い階へ移ると tickPits が入口で帰る（enterFloor で消すようにした）
+     ・落ちている最中に倒れると、蘇生後も抱えたまま（downAlly / die で消すようにした）
+   どちらも「消し忘れた側」を1ヶ所ずつ塞いだが、**置く場所が1つ増えるたびに
+   同じ事故が戻ってくる。** 進まない fallAnim は、画面の上では
+   「キャラが縮んで消えたまま動かない」という同じ1つの症状になる。
+
+   そこで出口にも番をひとつ置く。持っている時間だけを自分で数えて、
+   本来の長さを大きく超えたら黙って落とす。**誰が消し忘れても、
+   2秒ちょっとで必ず戻ってくる**ようにしておく。
+   （直った原因を隠さないよう、消す時にログは残さない——
+     ここが働いていること自体は不具合なので、検証は movetest 側で見る） */
+const FALL_WATCHDOG_MUL = 3;      // 本来の長さの何倍まで待つか
+const FALL_WATCHDOG_PAD = 1.0;    // ＋この秒数（スローモーション等の余地）
+function tickFallWatchdog(dt){
+  const watch = e => {
+    if(!e || !e.fallAnim) return;
+    e.fallAnim.age = (e.fallAnim.age||0) + dt;
+    if(e.fallAnim.age > e.fallAnim.dur*FALL_WATCHDOG_MUL + FALL_WATCHDOG_PAD){
+      e.fallAnim = null; e.fallBlink = 0;
+    }
+  };
+  watch(P);
+  // livingParty ではなく party。**倒れている間に抱えたまま**になるのが元の事故なので。
+  party().forEach(watch);
+  if(W.npc) watch(W.npc);
+}
 function update(dt){
   updateFeel(dt);
+  tickFallWatchdog(dt);
   /* 弔いの残り時間。stats() を取る前に減らす——同じフレーム内で
      「もう切れているのに効いている」状態を作らないため。 */
   if(S.hero.avengeT>0) S.hero.avengeT=Math.max(0, S.hero.avengeT-dt);
@@ -13536,8 +13608,13 @@ function drawMinimap(){
     dot(intr.x, intr.y, 6, '#ff4a3a');
     ctx.globalAlpha=1;
   }
-  livingParty().forEach(a=>dot(a.x, a.y, 3.5, jobDef(a.job).col));
-  dot(P.x, P.y, 4.5, '#fff');
+  /* 自分と仲間の点だけは**縮尺に付き合わせない。**
+     他の印（階段・遺体・鉱脈）は「探す物」なので大きいほうが見つけやすいが、
+     自分の点は探す物ではなく**基準**で、大きいと自分が今どのマスに
+     立っているのかが逆に読めなくなる（報告：地図の自機表示が大き過ぎる）。
+     旧ミニマップでの見た目（3.5px / 3px）くらいに収まる値にしてある。 */
+  livingParty().forEach(a=>dot(a.x, a.y, 2.0, jobDef(a.job).col));
+  dot(P.x, P.y, 2.4, '#fff');
 }
 
 /* ---------- HUD ---------- */
