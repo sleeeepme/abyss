@@ -12277,12 +12277,12 @@ function draw(){
     }
     if(d.it && isConsum(d.it)){
       const cc=(consumDef(d.it.consum)||{}).col || '#7fe0c0';
-      drawFeelItemIcon(d.it,sx,sy);
+      drawDropIcon(d.it,sx,sy,cc);
       if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label(d.it.nm, sx, sy-TS*0.52, cc, 0.95);
       return;
     }
     const c=RARCOL[d.it.rar];
-    drawFeelItemIcon(d.it,sx,sy);
+    drawDropIcon(d.it,sx,sy,c);
     // 名前は近づいたときだけ。常時出すと画面が文字で埋まる
     if(Math.hypot(d.x-P.x,d.y-P.y)<3.2)
       label(itemName(d.it), sx, sy-TS*0.6, c, 0.95);
@@ -13575,6 +13575,35 @@ function drawAir(Z, dt){
    ずれた変換や薄い不透明度を引き継ぐので、変換を見て積み残しを戻す。
    何度も投げるようなら演出側の描画を切って素の図形に固定する——
    毎フレーム例外を作ること自体が重い。 */
+/* ---------- 落ちている物の絵 ----------
+   絵は演出ファイル（item-icons.js の ITEM_ART）が持っている。
+   **その1ファイルが配信側に無いだけで、盤面が丸ごと消えていた。**
+
+   落とし物は地形と一緒に、敵より前に描く。ここで投げると
+   そこから後ろ——敵・仲間・主人公・HUD・地図——が
+   そのフレームまるごと落ちる。画面には「床だけが映って、
+   自分も敵も居ない」という形で出る（報告「キャラが消える」の正体）。
+
+   絵が無いことは、例外ではなく**簡易表示**で伝える。
+   一度落ちたら以後は試さない（毎フレーム例外を作ること自体が重い）。 */
+let _dropArtOk = true;
+function drawDropIcon(it, sx, sy, col){
+  if(_dropArtOk){
+    try{ drawFeelItemIcon(it, sx, sy); return; }
+    catch(err){
+      _dropArtOk = false;
+      console.error('item art unavailable:', err);
+      try{ log('⚠ アイテムの絵が読めないので簡易表示にした'); }catch(_){}
+    }
+  }
+  // 素の菱形。レア度の色だけは残す——拾う価値はここで判断している。
+  const r = TS*0.26;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy-r); ctx.lineTo(sx+r, sy); ctx.lineTo(sx, sy+r); ctx.lineTo(sx-r, sy);
+  ctx.closePath();
+  ctx.fillStyle = col || '#c3cad8'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+}
 /* ---------- 消えないキャラ ----------
    「突然キャラだけ表示されなくなり、そのまま戻らない」報告への対処。
 

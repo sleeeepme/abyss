@@ -680,5 +680,48 @@ R.effectCrashStillDrawsHero = await pg.evaluate(()=>{
           ok: fxCalls>0 && drawn>=20 && threw===null && ctxIsMain};
 });
 
+/* 5-i. 演出ファイルが1つ欠けても、盤面は最後まで描く。
+   実際に起きたこと: item-icons.js が配信側に無く（未コミットだった）、
+   ITEM_ART が未定義。落とし物は敵より前に描くので、毎フレームそこで落ち、
+   敵・仲間・主人公・HUD・地図が丸ごと出なくなっていた。
+   床だけが映って自分も敵も居ない——報告「キャラが消える」の正体。 */
+R.missingItemArtStillDrawsFrame = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  /* 近くに落とし物を置く（これが無いと絵を描く経路に入らない）。
+     以後は draw() だけを呼ぶ——update() を回すと autoPickup が拾ってしまう。 */
+  const place=()=>{ W.drops.length=0;
+    W.drops.push({x:P.x+1.2, y:P.y, it:genItem(3, 0, 3), life:999}); };
+  place(); draw();
+  const drewWithArt = _drawStage;
+
+  const cerr=console.error; console.error=()=>{};
+  // ITEM_ART が無い環境を作る（配信側にファイルが無いのと同じ状態）
+  const orig=window.drawFeelItemIcon;
+  let called=0;
+  window.drawFeelItemIcon=()=>{ called++; throw new ReferenceError("Can't find variable: ITEM_ART"); };
+  _dropArtOk=true;
+  let threw=null, heroDrawn=0;
+  const origHero=window.drawFeelCharacterSprite;
+  window.drawFeelCharacterSprite=function(id,x,y,size,ent){
+    if(ent===P) heroDrawn++;
+    return origHero.apply(this,arguments);
+  };
+  try{ for(let i=0;i<10;i++){ place(); draw(); } }catch(e){ threw=String(e.message); }
+  const stageAfter=_drawStage;
+  window.drawFeelItemIcon=orig; window.drawFeelCharacterSprite=origHero;
+  _dropArtOk=true; console.error=cerr;
+  W.drops.length=0;
+  draw();
+  return {drewWithArt, stageAfter, called, heroDrawn, threw,
+          artWasMissing: called>0,
+          onlyTriedOnce: called===1,          // 一度落ちたら以後は試さない
+          frameCompleted: stageAfter==='地図',
+          heroStillDrawn: heroDrawn===10,
+          drawSurvives: threw===null,
+          ok: called===1 && stageAfter==='地図' && heroDrawn===10 && threw===null};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));
