@@ -11431,7 +11431,12 @@ function tick(now){
        ログが埋まって、肝心の1行目が流れて読めなくなる）。 */
     if(!_tickErrShown){
       _tickErrShown=true;
-      try{ log('⚠ 描画エラー: '+((err&&err.message)||err)); }catch(_){}
+      /* どこで落ちたかを一緒に出す。「描画エラー」だけでは、
+         報告をもらっても探す場所が決まらない。 */
+      try{
+        const where = errSite(err);
+        log('⚠ 描画エラー['+_drawStage+']: '+((err&&err.message)||err)+(where?' @'+where:''));
+      }catch(_){}
     }
   }
   requestAnimationFrame(tick);
@@ -11439,6 +11444,24 @@ function tick(now){
 let _canvasDirty=true;
 let _tickErrShown=false;
 let _fxFails=0;          // 演出の描画で落ちた回数（最初の1回だけ画面に出す）
+/* ---------- どこまで描けたか ----------
+   例外が出ても「描画エラー」としか言えないと、報告をもらっても場所が分からない
+   （実際そうなった）。draw() の節目ごとに名前を置いて、落ちたときに
+   **直前に通った節**を一緒に出す。スタックを読める環境が無くても、
+   「敵まで描けて仲間で落ちた」のように場所が一言で伝わる。
+   代入1つぶんなので、毎フレーム通っても費用はほぼ無い。 */
+let _drawStage='開始前';
+/* 例外の発生場所を1行に縮める。行番号まで出れば原因はほぼ一意に決まる。
+   端末では開発者コンソールを開けないので、**画面のログに出る形**にしておく。 */
+function errSite(err){
+  const st = err && err.stack;
+  if(!st) return '';
+  const line = (String(st).split('\n').find(l=>/:\d+:\d+/.test(l)) || '').trim();
+  if(!line) return '';
+  const m = line.match(/:(\d+):\d+\)?$/);
+  const fn = (line.match(/^at\s+([\w$.<>]+)/)||[])[1] || '';
+  return (fn ? fn+' ' : '') + (m ? m[1]+'行' : line.slice(0,50));
+}
 
 /* ---------- 検証用: ループを実時間ではなく同期で進める ----------
    回帰テストの 64%（321秒中206秒）が「3秒待つ」の類の実時間待ちだった。
@@ -11502,6 +11525,7 @@ function tickFallWatchdog(dt){
   if(W.npc) watch(W.npc);
 }
 function update(dt){
+  _drawStage='更新';
   updateFeel(dt);
   tickFallWatchdog(dt);
   /* 弔いの残り時間。stats() を取る前に減らす——同じフレーム内で
@@ -12010,8 +12034,10 @@ function resize(){
 addEventListener('resize',resize);
 
 function draw(){
+  _drawStage='画面消し';
   ctx.fillStyle='#0d0f14'; ctx.fillRect(0,0,innerWidth,innerHeight);
   if(S.screen!=='game'||!W.fl||!S.hero||!S.run) return;
+  _drawStage='地形';
   beginFeelWorld();
   const f=W.fl;
   // 層（10階層ごと）の見た目。色・装飾・明かりの届く距離がここで切り替わる。
@@ -12263,6 +12289,7 @@ function draw(){
   });
 
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
+  _drawStage='敵';
   W.enemies.forEach(e=>{
     if(e.dead && e.pixelBurst) return;
     // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
@@ -12455,6 +12482,7 @@ function draw(){
      ここでバーまで描いてしまうと、寄り添った主人公の絵に踏まれて見えなくなる瞬間ができる。
      「誰のキャラ絵より上」を保証するには、全員のキャラ絵を描き終えたあとに
      まとめて描く1パスにするしかない。 */
+  _drawStage='仲間';
   const allyBars=[];
   const drawMate=(a, isNpc)=>{
     const motion=finiteXY(feelEntityOffset(a));
@@ -12847,6 +12875,7 @@ function draw(){
 
      演出は演出、盤面は本編。演出が転んでも、主人公と HUD は描き切る。
      finally で必ず endPixelFx() に戻すので、ctx が裏に残ることもない。 */
+  _drawStage='演出';
   beginPixelFx();
   try{
   W.fx.forEach(f=>{
@@ -12999,7 +13028,9 @@ function draw(){
   }finally{
     endPixelFx();
   }
+  _drawStage='弾';
   W.fx.forEach(f=>{if(f.t==='ashot'||f.t==='pshot')drawShot(f,camX,camY,f.t==='ashot');});
+  _drawStage='敵ドット';
   drawEnemyPixels(camX,camY);
   drawFeelMotes(camX,camY);
   const px=innerWidth/2, py=innerHeight/2;
@@ -13038,6 +13069,7 @@ function draw(){
   const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
   const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
+  _drawStage='主人公';
   const heroBlinkOff = vanishGuard(P, (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0), _drawDt);
   /* 演出の揺れは NaN になり得る（位相・反動が一度でも壊れると戻らない）。
      ctx.translate(NaN) は例外を出さずに**そのフレームの絵を捨てる**ので、
@@ -13072,6 +13104,7 @@ function draw(){
   });
   // 採用済みの武器別攻撃と、実属性で決まるヒットエフェクト。
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
+  _drawStage='ヒット効果';
   drawFeelHits(camX,camY);
   // ダメージ数値
   ctx.font=(TS*0.46)+'px '+FONT; ctx.textAlign='center';
@@ -13087,7 +13120,9 @@ function draw(){
   });
   ctx.globalAlpha=1;
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
+  _drawStage='空気';
   drawAir(Z, _drawDt);
+  _drawStage='カメラ復帰';
   ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
   drawFeelVignette();
   // 被弾フラッシュ
@@ -13112,11 +13147,13 @@ function draw(){
 
      50% は「そろそろ考えろ」の黄色、20% は「今すぐ何とかしろ」の赤。
      脈の速さも変える——赤のほうが速いのは、急かす気持ちを言葉なしで渡すため。 */
+  _drawStage='危険表示';
   drawDanger();
   drawFrozen();       // 凍結中。動かない理由を画面で言う
   // 中央バナー（層の切り替わり／装備の破損）
   drawBanner();
   // ミニマップ
+  _drawStage='地図';
   drawMinimap();
 }
 const DANGER_WARN = 0.50, DANGER_CRIT = 0.20;
@@ -13662,14 +13699,17 @@ function drawMinimap(){
   // ミニマップも層の色で塗る（開いた瞬間にどこにいるか分かる）
   ctx.fillStyle = f.zone ? shade(f.zone.dot, 1.15) : '#5a6685';
   for(let y=0;y<f.H;y++)for(let x=0;x<f.W;x++) if(W.seen[y][x]&&tileWalk(f,x,y)) ctx.fillRect(ox+x*s,oy+y*s,s,s);
-  /* 印の大きさは地図の縮尺に合わせる。**px の決め打ちだと、
-     大きく出した瞬間に印だけ豆粒になって読めない。**
-     旧ミニマップ（s≒1.15）を基準に、同じ見え方へ揃える。 */
-  const k = Math.max(1, s/1.15);
-  const dot=(x,y,sz,col)=>{ const d=sz*k; ctx.fillStyle=col;
-    ctx.fillRect(ox+x*s-d/2, oy+y*s-d/2, d, d); };
+  /* ---------- 印は1マス ----------
+     以前は「旧ミニマップでの px」を s/1.15 倍して描いていた。
+     地図を大きく出すようにしたので倍率もそのまま伸び、
+     **印1つが4マス分**まで膨らんでいた（報告：四角が全部大きい）。
+     地図の上の物は必ずどこかのマスに載っているので、
+     大きさで強弱を付ける理由が無い。**印＝そのマス**に揃える。
+     色だけで種類を分けるほうが、重なったときも読める。 */
+  const dot=(x,y,col)=>{ ctx.fillStyle=col;
+    ctx.fillRect(ox+Math.floor(x)*s, oy+Math.floor(y)*s, s, s); };
   if(stairRevealed()){
-    dot(f.stair.x, f.stair.y, 4.5, '#7fc3e0');
+    dot(f.stair.x, f.stair.y, '#7fc3e0');
   }else{
     const h=stairHint();
     if(h>0){
@@ -13677,15 +13717,15 @@ function drawMinimap(){
       const ang=Math.atan2(f.stair.y-P.y, f.stair.x-P.x);
       const rr=Math.min(mw,mh)*0.22;
       ctx.globalAlpha=0.25+0.45*h;
-      dot(P.x+Math.cos(ang)*rr/s, P.y+Math.sin(ang)*rr/s, 4, '#7fc3e0');
+      dot(P.x+Math.cos(ang)*rr/s, P.y+Math.sin(ang)*rr/s, '#7fc3e0');
       ctx.globalAlpha=1;
     }
   }
-  if(W.grave) dot(W.grave.x, W.grave.y, 5, '#7fe0c0');
+  if(W.grave) dot(W.grave.x, W.grave.y, '#7fe0c0');
   // ユニーク敵と仲間候補は地図に出す。避けるか会いに行くかを選ばせるため。
-  W.enemies.forEach(e=>{ if(e.uniq && !e.dead) dot(e.x, e.y, 5, '#c07fe0'); });
-  if(W.npc) dot(W.npc.x, W.npc.y, 5, '#ffd06a');
-  if(W.ev && !W.ev.used) dot(W.ev.x, W.ev.y, 5, eventDef(W.ev.id).col);
+  W.enemies.forEach(e=>{ if(e.uniq && !e.dead) dot(e.x, e.y, '#c07fe0'); });
+  if(W.npc) dot(W.npc.x, W.npc.y, '#ffd06a');
+  if(W.ev && !W.ev.used) dot(W.ev.x, W.ev.y, eventDef(W.ev.id).col);
   // ハザードは地図にも薄く出す。ルート取りを地図の上で決められるようにする。
   if(W.haz){
     const hz=hazardDef(W.haz.kind);
@@ -13695,23 +13735,21 @@ function drawMinimap(){
     ctx.globalAlpha=1;
   }
   // 鉱脈と鍛冶場も地図に出す。「掘ってから鍛冶場まで運ぶ」経路を地図の上で引かせたい。
-  (W.ores||[]).forEach(o=>dot(o.x, o.y, 4, o.mined?'#3f4452':oreDef(o.grade).col));
-  if(W.forge) dot(W.forge.x, W.forge.y, 5, '#e0705a');
-  if(W.shop)  dot(W.shop.x,  W.shop.y,  5, '#d6b34a');
+  (W.ores||[]).forEach(o=>dot(o.x, o.y, o.mined?'#3f4452':oreDef(o.grade).col));
+  if(W.forge) dot(W.forge.x, W.forge.y, '#e0705a');
+  if(W.shop)  dot(W.shop.x,  W.shop.y,  '#d6b34a');
   // 侵入者だけは霧を無視して常に見える。どこから来るか分かるから逃げる判断ができる。
   const intr=liveIntruder();
   if(intr){
     ctx.globalAlpha=0.55+0.45*Math.sin(performance.now()/220);
-    dot(intr.x, intr.y, 6, '#ff4a3a');
+    dot(intr.x, intr.y, '#ff4a3a');
     ctx.globalAlpha=1;
   }
-  /* 自分と仲間の点だけは**縮尺に付き合わせない。**
-     他の印（階段・遺体・鉱脈）は「探す物」なので大きいほうが見つけやすいが、
-     自分の点は探す物ではなく**基準**で、大きいと自分が今どのマスに
-     立っているのかが逆に読めなくなる（報告：地図の自機表示が大き過ぎる）。
-     旧ミニマップでの見た目（3.5px / 3px）くらいに収まる値にしてある。 */
-  livingParty().forEach(a=>dot(a.x, a.y, 2.0, jobDef(a.job).col));
-  dot(P.x, P.y, 2.4, '#fff');
+  /* 自分と仲間も1マス。自分の点は探す物ではなく**基準**なので、
+     「今どのマスに立っているか」がそのまま出るのが一番読みやすい
+     （報告：地図の自機表示が大き過ぎる）。最後に描いて必ず上に出す。 */
+  livingParty().forEach(a=>dot(a.x, a.y, jobDef(a.job).col));
+  dot(P.x, P.y, '#fff');
 }
 
 /* ---------- HUD ---------- */

@@ -604,4 +604,38 @@ R.tapCharacterOpensEquip = await pg.evaluate(()=>{
           ok: heroOpened && stickNotGrabbedOnHero && allyOpened && stickNotGrabbedOnAlly && stickStillWorksElsewhere};
 });
 
+/* 1-f. 地図の印は1マス。
+   以前は「旧ミニマップでの px」を s/1.15 倍していたので、
+   印1つが4マス分まで膨らんでいた（報告：四角が全部大きい）。
+   印はマス目と同じ大きさで、マスに載っていること。 */
+R.mapMarksAreOneCell = await pg.evaluate(()=>{
+  TH.busyFloor();
+  S.mapOn=true;
+  const box=mapBox(), s=box.s;
+  // 床の塗りと印の塗りを、大きさだけ集める
+  const rects=[];
+  const orig=ctx.fillRect.bind(ctx);
+  ctx.fillRect=(x,y,w,h)=>{ rects.push({x,y,w,h}); return orig(x,y,w,h); };
+  drawMinimap();
+  ctx.fillRect=orig;
+  S.mapOn=false;
+  // 板（背景）は地図全体を覆う1枚だけ。それ以外はすべてマス目の大きさのはず
+  const board = rects.filter(r=>r.w>s*2 && r.h>s*2);
+  const cells = rects.filter(r=>!(r.w>s*2 && r.h>s*2));
+  const wrongSize = cells.filter(r=>Math.abs(r.w-s)>0.01 || Math.abs(r.h-s)>0.01);
+  // マス目に載っているか（原点からの差が s の整数倍）
+  const offGrid = cells.filter(r=>{
+    const gx=(r.x-box.ox)/s, gy=(r.y-box.oy)/s;
+    return Math.abs(gx-Math.round(gx))>0.01 || Math.abs(gy-Math.round(gy))>0.01;
+  });
+  return {total:rects.length, boards:board.length, cells:cells.length,
+          wrongSize:wrongSize.length, offGrid:offGrid.length,
+          sample: wrongSize.slice(0,3).map(r=>Math.round(r.w)+'x'+Math.round(r.h)
+                                              +' (マス目='+Math.round(s)+')'),
+          drewSomething: cells.length>10,
+          allOneCell: wrongSize.length===0,
+          allOnGrid: offGrid.length===0,
+          ok: cells.length>10 && wrongSize.length===0 && offGrid.length===0};
+});
+
 await done(b, errs, R);

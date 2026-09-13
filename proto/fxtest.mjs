@@ -576,10 +576,9 @@ R.frameErrorKeepsLastPicture = await pg.evaluate(()=>{
               && compOk && transformOk && ctxIsMain};
 });
 
-/* 5-f. 落ちたことを画面のログで1回だけ言う。
-       console にしか出していなかったので、端末側からは何が起きたのか
-       まったく見えなかった。 */
-R.frameErrorIsToldOnScreen = await pg.evaluate(()=>{
+/* 5-f. 落ちたことを画面のログで1回だけ言う。**どこで落ちたかも一緒に。**
+       「描画エラー」だけでは、報告をもらっても探す場所が決まらなかった。 */
+R.frameErrorSaysWhere = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
   S.hero.party=[]; P.invuln=1e9;
   stepSim(0.3,{draw:true});
@@ -594,10 +593,50 @@ R.frameErrorIsToldOnScreen = await pg.evaluate(()=>{
   window.updateFeel=orig; window.log=ol; console.error=cerr;
   const hits=seen.filter(m=>m.indexOf('描画エラー')>=0);
   _tickErrShown=false;
-  return {lines:hits.length, message:hits[0]||null,
+  const line=hits[0]||'';
+  return {lines:hits.length, message:line,
           toldOnce: hits.length===1,
-          saysWhat: !!(hits[0] && hits[0].indexOf('わざと落とす')>=0),
-          ok: hits.length===1 && !!(hits[0] && hits[0].indexOf('わざと落とす')>=0)};
+          saysWhat: line.indexOf('わざと落とす')>=0,
+          saysStage: /描画エラー\[.+\]/.test(line),
+          saysLine: /\d+行/.test(line),
+          ok: hits.length===1 && line.indexOf('わざと落とす')>=0
+              && /描画エラー\[.+\]/.test(line) && /\d+行/.test(line)};
+});
+
+/* 5-h. 節の名前が、実際に落ちた場所を指していること。
+       仲間の描画で落としたら「仲間」と出る（前のフレームの値を引きずらない）。 */
+R.drawStageFollowsProgress = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[];
+  const a=makeAlly(3,S.hero); a.boons=[]; a.job='warrior';
+  a.artVariant=pickAllyVariant('warrior'); a.slot=0;
+  a.hpNow=allyStats(a).maxHp; a.x=P.x+1; a.y=P.y;
+  S.hero.party.push(a);
+  P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  const finishedNormally = _drawStage;          // 最後まで描けたときの節
+  const cerr=console.error; console.error=()=>{};
+  // 仲間を描く一番手前（drawMate の先頭）で落とす
+  const orig=window.feelEntityOffset;
+  window.feelEntityOffset=function(e){
+    if(e && e.ally) throw new Error('仲間のところで落とす');
+    return orig.apply(this,arguments);
+  };
+  let stageAlly=null;
+  try{ draw(); }catch(_){ stageAlly=_drawStage; }
+  window.feelEntityOffset=orig;
+  // 更新で落ちたら「更新」と出る
+  const origFeel=window.updateFeel;
+  window.updateFeel=()=>{ throw new Error('更新で落とす'); };
+  let stageUpd=null;
+  try{ update(1/60); }catch(_){ stageUpd=_drawStage; }
+  window.updateFeel=origFeel; console.error=cerr;
+  draw();
+  return {finishedNormally, stageAlly, stageUpd,
+          allyStageRight: stageAlly==='仲間',
+          updStageRight: stageUpd==='更新',
+          endStageRight: finishedNormally==='地図',
+          ok: stageAlly==='仲間' && stageUpd==='更新' && finishedNormally==='地図'};
 });
 
 /* 5-g. 演出が落ちても主人公は描かれる。
