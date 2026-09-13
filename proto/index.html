@@ -156,6 +156,26 @@
   #wavebtn i{font-style:normal;font-size:20px;line-height:1}
   #wavebtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
     font-weight:700;margin-top:1px}
+  /* ---------- 武器技のボタン ----------
+     3つ目の技ボタン。同じ列（右の親指の通り道）に、衝撃波のさらに上へ積む。
+     大技＞武器技＞衝撃波 の順で大きさを変えてあるのは、
+     **どれが切り札でどれが手癖か**を、押す前に大きさで読ませるため。
+
+     武器を持ち替えると中身が変わる（技は武器種に付いている）ので、
+     名札を出す——衝撃波と違って「今なにが乗っているか」が変わりうる。 */
+  #artbtn{position:absolute;right:22px;bottom:calc(250px + env(safe-area-inset-bottom));
+    width:62px;height:62px;border-radius:50%;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(16,20,28,.82);border:2px solid #39415a;
+    color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    pointer-events:auto;user-select:none;z-index:6}
+  #artbtn.on{display:flex}
+  #artbtn.ready{border-color:currentColor;box-shadow:0 0 12px -2px currentColor}
+  #artbtn i{font-style:normal;font-size:19px;line-height:1}
+  #artbtn b{font-size:10px;font-weight:700;letter-spacing:.02em;margin-top:1px;
+    max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #artbtn s{text-decoration:none;font-size:11px;font-variant-numeric:tabular-nums;
+    font-weight:700;margin-top:1px}
   #adbar b{color:var(--dim);font-weight:600;letter-spacing:.14em;font-size:12px;
     border:1px solid var(--line);padding:1px 5px;margin-right:8px}
   /* バナーに隠れないよう、対象画面の下だけ余白を足す */
@@ -746,6 +766,7 @@
   <div id="guardbtn">🛡</div>
   <div id="ultbtn"><i id="ult-icon">✹</i><b id="ult-nm"></b><s id="ult-cd"></s></div>
   <div id="wavebtn"><i>〓</i><s id="wave-cd"></s></div>
+  <div id="artbtn"><i id="art-icon">✳</i><b id="art-nm"></b><s id="art-cd"></s></div>
   <div id="prompt"></div>
   <div id="bagbtn">🎒<span id="bagcount">0</span></div>
   <div id="statbtn">🧍</div>
@@ -759,6 +780,10 @@
   <p class="sub" style="text-align:center">開いている間はゲームが止まります</p>
 
   <div class="card" id="bag-stats"></div>
+
+  <h2>技 <span style="color:var(--dim);font-weight:400;font-size:12px">3つの枠・タップでセット</span></h2>
+  <p class="sub" id="bag-art-hint"></p>
+  <div class="grid" id="bag-arts"></div>
 
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">ボス撃破で得た・死ぬまで有効</span></h2>
   <div class="grid" id="bag-boons"></div>
@@ -4044,6 +4069,209 @@ function rogueHasteBonus(){
   return n;
 }
 
+/* ==================== 武器技 ====================
+   大技は「大ボスを倒した回数」で開く**手札**、衝撃波はSPで買う**装置**だった。
+   どちらも武器の外側にあるので、何を握っていても同じ技が出る——
+   つまり武器種は「数字がちがう棒」でしかなく、握り替える理由が熟練度しか無かった。
+
+   武器技はそこを埋める。剣には剣の、杖には杖の技があり、**その武器を振っている
+   あいだにだけ閃く**。だから「今この剣で戦っている」ことがそのまま蓄積になる。
+
+   閃きは低確率。狙って取りに行くものではなく、道中でふいに降ってくる出来事にしてある
+   （武器熟練が「目盛り」なら、こちらは「事件」）。lv1→lv2→lv3 の順にしか閃かないので、
+   同じ武器を握り続けた時間がそのまま段位になる。
+
+   熟練が上がるほど閃きやすい。同じ武器を使い続ける動機を、熟練と技で二重に置く。 */
+
+/* 段ごとのリキャスト。**一番長い lv3 でも、一番短い大技（24秒）より短い。**
+   大技は「ここで切る」1回、武器技は「戦いの中で回す」手——格を時間で分けている。 */
+const ART_CD = [7, 11, 16];
+/* 1撃ごとの閃き率。上の段ほど遠い。
+   目安（熟練0・中央値）: lv1 約150発 / lv2 約400発 / lv3 約870発。
+   熟練が乗ると縮む（Lv.10 で 2.2倍 出やすい）。 */
+const ART_FLASH_P      = [0.0046, 0.0017, 0.0008];
+const ART_FLASH_MAST   = 0.12;   // 熟練1段ごとに閃きやすさ +12%
+/* 仲間はロストする。**同じ確率にすると、覚えた端から失われて何も残らない。**
+   覚えやすくしておけば、拾ったばかりの仲間でも道中で1つは閃く。 */
+const ART_FLASH_ALLY   = 1.8;
+const ART_ALLY_CD_MUL  = 1.35;   // 仲間は自動発動なので、手で切るより少し遅く回す
+
+/* 技の形（k）と数値。
+   **威力は「大技 Lv.1（震撼＝ATK×3.15）を超えない」を上限に置いてある。**
+   段が上がると増えるのは主に届き方と付随効果で、倍率そのものではない——
+   倍率で伸ばすと lv3 が出るまで武器技そのものが弱い、という時間が長くなる。 */
+const WEAPON_ARTS={
+  /* 剣。素直な近接の見本にしてある（踏み込む→薙ぐ→刻む）。 */
+  sword:[
+    {id:'iai',    nm:'居合',     icon:'⚡', col:'#e8e2c8', k:'dash',
+     dist:3.4, mult:2.2, desc:'前方へ踏み込み、通り道の敵を斬る'},
+    {id:'swspin', nm:'回転斬り', icon:'✳', col:'#e8e2c8', k:'ring',
+     r:2.7, mult:2.7, knock:0.9, desc:'周囲を薙ぐ。当たった敵をノックバック'},
+    {id:'swmulti',nm:'多段斬り', icon:'≡', col:'#e8e2c8', k:'cone',
+     r:2.0, arc:100, mult:0.78, hits:3, every:0.16, desc:'前方を3回続けて斬る'},
+  ],
+  /* 大剣。全部「重い一撃で押し返す」方向で揃えてある。 */
+  great:[
+    {id:'gtspin', nm:'大回転斬り', icon:'✺', col:'#c8d8e8', k:'ring',
+     r:3.2, mult:0.95, hits:2, every:0.22, knock:1.1, desc:'周囲を2度薙ぐ。ノックバック付き'},
+    {id:'gtquake',nm:'地走り',     icon:'⋔', col:'#c8d8e8', k:'cone',
+     r:5.0, arc:70, mult:2.3, knock:1.2, desc:'扇状に地を走る衝撃。ノックバック付き'},
+    {id:'gtupper',nm:'レイジングアッパー', icon:'↟', col:'#c8d8e8', k:'single',
+     r:2.6, mult:3.0, knock:2.6, desc:'前方の敵1体を打ち上げる。強ノックバック'},
+  ],
+  /* 短剣。手数と、当たらないことそのものを技にしてある。 */
+  dagger:[
+    {id:'dgslash',nm:'乱斬り',   icon:'⁙', col:'#c8ced9', k:'cone',
+     r:1.7, arc:120, mult:0.75, hits:3, every:0.12, desc:'前方を素早く3回斬る'},
+    {id:'dgdance',nm:'ダンシングソード', icon:'❂', col:'#c8ced9', k:'orbit',
+     t:6, r:1.9, mult:0.62, every:0.5, desc:'6秒間、周囲を回る刃が出る'},
+    {id:'dgmirage',nm:'ミラージュ', icon:'◇', col:'#c8ced9', k:'invuln',
+     t:2.6, desc:'2.6秒のあいだ、あらゆる攻撃を受けない'},
+  ],
+  /* 斧。線で薙ぐ形に寄せてある（貫くか、押し込むか）。 */
+  axe:[
+    {id:'axtoma', nm:'トマホーク', icon:'↣', col:'#d8c0a0', k:'line',
+     len:6.0, wide:0.7, mult:2.2, pierce:true, desc:'直線上を貫いて飛ぶ斧'},
+    {id:'axspin', nm:'スピンアクス', icon:'✸', col:'#d8c0a0', k:'ring',
+     r:3.0, mult:2.7, knock:1.0, desc:'周囲を薙ぐ。ノックバック付き'},
+    {id:'axspiral',nm:'スパイラルホーク', icon:'➶', col:'#d8c0a0', k:'line',
+     len:5.0, wide:0.8, mult:1.0, hits:3, every:0.18, knock:0.8,
+     desc:'直線上を3回打つ（貫通なし）。ノックバック付き'},
+  ],
+  /* 槍。間合いの長さを技でも押し出す。 */
+  spear:[
+    {id:'spswing',nm:'スウィング', icon:'◠', col:'#c8d8e8', k:'ring',
+     r:2.9, mult:1.1, hits:2, every:0.2, desc:'穂先で周囲を2度払う'},
+    {id:'splance',nm:'ショットランス', icon:'⇥', col:'#c8d8e8', k:'line',
+     len:7.0, wide:0.6, mult:2.7, pierce:true, desc:'直線上を貫く刺突'},
+    {id:'spdragoon',nm:'ドラグーン', icon:'✜', col:'#c8d8e8', k:'dragoon',
+     t:1.0, r:6.5, mult:3.0, desc:'姿を消し、1秒後に範囲内の敵1体へ跳びかかる'},
+  ],
+  /* 弓。撃ち方そのものを変える3つ。 */
+  bow:[
+    {id:'bwrain', nm:'アローレイン', icon:'⇊', col:'#7fc08a', k:'rain',
+     r:2.6, mult:0.60, min:6, max:10, desc:'狙った辺りへ矢が降る（本数はばらつく）'},
+    {id:'bwrapid',nm:'連射',       icon:'⋮', col:'#7fc08a', k:'volley',
+     r:6.0, mult:0.55, hits:5, every:0.14, desc:'近くの敵へ5回続けて撃つ（1発は軽い）'},
+    {id:'bwburst',nm:'バーストショット', icon:'✹', col:'#ff8a4a', k:'line',
+     len:7.5, wide:0.75, mult:2.1, pierce:true, dt:'fire', status:'burn',
+     desc:'直線上を貫く火の矢'},
+  ],
+  /* 戦鎚。支える側へ倒してある（打つ／癒す／庇う）。 */
+  mace:[
+    {id:'mcdouble',nm:'ダブルアタック', icon:'⁝', col:'#d8c0a0', k:'cone',
+     r:2.0, arc:95, mult:1.1, hits:2, every:0.2, desc:'前方を2回続けて打つ'},
+    {id:'mcheal', nm:'癒し打ち',   icon:'✚', col:'#7fe0c0', k:'cone',
+     r:2.2, arc:95, mult:2.0, healPct:9, healR:4.0,
+     desc:'前方を打ち、周囲の味方を最大HPの9%回復する'},
+    {id:'mcshield',nm:'ホーリーシールド', icon:'▣', col:'#e8d9a0', k:'barrier',
+     desc:'攻撃を1回だけ完全に無効化する盾を張る'},
+  ],
+  /* 杖。属性と「置いて燃やす」を担当。 */
+  staff:[
+    {id:'stflame',nm:'フレイム',   icon:'♨', col:'#ff8a4a', k:'conefield',
+     t:2.5, r:3.6, arc:70, mult:0.15, every:0.4, dt:'fire', status:'burn',
+     desc:'前方の扇状に3秒間、燃え続ける炎を出す'},
+    {id:'sticicle',nm:'アイシクルエッジ', icon:'❆', col:'#7fd8ff', k:'line',
+     len:5.5, wide:0.7, mult:0.80, hits:3, every:0.2, knock:0.7, dt:'frost', status:'chill',
+     desc:'直線上を3回貫く氷。ノックバック付き'},
+    {id:'stbolt', nm:'ライトニング', icon:'⚡', col:'#ffe066', k:'field',
+     t:3.0, r:3.2, mult:0.36, every:0.4, dt:'shock', status:'shock',
+     desc:'周囲に3秒間、雷が落ち続ける'},
+  ],
+};
+/* 武器技を持つ武器種の一覧（BASES の並び順で見せる） */
+const ART_BASES = BASES.filter(b=>WEAPON_ARTS[b.id]).map(b=>b.id);
+function artsOf(baseId){ return WEAPON_ARTS[baseId] || []; }
+function artDef(id){
+  for(const k in WEAPON_ARTS){
+    const d=WEAPON_ARTS[k].find(a=>a.id===id);
+    if(d) return d;
+  }
+  return null;
+}
+/* その技が何段目か（1〜3）。リキャストと閃きやすさはここで決まる。 */
+function artTier(def){
+  for(const k in WEAPON_ARTS){
+    const i=WEAPON_ARTS[k].indexOf(def);
+    if(i>=0) return i+1;
+  }
+  return 1;
+}
+function artCooldown(def, isAlly){
+  const cd = ART_CD[artTier(def)-1] || ART_CD[0];
+  return isAlly ? cd*ART_ALLY_CD_MUL : cd;
+}
+/* ---------- 習得（閃き） ----------
+   主人公のぶんは**アカウント単位**で持つ（S.arts）。武器熟練と同じ扱いで、
+   死んでも消えない——「使い続けた武器種の蓄積」という一点で揃えてある。
+   仲間のぶんは仲間自身が持つ（a.arts）ので、その仲間を失えば一緒に消える。 */
+function artsLearnedN(baseId){ return (S.arts && S.arts[baseId]) || 0; }
+function learnedArts(baseId){ return artsOf(baseId).slice(0, artsLearnedN(baseId)); }
+function allyArtsN(a, baseId){ return (a && a.arts && a.arts[baseId]) || 0; }
+function allyLearnedArts(a, baseId){ return artsOf(baseId).slice(0, allyArtsN(a, baseId)); }
+/* 今その手に握っている武器の種。素手なら null（素手に技は無い）。 */
+function heroWeaponBase(){
+  const w = S.hero && S.hero.equip && S.hero.equip.weapon;
+  return w ? w.base : null;
+}
+function allyWeaponBase(a){
+  const w = a && a.equip && a.equip.weapon;
+  return w ? w.base : null;
+}
+/* ボタンに乗っている武器技。**武器種ごとに選んだものを覚えておく**ので、
+   持ち替えて戻ってきたときに選び直さなくていい。未選択なら一番上の段。 */
+function playerArt(){
+  const b=heroWeaponBase();
+  if(!b) return null;
+  const list=learnedArts(b);
+  if(!list.length) return null;
+  const pick=(S.artPick||{})[b];
+  return list.find(a=>a.id===pick) || list[list.length-1];
+}
+/* 仲間が使う技。選ぶ操作を持たないので、覚えている中で一番上の段を出す。 */
+function allyArt(a){
+  const b=allyWeaponBase(a);
+  if(!b) return null;
+  const list=allyLearnedArts(a, b);
+  return list.length ? list[list.length-1] : null;
+}
+/* 1撃ごとの閃き判定。**当てた時にだけ**引く（熟練と同じ条件に揃えてある——
+   誰もいない場所で素振りして覚えられると、道中を歩く意味が反対になる）。 */
+function artFlashChance(baseId, tier, isAlly){
+  const p = ART_FLASH_P[tier-1];
+  if(!p) return 0;
+  return p * (1 + masteryOf(baseId)*ART_FLASH_MAST) * (isAlly ? ART_FLASH_ALLY : 1);
+}
+function tryFlashArt(baseId){
+  if(!baseId || !S.hero) return null;
+  const list=artsOf(baseId);
+  const n=artsLearnedN(baseId);
+  if(n>=list.length) return null;
+  if(rnd() >= artFlashChance(baseId, n+1, false)) return null;
+  S.arts = S.arts || {};
+  S.arts[baseId] = n+1;
+  const def=list[n];
+  artFlashFx(P.x, P.y, def);
+  const b=BASES.find(x=>x.id===baseId);
+  log('💡 '+(b?b.nm:baseId)+'『'+def.nm+'』を閃いた');
+  showBanner('💡 '+def.nm, (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, 2.2);
+  return def;
+}
+function tryFlashArtAlly(a, baseId){
+  if(!a || !baseId) return null;
+  const list=artsOf(baseId);
+  const n=allyArtsN(a, baseId);
+  if(n>=list.length) return null;
+  if(rnd() >= artFlashChance(baseId, n+1, true)) return null;
+  a.arts = a.arts || {};
+  a.arts[baseId] = n+1;
+  const def=list[n];
+  artFlashFx(a.x, a.y, def);
+  log('💡 '+a.name+'が『'+def.nm+'』を閃いた');
+  return def;
+}
+
 /* ---------- 上位ジョブ ----------
    大ボス（10階ごと）を倒すと1つずつ解放される、派手な側のジョブ。
    既存6ジョブより明確に強く見えるので、そのぶん出現率を落としてある（weight）。
@@ -4237,6 +4465,7 @@ function tickAllyArt(a, st, dt){
       if(h.hpNow<mx) healEnt(h, mx*HALO_PER_SEC/100*dt*halo);
     });
   }
+  tickAllyWeaponArt(a, st, dt);          // 武器技（閃いたぶん）は大技とは別枠で回す
   const id=(st.skills&&st.skills.art);
   if(!id || !ALLY_ARTS[id]){ a.artCd=0; return; }
   const def=ALLY_ARTS[id];
@@ -4249,9 +4478,28 @@ function tickAllyArt(a, st, dt){
   a.artCd = def.cd;
   fireAllyArt(a, st, id, tgt, def);
 }
+/* ---------- 仲間の武器技 ----------
+   仲間にはボタンが無い（このゲームの操作は移動だけ、というのが核）。
+   だから閃いた技は**リキャストで勝手に出る**——Lv.50 の大技・僧侶の祈り・
+   召喚士の使い魔と同じ作法に揃えてある。
+   選ばせないので、覚えている中で一番上の段が出る。 */
+function tickAllyWeaponArt(a, st, dt){
+  const def=allyArt(a);
+  if(!def){ a.wartCd=0; return; }
+  const cd=artCooldown(def, true);
+  a.wartCd = (a.wartCd===undefined) ? rf(1.0, cd*0.6) : a.wartCd - dt;   // 初回は少しずらす
+  if(a.wartCd>0) return;
+  // 相手がいないと意味の無い技は、溜めたまま待つ（誰もいない部屋で空撃ちしない）
+  const tgt=nearestEnemyNearPlayer(a.x, a.y, Math.max(st.aggro, 6), ALLY_ENGAGE);
+  if(!tgt && def.k!=='barrier' && def.k!=='invuln') return;
+  a.wartCd = cd;
+  fireArt(def, a);
+}
 function fireAllyArt(a, st, id, tgt, def){
   feelUltimate(a,def.col);
-  const say = txt => { log('◈ '+a.name+'『'+def.nm+'』'+(txt||'')); };
+  /* 技名は**使った本人の頭上**にも出す。ログに流すだけだと、
+     見るのは戦いが終わってからになり、何が起きたのか分からないまま画面が光る。 */
+  const say = txt => { sayArt(a.x, a.y, def.nm, def.col); log('◈ '+a.name+'『'+def.nm+'』'+(txt||'')); };
   if(id==='spin'){
     const r=2.4;
     W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:r, life:0.4, maxLife:0.4, col:def.col});
@@ -4354,9 +4602,81 @@ function tickArts(dt){
           if(e.hp<=0) killEnemy(e, f.src);
         });
       }
+    }else if(f.kind==='artrep'){
+      /* 多段技の2発目以降。**撃った本人が動いていれば追いかける**ので、
+         下がりながら刻んでも絵と当たり判定がずれない。 */
+      f.tick -= dt;
+      if(f.tick<=0 && f.left>0){
+        f.tick=f.every; f.left--;
+        if(artSrcAlive(f.c)) artStrike(f.c, f.def, artFaceAngle(f.c, f.a));
+      }
+    }else if(f.kind==='artvolley'){
+      // 連射。1発ごとに近くの相手を選び直す（倒れたら次へ流れる）
+      f.tick -= dt;
+      if(f.tick<=0 && f.left>0){
+        f.tick=f.every; f.left--;
+        if(artSrcAlive(f.c)){
+          artNow(f.c);
+          const tgt=artTargetFor(f.c, f.def.r);
+          if(tgt){
+            W.fx.push({t:'ultline', x:f.c.x, y:f.c.y, x2:tgt.x, y2:tgt.y,
+                       life:0.14, maxLife:0.14, col:f.col});
+            artHit(f.c, f.def, tgt, f.def.mult);
+          }
+        }
+      }
+    }else if(f.kind==='artorbit'){
+      /* 回る刃。本人に付いて回り、触れた相手を刻む。 */
+      if(artSrcAlive(f.c)){ artNow(f.c); f.x=f.c.x; f.y=f.c.y; }
+      f.a=(f.a||0)+dt*4.5;
+      f.tick-=dt;
+      if(f.tick<=0){
+        f.tick=f.every;
+        const bx=f.x+Math.cos(f.a)*f.r, by=f.y+Math.sin(f.a)*f.r;
+        nearEnemies(bx, by, 1.2).forEach(e=>{
+          if(e.dead || Math.hypot(e.x-bx, e.y-by) > 0.9+e.r) return;
+          artHit(f.c, f.def, e, f.def.mult);
+        });
+      }
+    }else if(f.kind==='artfield' || f.kind==='artcone'){
+      /* 燃え続ける／落ち続ける。扇（フレイム）は本人の向きに付いて回る。 */
+      if(f.follow && artSrcAlive(f.c)){
+        artNow(f.c); f.x=f.c.x; f.y=f.c.y;
+        f.a=artFaceAngle(f.c, f.a);
+      }
+      f.tick-=dt;
+      if(f.tick<=0){
+        f.tick=f.every;
+        nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
+          if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
+          if(f.kind==='artcone'){
+            const da=Math.abs(((Math.atan2(e.y-f.y, e.x-f.x)-f.a+Math.PI*3)%(Math.PI*2))-Math.PI);
+            if(da>f.arc) return;
+          }
+          artHit(f.c, f.def, e, f.def.mult);
+        });
+      }
+    }else if(f.kind==='artdragoon'){
+      /* 消えている1秒。**予兆として着地点に輪を出す**——
+         何も見えないまま敵が飛ぶと、何が起きたのか読めない。 */
+      if(f.t<=0 && !f.hit){
+        f.hit=true;
+        if(!artSrcAlive(f.c)) continue;
+        const tgt=(f.tgt && !f.tgt.dead) ? f.tgt : artTargetFor(f.c, f.def.r);
+        if(tgt){
+          // 相手の脇へ降り立ってから打つ
+          const ang=Math.atan2(f.c.y-tgt.y, f.c.x-tgt.x);
+          const lx=tgt.x+Math.cos(ang)*0.9, ly=tgt.y+Math.sin(ang)*0.9;
+          if(f.c.isPlayer){ if(!solid(lx,ly)){ P.x=lx; P.y=ly; } }
+          else if(!solid(lx,ly)){ f.c.ally.x=lx; f.c.ally.y=ly; }
+          artNow(f.c);
+          W.fx.push({t:'ultring', x:tgt.x, y:tgt.y, r:0, max:1.8, life:0.35, maxLife:0.35, col:f.col});
+          artHit(f.c, f.def, tgt, f.def.mult);
+        }
+      }
     }
   }
-  W.arts = W.arts.filter(f=>f.t>0);
+  W.arts = W.arts.filter(f=>f.t>0 || (f.kind==='artdragoon' && !f.hit));
   // 聖域の残り時間
   if(S.run && S.run.sanct){
     S.run.sanct.t -= dt;
@@ -5053,6 +5373,11 @@ const S={
   fallen:[],             // 慰霊碑。失った仲間（アカウント単位・キャラが死んでも残る）
   beacons:[],            // 大ボスを倒して開いた中継地点（倒した階の番号）
   mastery:{},            // 武器種ごとの熟練度（アカウント単位・死んでも消えない）
+  /* 閃いた武器技。**熟練度と同じくアカウント単位で残す**——
+     どちらも「その武器種を使い続けた蓄積」なので、片方だけ死で消えると
+     同じ物を2つの規則で数えることになる。値は「何段目まで閃いたか」（0〜3）。 */
+  arts:{},
+  artPick:{},            // 武器種ごとに、ボタンへ乗せている技の id
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
   hero:null, run:null, screen:'title', prevScreen:'town'
@@ -7415,7 +7740,12 @@ function playerAttack(){
      相手のいない場所で振り続けて上がると、道中に目盛りを置いた意味が反対になる
      （安全な場所で素振りするのが最適解になってしまう）。 */
   const wb = S.hero.equip.weapon && S.hero.equip.weapon.base;
-  if(wb && P.target && !P.target.dead) gainMastery(wb, 1);
+  if(wb && P.target && !P.target.dead){
+    gainMastery(wb, 1);
+    /* 武器技の閃き。**熟練と同じ条件（相手がいるときだけ）**に揃えてある。
+       素振りで閃けるようにすると、安全な場所で振り続けるのが最適解になる。 */
+    tryFlashArt(wb);
+  }
 
   // 攻撃するたびに武器が擦り減る（技「堅牢」があると半分）
   if(rnd()<DUR.weaponHitChance*(1-(st.durSave||0)/100)) damageGear('weapon',1);
@@ -7683,7 +8013,232 @@ function fireWave(){
     if(da > half) return;
     hitEnemy(e, st, WAVE_MUL);
   });
+  sayArt(P.x, P.y, '衝撃波', '#8fd8ff');
   return true;
+}
+
+/* ==================== 武器技の発動 ====================
+   主人公と仲間で**同じ関数**を通す。ここを二重に書くと、技を1つ足すたびに
+   「主人公では出るのに仲間では出ない」が生まれる（仲間の大技で実際に起きた）。
+   違いは3つだけ——誰の座標か、どちらのダメージ経路か、リキャストの長さか。 */
+function artCtx(src){
+  if(!src || src===S.hero){
+    return {isPlayer:true, ent:S.hero, ally:null, x:P.x, y:P.y,
+            dirx:P.dirx||1, diry:P.diry||0, st:stats(S.hero)};
+  }
+  return {isPlayer:false, ent:src, ally:src, x:src.x, y:src.y,
+          dirx:src.dirx||1, diry:src.diry||0, st:allyStats(src)};
+}
+/* 技のダメージ。属性を差し替える技（炎・氷・雷）はここで st を包み直す。 */
+function artStats(c, def){
+  if(!def.dt) return c.st;
+  return Object.assign({}, c.st, {dmgType:def.dt});
+}
+function artHit(c, def, e, mult){
+  if(!e || e.dead) return;
+  const st=artStats(c, def);
+  if(c.isPlayer) hitEnemy(e, st, mult);
+  else           hitEnemyByAlly(c.ally, st, e, mult);
+  if(e.dead || e.hp<=0) return;
+  if(def.status) addStatus(e, def.status, c.ent.lv);
+  // ノックバックはボスには効かない（他の技と同じ約束。既存の legend.knock に揃える）
+  if(def.knock && !e.boss) knockBack(e, {x:c.x, y:c.y}, def.knock);
+}
+/* 形ごとの当たり判定。座標は「撃った本人の今の位置」を毎回取り直す——
+   多段技の2発目以降が、動いた本人ではなく撃った場所に残ると絵と合わない。 */
+function artNow(c){
+  if(c.isPlayer){ c.x=P.x; c.y=P.y; }
+  else if(c.ally){ c.x=c.ally.x; c.y=c.ally.y; }
+  return c;
+}
+/* 続きを出してよいか。**倒れた本人の技が刻み続けない**ようにする
+   （仲間は死ぬので、置きっぱなしの多段技が主のいないまま走り続ける）。 */
+function artSrcAlive(c){
+  if(!c) return false;
+  if(c.isPlayer) return !!S.hero && !!S.run;
+  return !!c.ally && !c.ally.dead;
+}
+/* 続きの向き。動いていればその向き、止まっていれば出した時の向きのまま。 */
+function artFaceAngle(c, fallback){
+  const dx = c.isPlayer ? (P.dirx||0) : (c.ally.dirx||0);
+  const dy = c.isPlayer ? (P.diry||0) : (c.ally.diry||0);
+  return (dx||dy) ? Math.atan2(dy, dx) : fallback;
+}
+function artStrikeRing(c, def, ang){
+  artNow(c);
+  W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:def.r, life:0.34, maxLife:0.34, col:def.col});
+  nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
+    if(e.dead || Math.hypot(e.x-c.x, e.y-c.y) > def.r+e.r) return;
+    artHit(c, def, e, def.mult);
+  });
+}
+function artStrikeCone(c, def, ang){
+  artNow(c);
+  const half=(def.arc||90)*Math.PI/180/2;
+  W.fx.push({t:'lwave', x:c.x, y:c.y, a:ang, life:0.3, max:0.3, r:def.r, arc:half,
+             dt:def.dt||c.st.dmgType});
+  nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
+    if(e.dead) return;
+    const dx=e.x-c.x, dy=e.y-c.y;
+    if(Math.hypot(dx,dy) > def.r+e.r) return;
+    const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+    if(da<=half) artHit(c, def, e, def.mult);
+  });
+}
+/* 線。pierce が無い技は**一番手前の1体で止まる**（スパイラルホークの「貫通なし」）。 */
+function artStrikeLine(c, def, ang){
+  artNow(c);
+  const len=def.len, wide=def.wide||0.7;
+  W.fx.push({t:'ultbeam', x:c.x, y:c.y, a:ang, len, wide, life:0.28, maxLife:0.28, col:def.col});
+  const onLine=[];
+  nearEnemies(c.x, c.y, len+1).forEach(e=>{
+    if(e.dead) return;
+    const dx=e.x-c.x, dy=e.y-c.y;
+    const along=dx*Math.cos(ang)+dy*Math.sin(ang);
+    const side =Math.abs(-dx*Math.sin(ang)+dy*Math.cos(ang));
+    if(along>=-0.4 && along<=len && side<=wide+e.r) onLine.push({e, along});
+  });
+  onLine.sort((a,b)=>a.along-b.along);
+  (def.pierce ? onLine : onLine.slice(0,1)).forEach(o=>artHit(c, def, o.e, def.mult));
+}
+function artStrike(c, def, ang){
+  if(def.k==='ring') artStrikeRing(c, def, ang);
+  else if(def.k==='cone') artStrikeCone(c, def, ang);
+  else if(def.k==='line') artStrikeLine(c, def, ang);
+}
+/* その技が狙う相手。仲間は自動発動なので、相手がいないと空撃ちになる。 */
+function artTargetFor(c, r){
+  if(c.isPlayer){
+    const list=nearEnemies(c.x, c.y, r).filter(e=>!e.dead);
+    if(!list.length) return null;
+    return list.sort((a,b)=>Math.hypot(a.x-c.x,a.y-c.y)-Math.hypot(b.x-c.x,b.y-c.y))[0];
+  }
+  return nearestEnemyNearPlayer(c.x, c.y, r, ALLY_ENGAGE);
+}
+/* 空撃ちさせない技かどうか（相手がいなければ溜めたまま待つ）。 */
+function artNeedsTarget(def){
+  return def.k==='rain' || def.k==='volley' || def.k==='dragoon' || def.k==='single';
+}
+/* 技を出す。src を省くと主人公。戻り値は出せたかどうか。 */
+function fireArt(def, src){
+  if(!def || !S.run) return false;
+  const c=artCtx(src);
+  if(!c.ent || c.ent.dead) return false;
+  const ang=Math.atan2(c.diry||0, c.dirx||1);
+  sayArt(c.x, c.y, def.nm, def.col);
+  if(c.isPlayer) feelUltimate(P, def.col); else feelUltimate(c.ally, def.col);
+
+  if(def.k==='dash'){
+    /* 踏み込み。壁は抜けない（瞬歩と同じ作法で、通り道を線分で1回だけ取る）。 */
+    const from={x:c.x, y:c.y};
+    let gx=c.x, gy=c.y;
+    for(let d=0; d<def.dist; d+=0.25){
+      const nx=gx+Math.cos(ang)*0.25, ny=gy+Math.sin(ang)*0.25;
+      if(solid(nx,ny)) break;
+      gx=nx; gy=ny;
+    }
+    W.fx.push({t:'ultline', x:from.x, y:from.y, x2:gx, y2:gy, life:0.32, maxLife:0.32, col:def.col});
+    W.enemies.forEach(e=>{
+      if(e.dead) return;
+      const dx=gx-from.x, dy=gy-from.y, len2=dx*dx+dy*dy||1e-6;
+      let t=((e.x-from.x)*dx+(e.y-from.y)*dy)/len2; t=clamp(t,0,1);
+      if(Math.hypot(e.x-(from.x+dx*t), e.y-(from.y+dy*t)) <= 0.85+e.r) artHit(c, def, e, def.mult);
+    });
+    if(c.isPlayer){ P.x=gx; P.y=gy; } else { c.ally.x=gx; c.ally.y=gy; }
+
+  }else if(def.k==='single'){
+    const tgt=artTargetFor(c, def.r);
+    if(tgt){
+      W.fx.push({t:'ultline', x:c.x, y:c.y, x2:tgt.x, y2:tgt.y, life:0.3, maxLife:0.3, col:def.col});
+      artHit(c, def, tgt, def.mult);
+    }
+
+  }else if(def.k==='invuln'){
+    if(c.isPlayer) P.invuln=Math.max(P.invuln||0, def.t);
+    else c.ally.iframe=Math.max(c.ally.iframe||0, def.t);
+    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:1.8, life:0.45, maxLife:0.45, col:def.col});
+
+  }else if(def.k==='barrier'){
+    c.ent.barrier = Math.max(c.ent.barrier||0, 1);
+    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:2.2, life:0.5, maxLife:0.5, col:def.col});
+
+  }else if(def.k==='orbit'){
+    /* 回る刃。**本人に付いて回る**ので、置き型（field）とは別に持つ。 */
+    W.arts.push({kind:'artorbit', x:c.x, y:c.y, t:def.t, max:def.t, r:def.r,
+                 every:def.every, tick:0, a:0, def, c, col:def.col});
+
+  }else if(def.k==='field' || def.k==='conefield'){
+    /* 置き型。円（ライトニング）は足元に敷き、扇（フレイム）は本人の向きに付いて回る。 */
+    W.arts.push({kind:(def.k==='field'?'artfield':'artcone'), x:c.x, y:c.y, t:def.t, max:def.t,
+                 r:def.r, arc:(def.arc||70)*Math.PI/180/2, a:ang,
+                 every:def.every, tick:0, def, c, col:def.col, follow:(def.k==='conefield')});
+
+  }else if(def.k==='rain'){
+    /* 降らせる本数はばらつく（「ランダムな回数」）。矢の雨と同じ予約式。 */
+    const tgt=artTargetFor(c, def.r+3) || {x:c.x+Math.cos(ang)*2, y:c.y+Math.sin(ang)*2};
+    const n=def.min + Math.floor(rnd()*(def.max-def.min+1));
+    const st=artStats(c, def);
+    for(let i=0;i<n;i++){
+      const a2=rnd()*Math.PI*2, rad=Math.sqrt(rnd())*def.r;
+      W.arts.push({kind:'arrow', x:tgt.x+Math.cos(a2)*rad, y:tgt.y+Math.sin(a2)*rad,
+                   t:RAIN_FALL+rnd()*RAIN_SPREAD, fall:RAIN_FALL, r:RAIN_HIT_R,
+                   dmg:Math.max(1, Math.round(st.atk*def.mult)), lv:c.ent.lv,
+                   src:c.isPlayer?S.hero:c.ally, col:def.col, hit:false});
+    }
+
+  }else if(def.k==='volley'){
+    /* 近くの敵へ順に撃つ。狙いは付け直すので、途中で相手が倒れても続く。 */
+    W.arts.push({kind:'artvolley', x:c.x, y:c.y, t:def.every*def.hits+0.05, max:def.every*def.hits,
+                 every:def.every, tick:0, left:def.hits, def, c, col:def.col});
+
+  }else if(def.k==='dragoon'){
+    /* 消えて、1秒後に跳びかかる。消えているあいだは当たらない（無敵）。 */
+    const tgt=artTargetFor(c, def.r);
+    if(c.isPlayer) P.invuln=Math.max(P.invuln||0, def.t+0.1);
+    else c.ally.iframe=Math.max(c.ally.iframe||0, def.t+0.1);
+    W.arts.push({kind:'artdragoon', x:c.x, y:c.y, t:def.t, max:def.t,
+                 tgt, def, c, col:def.col, hit:false});
+
+  }else if(def.healPct){
+    // 癒し打ち。打ってから配る（打てなくても回復はする——支える技なので）
+    artStrike(c, def, ang);
+    const heal=h=>{
+      if(!h || h.dead) return;
+      const hx=(h===S.hero?P.x:h.x), hy=(h===S.hero?P.y:h.y);
+      if(Math.hypot(hx-c.x, hy-c.y) > def.healR) return;
+      const mx=(h===S.hero)?stats(h).maxHp:allyStats(h).maxHp;
+      healEnt(h, mx*def.healPct/100);
+      W.pops.push({x:hx, y:hy-0.5, txt:'+'+Math.round(mx*def.healPct/100), c:'#7fe0c0', life:0.8});
+    };
+    [S.hero, ...livingParty()].forEach(heal);
+    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:def.healR, life:0.5, maxLife:0.5, col:def.col});
+
+  }else if(def.hits && def.hits>1){
+    // 多段。1発目はその場で、残りは間を置いて刻む
+    artStrike(c, def, ang);
+    W.arts.push({kind:'artrep', x:c.x, y:c.y, t:def.every*def.hits, max:def.every*def.hits,
+                 every:def.every, tick:def.every, left:def.hits-1, a:ang, def, c, col:def.col});
+
+  }else{
+    artStrike(c, def, ang);
+  }
+  if(c.isPlayer) feelKick(3.6, .2);
+  return true;
+}
+/* ---------- 主人公の武器技 ---------- */
+function artReady(){
+  if(hasCurse('silence')) return false;            // 呪い「静寂」
+  return !!playerArt() && S.screen==='game' && !!S.run && !!S.hero && (P.artCd||0)<=0;
+}
+function firePlayerArt(){
+  const def=playerArt();
+  if(!def || !artReady()) return false;
+  if(frozenNow()){ log('凍りついて動けない'); return false; }
+  if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
+  /* リキャストは**枠の側**に持つ。技を持ち替えた瞬間に戻る作りにすると、
+     「切る→持ち替える→また切る」で待ち時間が消える。 */
+  P.artCd = artCooldown(def, false);
+  return fireArt(def, S.hero);
 }
 
 /* ---------- 大技の発動 ----------
@@ -7710,6 +8265,7 @@ function fireUlt(){
   const st = UP===1 ? base : Object.assign({}, base, {atk: base.atk*UP});
   P.ultCd = ultCooldown(u);
   feelUltimate(P,u.col);
+  sayArt(P.x, P.y, u.nm, u.col);        // 技名を頭上に（大技も武器技も同じ作法）
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && Math.hypot(e.x-P.x, e.y-P.y) <= r + e.r);
 
@@ -8442,6 +8998,9 @@ function allyAttack(a, st, tgt){
   const ang = Math.atan2(tgt.y-a.y, tgt.x-a.x);
   a.dirx=Math.cos(ang); a.diry=Math.sin(ang);
   if(rnd()<DUR.weaponHitChance) damageAllyGear(a,'weapon',1);
+  /* 仲間の閃き。主人公と同じ「相手がいるときだけ」だが、確率は高くしてある——
+     仲間は失われるので、同じ確率だと覚えたそばから消えて何も残らない。 */
+  tryFlashArtAlly(a, allyWeaponBase(a));
 
   // 狩人の「狙撃」: 3発に1回は必ず会心
   const forceCrit = j.sk.id==='snipe' && a.shots%3===0;
@@ -8583,6 +9142,24 @@ function heal(v){ const st=stats(S.hero); S.hero.hpNow=Math.min(st.maxHp,S.hero.
    太くするのは「いつもと違う一撃」だけ——会心と、弱点を突いたとき。 */
 function pop(x,y,v,c,mark,bold){
   W.pops.push({x,y,v:Math.round(v),c,mark:mark||'',life:0.7,bold:!!bold});
+}
+/* ---------- 技名の名乗り ----------
+   技は出た瞬間に画面が派手になるので、**何が起きたのか**が絵だけでは読めない。
+   ログに流すだけでは間に合わない（見るのは戦いが終わってから）。
+   使った本人の頭上に出せば、誰の技かと何の技かが同時に読める。
+
+   ダメージ数値より少し上（-1.05）に、長め（1.0秒）に出す——
+   数字と同じ高さに出すと、当たった瞬間に数字に埋もれて消える。 */
+function sayArt(x, y, nm, col){
+  W.pops.push({x, y:y-1.05, txt:nm+'！', c:col||'#e5d18c', life:1.0, max:1.0, bold:true});
+}
+/* 閃いた瞬間。頭上に💡を出して、輪を1つ広げる。
+   **ここだけは戦いを止めない**（モーダルを出すと、殴られている最中に手が止まる）。 */
+function artFlashFx(x, y, def){
+  W.pops.push({x, y:y-1.25, txt:'💡', c:'#ffe066', life:1.5, max:1.5, bold:true});
+  W.pops.push({x, y:y-0.55, txt:def.nm, c:def.col, life:1.5, max:1.5, delay:0.25, bold:true});
+  W.fx.push({t:'ultring', x, y, r:0, max:2.4, life:0.6, maxLife:0.6, col:'#ffe066'});
+  W.fx.push({t:'levelup', x, y, life:0.9, max:0.9, col:def.col});
 }
 
 /* ---------- 経験値の分配 ----------
@@ -10075,7 +10652,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#guardbtn,#dbgbtn,#partybar')) continue;
+    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
       if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
@@ -10117,7 +10694,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#guardbtn,#dbgbtn,#partybar')));
+      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -10142,6 +10719,7 @@ bindTap(el('prompt'), interact);
 bindTap(el('ultbtn'), ()=>{ fireUlt(); });
 /* 通常技のボタン。大技と同じ作法で、押した瞬間にその場で完結する。 */
 bindTap(el('wavebtn'), ()=>{ fireWave(); });
+bindTap(el('artbtn'),  ()=>{ firePlayerArt(); });
 
 /* 盾のボタンは「押しているあいだ」構える。bindTap（離したら発火）では
    構えっぱなしにできないので、押下と離しを直に拾う。
@@ -10640,6 +11218,7 @@ function update(dt){
   tickIntruder();                     // 居座りに顔をつける
   P.ultCd = Math.max(0, (P.ultCd||0) - dt);
   P.waveCd = Math.max(0, (P.waveCd||0) - dt);   // リキャスト技「衝撃波」
+  P.artCd  = Math.max(0, (P.artCd||0) - dt);    // 武器技（枠ごとに1つ）
   tickHazards(dt);
   if(!S.hero || !S.run) return;
   P.invuln = Math.max(0, (P.invuln||0) - dt);
@@ -11307,39 +11886,18 @@ function draw(){
       ctx.closePath();
       ctx.fillStyle=sc; ctx.fill();
       ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.5; ctx.stroke();
-      ctx.globalAlpha=0.35+0.3*Math.sin(performance.now()/180);
-      ctx.strokeStyle=sc; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(sx,sy,TS*0.40,0,7); ctx.stroke();
-      ctx.globalAlpha=1;
       if(Math.hypot(d.x-P.x,d.y-P.y)<3.2)
         label('◆'+d.shard, sx, sy-TS*0.55, sc, 0.95);
       return;
     }
     if(d.it && isConsum(d.it)){
-      // 消耗品は丸薬のような丸で描く。装備のひし形とは形で区別する。
       const cc=(consumDef(d.it.consum)||{}).col || '#7fe0c0';
-      ctx.beginPath(); ctx.arc(sx, sy, TS*0.20, 0, 7);
-      ctx.fillStyle=cc; ctx.fill();
-      ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.5; ctx.stroke();
-      ctx.globalAlpha=0.30+0.25*Math.sin(performance.now()/220);
-      ctx.strokeStyle=cc; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(sx,sy,TS*0.38,0,7); ctx.stroke();
-      ctx.globalAlpha=1;
+      drawFeelItemIcon(d.it,sx,sy);
       if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label(d.it.nm, sx, sy-TS*0.52, cc, 0.95);
       return;
     }
     const c=RARCOL[d.it.rar];
-    // ひし形＝アイテム
-    ctx.fillStyle=c;
-    ctx.beginPath();
-    ctx.moveTo(sx,sy-TS*0.26); ctx.lineTo(sx+TS*0.19,sy); ctx.lineTo(sx,sy+TS*0.26); ctx.lineTo(sx-TS*0.19,sy);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1.5; ctx.stroke();
-    // 淡い光輪
-    ctx.globalAlpha=0.25+0.15*Math.sin(performance.now()/220);
-    ctx.strokeStyle=c; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(sx,sy,TS*0.42,0,7); ctx.stroke();
-    ctx.globalAlpha=1;
+    drawFeelItemIcon(d.it,sx,sy);
     // 名前は近づいたときだけ。常時出すと画面が文字で埋まる
     if(Math.hypot(d.x-P.x,d.y-P.y)<3.2)
       label(itemName(d.it), sx, sy-TS*0.6, c, 0.95);
@@ -11410,8 +11968,9 @@ function draw(){
     ctx.save(); ctx.globalAlpha*=feelBlink(e);
     if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
-      drawSprite(spr, sx, sy, R*2.6);
-      spriteDrawn=true;
+      const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
+      spriteDrawn=drawSpriteArt ? drawSpriteArt(sprite(spr),sx,sy,R*2.6,e,e.artDx,e.artDy,1,1,0,true)
+        : drawSprite(spr,sx,sy,R*2.6);
       if(e.hit>0){
         ctx.save();
         ctx.globalAlpha=Math.min(0.6, e.hit*4);
@@ -11421,8 +11980,9 @@ function draw(){
       }
     }else if(charKey){
       const artSize=e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1);
-      spriteDrawn=CharacterArt.put(charKey,sx,sy,artSize,e,e.artDx,e.artDy,
-                                   e.dead?Math.max(0,e.fade/0.3):1);
+      const drawCharacter=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
+      spriteDrawn=drawCharacter(charKey,sx,sy,artSize,e,e.artDx,e.artDy,
+                                e.dead?Math.max(0,e.fade/0.3):1);
       if(!spriteDrawn){
         ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
@@ -11550,12 +12110,16 @@ function draw(){
     const mspr = isDurantree(a) ? 'moss-ball' : null;
     ctx.save(); ctx.globalAlpha*=feelBlink(a);
     if(mspr && sprite(mspr)){
-      drawSprite(mspr, sx, sy, R*2.6);
+      const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
+      if(drawSpriteArt) drawSpriteArt(sprite(mspr),sx,sy,R*2.6,a,a.dirx,a.diry,1,aScale,aRot,true);
+      else drawSprite(mspr,sx,sy,R*2.6);
       if(a.hit>0){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
-    }else if(!CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
+    }else{
+      const drawCharacter=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
+      if(!drawCharacter(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
         const ang=i/6*Math.PI*2-Math.PI/2+aRot;
@@ -11566,6 +12130,7 @@ function draw(){
       ctx.fillStyle = a.hit>0 ? '#fff' : j.col;
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=2;
       ctx.fill(); ctx.stroke();
+      }
     }
     ctx.restore();
     drawFeelFlash(a,sx,sy,mspr?R*2.6:TS*aScale);
@@ -11813,6 +12378,39 @@ function draw(){
       ctx.beginPath(); ctx.arc(sx,sy,f.r*TS,0,7); ctx.fill();
       ctx.globalAlpha=0.55*k; ctx.strokeStyle='#ffb066'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(sx,sy,f.r*TS,0,7); ctx.stroke();
+    }else if(f.kind==='artfield'){
+      // ライトニング：脈打つ円。技ごとの色で塗る（焦土の赤とは別物だと分かるように）
+      const pl=0.55+0.45*Math.sin(performance.now()/90);
+      ctx.globalAlpha=0.15*k*pl; ctx.fillStyle=f.col;
+      ctx.beginPath(); ctx.arc(sx,sy,f.r*TS,0,7); ctx.fill();
+      ctx.globalAlpha=0.6*k*pl; ctx.strokeStyle=f.col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(sx,sy,f.r*TS,0,7); ctx.stroke();
+    }else if(f.kind==='artcone'){
+      // フレイム：前方の扇。届く範囲がそのまま形になっている
+      const pl=0.55+0.45*Math.sin(performance.now()/110);
+      ctx.globalAlpha=0.17*k*pl; ctx.fillStyle=f.col;
+      ctx.beginPath(); ctx.moveTo(sx,sy);
+      ctx.arc(sx,sy,f.r*TS,f.a-f.arc,f.a+f.arc); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=0.5*k; ctx.strokeStyle=f.col; ctx.lineWidth=2; ctx.stroke();
+    }else if(f.kind==='artorbit'){
+      // ダンシングソード：回る刃そのものを描く（軌道の輪も薄く残す）
+      ctx.globalAlpha=0.22*k; ctx.strokeStyle=f.col; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.arc(sx,sy,f.r*TS,0,7); ctx.stroke();
+      const bx=sx+Math.cos(f.a)*f.r*TS, by=sy+Math.sin(f.a)*f.r*TS;
+      ctx.globalAlpha=0.9; ctx.strokeStyle=f.col; ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(bx-Math.cos(f.a)*TS*0.3, by-Math.sin(f.a)*TS*0.3);
+      ctx.lineTo(bx+Math.cos(f.a)*TS*0.3, by+Math.sin(f.a)*TS*0.3);
+      ctx.stroke();
+    }else if(f.kind==='artdragoon'){
+      // ドラグーン：着地点の予兆。縮んでいく輪で「あと何秒か」を見せる
+      if(f.tgt && !f.tgt.dead){
+        const tx=f.tgt.x*TS-camX, ty=f.tgt.y*TS-camY;
+        ctx.globalAlpha=0.6; ctx.strokeStyle=f.col; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.arc(tx,ty,TS*(0.6+k*1.6),0,7); ctx.stroke();
+      }
+    }else if(f.kind==='artrep' || f.kind==='artvolley'){
+      // 続きを待っているだけ。絵は当たった瞬間に出るので、ここでは何も描かない
     }else{           // 聖域
       const pl=0.6+0.4*Math.sin(performance.now()/260);
       ctx.globalAlpha=0.13*k*pl; ctx.fillStyle=f.col;
@@ -12066,7 +12664,8 @@ function draw(){
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){
-    if(!CharacterArt.put(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
+    const drawHero=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
+    if(!drawHero(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
@@ -12684,6 +13283,22 @@ function updateHUD(){
     hset('wavebtn.col', wr ? '#8fd8ff' : '', v=>wb.style.color=v);
     hset('wave-cd.t', wr ? '' : Math.ceil(P.waveCd)+'s', v=>el('wave-cd').textContent=v);
   }else wb.classList.remove('on');
+
+  /* 武器技のボタン。**閃くまでは出さない**（衝撃波と同じ作法）。
+     素手や、まだ何も閃いていない武器種に持ち替えたら、その場で消える——
+     押せないボタンを置いておくより、消えたことが「今は使えない」の説明になる。
+     こちらは名札を出す。武器を持ち替えると中身が変わるので、
+     「今なにが乗っているか」が読めないと押す判断ができない。 */
+  const ab=el('artbtn'), ad=playerArt();
+  if(ad){
+    const ar=(P.artCd||0)<=0;
+    ab.classList.add('on');
+    ab.classList.toggle('ready', ar);
+    hset('artbtn.col', ar ? ad.col : '', v=>ab.style.color=v);
+    hset('art-icon.t', ad.icon, v=>el('art-icon').textContent=v);
+    hset('art-nm.t', ad.nm, v=>el('art-nm').textContent=v);
+    hset('art-cd.t', ar ? '' : Math.ceil(P.artCd)+'s', v=>el('art-cd').textContent=v);
+  }else ab.classList.remove('on');
 
   /* 盾のボタン。**盾を装備しているときだけ出す。**
      以前は「盾を持てば何かできる」と伝えるために無くてもグレーで置いていたが、
@@ -14369,6 +14984,78 @@ function renderUlts(){
       + '<br><span style="color:var(--dim);font-size:12px">探索中はHUDの丸ボタンで発動。技レベルはSPで上げる（リキャストも短くなる）</span>'
     : '大ボスは10階ごと。1体倒すごとに大技が1つ解放される。';
 }
+/* ==================== ステータス画面の「技」欄 ====================
+   技ボタンは3つある（大技・スキル技・武器技）が、**何が乗っているかを
+   決める場所が3ヶ所に散っていた**——大技は街、スキル技は能力強化、
+   武器技はどこにも無い。押すのは同じ画面なのに、替えるのは別々の画面だった。
+
+   ここに3枠まとめて置く。探索中でも開ける画面なので、
+   「今この状況ならこっち」を握り替えられる。
+
+   **リキャストは枠の側に残す**（技を替えても戻らない）。
+   替えるたびに待ち時間が消えるなら、それは付け替えではなく連射になる。 */
+function artSlotHTML(o){
+  const on=o.cur;
+  return `<div class="item" data-artslot="${o.slot}" data-artpick="${o.id||''}"
+     style="border-left-color:${o.col};${o.set?'background:rgba(143,216,255,.06)':''}">
+    <div class="nm" style="color:${o.col}">${o.icon||'・'} ${o.nm}
+      ${o.set?'<span style="color:#7fe0c0;font-size:12px">　セット中</span>'
+             :'<span style="color:var(--dim);font-size:12px">　タップでセット</span>'}</div>
+    <div class="af">${o.desc}</div>
+    ${o.sub?`<div class="af" style="color:var(--dim)">${o.sub}</div>`:''}
+  </div>`;
+}
+function renderArtSlots(){
+  const rows=[];
+
+  // ---- 枠1: 大技 ----
+  const ul=unlockedUlts();
+  rows.push('<div class="af" style="margin:6px 2px 2px;color:#8fd8ff;font-weight:700">枠1　大技</div>');
+  if(!ul.length){
+    rows.push('<div class="empty">まだ1つも無い。第10階層の大ボスを倒すと最初の大技を覚える</div>');
+  }else ul.forEach(u=>rows.push(artSlotHTML({
+    slot:'ult', id:u.id, nm:u.nm, icon:u.icon, col:u.col, set:S.ult===u.id,
+    desc:u.desc(ultLv(u.id)),
+    sub:'Lv.'+ultLv(u.id)+'　リキャスト '+ultCooldown(u).toFixed(0)+'秒'})));
+
+  // ---- 枠2: スキル技 ----
+  rows.push('<div class="af" style="margin:10px 2px 2px;color:#8fd8ff;font-weight:700">枠2　スキル技</div>');
+  if(upgLv('wave')){
+    rows.push(artSlotHTML({slot:'wave', id:'wave', nm:'衝撃波', icon:'〓', col:'#8fd8ff', set:true,
+      desc:'前方をまとめて薙ぐ。下がりながらでも出せる',
+      sub:'リキャスト '+WAVE_CD+'秒　（今はこの枠に入る技が1つだけ）'}));
+  }else{
+    rows.push('<div class="empty">能力強化「衝撃波」を買うと、この枠に入る</div>');
+  }
+
+  // ---- 枠3: 武器技 ----
+  const wb=heroWeaponBase();
+  const wbn=wb ? (BASES.find(b=>b.id===wb)||{}).nm : null;
+  rows.push('<div class="af" style="margin:10px 2px 2px;color:#8fd8ff;font-weight:700">枠3　武器技'
+    +(wbn?`<span style="color:var(--dim);font-weight:400">　${wbn}</span>`:'')+'</div>');
+  if(!wb){
+    rows.push('<div class="empty">素手には武器技が無い。武器を装備すると、その種の技がここに出る</div>');
+  }else{
+    const learned=learnedArts(wb), all=artsOf(wb), cur=playerArt();
+    if(!learned.length){
+      rows.push('<div class="empty">'+wbn+'の技はまだ閃いていない。'
+        +wbn+'で戦い続けると、ふいに閃く</div>');
+    }else learned.forEach((d,i)=>rows.push(artSlotHTML({
+      slot:'art', id:d.id, nm:d.nm, icon:d.icon, col:d.col, set:!!cur && cur.id===d.id,
+      desc:d.desc,
+      sub:'lv'+(i+1)+'　リキャスト '+artCooldown(d,false)+'秒'})));
+    // まだ閃いていないぶんは「あと何段あるか」だけ見せる（中身は伏せる）
+    const left=all.length-learned.length;
+    if(left>0) rows.push('<div class="empty">'+wbn+'の技はあと'+left+'つ。'
+      +'lv'+(learned.length+1)+'の技を閃くまで、'+wbn+'を振り続けること</div>');
+  }
+  el('bag-arts').innerHTML = rows.join('');
+  el('bag-art-hint').innerHTML =
+    '探索中でも入れ替えられる。<b>ただしリキャストは枠に残る</b>（替えても待ち時間は戻らない）。'
+    + (wb ? '<br><span style="color:var(--dim);font-size:12px">武器技は武器種ごと。'
+            +wbn+'の熟練 '+masteryOf(wb)+' → 閃きやすさ ×'
+            +(1+masteryOf(wb)*ART_FLASH_MAST).toFixed(2)+'</span>' : '');
+}
 function charmName(c){ return '🔮 '+c.nm; }   // 護符も行頭でそれと分かるように
 function carryName(c){ return c.kind==='charm' ? charmName(c.charm) : itemName(c.item); }
 function carryHTML(c){
@@ -15012,6 +15699,7 @@ function renderBag(){
     '<div class="row"><span class="k">発見力 / 次のLvまで</span><span>'+st.mf+' / '+Math.max(0,xpNeed(S.hero.lv)-S.hero.xp)+'</span></div>'+
     '<div class="row"><span class="k">この探索の稼ぎ</span><span>撃破 '+S.run.kills+' / '+S.run.gold+' G</span></div>';
 
+  renderArtSlots();
   el('bag-boons').innerHTML = boonListHTML(S.hero);
   el('bag-party').innerHTML = livingParty().length ? livingParty().map(a=>{
     const j=jobDef(a.job), as=allyStats(a);
@@ -15077,6 +15765,21 @@ function closeStat(){ el('m-stat').classList.remove('on'); setScreen('game'); la
 function bagTap(e){
   if(S.screen!=='bag' && S.screen!=='stat') return;
   if(!e.target || !e.target.closest) return;
+  /* 技のセット。**リキャストには触らない**——替えるたびに待ちが消えると、
+     3つの技を順番に着け替えるだけで連射できてしまう。 */
+  const as=e.target.closest('.item[data-artslot]');
+  if(as){
+    if(!tapAccepted(e)) return;
+    if(e.type==='touchend' && e.cancelable) e.preventDefault();
+    const slot=as.dataset.artslot, id=as.dataset.artpick;
+    if(slot==='ult' && id){ S.ult=id; log('大技を『'+ultDef(id).nm+'』にした'); }
+    else if(slot==='art' && id){
+      const wb=heroWeaponBase();
+      if(wb){ S.artPick=S.artPick||{}; S.artPick[wb]=id; log('武器技を『'+artDef(id).nm+'』にした'); }
+    }
+    renderBag();
+    return;
+  }
   const ally=e.target.closest('.item[data-ally]');
   if(ally){
     if(!tapAccepted(e)) return;
@@ -15870,7 +16573,8 @@ bindTap(el('dbg-reset'), ()=>{
   S.carry=[];S.gachaDay='';refreshGacha();
   /* 名前も消してタイトルへ戻す。「全消去」と言っておいて名前だけ残るのは、
      消えたのかどうかが分からない一番よくない形。 */
-  S.name=''; S.mastery={}; S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
+  S.name=''; S.mastery={}; S.arts={}; S.artPick={};
+  S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
   S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   S.moss={}; S.duranGiven=false;                  // 苔玉の記録も消す
   S.bossBoon={}; S.cleared2={};                   // ボスの恩寵と踏破の記録も消す
@@ -16135,6 +16839,7 @@ initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
 <script src="ally-effect-study.js"></script>
+<script src="item-icons.js"></script>
 <script src="game-feel.js"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
