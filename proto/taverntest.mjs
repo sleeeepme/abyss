@@ -352,4 +352,69 @@ R.returnMarks = await pg.evaluate(()=>{
               && tavernPool().every(x=>!x.returned)};
 });
 
+/* ---------- 一覧のスクロールがタップに化けない ----------
+   報告「酒場の項目が5以上あるとスクロールできない」。
+
+   ブラウザがスクロールの手綱を取ると、そこから先の touchmove は
+   ページへ配られなくなる。**指は動いているのに移動量の見張りは
+   false のまま touchend が来る。** それを「タップ」と扱うと
+   preventDefault が走って、動いた位置が元へ戻る＝指で引いても動かない。
+   4件までは器が動かないので、症状そのものが現れなかった。
+
+   touchmove が1つも来ない最悪の形を作って、
+   それでもタップとして扱われないことを確かめる。 */
+R.scrollIsNotATap = await pg.evaluate(async ()=>{
+  S.bld={forge:1,stash:1,tavern:1,altar:1};
+  S.gold=999999;
+  S.hero.party=[];
+  S.tavernPool=[];
+  for(let i=0;i<8;i++){ const a=makeAlly(3,S.hero); a.boons=[];
+    a.artVariant=pickAllyVariant(a.job); S.tavernPool.push(a); }
+  setScreen('tavern');
+  await new Promise(r=>setTimeout(r,120));
+  const sc=document.getElementById('scr-tavern');
+  const scrollable = sc.scrollHeight > sc.clientHeight+1;
+  const row=document.querySelector('#tavernpool [data-hire]');
+  if(!row) return {ok:false, why:'雇える行が無い'};
+  const partyBefore=party().length, goldBefore=S.gold;
+
+  // 器を実際に動かしてから、touchmove を1つも出さずに指を離す
+  sc.scrollTop=0;
+  const r=row.getBoundingClientRect();
+  const cx=Math.round(r.left+r.width/2), cy=Math.round(r.top+r.height/2);
+  const mk=(x,y)=>new Touch({identifier:11,target:row,clientX:x,clientY:y});
+  const fire=(type,x,y)=>{ const t=mk(x,y);
+    row.dispatchEvent(new TouchEvent(type,{touches:type==='touchend'?[]:[t],
+      changedTouches:[t],bubbles:true,cancelable:true})); };
+  fire('touchstart',cx,cy);
+  sc.scrollTop=150;                      // ブラウザがスクロールを引き取った状態
+  fire('touchend',cx,cy);                // touchmove は一度も配られない
+  await new Promise(r2=>setTimeout(r2,150));
+  const hiredByScroll = party().length>partyBefore || S.gold<goldBefore;
+  const keptPosition = sc.scrollTop>100;   // 位置が戻されていない
+  const hiredCount = (party().length-partyBefore);
+
+  // 普通のタップは今までどおり効くこと
+  sc.scrollTop=0;
+  await new Promise(r2=>setTimeout(r2,60));
+  const row2=document.querySelector('#tavernpool [data-hire]');
+  const r2b=row2.getBoundingClientRect();
+  const tx=Math.round(r2b.left+r2b.width/2), ty=Math.round(r2b.top+r2b.height/2);
+  const mk2=(x,y)=>new Touch({identifier:12,target:row2,clientX:x,clientY:y});
+  const fire2=(type,x,y)=>{ const t=mk2(x,y);
+    row2.dispatchEvent(new TouchEvent(type,{touches:type==='touchend'?[]:[t],
+      changedTouches:[t],bubbles:true,cancelable:true})); };
+  fire2('touchstart',tx,ty);
+  fire2('touchend',tx,ty);
+  await new Promise(r3=>setTimeout(r3,200));
+  const tapStillHires = party().length>partyBefore;
+
+  return {hiredByScrollCount: hiredCount,
+          listScrolls: scrollable,
+          scrollNotTreatedAsTap: !hiredByScroll,
+          scrollPositionKept: keptPosition,
+          normalTapStillWorks: tapStillHires,
+          ok: scrollable && !hiredByScroll && keptPosition && tapStillHires};
+});
+
 await done(b, errs, R);

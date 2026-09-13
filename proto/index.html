@@ -77,6 +77,11 @@
     z-index:10;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
     overflow-y:auto;touch-action:pan-y}
   .screen.on{display:flex}
+  /* 画面はどれも上から下へ積むだけなので、子は縮めない。
+     縦の flex 列では子が既定で縮む（flex-shrink:1）ため、中身が増えても
+     容器が「収まっている」と判断されてスクロールが起きない場合がある。
+     .hub-plaza だけは後段で flex:1 を指定していて、そちらが勝つ（広場は伸ばす）。 */
+  .screen>*{flex-shrink:0}
   /* 街まわりの画面だけに出る下部バナー枠。
      探索中は絶対に出さない（画面が狭く、視界が塞がると被弾に直結する）。
      実際の広告SDKに差し替える前提のダミー枠。高さは標準的なバナー（50px）に合わせてある。 */
@@ -4348,9 +4353,18 @@ function tryFlashArt(baseId){
   const b=BASES.find(x=>x.id===baseId);
   log('💡 '+(b?b.nm:baseId)+'『'+artName(def)+'』を閃いた');
   showBanner('💡 '+artName(def), (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, 2.2);
-  /* 閃いたその場で名前を付けられるようにする（既定値は入れてある）。
-     探索中に画面を止めたくないので**開くのは自分から**——
-     ステータス画面の技欄の ✎ から、いつでも変えられる。 */
+  /* ---------- 閃いたその場で名前を付ける ----------
+     技は「教わった物」ではなく「自分で見つけた物」なので、
+     見つけた瞬間に名前を付けられるのが筋（依頼どおり）。
+
+     閃くのは必ず戦いの最中なので、開いているあいだは盤面を止める。
+     倒れた仲間の窓と同じ扱い——止めずに出すと、名前を考えているあいだに
+     殴られる。止めても得はしない（相手も一緒に止まる）し、
+     閃きはそもそも滅多に起きない。
+
+     やめる／決定のどちらでも閉じて戦いに戻る。あとから
+     ステータス画面の技欄の ✎ で変えることもできる。 */
+  openArtRename(def.id);
   return def;
 }
 function tryFlashArtAlly(a, baseId){
@@ -10781,11 +10795,24 @@ function finishReturn(overflow){
    click / touchend / pointerup の三つを受けて、直後の重複だけ弾く。 */
 // -1e9 で初期化する。0 だと読み込み直後 700ms の click が「重複」と誤判定され、
 // 起動直後に急いでタップした一発目が無視される。
-let _lastTap=-1e9, _tsX=0, _tsY=0, _tsMoved=false;
+let _lastTap=-1e9, _tsX=0, _tsY=0, _tsMoved=false, _tsScroller=null, _tsScrollTop=0;
+/* 指の下にある「実際に動く器」を探す。
+   移動量だけを見ていると取りこぼす場合があるので、
+   器が動いたかどうかも併せて見る（下の tapAccepted 参照）。 */
+function scrollParent(node){
+  for(let n=node; n && n!==document.body; n=n.parentElement){
+    if(n.nodeType!==1) continue;
+    const ov=getComputedStyle(n).overflowY;
+    if((ov==='auto'||ov==='scroll') && n.scrollHeight > n.clientHeight+1) return n;
+  }
+  return null;
+}
 /* スクロール中に指を離したのをタップと誤認しないよう、移動量を見張る */
 document.addEventListener('touchstart',e=>{
   const t=e.touches&&e.touches[0]; if(!t) return;
   _tsX=t.clientX; _tsY=t.clientY; _tsMoved=false;
+  _tsScroller = (t.target && t.target.nodeType===1) ? scrollParent(t.target) : null;
+  _tsScrollTop = _tsScroller ? _tsScroller.scrollTop : 0;
 },{passive:true,capture:true});
 document.addEventListener('touchmove',e=>{
   const t=e.touches&&e.touches[0]; if(!t) return;
@@ -10799,6 +10826,16 @@ function tapAccepted(e){
   const now=(performance.now?performance.now():Date.now());
   if(e && e.type==='touchend'){
     if(_tsMoved) return false;            // スクロールだった
+    /* ---------- 移動量だけでは足りない ----------
+       ブラウザがスクロールの手綱を取ると、そこから先の touchmove は
+       ページへ配られなくなる。**指は動いているのに _tsMoved は false のまま
+       touchend が来る。** そのまま「タップ」と扱うと、下で preventDefault が
+       走って、せっかく動いた位置が元へ戻る——指で引いても一覧が動かない、
+       という形で出る（報告「酒場の項目が5以上あるとスクロールできない」。
+       4件までは器が動かないので、症状そのものが現れなかった）。
+
+       動いたかどうかは、器の scrollTop を見れば取りこぼしなく分かる。 */
+    if(_tsScroller && Math.abs(_tsScroller.scrollTop - _tsScrollTop) > 2) return false;
     _lastTap=now;                          // 直後の合成 click を無効化する目印
     return true;
   }
@@ -11404,7 +11441,7 @@ function tick(now){
   // 例外でループが止まると「ゲームオーバー後にフリーズ」になる。必ず次フレームを予約する。
   try{
     const live = S.screen==='game' && S.hero && S.run && W.fl;
-    if(live){ update(dt); draw(); _canvasDirty=true; }
+    if(live){ if(!gamePaused()) update(dt); draw(); _canvasDirty=true; }
     else if(_canvasDirty){
       /* ---------- 街やメニューではキャンバスを塗らない ----------
          draw() は「画面全体を一色で塗ってから、game でなければ帰る」形だった。
@@ -11451,6 +11488,18 @@ let _fxFails=0;          // 演出の描画で落ちた回数（最初の1回だ
    「敵まで描けて仲間で落ちた」のように場所が一言で伝わる。
    代入1つぶんなので、毎フレーム通っても費用はほぼ無い。 */
 let _drawStage='開始前';
+/* ---------- 盤面を止める窓 ----------
+   探索中に開く窓（閃いた技の名前など）は、開いているあいだ時間を止める。
+   止めるのは update だけで draw は回す——画面まで落とすと、
+   何の上に窓が出ているのか分からなくなる。 */
+let _paused=false;
+function pauseGame(on){ _paused = !!on; }
+function gamePaused(){
+  /* 窓が閉じているのに止まったままになると、盤面が二度と動かない。
+     止めている理由（開いている窓）が消えていたら自分で戻す。 */
+  if(_paused && !document.querySelector('.modal.on')) _paused=false;
+  return _paused;
+}
 /* 例外の発生場所を1行に縮める。行番号まで出れば原因はほぼ一意に決まる。
    端末では開発者コンソールを開けないので、**画面のログに出る形**にしておく。 */
 function errSite(err){
@@ -15726,10 +15775,22 @@ function openArtRename(id){
   el('an-sub').textContent = '既定の名前は「'+d.nm+'」';
   el('an-input').value = artName(d);
   el('m-artname').classList.add('on');
-  // 開いた瞬間に打ち始められるようにする（名前を決めに来たのだから）
-  setTimeout(()=>{ const i=el('an-input'); if(i){ i.focus(); i.select&&i.select(); } }, 30);
+  /* 戦っている最中に開くので、開いているあいだは時間を止める。
+     **止めるのは update だけで、draw は回し続ける**——
+     画面まで消すと、何の上に窓が出ているのか分からなくなる。 */
+  pauseGame(true);
+  /* 開いた瞬間に打ち始められるようにする（名前を決めに来たのだから）。
+     ただし探索中は伏せる——戦いの最中にキーボードがせり上がると
+     盤面が半分隠れる。名前だけ見せて、打ちたければ枠を押させる。 */
+  if(S.screen!=='game')
+    setTimeout(()=>{ const i=el('an-input'); if(i){ i.focus(); i.select&&i.select(); } }, 30);
 }
-function closeArtRename(){ el('m-artname').classList.remove('on'); _renamingArt=null; }
+function closeArtRename(){
+  el('m-artname').classList.remove('on');
+  _renamingArt=null;
+  const i=el('an-input'); if(i && i.blur) i.blur();
+  pauseGame(false);
+}
 function commitArtRename(reset){
   const id=_renamingArt; if(!id) return closeArtRename();
   const d=artDef(id);

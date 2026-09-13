@@ -429,4 +429,73 @@ R.renameArt = await pg.evaluate(()=>{
           ok: prefilled && renamed==='わが一閃' && onButton && restored===d.nm};
 });
 
+/* ---------- 閃いたその場で名前を付ける ----------
+   依頼「技を閃いた時に名前を変更できるようにする」に対して、
+   一度は「探索中に画面を止めたくない」と判断して開かない作りにした。
+   依頼と食い違っていたので開くようにした（報告：窓が開かない）。 */
+
+/* A. 閃いたら窓が開き、既定値が入っていること。 */
+R.flashOpensRenameWindow = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; S.arts={}; S.artName={};
+  closeArtRename();
+  const base='sword';
+  const list=artsOf(base);
+  // 必ず閃かせる（rnd は const なので、確率のほうを差し替える）
+  const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
+  const def=tryFlashArt(base);
+  window.artFlashChance=chanceOrig;
+  const open=document.getElementById('m-artname').classList.contains('on');
+  const shown=document.getElementById('an-input').value;
+  const sub=document.getElementById('an-sub').textContent;
+  const paused=gamePaused();
+  closeArtRename();
+  const resumed=!gamePaused();
+  return {artNm:def?def.nm:null, shown, sub,
+          learned:!!def, windowOpened:open,
+          defaultFilled: !!def && shown===def.nm,
+          pausedWhileOpen: paused,
+          resumedAfterClose: resumed,
+          ok: !!def && open && !!def && shown===def.nm && paused && resumed};
+});
+
+/* B. 止めているあいだ盤面は動かない。閉じたら動く。
+      止めても描画は続ける（背景が落ちると何の上の窓か分からない）。 */
+R.renameWindowFreezesBoard = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; S.arts={}; S.artName={};
+  closeArtRename();
+  stepSim(0.2,{draw:true});
+  const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
+  tryFlashArt('sword');
+  window.artFlashChance=chanceOrig;
+  // 窓が開いている状態で tick を回す
+  const t0=S.run.elapsed;
+  _drawStage='';
+  for(let i=0;i<20;i++) tick(performance.now()+i*16);
+  const elapsedWhilePaused=S.run.elapsed-t0;
+  const drewWhilePaused=_drawStage==='地図';     // 描画は回っている
+  closeArtRename();
+  const t1=S.run.elapsed;
+  for(let i=0;i<20;i++) tick(performance.now()+1000+i*16);
+  const elapsedAfter=S.run.elapsed-t1;
+  return {elapsedWhilePaused:+elapsedWhilePaused.toFixed(3),
+          elapsedAfter:+elapsedAfter.toFixed(3),
+          frozenWhileOpen: elapsedWhilePaused===0,
+          stillDraws: drewWhilePaused,
+          runsAfterClose: elapsedAfter>0,
+          ok: elapsedWhilePaused===0 && drewWhilePaused && elapsedAfter>0};
+});
+
+/* C. 窓を閉じ忘れても盤面が永久に止まらない。
+      止める理由（開いている窓）が消えたら自分で戻る。 */
+R.pauseNeverSticks = await pg.evaluate(()=>{
+  pauseGame(true);
+  document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on'));
+  const stuck=gamePaused();
+  return {stillPausedAfterWindowsClosed: stuck?'はい':'いいえ',
+          selfHealed: stuck===false,
+          ok: stuck===false};
+});
+
 await done(b, errs, R);
