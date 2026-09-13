@@ -541,5 +541,105 @@ R.pixelFxNeverStealsContext = await pg.evaluate(()=>{
           ok: swapped && recovered && backToMain};
 });
 
+/* 5-e. 例外が毎フレーム出ても、盤面を真っ暗にしない。
+       後始末に resize()（cv.width への代入）を使うと canvas が作り直されて
+       中身が消える。例外が続くと前のフレームすら残らず画面が黒くなった（報告）。
+       直すのは状態だけで、最後に描けた絵は残す。 */
+R.frameErrorKeepsLastPicture = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.5,{draw:true});
+  const cx=Math.round(innerWidth/2), cy=Math.round(innerHeight/2);
+  const box=()=>Array.from(ctx.getImageData(cx-40,cy-40,80,80).data);
+  const painted=(d)=>d.some((v,i)=>i%4!==3 && v>0);   // 何か塗られているか
+  const before=box();
+  const hadPicture=painted(before);
+
+  // 落ちたフレームの後始末を、毎フレーム出ている想定で繰り返す
+  ctx.save(); ctx.save(); ctx.save();        // save の積み残しも作っておく
+  ctx.globalAlpha=0.2; ctx.setLineDash([3,3]);
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<30;i++) resetDrawState();
+
+  const after=box();
+  const stillPainted=painted(after);
+  const untouched=after.every((v,i)=>v===before[i]);   // 絵に触っていない
+  const t=ctx.getTransform();
+  const alphaOk=ctx.globalAlpha===1;
+  const dashOk=ctx.getLineDash().length===0;
+  const compOk=ctx.globalCompositeOperation==='source-over';
+  const transformOk=[t.a,t.b,t.c,t.d,t.e,t.f].every(Number.isFinite);
+  const ctxIsMain=ctx===MAIN_CTX;
+  return {hadPicture, stillPainted, untouched, alphaOk, dashOk, compOk,
+          transformOk, ctxIsMain,
+          ok: hadPicture && stillPainted && untouched && alphaOk && dashOk
+              && compOk && transformOk && ctxIsMain};
+});
+
+/* 5-f. 落ちたことを画面のログで1回だけ言う。
+       console にしか出していなかったので、端末側からは何が起きたのか
+       まったく見えなかった。 */
+R.frameErrorIsToldOnScreen = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  _tickErrShown=false;
+  const cerr=console.error; console.error=()=>{};
+  const seen=[]; const ol=window.log;
+  window.log=(m)=>{ seen.push(String(m)); return ol(m); };
+  const orig=updateFeel;
+  window.updateFeel=()=>{ throw new Error('わざと落とす'); };
+  try{ tick(performance.now()); }catch(_){}
+  try{ tick(performance.now()+16); }catch(_){}
+  window.updateFeel=orig; window.log=ol; console.error=cerr;
+  const hits=seen.filter(m=>m.indexOf('描画エラー')>=0);
+  _tickErrShown=false;
+  return {lines:hits.length, message:hits[0]||null,
+          toldOnce: hits.length===1,
+          saysWhat: !!(hits[0] && hits[0].indexOf('わざと落とす')>=0),
+          ok: hits.length===1 && !!(hits[0] && hits[0].indexOf('わざと落とす')>=0)};
+});
+
+/* 5-g. 演出が落ちても主人公は描かれる。
+       主人公は描画の最後なので、手前の演出で1つ投げると真っ先に消える。
+       演出区間を切り離してあるので、落ちても主人公まで届かない。 */
+R.effectCrashStillDrawsHero = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.5,{draw:true});
+  const cerr=console.error; console.error=()=>{};
+  // 主人公が描かれたか数える
+  let heroDraws=0;
+  const origHero=window.drawFeelCharacterSprite;
+  window.drawFeelCharacterSprite=function(id,x,y,size,ent){
+    if(ent===P) heroDraws++;
+    return origHero.apply(this,arguments);
+  };
+  // 演出区間の中で毎回投げさせる（弾の描画を落とす）
+  const origMagic=window.drawFeelMagic;
+  const origRing=window.drawFeelRing;
+  let fxCalls=0;
+  window.drawFeelMagic=()=>{ fxCalls++; throw new Error('演出をわざと落とす'); };
+  window.drawFeelRing =()=>{ fxCalls++; throw new Error('演出をわざと落とす'); };
+  // 弾を必ず飛ばしておく
+  for(let i=0;i<6;i++)
+    W.fx.push({t:'bolt', x:P.x+0.5+i*0.1, y:P.y, vx:0.2, vy:0, life:9, max:9, dt:'arcane', dmg:1});
+  _fxFails=0;
+  const before=heroDraws;
+  let threw=null;
+  try{ for(let i=0;i<20;i++) draw(); }catch(e){ threw=String(e.message); }
+  const drawn=heroDraws-before;
+  window.drawFeelMagic=origMagic; window.drawFeelRing=origRing;
+  window.drawFeelCharacterSprite=origHero; console.error=cerr;
+  const ctxIsMain = ctx===MAIN_CTX;
+  _fxFails=0;
+  draw();
+  return {fxCalls, heroDrawnWhileEffectsCrash:drawn, threw, ctxIsMain,
+          effectsDidCrash: fxCalls>0,
+          heroStillDrawn: drawn>=20,
+          drawSurvives: threw===null,
+          ok: fxCalls>0 && drawn>=20 && threw===null && ctxIsMain};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

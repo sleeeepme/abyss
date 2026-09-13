@@ -10872,6 +10872,10 @@ const FONT = (getComputedStyle(document.documentElement)
 const _hc={};
 function hset(key, val, apply){ if(_hc[key]!==val){ _hc[key]=val; apply(val); } }
 const cv=el('cv'); let ctx=cv.getContext('2d');
+/* ctx は演出側（beginPixelFx）がフレームの途中で裏キャンバスに差し替える。
+   差し替わったまま戻らなくなったときに帰る先を、最初に控えておく。 */
+const MAIN_CTX = ctx;
+let _dpr = 1;
 
 /* ---------- 指の役割分担 ----------
    以前は **画面の左右**で決めていた（左半分＝スティック／右半分＝ガード）。
@@ -11419,10 +11423,22 @@ function tick(now){
        次のフレームがそれを引き継ぐと、例外はもう出ていないのに
        絵だけが消えたままになる（＝「キャラが消えて戻らない」）。 */
     resetDrawState();
+    /* ---------- 落ちたことを画面で言う ----------
+       ここは長いあいだ console.error だけで、端末で遊んでいる側からは
+       **何が起きたのか一切見えなかった。** 「キャラが消える」「画面が止まる」
+       としか報告できないのは、報告する側の問題ではなく、こちらが
+       何も出していなかったせい。1回だけログに出す（毎フレーム出すと
+       ログが埋まって、肝心の1行目が流れて読めなくなる）。 */
+    if(!_tickErrShown){
+      _tickErrShown=true;
+      try{ log('⚠ 描画エラー: '+((err&&err.message)||err)); }catch(_){}
+    }
   }
   requestAnimationFrame(tick);
 }
 let _canvasDirty=true;
+let _tickErrShown=false;
+let _fxFails=0;          // 演出の描画で落ちた回数（最初の1回だけ画面に出す）
 
 /* ---------- 検証用: ループを実時間ではなく同期で進める ----------
    回帰テストの 64%（321秒中206秒）が「3秒待つ」の類の実時間待ちだった。
@@ -11986,6 +12002,7 @@ const CharacterArt = (function(){
 let TS=26;
 function resize(){
   const dpr=Math.min(2,devicePixelRatio||1);
+  _dpr=dpr;
   cv.width=innerWidth*dpr; cv.height=innerHeight*dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   TS = clamp(Math.round(Math.min(innerWidth,innerHeight)/13), 28, 60);
@@ -12822,7 +12839,16 @@ function draw(){
   }
 
   // 弾（敵の遠距離攻撃）・回収エフェクト
+  /* ---------- 演出はここで切り離す ----------
+     この区間は ctx を裏キャンバスに差し替えたうえで、寿命や半径から
+     その場で数字を作る演出を大量に描く。**1つ投げると、そこから後ろが
+     丸ごと落ちる**——主人公は最後に描かれるので、真っ先に消えるのが主人公になる。
+     （報告「突然キャラの表示が消える」がこの形だった）
+
+     演出は演出、盤面は本編。演出が転んでも、主人公と HUD は描き切る。
+     finally で必ず endPixelFx() に戻すので、ctx が裏に残ることもない。 */
   beginPixelFx();
+  try{
   W.fx.forEach(f=>{
     if(f.t==='levelup'){       // レベルアップ：広がる二重の輪
       const k=1-f.life/f.max;
@@ -12967,7 +12993,12 @@ function draw(){
   });
 
   // 主人公（候補B・遺跡の斥候）。
-  endPixelFx();
+  }catch(_fxErr){
+    if(_fxFails++ === 0) console.error('演出の描画で落ちた:', _fxErr);
+    if(_fxFails === 1){ try{ log('⚠ 演出の描画で落ちた: '+((_fxErr&&_fxErr.message)||_fxErr)); }catch(_){} }
+  }finally{
+    endPixelFx();
+  }
   W.fx.forEach(f=>{if(f.t==='ashot'||f.t==='pshot')drawShot(f,camX,camY,f.t==='ashot');});
   drawEnemyPixels(camX,camY);
   drawFeelMotes(camX,camY);
@@ -13545,14 +13576,23 @@ function vanishGuard(e, hidden, dt){
 /* 落ちたフレームの後始末。
    canvas の状態（不透明度・線種・差し替えた ctx・積み残した save）は
    フレームを跨いで残る。中途半端なまま次のフレームが引き継ぐと、
-   例外はもう出ていないのに**絵だけが消えたまま**になる。 */
+   例外はもう出ていないのに**絵だけが消えたまま**になる。
+
+   **ここで画面を消してはいけない。**
+   最初は resize()（cv.width への代入）で状態ごと流していたが、
+   あれは canvas を作り直すので中身が全部消える。例外が毎フレーム出ていると
+   前のフレームすら残らず、盤面が真っ暗になった（報告）。
+   例外が続くあいだも、**最後に描けた絵は残す**のが正しい。
+   直すのは状態だけで、絵には触らない。 */
 function resetDrawState(){
   try{
-    if(typeof feelResetCtx==='function') feelResetCtx();  // 裏キャンバスに残った ctx を戻す
+    if(ctx!==MAIN_CTX) ctx=MAIN_CTX;      // 裏キャンバスに残った ctx を戻す
+    // save() の積み残しを戻す。底を越えた restore() は何もしないので安全。
+    for(let i=0;i<16;i++) ctx.restore();
+    ctx.setTransform(_dpr,0,0,_dpr,0,0);
     ctx.globalAlpha=1;
     ctx.setLineDash([]);
     ctx.globalCompositeOperation='source-over';
-    resize();      // width への代入で変換行列も save の積み残しも消える
   }catch(_){}
 }
 let _feelDrawFails=0;
