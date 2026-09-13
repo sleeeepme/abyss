@@ -447,5 +447,99 @@ R.feelThrowFallsBackToShapes = await pg.evaluate(()=>{
           ok: calls>0 && threw===null && cleanTransform};
 });
 
+/* ============ 5. 「キャラだけ消えて戻らない」 ============
+   報告: 歩いている／戦っている最中に、突然キャラの表示が消えて戻らなくなる。
+
+   この形の事故は例外もログも残さないので、原因側を1つずつ塞ぐのではなく
+   **消えている状態が続いたら必ず戻す**という受け口を用意した。
+   ここでは消え方を3種類とも人工的に作り、どれも戻ることを確かめる。 */
+
+/* 5-a. 点滅の位相で固まった場合（fallBlink が減らなくなる）。
+       正常な点滅は 1 コマ 0.06 秒なので見張りに掛からず、
+       止まって消えたままになったときだけ戻る。 */
+R.stuckBlinkRecovers = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  const hiddenNow=()=>(P.fallBlink>0)&&(Math.floor(P.fallBlink*16)%2===0);
+  // 「消えている側」の位相で止める
+  P.fallBlink=0.875;                       // floor(0.875*16)=14 → 偶数＝消えている
+  const hiddenAtStart=hiddenNow();
+  const cerr=console.error; console.error=()=>{};
+  let stillHidden=0;
+  for(let i=0;i<120;i++){                  // 2秒ぶん、fallBlink を止めたまま描く
+    P.fallBlink=0.875;                     // 減らさない＝固まった状態を再現
+    draw();
+    if(i>70 && P._gone===0 && P.fallBlink===0.875) stillHidden++;
+  }
+  console.error=cerr;
+  // 見張りが働けば fallBlink は 0 に落とされる（毎フレーム戻しているので直後に再現される）
+  P.fallBlink=0.875;
+  const before=P._gone;
+  for(let i=0;i<70;i++) draw();            // 1.2秒ぶん
+  const cleared = P.fallBlink===0;
+  P.fallBlink=0; P._gone=0;
+  return {hiddenAtStart, cleared, recovers: hiddenAtStart && cleared};
+});
+
+/* 5-b. 演出の揺れが NaN になった場合。
+       canvas は translate(NaN) を例外なしで捨てるので、
+       丸めていないと「主人公だけ消える」になる。 */
+R.nanOffsetStillDraws = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  const m=feelMotion(P);
+  m.recoilX=NaN; m.recoilY=NaN; m.phase=NaN;   // 一度壊れると反動が 0 でも NaN のまま
+  const raw=feelHeroOffset();
+  const rawBroken = !Number.isFinite(raw.x) || !Number.isFinite(raw.y);
+  const safe=finiteXY(raw);
+  const safeFinite = Number.isFinite(safe.x) && Number.isFinite(safe.y);
+  // 実際に描いて、変換行列に NaN が残らないこと
+  let threw=null;
+  try{ draw(); }catch(e){ threw=String(e.message); }
+  const t=ctx.getTransform();
+  const transformFinite = [t.a,t.b,t.c,t.d,t.e,t.f].every(Number.isFinite);
+  return {rawBroken, safeFinite, transformFinite, drawSurvives:threw===null,
+          ok: safeFinite && transformFinite && threw===null};
+});
+
+/* 5-c. 被弾元が座標を持たない場合（罠・地形・消えた撃ち手）。
+       ここで NaN を入れてしまうと、反動が切れたあとも
+       NaN*0=NaN でオフセットが戻らない。 */
+R.impactFromPlacelessSourceStaysFinite = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  const m=feelMotion(P);
+  m.recoilX=0; m.recoilY=0;
+  feelImpact(P, {name:'座標を持たない何か'}, false, 'slash', null);   // x,y が無い
+  const finiteAfterHit = Number.isFinite(m.recoilX) && Number.isFinite(m.recoilY);
+  m.recoil=0;                                   // 反動が切れたあとも有限か
+  const off=feelHeroOffset();
+  const finiteAfterDecay = Number.isFinite(off.x) && Number.isFinite(off.y);
+  return {finiteAfterHit, finiteAfterDecay, ok: finiteAfterHit && finiteAfterDecay};
+});
+
+/* 5-d. 演出の途中で落ちても、裏キャンバスに ctx が残らない。
+       残ると以後ずっと画面に何も描かれなくなる（例外もログも出ない）。 */
+R.pixelFxNeverStealsContext = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; P.invuln=1e9;
+  stepSim(0.3,{draw:true});
+  const main=ctx;
+  beginPixelFx();
+  const swapped = ctx!==main;
+  // endPixelFx を呼ばずに落ちた状況を作る
+  const leaked = ctx;
+  beginPixelFx();                 // 次のフレームの入口
+  const recovered = feelMainCtx===main;
+  endPixelFx();
+  const backToMain = ctx===main;
+  draw();
+  return {swapped, recovered, backToMain,
+          ok: swapped && recovered && backToMain};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

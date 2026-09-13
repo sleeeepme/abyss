@@ -33,7 +33,14 @@ function feelWeaponKind(base,dt,proj){
 function feelImpact(e,src,crit,dt,elem){
   const m=feelMotion(e);m.flash=.22;m.crit=crit?.25:0;
   // Replace the visual recoil on each hit; never accumulate or change simulation coordinates.
-  const dx=src?e.x-src.x:-(e.dirx||1),dy=src?e.y-src.y:-(e.diry||0),n=Math.hypot(dx,dy)||1;
+  /* src は座標を持たない物（罠・地形・消えた撃ち手）も来る。
+     そのとき dx が NaN になり、Math.hypot(NaN,..)||1 が 1 に化けるので
+     recoilX が NaN のまま残る。反動が 0 に戻っても NaN*0 は NaN なので、
+     以後**そのキャラの描画オフセットが永久に NaN**＝消えたまま戻らない。 */
+  let dx=src?e.x-src.x:-(e.dirx||1),dy=src?e.y-src.y:-(e.diry||0);
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)){dx=-(e.dirx||1);dy=-(e.diry||0);}
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)){dx=-1;dy=0;}
+  const n=Math.hypot(dx,dy)||1;
   const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
@@ -456,7 +463,14 @@ addEventListener('keydown',e=>{if(e.key.toLowerCase()==='x'&&!e.repeat) tapDash(
 // Render the existing effects at a shared coarse pixel resolution, preserving their timing.
 const feelFxCanvas=document.createElement('canvas'),feelFxCtx=feelFxCanvas.getContext('2d');
 let feelMainCtx=null;
+/* この区間だけ ctx を裏キャンバスに差し替える。
+   途中で例外が出ると差し替えたまま抜けるので、次のフレームで
+   feelMainCtx に裏キャンバス自身が控えられ、**以後ずっと画面へ描かれなくなる**。
+   （症状は「絵が止まる／キャラが出ない」だけで、例外もログも残らない）
+   入口で必ず表のコンテキストへ戻してから控える。 */
+function feelResetCtx(){ if(ctx===feelFxCtx&&feelMainCtx) ctx=feelMainCtx; }
 function beginPixelFx(){
+  feelResetCtx();
   const q=Math.max(2,Math.round(TS/16));
   const w=Math.ceil(innerWidth/q),h=Math.ceil(innerHeight/q);
   if(feelFxCanvas.width!==w||feelFxCanvas.height!==h){feelFxCanvas.width=w;feelFxCanvas.height=h;}

@@ -11415,6 +11415,10 @@ function tick(now){
     }
   }catch(err){
     console.error('tick error:', err);
+    /* 途中で落ちたフレームは canvas の状態を中途半端に残す。
+       次のフレームがそれを引き継ぐと、例外はもう出ていないのに
+       絵だけが消えたままになる（＝「キャラが消えて戻らない」）。 */
+    resetDrawState();
   }
   requestAnimationFrame(tick);
 }
@@ -12245,7 +12249,7 @@ function draw(){
   W.enemies.forEach(e=>{
     if(e.dead && e.pixelBurst) return;
     // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
-    const motion=feelEntityOffset(e);
+    const motion=finiteXY(feelEntityOffset(e));
     const sx=e.x*TS-camX+motion.x, sy=e.y*TS-camY-hopLift(e)+motion.y;
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
@@ -12436,14 +12440,14 @@ function draw(){
      まとめて描く1パスにするしかない。 */
   const allyBars=[];
   const drawMate=(a, isNpc)=>{
-    const motion=feelEntityOffset(a);
+    const motion=finiteXY(feelEntityOffset(a));
     const sx=a.x*TS-camX+motion.x, sy=a.y*TS-camY+motion.y;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
     /* 落とし穴の演出（主人公と同じ規則）。点滅で消えているフレームは丸ごと描かない。 */
     const aFallK = a.fallAnim ? clamp(a.fallAnim.t/a.fallAnim.dur,0,1) : 0;
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
     const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
-    if((a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0)) return;
+    if(vanishGuard(a, (a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0), _drawDt)) return;
     const j=jobDef(a.job), R=TS*0.30*aScale;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
@@ -12973,7 +12977,9 @@ function draw(){
   ctx.strokeStyle = P.target ? 'rgba(127,224,192,.45)' : 'rgba(127,224,192,.16)';
   ctx.lineWidth = P.target ? 2 : 1.5;
   ctx.setLineDash([4,5]);
-  ctx.beginPath(); ctx.arc(px,py,pst.range*TS,0,7); ctx.stroke();
+  /* 半径は必ず 0 以上に丸める。ctx.arc は負の半径で**例外を投げ**、
+     この位置で投げると主人公から後ろが丸ごと描かれないフレームになる。 */
+  ctx.beginPath(); ctx.arc(px,py,Math.max(0,pst.range*TS),0,7); ctx.stroke();
   ctx.setLineDash([]);
 
   // 盾を構えている表示: 向いている側に弧を描く
@@ -13001,8 +13007,11 @@ function draw(){
   const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
   const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
   const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
-  const heroBlinkOff = (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0);
-  const heroBob=feelHeroOffset();
+  const heroBlinkOff = vanishGuard(P, (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0), _drawDt);
+  /* 演出の揺れは NaN になり得る（位相・反動が一度でも壊れると戻らない）。
+     ctx.translate(NaN) は例外を出さずに**そのフレームの絵を捨てる**ので、
+     ここで有限に丸めておかないと「主人公だけ消える」が起きる。 */
+  const heroBob=finiteXY(feelHeroOffset());
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){
@@ -13498,6 +13507,54 @@ function drawAir(Z, dt){
    ずれた変換や薄い不透明度を引き継ぐので、変換を見て積み残しを戻す。
    何度も投げるようなら演出側の描画を切って素の図形に固定する——
    毎フレーム例外を作ること自体が重い。 */
+/* ---------- 消えないキャラ ----------
+   「突然キャラだけ表示されなくなり、そのまま戻らない」報告への対処。
+
+   この形の事故には共通点がある。**ログにも例外にも何も残らない。**
+     ・canvas は translate/scale に NaN を渡されても例外を出さず、描画を黙って捨てる
+     ・点滅（fallBlink）のように「消えている側の位相」で状態が止まると、消えたまま固まる
+     ・描画の途中で1つ投げると、そこから後ろ（＝最後に描く主人公）が丸ごと落ちる
+   どれも手掛かりは「絵だけが無い」だけで、原因の区別が付かない。
+
+   原因を1つずつ塞いでも、消える経路が1つ増えるたびに同じ事故が戻ってくる。
+   なので**描く直前に、消えている状態そのものを見張る。**
+   VANISH_LIMIT 秒より長く消え続けたら、理由が何であれ表示を取り戻す。
+
+   点滅（FALL_INV のあいだ 1/16 秒ごとに入れ替わる）は1回あたり 0.06 秒しか
+   消えないので、正常な点滅がこの見張りに掛かることはない。 */
+const VANISH_LIMIT = 0.9;
+function finiteXY(o){
+  return (o && Number.isFinite(o.x) && Number.isFinite(o.y)) ? o : {x:0,y:0};
+}
+let _vanishFixes=0;
+function vanishGuard(e, hidden, dt){
+  if(!e) return hidden;
+  if(!hidden){ e._gone=0; return false; }
+  e._gone = (e._gone||0) + (dt||0);
+  if(e._gone < VANISH_LIMIT) return true;
+  /* ここまで来たら「点滅」ではなく「消えたまま」。
+     消える理由になり得る物を全部捨てて、次のフレームから必ず出す。 */
+  e._gone = 0;
+  e.fallAnim = null; e.fallBlink = 0;
+  const m = (typeof FEEL==='object' && FEEL.motion) ? FEEL.motion.get(e) : null;
+  if(m) for(const k of ['phase','speed','recoil','recoilX','recoilY','flash'])
+    if(!Number.isFinite(m[k])) m[k]=0;
+  if(_vanishFixes++ === 0) console.error('vanish guard: 消えたままの表示を戻した');
+  return false;
+}
+/* 落ちたフレームの後始末。
+   canvas の状態（不透明度・線種・差し替えた ctx・積み残した save）は
+   フレームを跨いで残る。中途半端なまま次のフレームが引き継ぐと、
+   例外はもう出ていないのに**絵だけが消えたまま**になる。 */
+function resetDrawState(){
+  try{
+    if(typeof feelResetCtx==='function') feelResetCtx();  // 裏キャンバスに残った ctx を戻す
+    ctx.globalAlpha=1;
+    ctx.setLineDash([]);
+    ctx.globalCompositeOperation='source-over';
+    resize();      // width への代入で変換行列も save の積み残しも消える
+  }catch(_){}
+}
 let _feelDrawFails=0;
 const FEEL_DRAW_GIVEUP=8;
 function _sameTransform(a,b){
