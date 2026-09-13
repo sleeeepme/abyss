@@ -347,4 +347,86 @@ R.orphan = await pg.evaluate(()=>{
           stopped: e.hp===afterFirst};
 });
 
+/* ================= 技欄（ステータス画面） ================= */
+
+/* 見出しが格子の1マスに収まっていた。.grid は auto-fill の格子なので、
+   素の div を混ぜると列に食い込む——「枠2 スキル技」の見出しが大技の隣に入り、
+   衝撃波が大技の並びの一員に見えていた（報告「スキル技をセットすると
+   大技の枠に入ってしまう」）。見出しと空表示は行を独り占めさせる。 */
+R.slotHeadingsSpanRow = await pg.evaluate(()=>{
+  S.greatKills=20; S.upg=S.upg||{}; S.upg.wave=1;
+  TH.run(1); openStat();
+  const grid=el('bag-arts');
+  const gw=grid.getBoundingClientRect().width;
+  const heads=[...grid.querySelectorAll('.gridhead')];
+  const widths=heads.map(h=>Math.round(h.getBoundingClientRect().width));
+  const items=[...grid.querySelectorAll('.item')];
+  const itemW=items.length?Math.round(items[0].getBoundingClientRect().width):0;
+  closeStat();
+  /* 見出しには左右 2px の余白があるので、幅は格子と完全一致はしない。
+     見たいのは「1列ぶんに収まっていないこと」なので、
+     格子の幅との差（余白ぶん）と、品物1枚より明らかに広いことの両方で見る。 */
+  return {gridW:Math.round(gw), widths, itemW, heads:heads.length,
+          headsFullWidth: heads.length>=3 && widths.every(w=>Math.abs(w-gw)<=8),
+          widerThanOneColumn: itemW>0 && widths.every(w=>w > itemW*1.5),
+          itemsAreNarrower: itemW>0 && itemW < gw-2,
+          ok: heads.length>=3 && widths.every(w=>Math.abs(w-gw)<=8 && w>itemW*1.5)};
+});
+
+/* 枠2（スキル技）の行を押しても大技の枠は動かない。
+   枠が3つに分かれている以上、押した枠の中でしか物は動かない。 */
+R.waveRowDoesNotTouchUlt = await pg.evaluate(()=>{
+  S.greatKills=20; S.ult=null; S.upg=S.upg||{}; S.upg.wave=1;
+  TH.run(1); openStat();
+  const before=S.ult;
+  const row=document.querySelector('#bag-arts .item[data-artslot="wave"]');
+  if(row) row.click();
+  const after=S.ult;
+  closeStat();
+  return {before, after, rowExists: !!row, ultUntouched: before===after,
+          ok: !!row && before===after};
+});
+
+/* 街のステータス画面（#scr-char）でも技を付け替えられる。
+   「いつでも入れ替えられる」と書いてある以上、街で開けないのは嘘になる。 */
+R.townScreenSetsArt = await pg.evaluate(()=>{
+  S.greatKills=20; S.ult=null;
+  S.run=null; setScreen('char');
+  const grid=el('char-arts');
+  const rows=[...grid.querySelectorAll('.item[data-artslot="ult"]')];
+  const pick=rows[1] || rows[0];
+  const want=pick ? pick.dataset.artpick : null;
+  if(pick) pick.click();
+  return {rows:rows.length, want, got:S.ult,
+          hasSection: rows.length>0,
+          setFromTown: !!want && S.ult===want,
+          ok: rows.length>0 && !!want && S.ult===want};
+});
+
+/* 閃いた技は名前を変えられる。既定値は最初から入っている
+   （空欄から考えさせない）。空にして決定すれば元の名前に戻る。 */
+R.renameArt = await pg.evaluate(()=>{
+  TH.run(1);
+  S.hero.equip.weapon = buildItem(BASES.find(x=>x.id==='sword'), RARITY[0], 5);
+  S.arts={sword:3}; S.artName={};
+  const d=WEAPON_ARTS.sword[0];
+  const defName=artName(d);
+  openArtRename(d.id);
+  const prefilled = el('an-input').value===d.nm;
+  el('an-input').value='わが一閃';
+  commitArtRename(false);
+  const renamed=artName(d);
+  // ボタンの名札にも出る
+  S.artPick={sword:d.id};
+  updateHUD();
+  const onButton = el('art-nm').textContent==='わが一閃';
+  openArtRename(d.id);
+  commitArtRename(true);                 // 元に戻す
+  const restored=artName(d);
+  return {defName, prefilled, renamed, onButton, restored,
+          changed: renamed==='わが一閃',
+          resets: restored===d.nm,
+          ok: prefilled && renamed==='わが一閃' && onButton && restored===d.nm};
+});
+
 await done(b, errs, R);

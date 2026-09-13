@@ -524,11 +524,18 @@ await pg.evaluate(()=>{
   const v=TH.ally(10,'mage',10); uniqueAllyName(v,[]); memInter(v);
   setScreen('mem');
   _banner=null;
+  el('toast').classList.remove('on'); el('toast').textContent='';
 });
+/* 理由を出す先は showBanner ではなく #toast に変えた。
+   showBanner はキャンバスに描く物で、**街の画面は不透明な .screen が
+   キャンバスを覆っている**ので1文字も見えない——
+   「理由を出す」と言いながら、街では誰にも届いていなかった。 */
 R.memBlockedSaysWhy = {err: await tap('#memlist [data-mem]')};
 Object.assign(R.memBlockedSaysWhy, await pg.evaluate(()=>({
-  banner: _banner ? _banner.title+'/'+_banner.sub : null,
-  ok: !!(_banner && _banner.sub)
+  toast: el('toast').textContent,
+  shown: el('toast').classList.contains('on'),
+  hasReason: el('toast').textContent.length>6,
+  ok: el('toast').classList.contains('on') && el('toast').textContent.length>6
 })));
 
 // 8-c. 倉庫：装備をタップ → 相手を選ぶ → 本当に着る

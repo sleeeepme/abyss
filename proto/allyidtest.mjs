@@ -558,11 +558,12 @@ R.jobShown = await pg.evaluate(()=>{
   const j=jobDef('priest').nm;
   const lbl=allyLabel(a);
   updateHUD();
-  const bar=el('partybar').innerHTML;
+  /* 左肩のパーティ帯は廃止したので、そこは見ない。
+     名前と職が同時に読めることは allyLabel（盤面のラベル）と、
+     街・持ち物の一覧（次の項目）で押さえる。 */
   return {label:lbl, job:j,
           inLabel: lbl.includes(a.name) && lbl.includes(j),
-          inPartybar: bar.includes(j) && bar.includes(a.name),
-          ok: lbl.includes(a.name) && lbl.includes(j) && bar.includes(j)};
+          ok: lbl.includes(a.name) && lbl.includes(j)};
 });
 
 // ステータス画面・持ち物のパーティ一覧にも出る（同じ情報が画面ごとに欠けない）

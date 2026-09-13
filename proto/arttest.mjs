@@ -428,9 +428,9 @@ R.logNoOverlap = await pg.evaluate(()=>{
   const hit = (a,c) => !!a && !!c && a.width>0 && c.width>0 &&
     a.left < c.right && c.left < a.right && a.top < c.bottom && c.top < a.bottom;
   const lg = rect('log');
-  const clash = ['partybar','targetinfo','intruder'].filter(id=>hit(lg, rect(id)));
+  // パーティ帯は廃止。ログがぶつかり得る相手は敵の情報パネルと侵入者の警告だけ
+  const clash = ['targetinfo','intruder'].filter(id=>hit(lg, rect(id)));
   return {top: Math.round(lg.top), lines: logs.length,
-          partyShown: el('partybar').style.display==='flex',
           clash, ok: clash.length===0 && logs.length===3};
 });
 

@@ -36,7 +36,11 @@ await pg.waitForTimeout(150);
 
 // 拠点: 永続強化を買う（サブ画面へ移動してから）
 // 永続強化の対価は金ではなく秘石になったので、秘石を持たせる
-await pg.evaluate(()=>{ S.gold=9999; S.shards=999; S.deepest=20; rerollShop(); renderTown(); });
+/* 慰霊碑・鍛冶屋・倉庫・酒場は街開発で建ててから使う形になった。
+   このスイートは「全ボタンを実際に叩いて回る」ものなので、施設は建てておく。 */
+await pg.evaluate(()=>{ S.gold=9999; S.shards=999; S.deepest=20;
+  S.bld=Object.assign({}, S.bld, {forge:1, stash:1, tavern:1, altar:1});
+  rerollShop(); renderTown(); });
 await tap('#btn-go-upg');
 const g0=await pg.evaluate(()=>({gold:S.gold, shards:S.shards}));
 await tap('[data-upg="hp"]');

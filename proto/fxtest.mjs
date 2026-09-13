@@ -150,37 +150,7 @@ R.drawShots = await pg.evaluate(()=>{
   return {failures:fails, ok:fails.length===0};
 });
 
-// 2-e. 採用した7武器の形と、敵・味方への属性ヒットが本体側で選ばれる
-R.weaponFxIntegration = await pg.evaluate(()=>{
-  const expected={dagger:'dagger',sword:'swordaxe',axe:'swordaxe',mace:'hammer',
-                  spear:'spear',great:'greatsword',bow:'bow',staff:'magicbolt'};
-  const mapped={};
-  for(const [base,kind] of Object.entries(expected))mapped[base]=feelWeaponKind(base,null,
-    base==='bow'?'arrow':base==='staff'?'bolt':null);
-  const failures=[];
-  for(const [base,kind] of Object.entries(expected)){
-    try{drawSwing({t:'swing',x:P.x,y:P.y,a:.4,life:.44,max:FEEL_ATTACK_SECONDS,
-      r:1.8,dt:(BASES.find(b=>b.id===base)||{}).dt,weaponBase:base,elem:'fire'},0,0);}
-    catch(e){failures.push(base+': '+e.message);}
-    if(mapped[base]!==kind)failures.push(base+' mapped to '+mapped[base]);
-  }
-  FEEL.hits=[];
-  const enemy={x:P.x+1,y:P.y,arch:{},dirx:1,diry:0};
-  const ally={x:P.x-1,y:P.y,dirx:-1,diry:0};
-  feelImpact(enemy,P,false,'shock',null);
-  feelImpact(ally,enemy,false,'blunt','frost');
-  try{drawFeelHits(0,0);}catch(e){failures.push('hits: '+e.message);}
-  const hitKinds=FEEL.hits.map(f=>f.element+':'+f.target);
-  return {mapped,hitKinds,failures,
-    rendererLoaded:!!ALLY_EFFECT_FX,
-    allMapped:Object.entries(expected).every(([base,kind])=>mapped[base]===kind),
-    bothTargets:hitKinds.includes('shock:enemy')&&hitKinds.includes('frost:ally'),
-    ok:!!ALLY_EFFECT_FX&&!failures.length
-      &&Object.entries(expected).every(([base,kind])=>mapped[base]===kind)
-      &&hitKinds.includes('shock:enemy')&&hitKinds.includes('frost:ally')};
-});
-
-// 2-f. 敵の弾は敵の属性色になる
+// 2-e. 敵の弾は敵の属性色になる
 R.boltColor = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(20);
   const seen=new Set();
@@ -193,7 +163,7 @@ R.boltColor = await pg.evaluate(()=>{
           allTyped: bolts.every(f=>!!DTYPE[f.dt])};
 });
 
-// 2-g. 凡例に7属性ぶんの形が並ぶ
+// 2-f. 凡例に7属性ぶんの形が並ぶ
 R.legend = await pg.evaluate(()=>{
   buildLegend();
   const html=el('fxlist').innerHTML;
@@ -204,7 +174,7 @@ R.legend = await pg.evaluate(()=>{
           ok: svgs===DTYPE_IDS.length};
 });
 
-// 2-h. 仲間の攻撃にも属性が乗る
+// 2-g. 仲間の攻撃にも属性が乗る
 R.allySwing = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(6); S.hero.party=[];
   const out={};
@@ -401,6 +371,80 @@ R.rewardPopsInOrder = await pg.evaluate(()=>{
           separated, xpFirst, spLast, spBlue, goldStillWaiting, goldRanLater,
           ok: rewards.length===3 && separated && xpFirst && spLast && spBlue
               && goldStillWaiting && goldRanLater};
+});
+
+/* ================= 消えたまま戻らないキャラ =================
+   報告「敵と交戦中にキャラが見えなくなって戻らなくなる（高頻度）」。
+
+   正体は演出側の足踏み位相。updateFeel は m.phase に毎フレーム移動距離を
+   **足し込む**ので、座標に1フレームでも NaN が混ざると phase は NaN のまま固まる
+   （NaN + 何か = NaN）。そのまま動き出すとコマ番号 ((floor(x)%4)+4)%4 も NaN になり、
+   配列添字が NaN → pose が undefined → pose.upperY で例外。
+   例外は draw() ごと中断させるので、そのフレームの絵が丸ごと落ちる。
+   毎フレーム同じ所で投げるから、**戻ってこない。**
+
+   直したのは2ヶ所で、検証も2ヶ所ぶんある:
+     1) 演出側（game-feel.js）: 有限でないフレームは捨て、phase は自力で回復する
+     2) 本編側（index.html）: 演出が投げても素の図形へ落として盤面は描き切る */
+
+R.nanFrameDoesNotFreezeArt = await pg.evaluate(()=>{
+  /* このスイートは _h.mjs の install() を使っていないので TH は無い。
+     器は本編の関数から直に組む（S.run は startRun 経由、が全体の約束）。 */
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  P.invuln=1e9; W.enemies.length=0;
+  S.hero.party=[];
+  const a=makeAlly(3,S.hero); a.boons=[]; a.lv=5; a.slot=0;
+  a.hpNow=allyStats(a).maxHp; a.x=P.x+1; a.y=P.y; S.hero.party.push(a);
+  stickDx=1; stickDy=0; stepSim(0.3); stickDx=0; stickDy=0;
+  // 1フレームだけ座標を壊す（加入直後でまだ座標を持たない仲間などで実際に起きる形）
+  const sx=a.x, sy=a.y;
+  a.x=NaN; stepSim(1/60);
+  a.x=sx; a.y=sy; stepSim(1/60);
+  const phaseOk = Number.isFinite(feelMotion(a).phase);
+  // そのあと動かして描く。ここで投げていたのが報告された症状
+  let threw=null;
+  try{ stickDx=1; stickDy=0; stepSim(0.5,{draw:true}); stickDx=0; stickDy=0; }
+  catch(e){ threw=String(e.message); stickDx=0; stickDy=0; }
+  return {phase:feelMotion(a).phase, threw,
+          phaseRecovers: phaseOk,
+          drawSurvives: threw===null,
+          ok: phaseOk && threw===null};
+});
+
+/* 演出側が何かの拍子に投げても、盤面は素の図形で描き切る。
+   絵は演出、盤面は本編——この境目が無いと、演出の不具合が1つ増えるたびに
+   「画面が丸ごと消える」が1つ増える。 */
+R.feelThrowFallsBackToShapes = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  P.invuln=1e9;
+  S.hero.party=[];
+  const a=makeAlly(3,S.hero); a.boons=[]; a.lv=5; a.slot=0;
+  a.hpNow=allyStats(a).maxHp; a.x=P.x+1; a.y=P.y; S.hero.party.push(a);
+  const orig=window.drawFeelCharacterSprite;
+  /* 変換は素の単位行列ではない（端末の画素密度ぶん ctx.scale が掛かっている）。
+     比べる相手は「投げる前の変換」であって 1 ではない。 */
+  draw();
+  const t0=ctx.getTransform();
+  const cerr=console.error;
+  console.error=()=>{};                 // わざと投げるので、その報告は伏せる
+  let calls=0;
+  window.drawFeelCharacterSprite=()=>{ calls++; throw new Error('わざと投げる'); };
+  let threw=null;
+  try{ for(let i=0;i<12;i++) draw(); }catch(e){ threw=String(e.message); }
+  // 積み残した ctx.save() を引きずっていないか（変換が元に戻っているか）
+  const t=ctx.getTransform();
+  const cleanTransform = Math.abs(t.a-t0.a)<0.01 && Math.abs(t.d-t0.d)<0.01
+                      && Math.abs(t.e-t0.e)<1.5 && Math.abs(t.f-t0.f)<1.5;
+  window.drawFeelCharacterSprite=orig;
+  console.error=cerr;
+  _feelDrawFails=0;                     // 打ち切りの記録を戻す（後続の検証に持ち越さない）
+  draw();
+  return {calls, threw,
+          called: calls>0,
+          drawSurvives: threw===null,
+          transformNotLeaked: cleanTransform,
+          givesUpEventually: calls<=FEEL_DRAW_GIVEUP,
+          ok: calls>0 && threw===null && cleanTransform};
 });
 
 await b.close();

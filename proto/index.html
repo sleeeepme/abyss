@@ -67,9 +67,15 @@
     touch-action:none}
   canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
 
+  /* ---------- -webkit-overflow-scrolling は外した ----------
+     iOS 13 以降、慣性スクロールは既定なのでこの指定に効果は無い。
+     残っていると別のレイヤーに載るぶん、**スクロール中に中身を
+     差し替えたときスクロールが固まる**という古い癖だけが付いてくる
+     （報告「酒場で仲間を雇用した後でスクロールが効かなくなる」）。
+     指定を外し、描き直す側でもスクロール位置を保つようにした（renderKeepScroll）。 */
   .screen{position:fixed;top:0;right:0;bottom:0;left:0;display:none;flex-direction:column;background:var(--bg);
     z-index:10;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
-    overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+    overflow-y:auto;touch-action:pan-y}
   .screen.on{display:flex}
   /* 街まわりの画面だけに出る下部バナー枠。
      探索中は絶対に出さない（画面が狭く、視界が塞がると被弾に直結する）。
@@ -83,7 +89,13 @@
   #adbar.on{display:flex}
   /* 大技のボタン。右手の親指が自然に届く位置に置く（移動スティックは左半分）。
      押せないときは灰色＋残り秒数で、押せるときだけ縁が光る。 */
-  #ultbtn{position:absolute;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));
+  /* ---------- 技ボタンの列を下げた ----------
+     地図を画面中央に大きく出すようにしたので（🗺 のトグル）、
+     3つ積んだ技ボタンの一番上（武器技）が地図の下辺と噛んでいた。
+     列全体を少し詰めて下げ、地図が使える帯を上に空ける。
+     地図の側もこの帯を避けて描く（MAP_KEEP_BOTTOM）ので、
+     **どちらか片方を直すだけでは必ずまた重なる**——2つで1組の数字。 */
+  #ultbtn{position:absolute;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));
     width:74px;height:74px;border-radius:50%;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     background:rgba(16,20,28,.82);border:2px solid #39415a;
@@ -145,7 +157,7 @@
      大技の**すぐ上**に置く。左右に並べると親指の可動域から外れるし、
      反対側は盾（押しているあいだ構える）で埋まっている。
      大技より一回り小さくして、切り札と気軽な技の格を見た目で分ける。 */
-  #wavebtn{position:absolute;right:24px;bottom:calc(180px + env(safe-area-inset-bottom));
+  #wavebtn{position:absolute;right:24px;bottom:calc(162px + env(safe-area-inset-bottom));
     width:58px;height:58px;border-radius:50%;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     background:rgba(16,20,28,.82);border:2px solid #39415a;
@@ -163,7 +175,7 @@
 
      武器を持ち替えると中身が変わる（技は武器種に付いている）ので、
      名札を出す——衝撃波と違って「今なにが乗っているか」が変わりうる。 */
-  #artbtn{position:absolute;right:22px;bottom:calc(250px + env(safe-area-inset-bottom));
+  #artbtn{position:absolute;right:22px;bottom:calc(228px + env(safe-area-inset-bottom));
     width:62px;height:62px;border-radius:50%;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     background:rgba(16,20,28,.82);border:2px solid #39415a;
@@ -206,6 +218,14 @@
   .item .af{color:var(--dim);font-size:12px}
   .item.eq{outline:1px solid #3d7a5c}
   .empty{color:var(--dim);font-size:12px;padding:10px 0}
+  /* ---------- 一覧の中に置く見出し ----------
+     .grid は auto-fill の格子なので、見出しを素の div で入れると
+     **格子の1マスとして列に収まる。** 実際に踏んだ: ステータス画面の技欄で
+     「枠2 スキル技」の見出しが大技の隣の列に入り、衝撃波が大技の並びの
+     一員に見えていた（報告「スキル技をセットすると大技の枠に入ってしまう」）。
+     見出しと空表示は必ず行を独り占めさせる。 */
+  .grid>.gridhead,.grid>.empty{grid-column:1/-1}
+  .gridhead{font-size:12px;font-weight:700;color:#8fd8ff;margin:10px 2px 0}
 
   /* ---------- タイトル画面 ----------
      起動していきなり街に立たされると、**遊びが始まった瞬間が無い**。
@@ -221,10 +241,10 @@
   #scr-title .tbtns{width:100%;max-width:300px;display:flex;flex-direction:column;gap:10px}
   #scr-title .foot{margin-top:30px;font-size:12px;color:#5c6479;line-height:1.8}
   /* 名前の入力。text-size-adjust を切らないと iOS が勝手に拡大する */
-  #nm-input{width:100%;font-family:inherit;font-size:16px;font-weight:700;text-align:center;
+  #nm-input,#an-input{width:100%;font-family:inherit;font-size:16px;font-weight:700;text-align:center;
     color:var(--txt);background:#171c26;border:1px solid #2a3040;border-radius:10px;
     padding:14px 12px;margin:6px 0 10px;-webkit-text-size-adjust:100%}
-  #nm-input:focus{outline:none;border-color:#3d7a5c}
+  #nm-input:focus,#an-input:focus{outline:none;border-color:#3d7a5c}
 
   /* HUD */
   /* HUD の文字は**背景を選べない。** 下に流れているのはアビスの床で、
@@ -367,6 +387,16 @@
     width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
+  /* ---------- 地図のトグル ----------
+     ステータスの下に置く。右上は「開く物」の列なので、
+     地図もその列に並べたほうが探さずに済む。
+     出ているあいだは縁を光らせる——押したかどうかが一目で分かるように。 */
+  #mapbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 206px);
+    width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
+    color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
+    pointer-events:auto}
+  #mapbtn.on{border-color:#7fc3e0;color:#7fc3e0;box-shadow:0 0 10px -2px #7fc3e0}
+  #mapbtn:active{background:#2e3648}
   #statbtn:active{background:#2e3648}
   #bagbtn:active{background:#2e3648}
   #bagcount{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;border-radius:9px;
@@ -381,9 +411,21 @@
 
   .modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20;
     background:rgba(8,10,14,.96);display:none;flex-direction:column;
-    -webkit-overflow-scrolling:touch;touch-action:pan-y;
+    touch-action:pan-y;
     align-items:center;justify-content:center;padding:24px;text-align:center}
   .modal.on{display:flex}
+  /* ---------- 街での短い知らせ ----------
+     showBanner はキャンバスに描く物なので、**街の画面では一切見えない**
+     （.screen が不透明にキャンバスを覆っている）。
+     「雇えない」「まだ建っていない」のような理由は街でこそ読ませたいので、
+     画面に依らず出せる帯をひとつ持つ。ログ（HUD側）とは別物。 */
+  #toast{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;
+    max-width:min(360px,calc(100vw - 32px));display:none;
+    background:rgba(16,20,28,.96);border:1px solid var(--line);border-radius:10px;
+    padding:10px 16px;font-size:12px;font-weight:700;line-height:1.5;text-align:center;
+    box-shadow:0 6px 20px -8px #000;pointer-events:none}
+  #toast.on{display:block}
   /* 広告は必ず最前面。他のモーダルと同じ z-index だと DOM 順で下に潜り、
      視聴完了ボタンが押せなくなる（重ねない運用にしているが、保険として明示する） */
   #m-ad{z-index:40}
@@ -391,8 +433,7 @@
      実際に踏んだ: 鍛冶場のメニューが伸びて「閉じる」が画面外へ出て、
      **開いたら二度と閉じられない**状態になった。
      個別に付けて回ると必ず付け忘れが出るので、箱そのものに持たせる。 */
-  .modal .box{width:100%;max-width:380px;max-height:88vh;overflow-y:auto;
-    -webkit-overflow-scrolling:touch}
+  .modal .box{width:100%;max-width:380px;max-height:88vh;overflow-y:auto}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
 
   /* ---------- 街（ハブ） ----------
@@ -423,6 +464,10 @@
     border:1px solid var(--line);border-radius:12px}
   .hub-corner i,.hub-mini i{font-style:normal;font-size:20px;line-height:1}
   .hub-corner b,.hub-mini b{font-size:10.5px;font-weight:700;line-height:1.2;text-align:center}
+  /* まだ建っていない施設。押せる物と並べたままグレーにして、
+     「ここに何かが建つ」ことだけを見せる（押せば何を建てればいいか言う）。
+     pointer-events は殺さない——**押せないボタンは、押せない理由も言えない。** */
+  .hub-corner.locked,.hub-mini.locked{opacity:.38;filter:grayscale(1)}
   .hub-plaza{position:relative;flex:1;min-height:0}
   /* 「アビスへ潜る」は階段を上りきった先の門のあたりに置く（階段の途中ではなく上端）。 */
   .hub-dive{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);
@@ -587,6 +632,11 @@
 
   <h2>装備中</h2>
   <div class="grid" id="equipped"></div>
+
+  <!-- 技。探索中の #m-stat と同じ物を街でも出す（renderArtSlots が両方に書く） -->
+  <h2>技 <span style="color:var(--dim);font-weight:400;font-size:12px">タップでセット</span></h2>
+  <p class="sub" id="char-art-hint"></p>
+  <div class="grid" id="char-arts"></div>
 
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">死ぬまで有効</span></h2>
   <div class="grid" id="town-boons"></div>
@@ -770,6 +820,7 @@
   <div id="prompt"></div>
   <div id="bagbtn">🎒<span id="bagcount">0</span></div>
   <div id="statbtn">🧍</div>
+  <div id="mapbtn">🗺</div>
 </div>
 
 <!-- ============ 探索中の持ち物・ステータス ============ -->
@@ -865,6 +916,8 @@
 </div></div>
 
 <div id="adbar"><b>AD</b>バナー広告枠（街のみ・探索中は表示しない）</div>
+<!-- 街で理由を伝える帯（キャンバスのバナーは街では見えないため） -->
+<div id="toast"></div>
 
 <!-- ============ 仲間の装備 ============ -->
 <div class="modal" id="m-allyeq"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
@@ -1016,6 +1069,22 @@
   </div>
   <div style="height:8px"></div>
   <button class="ghost" id="nm-back">やめる</button>
+</div></div>
+
+<!-- ============ 閃いた技の名前 ============
+     技は「自分で見つけた物」として出すので、名前も自分の物にできていい。
+     既定値は最初から入れておく（空欄から考えさせない）。
+     空にして決定すれば元の名前に戻る＝取り消す道も同じボタンで済ませる。 -->
+<div class="modal" id="m-artname"><div class="box">
+  <h1>技の名前</h1>
+  <p class="sub" id="an-sub"></p>
+  <input id="an-input" maxlength="12" autocomplete="off" spellcheck="false">
+  <div class="btnrow">
+    <button class="ghost" id="an-reset">元に戻す</button>
+    <button class="primary" id="an-ok">決定</button>
+  </div>
+  <div style="height:8px"></div>
+  <button class="ghost" id="an-close">やめる</button>
 </div></div>
 
 <div class="modal" id="m-help"><div class="box" style="text-align:left;max-height:88vh;overflow-y:auto">
@@ -3399,15 +3468,18 @@ function doUpgrade(it, mid){
      鍛冶屋 1段 → 5段: 140 / 522 / 1096 / 1866 / 2836 G（合計 6460）
    以前は 3段で 140/424/840（合計 1404）だった。 */
 const BUILDINGS=[
-  {id:'forge', nm:'鍛冶屋', icon:'🔨', max:5, base:140,
+  {id:'forge', nm:'鍛冶屋', icon:'🔨', max:5, base:150, opens:'鍛冶屋',
    step:lv=>'修理費 -'+(lv*12)+'%　装備の耐久上限 +'+(lv*8)+'%',
-   desc:'壊れにくくなり、直すのも安くなる'},
-  {id:'tavern',nm:'酒場',   icon:'🍺', max:5, base:170,
+   desc:'武器を鍛えられる。壊れにくくなり、直すのも安くなる'},
+  {id:'tavern',nm:'酒場',   icon:'🍺', max:5, base:170, opens:'酒場',
    step:lv=>'出現率 +'+(lv*8)+'%　レベル差 -'+lv+'　雇用費 -'+(lv*7)+'%',
-   desc:'腕の立つ者が集まり、安く雇えるようになる'},
-  {id:'altar', nm:'祭壇',   icon:'🕯️', max:5, base:260,
+   desc:'仲間を雇える。腕の立つ者が集まり、安く雇えるようになる'},
+  /* 祭壇 → 慰霊碑に名前を寄せた。街の 🕯️ ボタン（失った仲間を呼び戻す場所）と
+     同じ建物なのに、片方は「祭壇」、片方は「慰霊碑」と別の名前で呼んでいて、
+     **建てた物と開いた場所が繋がって見えなかった。** 名前は1つでいい。 */
+  {id:'altar', nm:'慰霊碑', icon:'🕯️', max:5, base:190, opens:'慰霊碑',
    step:lv=>'死亡時、恩寵を '+lv+' つ次のキャラへ引き継ぐ',
-   desc:'積み上げた恩寵が完全には消えなくなる'},
+   desc:'失った仲間を呼び戻せる。積み上げた恩寵も完全には消えなくなる'},
   {id:'market',nm:'商館',   icon:'⚖️', max:5, base:150,
    step:lv=>'売値 +'+(lv*10)+'%　道具屋の品揃え +'+lv,
    desc:'持ち帰った物の価値が上がる'},
@@ -3415,11 +3487,31 @@ const BUILDINGS=[
      倉庫は**キャラの強さではなく街の設備**で、死んでも消えない側の物。
      SPは「自分を強くするか、仲間を強くするか」の取り合いに使いたいので、
      そこに置き場所の話を混ぜない。 */
-  {id:'stash', nm:'倉庫',   icon:'📦', max:5, base:120,
+  {id:'stash', nm:'倉庫',   icon:'📦', max:5, base:150, opens:'倉庫',
    step:lv=>'倉庫スロット +'+(lv*6),
-   desc:'持ち帰れる量が増える'},
+   desc:'持ち帰った装備を置ける。段を上げるほど置ける量が増える'},
 ];
 function bldLv(id){ return (S.bld&&S.bld[id])||0; }
+/* ---------- 街の施設は「建ててから使う」 ----------
+   慰霊碑・鍛冶屋・倉庫・酒場は、最初から街に建っていた。
+   だが街開発（金の行き先）が「既にある物を少しずつ良くする」だけだと、
+   **最初の1段を買った実感がいちばん薄い。**
+
+   Lv.0 は更地。街のボタンはグレーで残し、押せば何を建てれば開くかを言う。
+   Lv.1 で建つ（＝その施設が使えるようになる）。
+   1段目の値段は「第5階層まで潜って生きて帰れば1つ建つ」あたりに置いてある
+   （帰還報酬 101G ＋ 道中の拾得。BUILDINGS.base がそのまま Lv.1 の値段）。
+
+   能力強化・街開発・店・ガチャは塞がない——潜る前に必ず通る道なので、
+   ここを閉じると「金の使い道が分からない」だけになる。 */
+const HUB_GATE = {mem:'altar', forge:'forge', stash:'stash', tavern:'tavern'};
+function hubGateBld(key){ return BUILDINGS.find(b=>b.id===HUB_GATE[key]) || null; }
+function hubUnlocked(key){ const id=HUB_GATE[key]; return !id || bldLv(id)>0; }
+/* 押されたときの案内。黙って何も起きないのが一番わけが分からない（慰霊碑の件と同じ）。 */
+function hubLockedNotice(key){
+  const b=hubGateBld(key); if(!b) return;
+  toast('まだ建っていない — 街開発で「'+b.nm+'」を Lv.1 にすると開く（'+bldCost(b,0)+' G）', '#e0705a', 3.0);
+}
 /* ---------- 街開発の値段は強く跳ねさせる ----------
    1.9 だと5施設をカンストして計 40,327 G。第30階層まで潜れるようになった頃には
    1周の帰還報酬だけで数千入るので、**後半に金の行き先が無くなる**（報告）。
@@ -4254,8 +4346,11 @@ function tryFlashArt(baseId){
   const def=list[n];
   artFlashFx(P.x, P.y, def);
   const b=BASES.find(x=>x.id===baseId);
-  log('💡 '+(b?b.nm:baseId)+'『'+def.nm+'』を閃いた');
-  showBanner('💡 '+def.nm, (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, 2.2);
+  log('💡 '+(b?b.nm:baseId)+'『'+artName(def)+'』を閃いた');
+  showBanner('💡 '+artName(def), (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, 2.2);
+  /* 閃いたその場で名前を付けられるようにする（既定値は入れてある）。
+     探索中に画面を止めたくないので**開くのは自分から**——
+     ステータス画面の技欄の ✎ から、いつでも変えられる。 */
   return def;
 }
 function tryFlashArtAlly(a, baseId){
@@ -4268,7 +4363,7 @@ function tryFlashArtAlly(a, baseId){
   a.arts[baseId] = n+1;
   const def=list[n];
   artFlashFx(a.x, a.y, def);
-  log('💡 '+a.name+'が『'+def.nm+'』を閃いた');
+  log('💡 '+a.name+'が『'+artName(def)+'』を閃いた');
   return def;
 }
 
@@ -4776,7 +4871,13 @@ function makeAlly(depth, hero, forceJob){
     equip:{weapon:null, shield:null, armor:null, accessory:null},
     // 加入時に恩寵を持っていることがある（主人公のレベルで数もレア度も伸びる）
     hpNow:0, boons:rollAllyBoons(hero?hero.lv:1), revived:false, dead:false,
-    x:0, y:0, r:0.30, atkCd:0, swing:0, hit:0, st:{}, bu:{}, canFall:true,
+    /* ---------- 仲間は縁を避ける（canFall:false） ----------
+       以前は主人公と同じ「落ちられる側」にしてあった。だが仲間は追従で動くので、
+       主人公が縁の向こうにいると**縁へ真っ直ぐ歩き続ける**——落ちて戻され、
+       また同じ方向へ歩き、また落ちる。報告どおり永久に落ち続ける形になっていた。
+       操作していない者に「落ちる判断」は取れないので、そもそも踏ませない。
+       （吹き飛ばされて縁に乗ってしまった時のために、tickPits の救済は残してある） */
+    x:0, y:0, r:0.30, atkCd:0, swing:0, hit:0, st:{}, bu:{}, canFall:false,
     dirx:1, diry:0, shots:0, prayCd:rf(4,6),
     /* ---- 個体差 ----
        同じジョブが2人いると、同じ入力から同じ答えを出すので
@@ -4875,7 +4976,19 @@ function windGrace(){
 
      死んだ階も同じで、そこで倒れた以上まだ抜けていない。
      加護が掛かるのは「一度その先へ降りた階」だけ。 */
-  return S.run.depth < (S.run.startDeepest||0);
+  /* ---------- 「生きて帰った階」も知っている道に数える ----------
+     報告: 第5階層から街へ帰ったのに、次の潜りで加護が第4階層までしか効かない。
+
+     `<` のままだと、抜ける（次の階へ降りる）ことだけが「知った」の条件になる。
+     だが**生きて街まで戻った**なら、その階は行きも帰りも歩き切っている——
+     死んで終わった階とは別物で、ここを同じ扱いにしていたのが原因。
+
+     そこで「帰還した最深」を別に憶えて、そこまでは等号を許す。
+     死んだ階は S.deepestBack を動かさないので、
+     「そこで倒れた階はまだ知らない道」という元の筋は壊れない。 */
+  const d = S.run.depth;
+  if(d <= (S.run.startBack||0)) return true;
+  return d < (S.run.startDeepest||0);
 }
 
 /* ---------- 未踏の階層では穴を隠す ----------
@@ -5333,7 +5446,10 @@ function gachaNextBand(){
 
 /* ---------- ステート ---------- */
 const S={
-  stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1, deaths:0, runs:0,
+  stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1,
+  // 生きて帰った最深。到達（deepest）とは別に持つ——加護が掛かるのはこちら側
+  deepestBack:0, deaths:0, runs:0,
+  mapOn:false,           // 地図は既定で出さない（🗺 のトグル）
   bossClear:0,           // 倒したボスの最深階。能力強化の段はこれで開く
   /* ---------- 生成の塩 ----------
      階層の生成は S.runs と depth だけを種にしていた。決定的なのは良い
@@ -5378,6 +5494,7 @@ const S={
      同じ物を2つの規則で数えることになる。値は「何段目まで閃いたか」（0〜3）。 */
   arts:{},
   artPick:{},            // 武器種ごとに、ボタンへ乗せている技の id
+  artName:{},            // 閃いた技に自分で付けた名前（技ID→名前）。既定は WEAPON_ARTS の nm
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
   hero:null, run:null, screen:'title', prevScreen:'town'
@@ -5737,6 +5854,36 @@ function resistOf(target, type){
 function buildupNeed(target){
   return target.isPlayer ? 34 + target.lv*4 : 20 + target.lv*5;
 }
+/* ---------- 蓄積の速さ ----------
+   実測（resolveDamage を素で叩いて、同じ相手に当て続けた打数）:
+     Lv.1 斬撃のみ … 4発で発症（1発あたり 25%）
+     Lv.1 ＋業火の潜在（炎11）… 2発（50%）
+   閾値も damage も同じようにレベルで伸びるので、**どの階でも 25% 前後**。
+   つまり「炎の潜在を拾った瞬間から、殴れば必ず燃える」状態だった（報告）。
+
+   状態異常は「たまに起きる事故」であってほしい。既定の出やすさを
+   序盤 3% 前後まで落とし、レベルが上がるにつれて戻していく。
+   確率で入る手（焦＝proc の潜在、レジェンドの onHit、ハザード）は
+   ここを通らないので効きは変わらない——**狙って掛ける手だけが残る。**
+     Lv.1 → 3.3% ／ Lv.10 → 6% ／ Lv.30 → 12% ／ Lv.50 → 18%
+   装備の「状態異常蓄積 +%」（ailPct）はこの上に掛かる。 */
+const AIL_BUILD_BASE   = 0.13;
+const AIL_BUILD_PER_LV = 0.012;
+const AIL_BUILD_MAX    = 0.75;
+function ailBuildMul(srcLevel){
+  return Math.min(AIL_BUILD_MAX, AIL_BUILD_BASE + Math.max(0,(srcLevel||1)-1)*AIL_BUILD_PER_LV);
+}
+/* ---------- ボスは状態異常に強い ----------
+   ボスは「立ち位置で捌く相手」として作ってある。ところが火傷・出血が
+   常時入るようになると、**削る作業は勝手に進む**ので、
+   予兆を読んで避ける意味が薄れる。
+   階層ボス（mid/great）は 75% 弾き、名前つきの大ボス（uniqueBoss）は通らない。
+   よろめきだけは全ボスが完全に無効——**行動を止められる相手ではない。** */
+const BOSS_AIL_RES = 75;
+function ailResistPct(target){
+  if(!target || !target.boss) return 0;
+  return target.uniqueBoss ? 100 : BOSS_AIL_RES;
+}
 /* 継続ダメージは「毎秒 最大HPの何%まで」で頭を打つ。
 
    これが無いと、傷の重さが**受けた側の体力と無関係**になる。
@@ -5769,6 +5916,14 @@ function dotCap(target, dps){
 }
 function addStatus(target, id, srcLevel){
   const def=STATUS[id]; if(!def) return;
+  /* ボスの状態異常耐性。**入口をここ1ヶ所にしてある**ので、
+     蓄積からでも、確率で入る潜在からでも、レジェンドの onHit からでも、
+     同じ規則で弾かれる（掛ける道が増えるたびに書き足す形にはしない）。 */
+  if(target && target.boss){
+    if(id==='stagger') return;                       // よろめきは全ボス無効
+    const rz=ailResistPct(target);
+    if(rz>=100 || rnd()*100 < rz) return;
+  }
   /* ドゥラントリーの「苔の加護」。**こちら側にだけ**掛かる耐性。
      距離は見ない——隊がばらけているときほど要る物なので。 */
   const ours0 = !!(target.isPlayer || target.ally);
@@ -5827,7 +5982,8 @@ function resolveDamage(target, parts, srcLevel, opts){
     if(amt>mainAmt){ mainAmt=amt; mainType=p.type; }
     // 状態異常の蓄積は、耐性で減ったあとの実ダメージ量に比例させる
     if(d.status && !statusSuppressed(target, d.status))
-      build[d.status]=(build[d.status]||0)+amt*(d.phys?0.55:1.35)*(opts.ailMul||1);
+      build[d.status]=(build[d.status]||0)
+        + amt*(d.phys?0.55:1.35)*(opts.ailMul||1)*ailBuildMul(srcLevel);
   });
 
   if(hasStatus(target,'shock')) total *= (1+SHOCK_AMP);
@@ -7115,7 +7271,9 @@ function startRun(depth){
            revBand:reviveBand(d), revLeft:REVIVE_PER_BAND,
            /* 疾風の加護の境目。潜り始めに固定するのが肝で、S.deepest を
               直接見ると、記録を更新した瞬間に境目ごと動いて永久に切れない。 */
-           startDeepest:S.deepest};
+           startDeepest:S.deepest,
+           // 「生きて帰った最深」。この階までは加護が掛かる（等号を許す側）
+           startBack:(S.deepestBack||0)};
   S.shardsRun=0;
 
   // ガチャの持ち込み枠をここで渡す。武器は持ち物へ、護符はその探索の常時効果へ。
@@ -7194,6 +7352,7 @@ function enterFloor(depth){
     W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it, chest:true});
   }
   W.seen = Array.from({length:fl.H},()=>new Uint8Array(fl.W));
+  W.seenKey = null;                 // 階が変わったら塗り直しの記憶も捨てる
 
   // 遺体はその階層に来たときだけ出現する。マップは毎回生成し直されるので、
   // 死んだ座標に一番近い床タイルへスナップして「だいたい同じあたり」に置く。
@@ -7240,6 +7399,15 @@ function enterFloor(depth){
   livingParty().forEach((a,i)=>{
     const p = snapToFloor(fl, P.x + Math.cos(i*2.1)*1.2, P.y + Math.sin(i*2.1)*1.2);
     a.x=p.x; a.y=p.y; a.atkCd=0; a.swing=0; a.st={}; a.bu={};
+    /* ---------- 落下演出も持ち越さない ----------
+       主人公の側（P.fallAnim）は上で消しているのに、**仲間のぶんが漏れていた。**
+       落ちている最中に階段を降りると、次の階が穴も水も持たない階なら
+       tickPits が入口で帰るので a.fallAnim は誰にも進められない。
+       その仲間は **縮んだまま（aScale は最小 0.04）描かれ、しかも一歩も動かない**
+       ——tickAlly が a.fallAnim を見て即 return するため。
+       つまり「交戦中にキャラが見えなくなって戻らない」。
+       根の層（縁）と水の層（淵）は落ちる機会が多いぶん、頻度も高かった。 */
+    a.fallAnim=null; a.fallBlink=0; a.iframe=0;
     a.crumb=0; a.stuck=0; a.svx=0; a.svy=0; a.mode='follow';
     a.lastDp=undefined; a.slideT=0;
     // 階層を降りるたびに少し回復する。仲間だけ削れっぱなしだと事故死しかしなくなる。
@@ -7376,8 +7544,35 @@ function pitAt(x,y){
 }
 /* そこに立てるか。物を置く場所を決めるときは solid ではなくこちらを見る。 */
 function standable(x,y){ return !solid(x,y) && !pitAt(x,y); }
+/* ---------- 走り抜けた先を決める（瞬歩・踏み込み） ----------
+   以前は 0.25 刻みで**中心点だけ** solid() を見ていた。
+   体には半径があるので、中心が壁の手前 0.24 マスでも体は壁にめり込む——
+   報告「瞬歩で壁に埋まることがあった」の正体はこれ。
+
+   壁の判定は moveEnt と同じく**半径ぶん外側**で取り、刻みも細かくして
+   0.25 マスの隙間から角を跨いでしまう抜けも塞ぐ。
+   ダメージ判定の線分は呼び出し側が始点と戻り値で引くので、
+   ここが短くなれば当たり判定も同じだけ短くなる（食い違わない）。 */
+function dashStop(x0, y0, ang, dist, r){
+  const rr = r || 0.32, step = 0.1;
+  const cx = Math.cos(ang), cy = Math.sin(ang);
+  const hits = (x,y)=> solid(x,y)
+      || solid(x+cx*rr, y+cy*rr)      // 進む先の体の縁
+      || solid(x-cy*rr, y+cx*rr)      // 横の縁。角に肩を刺したまま止まらないように
+      || solid(x+cy*rr, y-cx*rr);
+  let gx=x0, gy=y0;
+  for(let d=0; d<dist; d+=step){
+    const nx=gx+cx*step, ny=gy+cy*step;
+    if(hits(nx,ny)) break;
+    gx=nx; gy=ny;
+  }
+  return {x:gx, y:gy};
+}
 /* この者にとって進めないか。落ちられない者（＝敵）は縁で止まる。 */
-function blockedFor(e,x,y){ return solid(x,y) || (!e.canFall && pitAt(x,y)); }
+/* e.ally を明示的に見ているのは**古いセーブのため**。
+   仲間は canFall:false で作るようになったが、既に保存されている仲間は
+   true を持ったままなので、種別のほうでも締めておく。 */
+function blockedFor(e,x,y){ return solid(x,y) || ((!e.canFall || e.ally) && pitAt(x,y)); }
 function moveEnt(e,dx,dy){
   // 壊れた移動量は捨てる。座標に NaN を書き込むと、そこから先が全部 NaN になる。
   if(!Number.isFinite(dx) || !Number.isFinite(dy)) return;
@@ -7884,7 +8079,28 @@ function tickPits(dt){
   /* 穴のある階（根の層）だけでなく、**淵のある水の階**でも回す。
      ここを W.fl.pit で切っていたせいで、水の淵に立っても何も起きなかった。 */
   const anyVoid = (W.fl && W.fl.pit) || (W.haz && W.haz.kind==='water');
-  if(!anyVoid || !S.run || !S.hero) return;
+  if(!S.run || !S.hero) return;
+  /* ---------- 始まった落下は、縁が無い階でも必ず終わらせる ----------
+     この関数は「縁のある階だけ」で回していた。だが落下演出は**始まったあとに
+     階が変わる**ことがあり、次の階に縁が無いと誰も進めてくれない。
+     進まない fallAnim は「縮んだまま動かない」＝画面から消えたまま戻らない、
+     という形で残る（交戦中に仲間が消える報告の正体）。
+     入る条件（落ちる）は縁のある階だけ、出る条件（演出を終える）はどの階でも——
+     入口と出口の条件をそろえない。 */
+  if(!anyVoid){
+    if(P.fallAnim){
+      P.fallAnim.t += dt;
+      if(P.fallAnim.t >= P.fallAnim.dur){ P.fallAnim=null; P.fallBlink=FALL_INV; }
+    }
+    P.fallBlink = Math.max(0, (P.fallBlink||0)-dt);
+    livingParty().forEach(a=>{
+      a.fallBlink = Math.max(0, (a.fallBlink||0)-dt);
+      if(!a.fallAnim) return;
+      a.fallAnim.t += dt;
+      if(a.fallAnim.t >= a.fallAnim.dur){ a.fallAnim=null; a.fallBlink=FALL_INV; }
+    });
+    return;
+  }
   // 主人公。落下演出の最中はその場で沈むだけ——動かさない、操作も受け付けない。
   if(P.fallAnim){
     P.fallAnim.t += dt;
@@ -7937,9 +8153,16 @@ function tickHazards(dt){
   const step = W.hazT; W.hazT = 0;
   const lv = S.run.depth;
 
+  /* ---------- dps 0 のハザードは一切削らない ----------
+     水は「痛い床」ではなく「重い床」として作ってある（HAZARDS.water.dps = 0）。
+     ところが削る量を Math.max(1, ...) で床上げしていたので、
+     **0 を指定してあるのに 0.5 秒ごとに 1 ずつ入り続けていた**
+     （報告「水に入った際の継続ダメージがまだ残っている」）。
+     床上げは「1未満の端数を切り捨てて0にしない」ためのもので、
+     「0 を 1 に変える」ためのものではない。入口で弾く。 */
   // 主人公
   const ph = hazardAt(P.x, P.y);
-  if(ph && S.hero && !godMode() && (P.invuln||0)<=0){
+  if(ph && ph.dps>0 && S.hero && !godMode() && (P.invuln||0)<=0){
     // 踏み続けている間の削れも、割合で頭を打つ（出血と同じ理由）
     const cap = stats(S.hero).maxHp*dotPct()*step;
     const dmg = Math.max(1, Math.round(Math.min(ph.dps*step*(1+lv*0.06), cap)));
@@ -7954,7 +8177,7 @@ function tickHazards(dt){
 
   // 仲間
   livingParty().forEach(a=>{
-    const h=hazardAt(a.x,a.y); if(!h) return;
+    const h=hazardAt(a.x,a.y); if(!h || !(h.dps>0)) return;   // dps 0 の床では削らない（主人公と同じ）
     const cap = allyStats(a).maxHp*dotPct()*step;
     const dmg=Math.max(1, Math.round(Math.min(h.dps*step*(1+lv*0.05)*0.8, cap)));
     a.hpNow-=dmg; pop(a.x,a.y-0.4,dmg,h.edge);
@@ -8125,18 +8348,14 @@ function fireArt(def, src){
   const c=artCtx(src);
   if(!c.ent || c.ent.dead) return false;
   const ang=Math.atan2(c.diry||0, c.dirx||1);
-  sayArt(c.x, c.y, def.nm, def.col);
+  sayArt(c.x, c.y, artName(def), def.col);
   if(c.isPlayer) feelUltimate(P, def.col); else feelUltimate(c.ally, def.col);
 
   if(def.k==='dash'){
     /* 踏み込み。壁は抜けない（瞬歩と同じ作法で、通り道を線分で1回だけ取る）。 */
     const from={x:c.x, y:c.y};
-    let gx=c.x, gy=c.y;
-    for(let d=0; d<def.dist; d+=0.25){
-      const nx=gx+Math.cos(ang)*0.25, ny=gy+Math.sin(ang)*0.25;
-      if(solid(nx,ny)) break;
-      gx=nx; gy=ny;
-    }
+    const stop=dashStop(c.x, c.y, ang, def.dist, (c.ent&&c.ent.r)||0.32);
+    const gx=stop.x, gy=stop.y;
     W.fx.push({t:'ultline', x:from.x, y:from.y, x2:gx, y2:gy, life:0.32, maxLife:0.32, col:def.col});
     W.enemies.forEach(e=>{
       if(e.dead) return;
@@ -8284,14 +8503,9 @@ function fireUlt(){
        火力は変わらない。変わるのは**見えるかどうか**だけ。 */
     const dist = 4.2 + lv*0.25, mult = 1.8 + lv*0.4;
     const from = {x:P.x, y:P.y};
-    // 行き先を先に決める。壁は抜けない
-    let gx=P.x, gy=P.y;
-    const step = 0.25;
-    for(let d=0; d<dist; d+=step){
-      const nx=gx+Math.cos(ang)*step, ny=gy+Math.sin(ang)*step;
-      if(solid(nx,ny)) break;
-      gx=nx; gy=ny;
-    }
+    // 行き先を先に決める。壁は抜けないし、体も壁にめり込ませない（dashStop）
+    const stop = dashStop(P.x, P.y, ang, dist, P.r);
+    const gx=stop.x, gy=stop.y;
     /* 走っている間の操作は奪う（途中で曲げられると線分の判定と食い違う）。
        update() の頭で P.dash を進めて、終わったら解ける。 */
     P.dash = {x0:from.x, y0:from.y, x1:gx, y1:gy, t:0, max:BLINK_SEC, col:u.col};
@@ -9157,7 +9371,7 @@ function sayArt(x, y, nm, col){
    **ここだけは戦いを止めない**（モーダルを出すと、殴られている最中に手が止まる）。 */
 function artFlashFx(x, y, def){
   W.pops.push({x, y:y-1.25, txt:'💡', c:'#ffe066', life:1.5, max:1.5, bold:true});
-  W.pops.push({x, y:y-0.55, txt:def.nm, c:def.col, life:1.5, max:1.5, delay:0.25, bold:true});
+  W.pops.push({x, y:y-0.55, txt:artName(def), c:def.col, life:1.5, max:1.5, delay:0.25, bold:true});
   W.fx.push({t:'ultring', x, y, r:0, max:2.4, life:0.6, maxLife:0.6, col:'#ffe066'});
   W.fx.push({t:'levelup', x, y, life:0.9, max:0.9, col:def.col});
 }
@@ -10437,6 +10651,21 @@ function returnToTown(){
   loot.forEach(it=>S.stash.push(it));
   finishReturn(0);
 }
+/* ---------- 街での休息 ----------
+   主人公と、生き残って連れ帰った仲間を満タンに戻す。
+   状態異常も落とす——街まで火傷を持ち帰る理由が無い。
+   倒れた仲間（dead）は対象外。ここで戻すと死が無効になる。 */
+function healPartyFull(){
+  if(S.hero){
+    S.hero.hpNow = stats(S.hero).maxHp;
+    S.hero.avengeT = 0;
+    if(S.run) S.run.pst = {};
+  }
+  livingParty().forEach(a=>{
+    a.hpNow = allyStats(a).maxHp;
+    a.st = {}; a.bu = {};
+  });
+}
 /* 帰還の残り。持ち帰る物が決まってから走る。 */
 function finishReturn(overflow){
   if(!S.run) return;
@@ -10448,6 +10677,14 @@ function finishReturn(overflow){
   const bonus = Math.round(18*depth*(1+depth/40) * sellBonus());
   S.gold += bonus;
   const zone = zoneAt(depth);
+  /* 生きて帰った最深。疾風の加護がここまで等号で掛かる（windGrace 参照）。
+     死亡では動かない——ここを更新するのは「帰り着いた」この一点だけ。 */
+  S.deepestBack = Math.max(S.deepestBack||0, depth);
+  /* ---------- 街に着いたら全員が満タンに戻る ----------
+     宿屋のような回復手段を街に置いていないので、帰還そのものを休息にする。
+     ここが無いと「帰ってきたのに削れたまま次へ潜る」が既定になり、
+     帰る判断が『安全に補給する』ではなく『荷物を置くだけ』になる。 */
+  healPartyFull();
 
   el('r-body').textContent = '第'+depth+'階層から生還。撃破 '+S.run.kills+' / 拾得 '+S.run.gold+'G'
     + (overflow?`（倉庫に入らない ${overflow} 点を売った）`:'');
@@ -10652,7 +10889,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')) continue;
+    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
       if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
@@ -10694,7 +10931,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')));
+      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -11120,13 +11357,26 @@ function tick(now){
   _tickCount++; _drawDt=dt;
   // 例外でループが止まると「ゲームオーバー後にフリーズ」になる。必ず次フレームを予約する。
   try{
-    if(S.screen==='game' && S.hero && S.run && W.fl) update(dt);
-    draw();
+    const live = S.screen==='game' && S.hero && S.run && W.fl;
+    if(live){ update(dt); draw(); _canvasDirty=true; }
+    else if(_canvasDirty){
+      /* ---------- 街やメニューではキャンバスを塗らない ----------
+         draw() は「画面全体を一色で塗ってから、game でなければ帰る」形だった。
+         つまり**街にいるあいだ、見えないキャンバスを毎フレーム全面塗っていた。**
+         端末の実ピクセルは 390×844 の9倍（DPR 3）＝約296万画素あり、
+         その上を不透明な .screen が完全に覆っている——1枚も見えない塗りに
+         毎秒60回ぶんの塗り帯域を使っていたことになる。熱の割に得る物が無い。
+
+         抜けた瞬間に一度だけ消して、あとは触らない
+         （消さずに放置すると、半透明のモーダル越しに前の盤面が残る）。 */
+      draw(); _canvasDirty=false;
+    }
   }catch(err){
     console.error('tick error:', err);
   }
   requestAnimationFrame(tick);
 }
+let _canvasDirty=true;
 
 /* ---------- 検証用: ループを実時間ではなく同期で進める ----------
    回帰テストの 64%（321秒中206秒）が「3秒待つ」の類の実時間待ちだった。
@@ -11421,10 +11671,18 @@ function update(dt){
   W.enemies=W.enemies.filter(e=>!e.dead || (e.fade=(e.fade??0.3)-dt)>0);
   if(!S.hero || !S.run) return;
 
-  // 探索済み記録。試練の枷「暗幕」のあいだは見える範囲そのものが狭まる
+  /* 探索済み記録。試練の枷「暗幕」のあいだは見える範囲そのものが狭まる。
+
+     **立っているマスが変わったときだけ**塗る。半径9なら 19×19＝361 マスを
+     毎フレーム舐めていたが、結果は同じマスの上にいるかぎり1ビットも変わらない。
+     マスをまたいだ回（歩いていても毎秒数回）だけで足りる。 */
   const gx=Math.floor(P.x), gy=Math.floor(P.y), R=Math.round(9*baneMul('sight',1));
-  for(let y=gy-R;y<=gy+R;y++) for(let x=gx-R;x<=gx+R;x++)
-    if(y>=0&&x>=0&&y<W.fl.H&&x<W.fl.W && (x-gx)**2+(y-gy)**2<R*R) W.seen[y][x]=1;
+  const seenKey = gx+','+gy+','+R;
+  if(W.seenKey !== seenKey){
+    W.seenKey = seenKey;
+    for(let y=gy-R;y<=gy+R;y++) for(let x=gx-R;x<=gx+R;x++)
+      if(y>=0&&x>=0&&y<W.fl.H&&x<W.fl.W && (x-gx)**2+(y-gy)**2<R*R) W.seen[y][x]=1;
+  }
 
   updateHUD();
 }
@@ -11487,14 +11745,22 @@ function drawHubBgFrame(){
   const sx=(frame%HUB_BG.cols)*HUB_BG.fw, sy=Math.floor(frame/HUB_BG.cols)*HUB_BG.fh;
   ctx.drawImage(hubBgImg, sx, sy, HUB_BG.fw, HUB_BG.fh, 0, 0, HUB_BG.fw, HUB_BG.fh);
 }
+/* ---------- 街の背景は 12fps の絵。60回描く意味は無い ----------
+   スプライトシートは 12fps・72コマ。rAF は 60回/秒で回るので、
+   **6回のうち5回はまったく同じコマを描き直していた。**
+   コマ番号が変わったときだけ描く。見た目は1ピクセルも変わらない。 */
+let _hubBgFrame=-1;
 function hubBgTick(){
-  drawHubBgFrame();
-  _hubBgRaf = (S.screen==='town' && !hubReducedMotion()) ? requestAnimationFrame(hubBgTick) : null;
+  const reduced=hubReducedMotion();
+  const f = reduced ? 0 : Math.floor((performance.now()-_hubBgT0)/1000*HUB_BG.fps) % HUB_BG.frames;
+  if(f!==_hubBgFrame){ _hubBgFrame=f; drawHubBgFrame(); }
+  _hubBgRaf = (S.screen==='town' && !reduced) ? requestAnimationFrame(hubBgTick) : null;
 }
 /* 街に入るたびに呼ぶ。二重にrAFを作らないよう既にあれば何もしない。 */
 function startHubBg(){
   if(!_hubBgT0) _hubBgT0=performance.now();
   layoutHubBg();
+  _hubBgFrame=-1;            // 大きさが変わるとキャンバスは白紙に戻る。次で必ず描き直す
   drawHubBgFrame();
   if(_hubBgRaf) return;
   if(!hubReducedMotion()) _hubBgRaf=requestAnimationFrame(hubBgTick);
@@ -11502,7 +11768,7 @@ function startHubBg(){
 function stopHubBg(){
   if(_hubBgRaf){ cancelAnimationFrame(_hubBgRaf); _hubBgRaf=null; }
 }
-addEventListener('resize', ()=>{ if(S.screen==='town'){ layoutHubBg(); drawHubBgFrame(); } });
+addEventListener('resize', ()=>{ if(S.screen==='town'){ layoutHubBg(); _hubBgFrame=-1; drawHubBgFrame(); } });
 
 /* ---------- 画面遷移の黒暗転 ----------
    タイトル→街／街→アビスの2箇所だけに挟む演出。
@@ -11969,8 +12235,10 @@ function draw(){
     if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
-      spriteDrawn=drawSpriteArt ? drawSpriteArt(sprite(spr),sx,sy,R*2.6,e,e.artDx,e.artDy,1,1,0,true)
+      spriteDrawn=drawSpriteArt
+        ? safeFeelDraw(drawSpriteArt,[sprite(spr),sx,sy,R*2.6,e,e.artDx,e.artDy,1,1,0,true])
         : drawSprite(spr,sx,sy,R*2.6);
+      if(!spriteDrawn) spriteDrawn=drawSprite(spr,sx,sy,R*2.6);   // 演出が描けなければ素の絵で
       if(e.hit>0){
         ctx.save();
         ctx.globalAlpha=Math.min(0.6, e.hit*4);
@@ -11981,8 +12249,9 @@ function draw(){
     }else if(charKey){
       const artSize=e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1);
       const drawCharacter=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
-      spriteDrawn=drawCharacter(charKey,sx,sy,artSize,e,e.artDx,e.artDy,
-                                e.dead?Math.max(0,e.fade/0.3):1);
+      spriteDrawn=safeFeelDraw(drawCharacter,[charKey,sx,sy,artSize,e,e.artDx,e.artDy,
+                                e.dead?Math.max(0,e.fade/0.3):1])
+        || CharacterArt.put(charKey,sx,sy,artSize);
       if(!spriteDrawn){
         ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
@@ -12111,15 +12380,16 @@ function draw(){
     ctx.save(); ctx.globalAlpha*=feelBlink(a);
     if(mspr && sprite(mspr)){
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
-      if(drawSpriteArt) drawSpriteArt(sprite(mspr),sx,sy,R*2.6,a,a.dirx,a.diry,1,aScale,aRot,true);
-      else drawSprite(mspr,sx,sy,R*2.6);
+      if(!(drawSpriteArt && safeFeelDraw(drawSpriteArt,[sprite(mspr),sx,sy,R*2.6,a,a.dirx,a.diry,1,aScale,aRot,true])))
+        drawSprite(mspr,sx,sy,R*2.6);
       if(a.hit>0){
         ctx.save(); ctx.globalAlpha=Math.min(0.6, a.hit*4); ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(sx, sy, R*1.05, 0, 7); ctx.fill(); ctx.restore();
       }
     }else{
       const drawCharacter=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
-      if(!drawCharacter(CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot)){
+      if(!safeFeelDraw(drawCharacter,[CharacterArt.allyKey(a),sx,sy,TS,a,a.dirx,a.diry,1,aScale,aRot])
+         && !CharacterArt.put(CharacterArt.allyKey(a),sx,sy,TS)){
       ctx.beginPath();
       for(let i=0;i<6;i++){
         const ang=i/6*Math.PI*2-Math.PI/2+aRot;
@@ -12665,7 +12935,9 @@ function draw(){
   ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){
     const drawHero=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
-    if(!drawHero(CharacterArt.heroKey(S.hero),px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot)){
+    const heroKey=CharacterArt.heroKey(S.hero);
+    if(!safeFeelDraw(drawHero,[heroKey,px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot])
+       && !CharacterArt.put(heroKey,px,py,TS)){
       ctx.save();
       ctx.translate(px,py); if(heroRot) ctx.rotate(heroRot);
       ctx.fillStyle='#ffffff';
@@ -12793,6 +13065,20 @@ function drawFrozen(){
 let _banner=null;   // {title, sub, col, t, max}
 function showBanner(title, sub, col, secs){
   _banner={title, sub:sub||'', col:col||'#cfd6e4', t:secs||3.0, max:secs||3.0};
+}
+/* ---------- 街で読ませる短い知らせ ----------
+   showBanner はキャンバスに描くので、街の画面（不透明な .screen）では
+   **1文字も見えない。** 街側の「できなかった理由」はこちらで出す。
+   タイマーは1本だけ持ち、次の知らせが来たら上書きする（重ならない）。 */
+let _toastT=null;
+function toast(msg, col, secs){
+  const n=el('toast'); if(!n) return;
+  n.textContent=msg;
+  n.style.color=col||'#cfd6e4';
+  n.style.borderColor=col||'var(--line)';
+  n.classList.add('on');
+  if(_toastT) clearTimeout(_toastT);
+  _toastT=setTimeout(()=>{ n.classList.remove('on'); _toastT=null; }, (secs||2.6)*1000);
 }
 /* 層のバナーは廃止（降りるたびに読ませる文章が挟まると道中が止まる）。
    層が変わったことは enterFloor のログ1行で伝えている。 */
@@ -13124,28 +13410,97 @@ function drawAir(Z, dt){
   ctx.globalAlpha=1;
 }
 
+/* ---------- 演出側が投げても、盤面は描き切る ----------
+   キャラの絵は game-feel.js（演出の担当）に描いてもらっている。
+   そこで例外が出ると draw() ごと中断するので、**主人公も仲間も敵も、
+   そこから先に描くはずだった物が一度に消える。** しかも原因が状態に残る類だと
+   毎フレーム同じ所で投げ続けるので、**消えたまま戻らない**
+   （報告「敵と交戦中にキャラが見えなくなって戻らなくなる」がこれだった。
+     座標に1フレームだけ NaN が混ざると feelMotion の位相が NaN のまま固まり、
+     足踏みのコマ番号が NaN → pose が undefined → pose.upperY で投げていた）。
+
+   根治は演出側で済ませてあるが、**受け口にも蓋をしておく。**
+   絵は演出、盤面は本編。演出が転んでも盤面は素の図形で描き切る。
+
+   例外で抜けると ctx.save() が釣り合わずに残り、次に描く物まで
+   ずれた変換や薄い不透明度を引き継ぐので、変換を見て積み残しを戻す。
+   何度も投げるようなら演出側の描画を切って素の図形に固定する——
+   毎フレーム例外を作ること自体が重い。 */
+let _feelDrawFails=0;
+const FEEL_DRAW_GIVEUP=8;
+function _sameTransform(a,b){
+  return !a || !b || (a.a===b.a && a.b===b.b && a.c===b.c && a.d===b.d && a.e===b.e && a.f===b.f);
+}
+function safeFeelDraw(fn, args){
+  if(typeof fn!=='function') return false;
+  if(_feelDrawFails>=FEEL_DRAW_GIVEUP) return false;
+  const t0 = ctx.getTransform ? ctx.getTransform() : null;
+  const a0 = ctx.globalAlpha;
+  try{
+    return fn.apply(null, args);
+  }catch(err){
+    for(let i=0;i<8 && ctx.getTransform && !_sameTransform(ctx.getTransform(), t0); i++) ctx.restore();
+    ctx.globalAlpha = a0;
+    if(++_feelDrawFails===1) console.error('feel draw error:', err);
+    if(_feelDrawFails===FEEL_DRAW_GIVEUP) log('演出の描画を切った（絵は素の表示に戻る）');
+    return false;
+  }
+}
 function shade(hex,k){
   const n=parseInt(hex.slice(1),16);
   const r=Math.round(((n>>16)&255)*k), g=Math.round(((n>>8)&255)*k), b=Math.round((n&255)*k);
   return 'rgb('+r+','+g+','+b+')';
 }
-/* ミニマップは右下。以前は右上（?と🎒の下）に置いていたが、
-   上の帯には敵の情報・侵入者の警告・パーティ・ログが集まっていて、
-   **一番よく見る地図が、一番混んでいる場所**にあった。
-   下は大技ボタンしか居ないので、そこの上に逃がす。 */
-const MM_BOTTOM = 186;      // 画面下端からの余白（大技ボタンの上に出す）
-function drawMinimap(){
-  const f=W.fl, s=Math.min(110/f.W, 110/f.H);
+/* ---------- 地図 ----------
+   長いあいだ右下に小さく出しっぱなしだったが、2つ問題があった。
+
+   1) 常時表示なので、**出ている必要が無い時間のほうが長い。**
+      戦っている最中に見る物ではないし、盤面の右下を常に食っていた。
+   2) 技ボタンを3つに増やした（大技・スキル技・武器技）ので、
+      一番上の武器技ボタンと地図が重なった（報告）。
+
+   既定では出さず、右上の 🗺 で出し入れする形にする。
+   出すときは隅ではなく**画面の中央に大きく**——出すか出さないかを
+   選ばせるなら、出したときは読むために出しているので、小さい理由が無い。
+
+   大きさは「技ボタンの列に掛からない範囲でできるだけ大きく」で決める。
+   MAP_KEEP_BOTTOM は #artbtn の上端（228+62）＋余白で、CSS 側の数字と対。
+   片方だけ動かすと必ずまた重なるので、直すときは2つ揃えて動かすこと。 */
+const MM_BOTTOM = 186;            // 旧ミニマップの余白。外部から参照している物があるので残す
+const MAP_KEEP_BOTTOM = 304;      // 下に空けておく帯（技ボタンの列）
+const MAP_KEEP_TOP    = 56;       // 上に空けておく帯（階層表示・ログ）
+const MAP_SIDE_KEEP   = 130;      // 左右に空ける合計幅（右上のボタン列を避ける）
+function mapOn(){ return !!S.mapOn; }
+/* 地図の矩形。描画とテストが同じ計算を見るように、ここ1ヶ所で決める。 */
+function mapBox(){
+  const f=W.fl; if(!f) return null;
+  const band = Math.max(80, innerHeight - MAP_KEEP_BOTTOM - MAP_KEEP_TOP);
+  const lim  = Math.max(110, Math.min(innerWidth - MAP_SIDE_KEEP, band, 520));
+  const s    = Math.min(lim/f.W, lim/f.H);
   const mw=f.W*s, mh=f.H*s;
-  const ox=innerWidth-mw-14, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
-  ctx.globalAlpha=0.28; ctx.fillStyle='#000'; ctx.fillRect(ox-3,oy-3,mw+6,mh+6); ctx.globalAlpha=1;
-  ctx.globalAlpha=0.5; ctx.strokeStyle='#39415a'; ctx.lineWidth=1;
-  ctx.strokeRect(ox-3.5,oy-3.5,mw+7,mh+7); ctx.globalAlpha=1;
+  return {s, mw, mh,
+          ox:(innerWidth-mw)/2,
+          oy:MAP_KEEP_TOP + (band-mh)/2};
+}
+function drawMinimap(){
+  if(!mapOn()) return;            // 既定は非表示。🗺 を押したときだけ出す
+  const box=mapBox(); if(!box) return;
+  const f=W.fl, s=box.s, mw=box.mw, mh=box.mh, ox=box.ox, oy=box.oy;
+  // 大きく出すぶん、下の盤面が透けたままだと読めない。板は濃いめに敷く。
+  ctx.globalAlpha=0.72; ctx.fillStyle='#070a10'; ctx.fillRect(ox-8,oy-8,mw+16,mh+16); ctx.globalAlpha=1;
+  ctx.globalAlpha=0.7; ctx.strokeStyle='#39415a'; ctx.lineWidth=1;
+  ctx.strokeRect(ox-8.5,oy-8.5,mw+17,mh+17); ctx.globalAlpha=1;
   // ミニマップも層の色で塗る（開いた瞬間にどこにいるか分かる）
   ctx.fillStyle = f.zone ? shade(f.zone.dot, 1.15) : '#5a6685';
   for(let y=0;y<f.H;y++)for(let x=0;x<f.W;x++) if(W.seen[y][x]&&tileWalk(f,x,y)) ctx.fillRect(ox+x*s,oy+y*s,s,s);
+  /* 印の大きさは地図の縮尺に合わせる。**px の決め打ちだと、
+     大きく出した瞬間に印だけ豆粒になって読めない。**
+     旧ミニマップ（s≒1.15）を基準に、同じ見え方へ揃える。 */
+  const k = Math.max(1, s/1.15);
+  const dot=(x,y,sz,col)=>{ const d=sz*k; ctx.fillStyle=col;
+    ctx.fillRect(ox+x*s-d/2, oy+y*s-d/2, d, d); };
   if(stairRevealed()){
-    ctx.fillStyle='#7fc3e0'; ctx.fillRect(ox+f.stair.x*s-1.5,oy+f.stair.y*s-1.5,3.5,3.5);
+    dot(f.stair.x, f.stair.y, 4.5, '#7fc3e0');
   }else{
     const h=stairHint();
     if(h>0){
@@ -13153,18 +13508,15 @@ function drawMinimap(){
       const ang=Math.atan2(f.stair.y-P.y, f.stair.x-P.x);
       const rr=Math.min(mw,mh)*0.22;
       ctx.globalAlpha=0.25+0.45*h;
-      ctx.fillStyle='#7fc3e0';
-      ctx.fillRect(ox+(P.x+Math.cos(ang)*rr/s)*s-1.5, oy+(P.y+Math.sin(ang)*rr/s)*s-1.5, 3, 3);
+      dot(P.x+Math.cos(ang)*rr/s, P.y+Math.sin(ang)*rr/s, 4, '#7fc3e0');
       ctx.globalAlpha=1;
     }
   }
-  if(W.grave){ ctx.fillStyle='#7fe0c0'; ctx.fillRect(ox+W.grave.x*s-2,oy+W.grave.y*s-2,4.5,4.5); }
-  // ユニーク敵と仲間候補はミニマップに出す。避けるか会いに行くかを選ばせるため。
-  W.enemies.forEach(e=>{ if(e.uniq && !e.dead){
-    ctx.fillStyle='#c07fe0'; ctx.fillRect(ox+e.x*s-2,oy+e.y*s-2,4.5,4.5); } });
-  if(W.npc){ ctx.fillStyle='#ffd06a'; ctx.fillRect(ox+W.npc.x*s-2,oy+W.npc.y*s-2,4.5,4.5); }
-  if(W.ev && !W.ev.used){ ctx.fillStyle=eventDef(W.ev.id).col;
-    ctx.fillRect(ox+W.ev.x*s-2,oy+W.ev.y*s-2,4.5,4.5); }
+  if(W.grave) dot(W.grave.x, W.grave.y, 5, '#7fe0c0');
+  // ユニーク敵と仲間候補は地図に出す。避けるか会いに行くかを選ばせるため。
+  W.enemies.forEach(e=>{ if(e.uniq && !e.dead) dot(e.x, e.y, 5, '#c07fe0'); });
+  if(W.npc) dot(W.npc.x, W.npc.y, 5, '#ffd06a');
+  if(W.ev && !W.ev.used) dot(W.ev.x, W.ev.y, 5, eventDef(W.ev.id).col);
   // ハザードは地図にも薄く出す。ルート取りを地図の上で決められるようにする。
   if(W.haz){
     const hz=hazardDef(W.haz.kind);
@@ -13173,24 +13525,19 @@ function drawMinimap(){
       for(let x=0;x<f.W;x++) if(row[x]&&W.seen[y][x]) ctx.fillRect(ox+x*s,oy+y*s,s,s); }
     ctx.globalAlpha=1;
   }
-  // 鉱脈と鍛冶場をミニマップに出す。「掘ってから鍛冶場まで運ぶ」経路を地図の上で引かせたい。
-  (W.ores||[]).forEach(o=>{ ctx.fillStyle=o.mined?'#3f4452':oreDef(o.grade).col;
-    ctx.fillRect(ox+o.x*s-1.5,oy+o.y*s-1.5,3.5,3.5); });
-  if(W.forge){ ctx.fillStyle='#e0705a';
-    ctx.fillRect(ox+W.forge.x*s-2,oy+W.forge.y*s-2,4.5,4.5); }
-  if(W.shop){ ctx.fillStyle='#d6b34a';
-    ctx.fillRect(ox+W.shop.x*s-2,oy+W.shop.y*s-2,4.5,4.5); }
+  // 鉱脈と鍛冶場も地図に出す。「掘ってから鍛冶場まで運ぶ」経路を地図の上で引かせたい。
+  (W.ores||[]).forEach(o=>dot(o.x, o.y, 4, o.mined?'#3f4452':oreDef(o.grade).col));
+  if(W.forge) dot(W.forge.x, W.forge.y, 5, '#e0705a');
+  if(W.shop)  dot(W.shop.x,  W.shop.y,  5, '#d6b34a');
   // 侵入者だけは霧を無視して常に見える。どこから来るか分かるから逃げる判断ができる。
   const intr=liveIntruder();
   if(intr){
     ctx.globalAlpha=0.55+0.45*Math.sin(performance.now()/220);
-    ctx.fillStyle='#ff4a3a';
-    ctx.fillRect(ox+intr.x*s-2.5,oy+intr.y*s-2.5,5.5,5.5);
+    dot(intr.x, intr.y, 6, '#ff4a3a');
     ctx.globalAlpha=1;
   }
-  livingParty().forEach(a=>{ ctx.fillStyle=jobDef(a.job).col;
-    ctx.fillRect(ox+a.x*s-1.5,oy+a.y*s-1.5,3,3); });
-  ctx.fillStyle='#fff'; ctx.fillRect(ox+P.x*s-1.5,oy+P.y*s-1.5,3.5,3.5);
+  livingParty().forEach(a=>dot(a.x, a.y, 3.5, jobDef(a.job).col));
+  dot(P.x, P.y, 4.5, '#fff');
 }
 
 /* ---------- HUD ---------- */
@@ -13296,9 +13643,12 @@ function updateHUD(){
     ab.classList.toggle('ready', ar);
     hset('artbtn.col', ar ? ad.col : '', v=>ab.style.color=v);
     hset('art-icon.t', ad.icon, v=>el('art-icon').textContent=v);
-    hset('art-nm.t', ad.nm, v=>el('art-nm').textContent=v);
+    hset('art-nm.t', artName(ad), v=>el('art-nm').textContent=v);
     hset('art-cd.t', ar ? '' : Math.ceil(P.artCd)+'s', v=>el('art-cd').textContent=v);
   }else ab.classList.remove('on');
+
+  // 地図のトグル。出ているあいだは縁を光らせる（押したかどうかが読めるように）
+  el('mapbtn').classList.toggle('on', !!S.mapOn);
 
   /* 盾のボタン。**盾を装備しているときだけ出す。**
      以前は「盾を持てば何かできる」と伝えるために無くてもグレーで置いていたが、
@@ -13363,17 +13713,17 @@ function updateHUD(){
     v=>dtag.innerHTML=v);
   }
 
-  // パーティ。誰が削れているかが常に見えないと、庇う・祈るの意味が伝わらない。
-  const pb=el('partybar'), mates=livingParty();
-  hset('partybar.disp', mates.length?'flex':'none', v=>pb.style.display=v);
-  if(mates.length){
-    hset('partybar.h', mates.map(a=>{
-      const j=jobDef(a.job), mx=allyStats(a).maxHp;
-      const pct=clamp(a.hpNow/mx*100,0,100);
-      return `<div class="mate" data-ally="${a.uidA}"><div class="mn" style="color:${j.col}">${a.name} <span style="color:var(--dim);font-weight:400">${j.nm} Lv.${a.lv}</span></div>`+
-             `<div class="mb"><i style="width:${pct}%;background:${j.col}"></i></div></div>`;
-    }).join(''), v=>pb.innerHTML=v);
-  }
+  /* ---------- 左肩のパーティ表示は廃止 ----------
+     同じ情報が**既に盤面の上にある**——仲間の足元には常にHPバーが出ているし
+     （drawMate の allyBars）、タップすれば装備画面まで開く（tapHitsAlly）。
+     左肩の帯はそれを名前付きで二重に出していただけで、
+     人数ぶん縦に伸びてログ・敵の名前・侵入者の警告を押し下げていた。
+
+     見るべきものは「今どっちが削れているか」であって「何人いるか」ではない。
+     盤面の上で読めるなら、画面の端に同じ物を置く理由が無い。
+     節点（#partybar）は残す——左肩の積み方（HUD_STACK）と
+     テストが名前で触っているので、消すより「常に空で非表示」が安全。 */
+  hset('partybar.disp', 'none', v=>el('partybar').style.display=v);
   // 引き撃ちの倍率の表記（#foottag）は常に非表示固定なので initHudOnce() で一度だけ消す。
 
   const gh=el('gravehint');
@@ -13871,9 +14221,24 @@ function isEliteJob(id){ return ELITE_JOBS.some(j=>j.id===id); }
    出現率を落としてあるだけだと「引ければ得」で終わるので、
    値段の側にも差を付けて、引いたあとにもう一度選ばせる。
    街開発の酒場を上げると安くなる（施設のレベルが場所の値段に効く）。 */
+/* ---------- 雇用費の base を上げた ----------
+   以前は「20 + Lv×6」。第20階層の仲間で 140 G ——
+   帰還報酬1回（第20階層で 540 G）で4人まとめて雇えてしまい、
+   **誰を連れて行くかが金の判断にならなかった。**
+
+   Lv×50 を軸にする。そのうえで後半はレートを上げる:
+   高レベルほど1人の効きが大きいので、比例のままだと深いほど安く感じる。
+   Lv.10 から 1レベルごとに +4% ずつ掛かるようにして、伸び方を上に曲げる。
+     Lv.1  50 G ／ Lv.5  250 G ／ Lv.10  500 G
+     Lv.20 1,400 G ／ Lv.30 2,700 G ／ Lv.40 4,400 G ／ Lv.50 6,500 G
+   （街開発の酒場を上げると 1段につき 7% 引き。上位職と流れ者の倍率は従来どおり） */
+const HIRE_PER_LV   = 50;
+const HIRE_LATE_FROM = 10;     // ここから上はレートが上がる
+const HIRE_LATE_RATE = 0.04;   // 1レベルごと
 function hireCost(a){
   if(a && a.free) return 0;      // 金で買った仲間ではない（ドゥラントリー）
-  let c = 20 + Math.round((a.lv||1)*6);
+  const lv = a.lv||1;
+  let c = lv * HIRE_PER_LV * (1 + Math.max(0, lv-HIRE_LATE_FROM)*HIRE_LATE_RATE);
   if(isEliteJob(a.job)) c *= HIRE_ELITE_MUL;
   if(a.returned)        c *= HIRE_RETURNED_MUL;
   return Math.max(8, Math.round(c * (1 - bldLv('tavern')*0.07)));
@@ -14077,28 +14442,39 @@ function renderTavern(){
     ? pool.map(tavernRow).join('')
     : '<div class="empty">今日は誰も来ていない</div>';
 }
+/* ---------- 描き直してもスクロール位置を動かさない ----------
+   一覧をまるごと innerHTML で作り直すので、そのままだと**押した行が
+   画面のどこにあったか**が失われる。控えて戻す。
+   （酒場でスクロールが効かなくなるという報告への対処の片割れ。
+     もう片方は .screen から -webkit-overflow-scrolling を外したこと） */
+function renderKeepScroll(screenId, fn){
+  const sc=el(screenId);
+  const y=sc ? sc.scrollTop : 0;
+  fn();
+  if(sc) sc.scrollTop=y;
+}
 bindRowTap(el('scr-tavern'), '[data-park]', t=>{
   const r=tavernPark(+t.dataset.park);
-  if(r.ok) log(r.ally.name+'を酒場に預けた');
-  else showBanner('預けられない', r.why||'', '#e0705a', 2.0);
-  renderTavern(); renderTown();
+  if(r.ok){ log(r.ally.name+'を酒場に預けた'); toast(r.ally.name+'を酒場に預けた'); }
+  else toast('預けられない — '+(r.why||''), '#e0705a');
+  renderKeepScroll('scr-tavern', ()=>{ renderTavern(); renderTown(); });
 });
 bindRowTap(el('scr-tavern'), '[data-hire]', t=>{
   const r=hireAlly(+t.dataset.hire);
   /* 雇えなかったら**理由を言う。** 慰霊碑と同じで、
      黙って何も起きないのが一番わけが分からない。 */
-  if(r.ok) log(r.ally.name+'を雇った（-'+r.cost+' G）');
-  else showBanner('雇えない', r.why||'', '#e0705a', 2.0);
-  renderTavern(); renderTown();
+  if(r.ok){ log(r.ally.name+'を雇った（-'+r.cost+' G）'); toast(r.ally.name+'を雇った（-'+r.cost+' G）'); }
+  else toast('雇えない — '+(r.why||''), '#e0705a');
+  renderKeepScroll('scr-tavern', ()=>{ renderTavern(); renderTown(); });
 });
 
 bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   const r=memRevive(+t.dataset.mem);
   /* 呼び戻せなかったら**理由を言う。**
      黙って何も起きないと、押し方が悪いのかSPが足りないのか分からない。 */
-  if(r.ok) log(r.ally.name+'が戻ってきた');
-  else showBanner('呼び戻せない', r.why||'', '#e0705a', 2.0);
-  renderMem(); renderTown();
+  if(r.ok){ log(r.ally.name+'が戻ってきた'); toast(r.ally.name+'が戻ってきた'); }
+  else toast('呼び戻せない — '+(r.why||''), '#e0705a');
+  renderKeepScroll('scr-mem', ()=>{ renderMem(); renderTown(); });
 });
 function shopHTML(it){
   const col=RARCOL[it.rar], afford=S.gold>=it.price;
@@ -14143,6 +14519,7 @@ function renderChar(){
   const eq=Object.values(S.hero.equip).filter(Boolean);
   el('equipped').innerHTML = eq.length? eq.map(it=>itemHTML(it,true)).join('')
     : '<div class="empty">素手・裸。道具屋で買うか、潜って拾おう。</div>';
+  renderArtSlots();          // 技は街でも付け替えられる（#char-arts に書く）
   el('town-boons').innerHTML = boonListHTML(S.hero);
   renderCurses();
   el('town-party').innerHTML = livingParty().length ? livingParty().map(a=>{
@@ -14249,6 +14626,16 @@ const uds=unlockedDepths();
   badge('badge-upg',    buyable);
   badge('badge-bld',    bldBuyable);
   badge('badge-forge',  fc.ok ? 1 : 0);
+
+  /* まだ建っていない施設はグレーで残す。**消さない**のが肝で、
+     消すと「そのうち建つ物がある」こと自体が伝わらない。
+     件数バッジも伏せる（開けない場所の件数は読む意味が無い）。 */
+  for(const key in HUB_GATE){
+    const btn=el('btn-go-'+key); if(!btn) continue;
+    const open=hubUnlocked(key);
+    btn.classList.toggle('locked', !open);
+    if(!open){ const bg=el('badge-'+key); if(bg) bg.style.display='none'; }
+  }
 
   renderHubPlaza();
 }
@@ -14844,7 +15231,11 @@ bindRowTap(el('m-mshop'), '[data-mbuy]', t=>{
   else if(r.why) log(r.why);
   renderMerchant();
 });
-bindTap(el('btn-go-forge'), ()=>openForge(false));
+/* 街の鍛冶屋も街開発で建ててから（道中の露天の鍛冶場は別物なので塞がない） */
+bindTap(el('btn-go-forge'), ()=>{
+  if(!hubUnlocked('forge')) return hubLockedNotice('forge');
+  openForge(false);
+});
 
 /* ---------- 道具屋 / 倉庫 / 能力強化 / ガチャ ---------- */
 function goldLabel(id){ el(id).textContent = S.gold+' G'; }
@@ -14995,7 +15386,12 @@ function renderUlts(){
    **リキャストは枠の側に残す**（技を替えても戻らない）。
    替えるたびに待ち時間が消えるなら、それは付け替えではなく連射になる。 */
 function artSlotHTML(o){
-  const on=o.cur;
+  /* ✎ は行の中に置くが、**行のタップ（セット）とは別物**として拾う。
+     bagTap は先に [data-artren] を見るので、名前を変えるつもりで押して
+     技が入れ替わる、という取り違えは起きない。 */
+  const ren = o.rename
+    ? `<button class="ghost" data-artren="${o.rename}"
+         style="width:auto;padding:4px 10px;font-size:12px;margin:4px 0 0">✎ 名前</button>` : '';
   return `<div class="item" data-artslot="${o.slot}" data-artpick="${o.id||''}"
      style="border-left-color:${o.col};${o.set?'background:rgba(143,216,255,.06)':''}">
     <div class="nm" style="color:${o.col}">${o.icon||'・'} ${o.nm}
@@ -15003,14 +15399,15 @@ function artSlotHTML(o){
              :'<span style="color:var(--dim);font-size:12px">　タップでセット</span>'}</div>
     <div class="af">${o.desc}</div>
     ${o.sub?`<div class="af" style="color:var(--dim)">${o.sub}</div>`:''}
+    ${ren}
   </div>`;
 }
-function renderArtSlots(){
+function artSlotsHTML(){
   const rows=[];
 
   // ---- 枠1: 大技 ----
   const ul=unlockedUlts();
-  rows.push('<div class="af" style="margin:6px 2px 2px;color:#8fd8ff;font-weight:700">枠1　大技</div>');
+  rows.push('<div class="gridhead">枠1　大技</div>');
   if(!ul.length){
     rows.push('<div class="empty">まだ1つも無い。第10階層の大ボスを倒すと最初の大技を覚える</div>');
   }else ul.forEach(u=>rows.push(artSlotHTML({
@@ -15019,7 +15416,7 @@ function renderArtSlots(){
     sub:'Lv.'+ultLv(u.id)+'　リキャスト '+ultCooldown(u).toFixed(0)+'秒'})));
 
   // ---- 枠2: スキル技 ----
-  rows.push('<div class="af" style="margin:10px 2px 2px;color:#8fd8ff;font-weight:700">枠2　スキル技</div>');
+  rows.push('<div class="gridhead">枠2　スキル技</div>');
   if(upgLv('wave')){
     rows.push(artSlotHTML({slot:'wave', id:'wave', nm:'衝撃波', icon:'〓', col:'#8fd8ff', set:true,
       desc:'前方をまとめて薙ぐ。下がりながらでも出せる',
@@ -15031,7 +15428,7 @@ function renderArtSlots(){
   // ---- 枠3: 武器技 ----
   const wb=heroWeaponBase();
   const wbn=wb ? (BASES.find(b=>b.id===wb)||{}).nm : null;
-  rows.push('<div class="af" style="margin:10px 2px 2px;color:#8fd8ff;font-weight:700">枠3　武器技'
+  rows.push('<div class="gridhead">枠3　武器技'
     +(wbn?`<span style="color:var(--dim);font-weight:400">　${wbn}</span>`:'')+'</div>');
   if(!wb){
     rows.push('<div class="empty">素手には武器技が無い。武器を装備すると、その種の技がここに出る</div>');
@@ -15041,21 +15438,71 @@ function renderArtSlots(){
       rows.push('<div class="empty">'+wbn+'の技はまだ閃いていない。'
         +wbn+'で戦い続けると、ふいに閃く</div>');
     }else learned.forEach((d,i)=>rows.push(artSlotHTML({
-      slot:'art', id:d.id, nm:d.nm, icon:d.icon, col:d.col, set:!!cur && cur.id===d.id,
-      desc:d.desc,
+      slot:'art', id:d.id, nm:artName(d), icon:d.icon, col:d.col, set:!!cur && cur.id===d.id,
+      desc:d.desc, rename:d.id,
       sub:'lv'+(i+1)+'　リキャスト '+artCooldown(d,false)+'秒'})));
     // まだ閃いていないぶんは「あと何段あるか」だけ見せる（中身は伏せる）
     const left=all.length-learned.length;
     if(left>0) rows.push('<div class="empty">'+wbn+'の技はあと'+left+'つ。'
       +'lv'+(learned.length+1)+'の技を閃くまで、'+wbn+'を振り続けること</div>');
   }
-  el('bag-arts').innerHTML = rows.join('');
-  el('bag-art-hint').innerHTML =
-    '探索中でも入れ替えられる。<b>ただしリキャストは枠に残る</b>（替えても待ち時間は戻らない）。'
+  const hint =
+    '<b>いつでも入れ替えられる</b>（街でも探索中でも）。'
+    + 'ただし<b>リキャストは枠に残る</b>——替えても待ち時間は戻らない。'
     + (wb ? '<br><span style="color:var(--dim);font-size:12px">武器技は武器種ごと。'
             +wbn+'の熟練 '+masteryOf(wb)+' → 閃きやすさ ×'
-            +(1+masteryOf(wb)*ART_FLASH_MAST).toFixed(2)+'</span>' : '');
+            +(1+masteryOf(wb)*ART_FLASH_MAST).toFixed(2)
+            +'　／　閃いた技は ✎ で名前を変えられる</span>' : '');
+  return {html:rows.join(''), hint};
 }
+/* ---------- 技欄は2ヶ所に出す ----------
+   探索中のステータス（#m-stat）と、街のステータス画面（#scr-char）。
+   「いつでも付け替えられる」を謳う以上、**街で開けないのは嘘**になる。
+   中身の組み立ては1つで、書き出す先だけ2つ持つ。 */
+function renderArtSlots(){
+  const r=artSlotsHTML();
+  for(const [listId, hintId] of [['bag-arts','bag-art-hint'], ['char-arts','char-art-hint']]){
+    const list=el(listId); if(!list) continue;
+    list.innerHTML=r.html;
+    const h=el(hintId); if(h) h.innerHTML=r.hint;
+  }
+}
+/* ---------- 閃いた技の名前 ----------
+   武器技は「教わった技」ではなく「自分で見つけた技」なので、
+   名前も自分の物にできていい。既定値は最初から入れておく——
+   空欄から考えさせると、変えないという選択が面倒になる。
+   置き場所は S.artName（技ID→名前）。**アカウント単位**で、
+   S.arts（閃いたかどうか）と同じ寿命にしてある。 */
+function artName(def){
+  if(!def) return '';
+  const v = S.artName && S.artName[def.id];
+  return (v && v.trim()) ? v : def.nm;
+}
+let _renamingArt=null;
+function openArtRename(id){
+  const d=artDef(id); if(!d) return;
+  _renamingArt=id;
+  el('an-sub').textContent = '既定の名前は「'+d.nm+'」';
+  el('an-input').value = artName(d);
+  el('m-artname').classList.add('on');
+  // 開いた瞬間に打ち始められるようにする（名前を決めに来たのだから）
+  setTimeout(()=>{ const i=el('an-input'); if(i){ i.focus(); i.select&&i.select(); } }, 30);
+}
+function closeArtRename(){ el('m-artname').classList.remove('on'); _renamingArt=null; }
+function commitArtRename(reset){
+  const id=_renamingArt; if(!id) return closeArtRename();
+  const d=artDef(id);
+  S.artName = S.artName || {};
+  const v = reset ? '' : (el('an-input').value||'').trim();
+  if(v) S.artName[id]=v; else delete S.artName[id];
+  closeArtRename();
+  toast('技の名前を「'+artName(d)+'」にした');
+  renderArtSlots();
+  if(S.screen==='char') renderKeepScroll('scr-char', renderChar);
+}
+bindTap(el('an-ok'),    ()=>commitArtRename(false));
+bindTap(el('an-reset'), ()=>commitArtRename(true));
+bindTap(el('an-close'), closeArtRename);
 function charmName(c){ return '🔮 '+c.nm; }   // 護符も行頭でそれと分かるように
 function carryName(c){ return c.kind==='charm' ? charmName(c.charm) : itemName(c.item); }
 function carryHTML(c){
@@ -15762,24 +16209,46 @@ function openStat(){
 }
 function closeStat(){ el('m-stat').classList.remove('on'); setScreen('game'); last=performance.now(); }
 
+/* ---------- 技欄のタップ ----------
+   持ち物／ステータスのモーダル（#m-bag・#m-stat）と、街のステータス画面
+   （#scr-char）の**両方**から呼ぶ。技欄を2ヶ所に出した以上、
+   拾う場所も2ヶ所ある——中身は1つにしておかないと必ず片方が腐る。
+   拾ったら true を返す（呼び出し側はそこで打ち切る）。
+
+   **リキャストには触らない。** 替えるたびに待ちが消えると、
+   3つの技を順番に着け替えるだけで連射できてしまう。 */
+function artSlotTap(e, redraw){
+  if(!e.target || !e.target.closest) return false;
+  // ✎（名前を変える）を先に見る。行のタップ（セット）に食われないように。
+  const rn=e.target.closest('[data-artren]');
+  if(rn){
+    if(!tapAccepted(e)) return true;
+    if(e.type==='touchend' && e.cancelable) e.preventDefault();
+    e.stopPropagation();
+    openArtRename(rn.dataset.artren);
+    return true;
+  }
+  const as=e.target.closest('.item[data-artslot]');
+  if(!as) return false;
+  if(!tapAccepted(e)) return true;
+  if(e.type==='touchend' && e.cancelable) e.preventDefault();
+  const slot=as.dataset.artslot, id=as.dataset.artpick;
+  if(slot==='ult' && id){ S.ult=id; log('大技を『'+ultDef(id).nm+'』にした'); }
+  else if(slot==='art' && id){
+    const wb=heroWeaponBase();
+    if(wb){ S.artPick=S.artPick||{}; S.artPick[wb]=id; log('武器技を『'+artName(artDef(id))+'』にした'); }
+  }
+  if(redraw) redraw();
+  return true;
+}
+/* 街のステータス画面でも技を付け替えられるようにする。 */
+bindRowTap(el('scr-char'), '.item[data-artslot],[data-artren]', (t,e)=>{
+  artSlotTap(e, ()=>renderKeepScroll('scr-char', renderChar));
+});
 function bagTap(e){
   if(S.screen!=='bag' && S.screen!=='stat') return;
   if(!e.target || !e.target.closest) return;
-  /* 技のセット。**リキャストには触らない**——替えるたびに待ちが消えると、
-     3つの技を順番に着け替えるだけで連射できてしまう。 */
-  const as=e.target.closest('.item[data-artslot]');
-  if(as){
-    if(!tapAccepted(e)) return;
-    if(e.type==='touchend' && e.cancelable) e.preventDefault();
-    const slot=as.dataset.artslot, id=as.dataset.artpick;
-    if(slot==='ult' && id){ S.ult=id; log('大技を『'+ultDef(id).nm+'』にした'); }
-    else if(slot==='art' && id){
-      const wb=heroWeaponBase();
-      if(wb){ S.artPick=S.artPick||{}; S.artPick[wb]=id; log('武器技を『'+artDef(id).nm+'』にした'); }
-    }
-    renderBag();
-    return;
-  }
+  if(artSlotTap(e, renderBag)) return;
   const ally=e.target.closest('.item[data-ally]');
   if(ally){
     if(!tapAccepted(e)) return;
@@ -16513,6 +16982,9 @@ bindTap(el('help-ok'), closeHelp);
 bindTap(el('bagbtn'), openBag);
 bindTap(el('bag-ok'), closeBag);
 bindTap(el('statbtn'), openStat);
+/* 地図の出し入れ。**押した瞬間に描き直さない**——次のフレームで
+   drawMinimap() が S.mapOn を見るので、ここで触るのは状態だけでいい。 */
+bindTap(el('mapbtn'), ()=>{ S.mapOn = !S.mapOn; });
 bindTap(el('stat-ok'), closeStat);
 /* 探索中、足元のHPバーだけでなく上のパーティ帯からもタップでステータスを見られる。
    一覧の行の作法（bindRowTap）に合わせ、描き直しても付け直さなくてよいようにする。 */
@@ -16538,11 +17010,14 @@ bindTap(el('ds-go'),    ()=>{ closeDepthSelect(); startRun(); });
 bindTap(el('ds-close'), closeDepthSelect);
 /* 街のサブ画面へ。「ステータス」は無くなった——広場の自分自身をタップする入口に替えた。 */
 bindTap(el('btn-go-shop'),  ()=>setScreen('shop'));
-bindTap(el('btn-go-stash'), ()=>setScreen('stash'));
+/* 建っていない施設は開かない。**入口で止める**のが肝で、画面を開いてから
+   「まだ使えません」を出すと、何のための画面なのかが伝わらない。 */
+const goGated=(key,scr)=>()=>{ if(!hubUnlocked(key)) return hubLockedNotice(key); setScreen(scr); };
+bindTap(el('btn-go-stash'), goGated('stash','stash'));
 bindTap(el('btn-go-upg'),   ()=>setScreen('upg'));
 bindTap(el('btn-go-bld'),   ()=>setScreen('bld'));
-bindTap(el('btn-go-mem'),   ()=>setScreen('mem'));
-bindTap(el('btn-go-tavern'),()=>setScreen('tavern'));
+bindTap(el('btn-go-mem'),   goGated('mem','mem'));
+bindTap(el('btn-go-tavern'),goGated('tavern','tavern'));
 bindTap(el('btn-go-gacha'), ()=>setScreen('gacha'));
 
 bindTap(el('btn-sellall'), ()=>{
@@ -16567,13 +17042,13 @@ bindTap(el('dbg-reset'), ()=>{
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
   S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
-  S.lastDepth=1; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
+  S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
   S.carry=[];S.gachaDay='';refreshGacha();
   /* 名前も消してタイトルへ戻す。「全消去」と言っておいて名前だけ残るのは、
      消えたのかどうかが分からない一番よくない形。 */
-  S.name=''; S.mastery={}; S.arts={}; S.artPick={};
+  S.name=''; S.mastery={}; S.arts={}; S.artPick={}; S.artName={};
   S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
   S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   S.moss={}; S.duranGiven=false;                  // 苔玉の記録も消す

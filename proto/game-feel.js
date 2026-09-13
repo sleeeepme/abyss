@@ -4,6 +4,8 @@ const ALLY_EFFECT_FX=window.AllyEffectStudy;
 const FEEL_ATTACK_SECONDS=.48;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
+  itemOutlinePeriod:1.8,itemOutlineMinAlpha:.25,
+  characterIdleSeconds:1.28,characterMoveThreshold:.16,
   bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
   motion:new WeakMap(),motes:[],ripples:[],hits:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
@@ -11,7 +13,8 @@ const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
 // Deterministic decoration noise is independent of combat / loot RNG.
 function feelHash(x,y,s=0){let n=Math.imul(x+17,374761393)^Math.imul(y+31,668265263)^Math.imul((S.run?.depth||1)+s,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;}
 function feelDecorAt(x,y,Z){return feelHash(x,y)<(Z.id==='root'?.30:Z.id==='stone'?.23:.16);}
-function feelMotion(e){let m=FEEL.motion.get(e);if(!m){m={speed:0,phase:0,flash:0,crit:0,step:0,recoil:0,recoilX:0,recoilY:0};FEEL.motion.set(e,m);}return m;}
+function feelMotion(e){let m=FEEL.motion.get(e);if(!m){m={speed:0,phase:0,flash:0,crit:0,step:0,recoil:0,recoilX:0,recoilY:0,
+  idlePhase:feelHash(Math.floor((e?.x||0)*17),Math.floor((e?.y||0)*17),11)*Math.PI*2};FEEL.motion.set(e,m);}return m;}
 function feelEntityOffset(e){
   if(FEEL_REDUCED.matches)return {x:0,y:0};
   const m=feelMotion(e),s=clamp(m.speed/FEEL_TUNING.normalMoveSpeed,0,1);
@@ -86,13 +89,31 @@ update=function(dt){
   FEEL.slow=Math.max(0,FEEL.slow-dt);if(!FEEL.slow)FEEL.slowScale=1;
   const sim=dt*scale,run=S.run;
   const actors=[P,...livingParty(),...(W.npc?[W.npc]:[])];
-  const before=actors.map(e=>[e,e.x,e.y]);
+  // 敵も仲間と同じ描画用の移動量を持つ。座標・AI・速度は変更しない。
+  const before=[...actors,...W.enemies].map(e=>[e,e.x,e.y]);
   for(const e of [...actors,...W.enemies]){const m=feelMotion(e);m.flash=Math.max(0,m.flash-sim);m.crit=Math.max(0,m.crit-sim);}
   updateSimulation(sim);
   if(S.run!==run||!S.hero)return;
   S.run.elapsed+=dt-sim; // Slow motion never grants extra expedition time.
   for(const [e,x,y] of before){
-    const m=feelMotion(e),dist=Math.hypot(e.x-x,e.y-y);
+    const m=feelMotion(e);
+    /* ---------- 有限でない座標のフレームは丸ごと捨てる ----------
+       m.phase は足し込み式なので、**1フレームでも NaN が混ざると二度と戻らない**
+       （NaN + 何か = NaN）。そして phase が NaN のまま動き出すと
+       feelCharacterSpritePose の配列添字が NaN になり、pose が undefined ——
+       drawFeelSpriteImage が pose.upperY で投げ、draw() ごと中断する。
+       毎フレーム同じ所で投げるので、そのキャラは**消えたまま戻らない**
+       （報告「敵と交戦中にキャラが見えなくなって戻らなくなる」の正体）。
+
+       NaN が入る口は1つではない（加入直後でまだ座標を持たない仲間、
+       長さ0のベクトルで割る吹き飛ばし等）ので、**入口を1つずつ塞ぐのではなく
+       ここで受け止める。** 有限でないフレームは「動いていない」として飛ばし、
+       万一 phase が壊れていたら 0 に戻して回復させる。 */
+    if(!Number.isFinite(m.phase)) m.phase=0;
+    const finite=Number.isFinite(e.x)&&Number.isFinite(e.y)
+              &&Number.isFinite(x)&&Number.isFinite(y);
+    const dist=finite?Math.hypot(e.x-x,e.y-y):NaN;
+    if(!Number.isFinite(dist)){ m.speed=0; continue; }
     m.speed=sim>0&&dist<1?dist/sim:0;m.phase+=dist*4.5;
     if(dist>.001&&dist<1&&!e.dead&&!e.fallAnim){
       m.step+=dist;
@@ -307,6 +328,82 @@ function feelHeroOffset(){
   const m=feelEntityOffset(P);
   return {x:m.x+Math.sin(FEEL.time*96)*k*2-P.dirx*P.swing*7,
           y:m.y+Math.cos(FEEL.time*86)*k-P.diry*P.swing*7};
+}
+
+/* 全キャラクター共通の16pxグリッド分割アニメーション。
+   腰は固定し、待機では上半身、移動では左右の脚だけを1px動かす。実座標や当たり判定は一切触らない。 */
+/* 足踏みのコマ番号。**必ず 0〜3 に落とす。**
+   phase が NaN や Infinity だと ((floor(x)%4)+4)%4 も NaN になり、
+   配列添字が NaN → pose が undefined → 呼び出し側が投げる。
+   上流（updateFeel）でも phase を守っているが、添字を作る側でも締めておく——
+   ここが素通しだと、新しい経路が1つ増えるたびに同じ事故が戻ってくる。 */
+function feelWalkPhase(m){
+  const v=Math.floor((m&&m.phase||0)/(Math.PI/2));
+  return Number.isFinite(v) ? ((v%4)+4)%4 : 0;
+}
+function feelCharacterSpritePose(ent,blob=false){
+  if(FEEL_REDUCED.matches) return {bodyY:0,upperY:0,leftLegY:0,rightLegY:0,moving:false};
+  const m=feelMotion(ent),moving=m.speed>FEEL_TUNING.characterMoveThreshold;
+  if(blob){
+    const phase=feelWalkPhase(m);
+    if(moving) return [{bodyY:1},{bodyY:0},{bodyY:-1},{bodyY:0}][phase];
+    return {bodyY:Math.sin(FEEL.time*Math.PI*2/FEEL_TUNING.characterIdleSeconds+m.idlePhase)>.55?-1:1};
+  }
+  if(moving){
+    // ドラクエ式の足踏み: 腰幅を変えず、左右の脚だけを1pxずつ上下させる。
+    const phase=feelWalkPhase(m);
+    return [{upperY:1,leftLegY:0,rightLegY:0},
+      {upperY:0,leftLegY:-1,rightLegY:1},
+      {upperY:1,leftLegY:0,rightLegY:0},
+      {upperY:0,leftLegY:1,rightLegY:-1}][phase];
+  }
+  const breath=Math.sin(FEEL.time*Math.PI*2/FEEL_TUNING.characterIdleSeconds+m.idlePhase)>.55;
+  return {upperY:breath?-1:1,leftLegY:0,rightLegY:0,moving:false};
+}
+function drawFeelSpriteImage(im,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0,blob=false){
+  if(!im) return false;
+  if(Math.abs(dx||0)>Math.abs(dy||0)+.02) ent._artFace=dx<0?-1:1;
+  const face=ent._artFace||1,n=Math.max(2,Math.round(size));
+  // Death, falling and reduced-motion stay on the uncut source frame.
+  if(ent?.dead||ent?.fallAnim||FEEL_REDUCED.matches){
+    ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha*=alpha;
+    ctx.translate(Math.round(x),Math.round(y));if(rot)ctx.rotate(rot);ctx.scale(face*scale,scale);
+    ctx.drawImage(im,-Math.round(n/2),-Math.round(n/2),n,n);
+    ctx.restore();
+    return true;
+  }
+  const pose=feelCharacterSpritePose(ent,blob);
+  const sw=im.naturalWidth,sh=im.naturalHeight,unitY=sh/16,hipY=9*unitY,legY=11*unitY;
+  const coreL=Math.round(sw*4/16),coreM=Math.round(sw*8/16),coreR=Math.round(sw*12/16);
+  // Movement remains on the sprite's logical grid even when the viewport resizes.
+  const pixel=Math.max(1,Math.round(n/16)),ox=-Math.round(n/2),oy=-Math.round(n/2);
+  const hipH=Math.round((legY-hipY)/sh*n),upperH=Math.round((hipY+unitY)/sh*n),legH=Math.round((sh-legY)/sh*n);
+  const hipTop=oy+Math.round(hipY/sh*n),legTop=oy+Math.round(legY/sh*n);
+  const x4=ox+Math.round(n*4/16),x8=ox+Math.round(n*8/16),x12=ox+Math.round(n*12/16),x16=ox+n;
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha*=alpha;
+  ctx.translate(Math.round(x),Math.round(y));if(rot)ctx.rotate(rot);ctx.scale(face*scale,scale);
+  if(blob){
+    ctx.drawImage(im,0,0,sw,sh,ox,oy+(pose.bodyY||0)*pixel,n,n);
+    ctx.restore();
+    return true;
+  }
+  /* 外側4ドットは杖・剣・弓・腕の固定レイヤー。
+     足を動かすために下半分を丸ごと切ると縦長の武器まで裂けるため、
+     中央の左右4ドットだけを脚として動かす。 */
+  const upperTop=oy+pose.upperY*pixel;
+  ctx.drawImage(im,0,0,coreL,sh,ox,upperTop,x4-ox,n);
+  ctx.drawImage(im,coreR,0,sw-coreR,sh,x12,upperTop,x16-x12,n);
+  ctx.drawImage(im,coreL,0,coreR-coreL,hipY+unitY,x4,upperTop,x12-x4,upperH);
+  // The fixed belt overlaps the torso by one row, so the idle inhale never opens a seam.
+  ctx.drawImage(im,coreL,hipY,coreR-coreL,legY-hipY,x4,hipTop,x12-x4,hipH);
+  ctx.drawImage(im,coreL,legY,coreM-coreL,sh-legY,x4,legTop+pose.leftLegY*pixel,x8-x4,legH);
+  ctx.drawImage(im,coreM,legY,coreR-coreM,sh-legY,x8,legTop+pose.rightLegY*pixel,x12-x8,legH);
+  ctx.restore();
+  return true;
+}
+function drawFeelCharacterSprite(id,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0){
+  const im=CharacterArt.image(id);
+  return drawFeelSpriteImage(im,x,y,size,ent,dx,dy,alpha,scale,rot,false);
 }
 
 // Short tap = dash. A drag keeps the existing movement stick; HUD taps stay UI taps.
@@ -543,3 +640,13 @@ drawSwing=drawFeelSwing;
 drawShot=function(f,camX,camY,isAlly){
   drawFeelWeaponShot(f,camX,camY);
 };
+
+// Shared pixel art; screen-space integer pixels stay crisp during camera movement.
+function drawFeelItemIcon(it,x,y){
+  // The black base stays visible while a separate 1 px color edge fades above it.
+  const outline=it&&!it.consum&&it.rar>0 ? RARCOL[it.rar] : undefined;
+  const period=FEEL_TUNING.itemOutlinePeriod,min=FEEL_TUNING.itemOutlineMinAlpha;
+  const alpha=FEEL_REDUCED.matches||period<=0 ? 1
+    : min+(1-min)*(.5+.5*Math.cos(performance.now()/1000/period*Math.PI*2));
+  ITEM_ART.draw(ctx,it,x,y,TS*.8,outline,alpha);
+}

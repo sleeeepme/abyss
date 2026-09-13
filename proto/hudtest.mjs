@@ -33,40 +33,78 @@ await pg.evaluate(()=>{
   };
 });
 
-/* ================= 1. ミニマップ ================= */
+/* ================= 1. 地図 =================
+   右下の常設ミニマップは廃止した。既定では出さず、右上の 🗺 で出し入れし、
+   出したときは画面の中央に大きく出す。
+   （技ボタンが3つに増えて一番上の武器技と地図が重なっていたのが発端） */
 
-/* 1-a. 右下に出る。上の帯には敵の情報・侵入者の警告・パーティ・ログが
-       集まっていて、**一番よく見る地図が一番混んでいる場所**にあった。 */
-R.miniBottomRight = await pg.evaluate(()=>{
+/* 1-a. 既定では出ない。押すと出て、もう一度押すと消える。 */
+R.mapToggle = await pg.evaluate(()=>{
   TH.busyFloor();
-  const f=W.fl, s=Math.min(110/f.W, 110/f.H);
-  const mw=f.W*s, mh=f.H*s;
-  const ox=innerWidth-mw-14, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
-  return {ox:Math.round(ox), oy:Math.round(oy), h:innerHeight,
-          right: ox > innerWidth*0.5,
-          bottomHalf: oy > innerHeight*0.5,
-          aboveUltButton: oy+mh <= innerHeight-96,
-          ok: ox>innerWidth*0.5 && oy>innerHeight*0.5 && oy+mh<=innerHeight-96};
+  const def = !!S.mapOn;
+  el('mapbtn').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const afterOn = !!S.mapOn;
+  updateHUD();
+  const lit = el('mapbtn').classList.contains('on');
+  el('mapbtn').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const afterOff = !!S.mapOn;
+  /* 真偽値はすべて「true＝期待どおり」に揃える（掃引はそれを前提に false を拾う）。
+     「既定では出ない」は hiddenByDefault:true と書く。 */
+  return {hiddenByDefault: def===false, shownAfterTap: afterOn===true,
+          hiddenAfterSecondTap: afterOff===false, lit,
+          ok: def===false && afterOn===true && afterOff===false && lit};
 });
 
-/* 1-b. パーティ表示や敵の情報パネルと重ならない（上の帯から離れた）。
-   ログだけは画面下中央の固定表示なので、同じ判定はできない
-   （下の帯にいること自体は正しい）。ミニマップの実際の矩形と
-   交差していないかで見る。 */
-R.miniClear = await pg.evaluate(()=>{
-  const f=W.fl, s=Math.min(110/f.W, 110/f.H);
-  const mw=f.W*s, mh=f.H*s;
-  const ox=innerWidth-mw-14, oy=Math.max(60, innerHeight-mh-MM_BOTTOM);
-  const base=el('hud').getBoundingClientRect().top;
-  const clash=['partybar','targetinfo'].filter(id=>{
-    const n=el(id); if(!n || n.style.display==='none') return false;
-    const r=n.getBoundingClientRect();
-    return r.height>0 && r.bottom-base > oy;
-  });
-  const lg=el('log').getBoundingClientRect();
-  const logClash = lg.height>0 && lg.left<ox+mw && ox<lg.right && lg.top<oy+mh && oy<lg.bottom;
-  if(logClash) clash.push('log');
-  return {clash, minimapTop:Math.round(oy), ok: clash.length===0};
+/* 1-b. ボタンはステータス（🧍）の下。右上は「開く物」の列なので、そこに並べる。 */
+R.mapButtonUnderStat = await pg.evaluate(()=>{
+  const st=el('statbtn').getBoundingClientRect();
+  const mp=el('mapbtn').getBoundingClientRect();
+  return {statBottom:Math.round(st.bottom), mapTop:Math.round(mp.top),
+          below: mp.top >= st.bottom,
+          sameColumn: Math.abs(mp.right-st.right) < 2,
+          ok: mp.top>=st.bottom && Math.abs(mp.right-st.right)<2};
+});
+
+/* 1-c. 出した地図は横が画面中央で、**技ボタンの列に掛からない。**
+   重なっていたのが発端なので、ここは数字で押さえておく。
+   #artbtn の上端（CSS: bottom 228px ＋ 高さ 62px）と対になっている数字。 */
+R.mapCenteredAndClear = await pg.evaluate(()=>{
+  TH.busyFloor();
+  S.mapOn=true;
+  const box=mapBox();
+  const cx=box.ox+box.mw/2;
+  const artTop = innerHeight - (228+62);
+  const big = box.mw >= Math.min(innerWidth,innerHeight)*0.3;
+  S.mapOn=false;
+  return {w:Math.round(box.mw), h:Math.round(box.mh),
+          ox:Math.round(box.ox), oy:Math.round(box.oy),
+          centeredX: Math.abs(cx - innerWidth/2) < 2,
+          clearOfArtButton: box.oy+box.mh <= artTop,
+          big,
+          ok: Math.abs(cx-innerWidth/2)<2 && box.oy+box.mh<=artTop && big};
+});
+
+/* 1-d. 消しているあいだは1本も引かない（＝盤面を食わない）。 */
+R.mapNotDrawnWhenOff = await pg.evaluate(()=>{
+  TH.busyFloor();
+  const orig=ctx.fillRect.bind(ctx);
+  let n=0;
+  ctx.fillRect=(...a)=>{ n++; return orig(...a); };
+  S.mapOn=false; n=0; drawMinimap(); const off=n;
+  S.mapOn=true;  n=0; drawMinimap(); const on=n;
+  ctx.fillRect=orig;
+  S.mapOn=false;
+  return {off, on, ok: off===0 && on>10};
+});
+
+/* 1-e. 左肩のパーティ帯は廃止。同じ情報（誰が削れているか）は
+   盤面の足元のHPバーに出ているので、画面の端に二重に置かない。 */
+R.partybarGone = await pg.evaluate(()=>{
+  TH.busyFloor();
+  updateHUD();
+  const pb=el('partybar');
+  return {display: pb.style.display, mates: livingParty().length,
+          ok: pb.style.display==='none' && livingParty().length>0};
 });
 
 /* ================= 2. 畳んだ物 ================= */
@@ -159,9 +197,9 @@ R.logClear = await pg.evaluate(()=>{
   const hit = (a,c) => !!a && !!c && a.width>0 && c.width>0 &&
     a.left<c.right && c.left<a.right && a.top<c.bottom && c.top<a.bottom;
   const lg=rect('log');
-  const clash=['partybar','targetinfo','intruder'].filter(id=>hit(lg,rect(id)));
+  // パーティ帯は廃止したので、残る相手は敵の情報パネルと侵入者の警告だけ
+  const clash=['targetinfo','intruder'].filter(id=>hit(lg,rect(id)));
   return {top:Math.round(lg.top), lines:logs.length, clash,
-          belowParty: lg.top > rect('partybar').bottom,
           ok: clash.length===0 && logs.length===3};
 });
 
@@ -186,11 +224,9 @@ R.logFollowsParty = await pg.evaluate(()=>{
   TH.clearEnemies(); P.target=null;
   log('位置確認用'); stepSim(0.1);
   const withTwo=el('log').getBoundingClientRect().top;
-  const pb=el('partybar').getBoundingClientRect();
   return {alone:Math.round(alone), withTwo:Math.round(withTwo),
-          partyBottom:Math.round(pb.bottom),
-          fixedRegardlessOfParty: withTwo===alone, belowParty: withTwo>=pb.bottom,
-          ok: withTwo===alone && withTwo>=pb.bottom};
+          fixedRegardlessOfParty: withTwo===alone,
+          ok: withTwo===alone};
 });
 
 /* 4-c. ログは数秒で自分から消える。
@@ -275,29 +311,31 @@ R.logBelowLeftColumn = await pg.evaluate(()=>{
 
 /* ================= 6. 探索中に仲間をタップしてステータスを見る ================= */
 
-/* 6-a. パーティ帯の名前をタップすると、その仲間の装備・ステータス画面が開く。
+/* 6-a. 盤面の仲間を直接タップすると、その仲間の装備・ステータス画面が開く。
+   左肩のパーティ帯を畳んだので、**ここが唯一の入口**になった。
    閉じれば探索へ戻り、HUD も出直す（他のモーダルと同じ作法）。 */
-R.partybarOpensAllyStats = await pg.evaluate(()=>{
+R.fieldTapOpensAllyStats = await pg.evaluate(()=>{
   TH.busyFloor();
   const a=livingParty()[0];
-  document.querySelector(`#partybar [data-ally="${a.uidA}"]`)
-    .dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  // 仲間の画面上の位置（主人公は常に画面中央）
+  const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
+  const hit=tapHitsAlly(a.x*TS-camX, a.y*TS-camY);
+  if(hit) openAllyEquip(hit,'game');
   const opened = S.screen==='allyeq';
   const showsRightAlly = el('ae-name').textContent===a.name;
   closeAllyEquip();
   const back=S.screen;
   const hudOn = el('hud').classList.contains('on');
-  return {opened, showsRightAlly, back, hudOn,
-          ok: opened && showsRightAlly && back==='game' && hudOn};
+  return {found: !!hit, opened, showsRightAlly, back, hudOn,
+          ok: !!hit && opened && showsRightAlly && back==='game' && hudOn};
 });
 
 /* 6-b. 閉じたあとに時間が飛ばない。モーダルを見ていた間ぶんの dt を
    まとめて食わせると、戻った瞬間だけ仲間や敵が大きく進んでしまう。 */
-R.partybarCloseDoesNotJumpTime = await pg.evaluate(()=>{
+R.allyCloseDoesNotJumpTime = await pg.evaluate(()=>{
   TH.busyFloor();
   const a=livingParty()[0];
-  document.querySelector(`#partybar [data-ally="${a.uidA}"]`)
-    .dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  openAllyEquip(a,'game');
   const before=last;
   // モーダルを開いたまま少し待ってから閉じる想定（実時間が経っている状況を作る）
   last = performance.now() - 5000;
@@ -306,13 +344,13 @@ R.partybarCloseDoesNotJumpTime = await pg.evaluate(()=>{
   return {jumpAvoided, ok: jumpAvoided};
 });
 
-/* 6-c. パーティ帯の上から始めた指は、移動スティックとしては拾わない。
-   拾ってしまうと、仲間をタップしたつもりが歩き出す事故になる。 */
-R.partybarDoesNotStartStick = await pg.evaluate(()=>{
+/* 6-c. 地図ボタン（🗺）の上から始めた指は、移動スティックとしては拾わない。
+   拾ってしまうと、地図を出したつもりが歩き出す事故になる。
+   （パーティ帯を畳んだので、同じ検証の相手をこちらへ移した） */
+R.mapbtnDoesNotStartStick = await pg.evaluate(()=>{
   TH.busyFloor();
   stickId=null; stickDx=0; stickDy=0;
-  const a=livingParty()[0];
-  const node=document.querySelector(`#partybar [data-ally="${a.uidA}"]`);
+  const node=el('mapbtn');
   const rect=node.getBoundingClientRect();
   touchStart({changedTouches:[{target:node, identifier:1,
     clientX:rect.left+rect.width/2, clientY:rect.top+rect.height/2}]});

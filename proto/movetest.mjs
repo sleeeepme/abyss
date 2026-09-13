@@ -382,5 +382,145 @@ R.stairBoss = await pg.evaluate(()=>{
   return {bossAlive:S.run.bossAlive, failures:fails, ok:fails.length===0};
 });
 
+/* ================= 5. 縁（穴）と瞬歩 ================= */
+
+/* 5-a. 仲間は縁を踏まない。
+   以前は主人公と同じ「落ちられる側」にしてあったので、主人公が縁の向こうに
+   いると**縁へ真っ直ぐ歩き続ける**——落ちて戻され、また同じ方向へ歩き、また落ちる。
+   報告どおり永久に落ち続ける形になっていた。操作していない者に
+   「落ちる判断」は取れないので、そもそも踏ませない。 */
+R.allyAvoidsPit = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(21);
+  // 根の層（縁のある階）を探す
+  let found=false;
+  for(const d of [21,22,23,24,25]){ enterFloor(d); if(W.fl.pit){ found=true; break; } }
+  if(!found) return {skipped:true, pitIsBlocked:true, neverFell:true, ok:true};
+  W.enemies.length=0;
+  const a=TH.ally(21,'warrior',20); a.slot=0; S.hero.party=[a];
+
+  /* 縁のマスと、その縁に**隣接した立てる床**を探す。
+     置き場所を目分量で決めると、仲間の初期位置がそのまま縁の中になって
+     「避けていない」ではなく「最初から落ちている」を測ってしまう
+     （実際それで一度落ちた）。立てることを確かめてから置く。 */
+  let pit=null, near=null;
+  const D=[[1,0],[-1,0],[0,1],[0,-1]];
+  outer:
+  for(let y=1;y<W.fl.H-1;y++) for(let x=1;x<W.fl.W-1;x++){
+    if(W.fl.g[y][x]!==T.PIT) continue;
+    for(const [dx,dy] of D){
+      const nx=x+dx+0.5, ny=y+dy+0.5;
+      if(standable(nx,ny)){ pit={x:x+0.5,y:y+0.5}; near={x:nx,y:ny}; break outer; }
+    }
+  }
+  if(!pit) return {skipped:true, pitIsBlocked:true, neverFell:true, ok:true};
+
+  a.x=near.x; a.y=near.y;
+  P.x=pit.x; P.y=pit.y;             // 主人公は縁の上（＝仲間から見て縁の向こう）
+  let fell=0;
+  stepSim(4, {after:()=>{ if(a.fallAnim) fell++; }});
+  const blocked = blockedFor(a, pit.x, pit.y);
+  return {fellFrames:fell, startedOnFloor: standable(near.x,near.y),
+          pitIsBlocked: blocked===true,
+          neverFell: fell===0,
+          ok: blocked===true && fell===0};
+});
+
+/* 5-b. 瞬歩で壁にめり込まない。
+   行き先を 0.25 刻みで**中心点だけ** solid() で見ていたので、
+   中心が壁の手前 0.24 マスでも体（半径 0.32）は壁の中で、
+   斜めに突っ込むと壁の角をすり抜けて閉じた側へ入り込めた（報告）。
+   dashStop は半径ぶん外側と左右も見る。
+
+   測り方: **始点が既に壁ぎわの場合は数えない。**
+   壁に背を向けて立っているだけで「めり込んでいる」と読めてしまい、
+   止まった先の良し悪しが見えなくなる。 */
+R.dashKeepsBodyOutOfWall = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  W.enemies.length=0;
+  const r=P.r;
+  /* 判定は**進む向きに沿って**取る。真上・真下が壁でも、壁に背を向けて
+     立っているだけなら不正ではない（moveEnt も同じ扱い）。
+     まずいのは「体の前側が壁の中」と「中心が壁の中」の2つ。 */
+  const buried=(x,y,ang)=>{
+    const c=Math.cos(ang), sn=Math.sin(ang);
+    return solid(x,y) || solid(x+c*r, y+sn*r)
+        || solid(x-sn*r, y+c*r) || solid(x+sn*r, y-c*r);
+  };
+  // 昔の決め方（中心点だけを 0.25 刻みで見る）。比較用に再現する
+  const oldStop=(x0,y0,ang,dist)=>{
+    let gx=x0, gy=y0;
+    for(let d=0; d<dist; d+=0.25){
+      const nx=gx+Math.cos(ang)*0.25, ny=gy+Math.sin(ang)*0.25;
+      if(solid(nx,ny)) break;
+      gx=nx; gy=ny;
+    }
+    return {x:gx, y:gy};
+  };
+  const spots=[];
+  for(let y=1;y<W.fl.H-1 && spots.length<40;y++) for(let x=1;x<W.fl.W-1;x++){
+    if(tileWalk(W.fl,x,y) && !buried(x+0.5,y+0.5,0)){ spots.push({x:x+0.5,y:y+0.5}); break; }
+  }
+  let tried=0, oldBad=0; const bad=[];
+  for(const p of spots){
+    for(let i=0;i<24;i++){
+      const ang=i/24*Math.PI*2;
+      // 始点が既に壁ぎわの向きは数えない（止まった先の良し悪しが見えなくなる）
+      if(buried(p.x,p.y,ang)) continue;
+      tried++;
+      const nw=dashStop(p.x, p.y, ang, 6, r);
+      if(buried(nw.x, nw.y, ang)) bad.push({x:+nw.x.toFixed(2), y:+nw.y.toFixed(2), ang:i});
+      const od=oldStop(p.x, p.y, ang, 6);
+      if(buried(od.x, od.y, ang)) oldBad++;
+    }
+  }
+  return {tried, buried:bad.length, oldBuried:oldBad, sample:bad.slice(0,3),
+          measured: tried>100,
+          clean: bad.length===0,
+          // 昔の決め方ならめり込む＝この検証が報告された不具合を実際に捕まえる
+          catchesOldBug: oldBad>0,
+          ok: tried>100 && bad.length===0 && oldBad>0};
+});
+
+/* 5-c. 落下演出は、縁の無い階へ移っても必ず終わる。
+   落ちている最中に階段を降りると、次の階に縁が無いかぎり誰も a.fallAnim を
+   進めてくれず、その仲間は**縮んだまま（描画倍率 0.04）動かない**——
+   tickAlly が a.fallAnim を見て即 return するので、攻撃も移動もしない。
+   画面の上では「交戦中に消えて戻らない」に見える（報告）。
+
+   入口（落ちる）は縁のある階だけでよいが、出口（演出を終える）はどの階でも要る。 */
+R.fallAnimNeverSticks = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(21);
+  // 縁のある階を探して、そこで落下演出を始める
+  let found=false;
+  for(const d of [21,22,23,24,25]){ enterFloor(d); if(W.fl.pit){ found=true; break; } }
+  if(!found) return {skipped:true, allyRecovers:true, heroRecovers:true, allyMoves:true, ok:true};
+  W.enemies.length=0;
+  const a=TH.ally(21,'warrior',20); a.slot=0; S.hero.party=[a];
+  a.x=P.x+1; a.y=P.y;
+  a.fallAnim={t:0, dur:FALL_ANIM_SEC};
+  P.fallAnim={t:0, dur:FALL_ANIM_SEC};
+
+  // 縁の無い階へ移る（第3階層は穴もハザードも出ない）
+  enterFloor(3);
+  const clearedOnEnter = !a.fallAnim && !P.fallAnim;
+  // 万一残っていても、数フレームで終わること
+  a.fallAnim={t:0, dur:FALL_ANIM_SEC};
+  P.fallAnim={t:0, dur:FALL_ANIM_SEC};
+  stepSim(FALL_ANIM_SEC+0.4);
+  const allyDone = !a.fallAnim, heroDone = !P.fallAnim;
+
+  // 終わったあと、仲間がちゃんと動き出すこと（止まったままにならない）
+  W.enemies.length=0;
+  P.x+=4;                                  // 主人公が離れれば追ってくるはず
+  const bx=a.x, by=a.y;
+  stepSim(1.2);
+  const moved=Math.hypot(a.x-bx, a.y-by);
+  return {clearedOnEnter, allyDone, heroDone, moved:+moved.toFixed(2),
+          clearedOnFloorChange: clearedOnEnter,
+          allyRecovers: allyDone, heroRecovers: heroDone,
+          allyMoves: moved>0.3,
+          ok: clearedOnEnter && allyDone && heroDone && moved>0.3};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

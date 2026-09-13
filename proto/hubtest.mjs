@@ -10,6 +10,10 @@ await pg.waitForTimeout(350);
 /* タイトル画面を1枚跨いでから拠点に入るようになった。
    このスイートが見たいのは拠点から先なので、ここで済ませておく。 */
 await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); } });
+/* 慰霊碑・鍛冶屋・倉庫・酒場は街開発で建ててから使う形になった。
+   このスイートが見たいのは「ハブから各画面へ行き来できるか」なので、
+   施設は建った状態にそろえておく（建てる前の挙動は towntest が見る）。 */
+await pg.evaluate(()=>{ S.bld=Object.assign({}, S.bld, {forge:1, stash:1, tavern:1, altar:1}); });
 const R={};
 const tap=async(sel)=>{ const l=pg.locator(sel).first();
   await l.scrollIntoViewIfNeeded({timeout:3000}); await l.tap({timeout:3000}); await pg.waitForTimeout(220); };

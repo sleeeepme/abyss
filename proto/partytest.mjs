@@ -465,8 +465,10 @@ R.live = await pg.evaluate(async ()=>{
           kills:S.run?S.run.kills:-1,
           heroAlive:!!S.hero,
           killedSomething: !!S.run && S.run.kills>0,
-          hudRendered: document.getElementById('partybar').style.display==='flex'
-                       || party().every(a=>a.dead)};
+          /* 以前は左肩のパーティ帯が出ていることで「HUDが回った」を見ていたが、
+             帯そのものを廃止した。代わりに**技ボタンの列が生きているか**で見る
+             （updateHUD が毎フレーム触っている要素のひとつ）。 */
+          hudRendered: el('hud').classList.contains('on')};
 });
 
 await b.close();

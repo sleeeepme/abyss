@@ -227,7 +227,10 @@ R.overflowDropsWeakest = await pg.evaluate(()=>{
 
 // 5-a. 街から開ける。中身が出る。タップで雇える
 R.screenWorks = await pg.evaluate(()=>{
-  S.run=null; S.tavern=[]; S.hero=newHero(); S.hero.party=[]; S.bld={};
+  /* 酒場は街開発で建ててから開く形になった。ここで見たいのは
+     「開いた先で雇えるか」なので、建っている前提にそろえる
+     （建てる前は入口で止まる——それは towntest が見る）。 */
+  S.run=null; S.tavern=[]; S.hero=newHero(); S.hero.party=[]; S.bld={tavern:1};
   const a=makeAlly(8,S.hero); a.lv=8; tavernPut(a);
   S.gold=hireCost(a)+10;
   setScreen('town');
@@ -334,7 +337,11 @@ R.returnMarks = await pg.evaluate(()=>{
   const parked=tavernStock().find(x=>x.uidA===a.uidA);
   S.bld={};
   const half=parked ? hireCost(parked) : 0;
-  const asIfNew=parked ? Math.round((20+parked.lv*6)) : 0;
+  /* 定価は hireCost の式そのものから作る。
+     以前ここに「20+Lv×6」を書き写していたので、値段を変えた瞬間に
+     **半額のほうが定価より高い**という判定になって落ちた。
+     写経はしない——同じ関数に returned を外した器を通して比べる。 */
+  const asIfNew=parked ? hireCost(Object.assign({}, parked, {returned:false})) : 0;
   return {marked: !!still && still.returned===true,
           parkedKeepsMark: !!parked && parked.returned===true,
           half, asIfNew,
