@@ -417,4 +417,72 @@ R.scrollIsNotATap = await pg.evaluate(async ()=>{
           ok: scrollable && !hiredByScroll && keptPosition && tapStillHires};
 });
 
+/* ---------- 画面の高さは「見えている高さ」 ----------
+   報告「まだ酒場画面でスクロールできない」。
+
+   position:fixed + top/bottom:0 の高さは iOS では **URLバーを隠した状態**の
+   高さになる。画面の下端は枠の裏に潜り、そこに入った行は指が届かない。
+   しかも器は「中身は収まっている」と思っているのでスクロール自体が起きない。
+   見えている高さ（visualViewport / innerHeight）を測って器に渡してある。 */
+R.screenMatchesVisibleHeight = await pg.evaluate(async ()=>{
+  setScreen('tavern');
+  await new Promise(r=>setTimeout(r,100));
+  const sc=document.getElementById('scr-tavern');
+  const vv=window.visualViewport;
+  const visible=Math.round((vv&&vv.height)||innerHeight);
+  const varSet=getComputedStyle(document.documentElement).getPropertyValue('--vvh').trim();
+  const boxH=Math.round(sc.getBoundingClientRect().height);
+  return {visible, varSet, boxH,
+          heightVarIsSet: varSet!=='',
+          matchesVisible: Math.abs(boxH-visible)<=1,
+          ok: varSet!=='' && Math.abs(boxH-visible)<=1};
+});
+
+/* URLバーの出入り（見えている高さの変化）に追随すること。
+   追随しないと、縮んだ瞬間に下端が枠の裏へ入って届かなくなる。 */
+R.screenFollowsViewportChange = await pg.evaluate(async ()=>{
+  const sc=document.getElementById('scr-tavern');
+  const before=Math.round(sc.getBoundingClientRect().height);
+  // URLバーが出て可視領域が縮んだ状態を作る
+  const root=document.documentElement;
+  root.style.setProperty('--vvh', (before-120)+'px');
+  await new Promise(r=>setTimeout(r,50));
+  const shrunk=Math.round(sc.getBoundingClientRect().height);
+  // 測り直せば戻る
+  syncViewportHeight();
+  await new Promise(r=>setTimeout(r,50));
+  const restored=Math.round(sc.getBoundingClientRect().height);
+  return {before, shrunk, restored,
+          shrinksWithViewport: shrunk===before-120,
+          restoresOnRemeasure: Math.abs(restored-before)<=1,
+          ok: shrunk===before-120 && Math.abs(restored-before)<=1};
+});
+
+/* 可視領域が縮んだぶん、中身は「溢れる」＝指で引いて届くようになること。
+   これが起きないのが報告の症状（下の行が枠の裏で止まったまま）。 */
+R.shrunkViewportMakesListScrollable = await pg.evaluate(async ()=>{
+  S.bld={forge:1,stash:1,tavern:1,altar:1};
+  S.gold=999999; S.hero.party=[];
+  S.tavernPool=[];
+  for(let i=0;i<5;i++){ const a=makeAlly(3,S.hero); a.boons=[];
+    a.artVariant=pickAllyVariant(a.job); S.tavernPool.push(a); }
+  setScreen('tavern');
+  await new Promise(r=>setTimeout(r,120));
+  const sc=document.getElementById('scr-tavern');
+  const root=document.documentElement;
+  const full=Math.round(sc.getBoundingClientRect().height);
+  // 可視領域が 160px 狭い端末を再現する
+  root.style.setProperty('--vvh', (full-160)+'px');
+  await new Promise(r=>setTimeout(r,60));
+  const canScroll = sc.scrollHeight > sc.clientHeight+1;
+  sc.scrollTop = 99999;
+  const reachedBottom = sc.scrollTop > 0;
+  syncViewportHeight();
+  sc.scrollTop=0;
+  return {contentH:sc.scrollHeight, boxH:sc.clientHeight,
+          overflowsWhenShrunk: canScroll,
+          bottomReachable: reachedBottom,
+          ok: canScroll && reachedBottom};
+});
+
 await done(b, errs, R);

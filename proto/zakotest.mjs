@@ -370,4 +370,38 @@ R.live = await pg.evaluate(()=>{
           ok: failures.length===0 && !!S.hero && !!S.run};
 });
 
+/* ---------- 黄の精鋭は「足を止めて戦う相手」 ----------
+   4.0/1.7/1.4 では、同じ階の規格外（紫 7.5/2.0）と並べたとき手応えの差が付かず、
+   金の輪が「少し硬いだけ」の印でしかなかった。重くしたぶん、
+   倒す価値（経験値）も上げてある——重いだけだと避けて通るのが最適解になる。 */
+R.eliteIsWorthStopping = await pg.evaluate(()=>{
+  const m=eliteMul();
+  const u=uniqMul(20);
+  return {mul:m, uniq:u,
+          hpMul:m.hp, atkMul:m.atk, defMul:m.def,
+          hpRaised: m.hp>4.0, atkRaised: m.atk>1.7, defRaised: m.def>1.4,
+          stillUnderUnique: m.hp<u.hp,      // 紫より上には置かない（序列は保つ）
+          ok: m.hp>4.0 && m.atk>1.7 && m.def>1.4 && m.hp<u.hp};
+});
+
+/* 重くしたぶん、倒したときの経験値も上がっていること。 */
+R.eliteXpFollowsTheDifficulty = await pg.evaluate(()=>{
+  // 大ボス階（10の倍数）は雑魚が出ないので、通常階で測る
+  S.hero=newHero(); S.upg={}; S.deepest=30; startRun(18); enterFloor(18);
+  const one=(elite)=>{
+    const e=W.enemies.find(x=>!x.dead && !x.boss && !x.uniq);
+    if(!e) return 0;
+    e.elite=elite; e.hp=1;
+    const before=totalXpOf(S.hero);
+    killEnemy(e);
+    return totalXpOf(S.hero)-before;
+  };
+  const plainXp=one(false);
+  const eliteXp=one(true);
+  const ratio=plainXp>0 ? +(eliteXp/plainXp).toFixed(2) : 0;
+  return {plainXp, eliteXp, ratio,
+          eliteWorthMore: ratio>=3.0,
+          ok: ratio>=3.0};
+});
+
 await done(b, errs, R);

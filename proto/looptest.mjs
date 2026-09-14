@@ -473,5 +473,56 @@ R.drawAll = await pg.evaluate(()=>{
   return {kinds:EVENTS.length, failures:fails, ok:fails.length===0};
 });
 
+/* ---------- アビスの口が呼ぶ ----------
+   決まった回数（3・10・20・40）だけ死んだ代は、街へ帰さず
+   第51階層から始める。勝てる相手ではないが、「いつか行く場所」を
+   数字ではなく一度見せておくと、以後の1階ぶんの意味が変わる。 */
+R.abyssCallOnMilestoneDeaths = await pg.evaluate(()=>{
+  const hit=[];
+  const kill=()=>{
+    S.hero=newHero(); S.upg={}; S.deepest=6;
+    startRun(3); enterFloor(3);
+    S.hero.hpNow=0; die();
+    document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+    return !!S.abyssCall;
+  };
+  S.deaths=0; S.abyssCall=false; S.greatDown={};
+  for(let i=1;i<=42;i++){ if(kill()) hit.push(i); S.abyssCall=false; }
+  return {calledAt:hit, expected:ABYSS_CALL_AT.slice(),
+          matchesRequest: JSON.stringify(hit)===JSON.stringify([3,10,20,40]),
+          ok: JSON.stringify(hit)===JSON.stringify([3,10,20,40])};
+});
+
+/* 呼ばれた代は、再開を押すと街を通らずそのまま第51階層に立っている。
+   開始階（S.startDepth）は動かさない——次の代からも51が既定になってしまう。 */
+R.abyssCallStartsAtFinalFloor = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; S.deepest=6; S.deaths=2; S.greatDown={};
+  S.startDepth=1;
+  startRun(3); enterFloor(3);
+  S.hero.hpNow=0; die();
+  const announced = document.getElementById('d-html')
+    ? document.getElementById('d-html').innerHTML.indexOf('アビスの口')>=0 : null;
+  const flagged = !!S.abyssCall;
+  el('d-ok').click();
+  const at = S.run ? S.run.depth : null;
+  const scr = S.screen;
+  const startDepthKept = S.startDepth;
+  const flagCleared = !S.abyssCall;
+  // 次の死は普通に街へ戻る（連続では呼ばれない）
+  S.hero.hpNow=0; die();
+  const nextCall = !!S.abyssCall;
+  document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+  S.abyssCall=false;
+  return {deaths:S.deaths, at, screen:scr, startDepthKept,
+          flaggedOnThirdDeath: flagged,
+          landsOnFinalFloor: at===FINAL_DEPTH,
+          skipsTown: scr==='game',
+          startDepthUnchanged: startDepthKept===1,
+          flagCleared,
+          notCalledAgainNextDeath: nextCall===false,
+          ok: flagged && at===FINAL_DEPTH && scr==='game'
+              && startDepthKept===1 && flagCleared && nextCall===false};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

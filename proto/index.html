@@ -73,7 +73,18 @@
      差し替えたときスクロールが固まる**という古い癖だけが付いてくる
      （報告「酒場で仲間を雇用した後でスクロールが効かなくなる」）。
      指定を外し、描き直す側でもスクロール位置を保つようにした（renderKeepScroll）。 */
-  .screen{position:fixed;top:0;right:0;bottom:0;left:0;display:none;flex-direction:column;background:var(--bg);
+  /* ---------- 高さは「見えている高さ」に合わせる ----------
+     position:fixed + top/bottom:0 の高さは、iOS では
+     **URLバーを隠した状態の高さ**になる。つまり画面の下端はブラウザの枠の裏へ潜り、
+     そこに入った行は指で引いても出てこない——器の側は「中身は収まっている」と
+     思っているので、そもそもスクロールが起きない
+     （報告：酒場の項目が5件を超えると動かせない。4件までは見えている範囲に
+     収まるので、症状そのものが現れなかった）。
+
+     見えている高さは JS で測って --vvh に入れてある（syncViewportHeight）。
+     top と bottom と height が揃うと bottom は無視されるので、height が勝つ。 */
+  .screen{position:fixed;top:0;right:0;bottom:0;left:0;height:var(--vvh,100%);
+    display:none;flex-direction:column;background:var(--bg);
     z-index:10;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
     overflow-y:auto;touch-action:pan-y}
   .screen.on{display:flex}
@@ -5490,7 +5501,7 @@ function gachaNextBand(){
 const S={
   stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1,
   // 生きて帰った最深。到達（deepest）とは別に持つ——加護が掛かるのはこちら側
-  deepestBack:0, deaths:0, runs:0,
+  deepestBack:0, deaths:0, runs:0, abyssCall:false,
   mapOn:false,           // 地図は既定で出さない（🗺 のトグル）
   bossClear:0,           // 倒したボスの最深階。能力強化の段はこれで開く
   /* ---------- 生成の塩 ----------
@@ -6648,7 +6659,12 @@ function ailForFamily(f){ return (f && FAM_AIL[f.id]) || 'bleed'; }
    （実測：第12階層から出すと、弓と革鎧の引き撃ちが成立しなくなった）。 */
 const ELITE_HARD_FROM = 15;    // 精鋭が出はじめる階＝曲線を吊り上げる階
 const ELITE_CHANCE    = 0.16;
-function eliteMul(){ return {hp:4.0, atk:1.7, def:1.4}; }
+/* 黄の精鋭。**雑魚の延長ではなく、足を止めて戦う相手**にする。
+   4.0/1.7/1.4 では、同じ階の規格外（紫 7.5/2.0）と並べたとき
+   手応えの差が付かず、金の輪が「少し硬いだけ」の印でしかなかった。
+   倒す価値の側も一緒に上げる（下の経験値と拾い物）——
+   重くするだけだと、避けて通るのが最適解になる。 */
+function eliteMul(){ return {hp:5.6, atk:2.1, def:1.6}; }
 /* 規格外（紫）は第3階層から出る。浅いところでは一段軽い物を出す。 */
 function uniqMul(depth){
   return depth>=ELITE_HARD_FROM ? {hp:7.5, atk:2.0} : {hp:4.2, atk:1.5};
@@ -9572,7 +9588,7 @@ function killEnemy(e, byAlly){
      対象は主が最初から連れてくる眷属（escort）と、招来で呼んだ分（summoned）
      ——どちらも「主が呼んだ」もので、道中の自然湧きとは区別する。 */
   const offeringTrashMul = (!e.boss && S.run.depth===OFFERING_BOSS_DEPTH && (e.escort || e.summoned)) ? 3 : 1;
-  const xp = Math.round((6+e.lv*4.2)*(e.elite?2.5:1)*(cfg?cfg.xp:1)*offeringTrashMul);
+  const xp = Math.round((6+e.lv*4.2)*(e.elite?3.2:1)*(cfg?cfg.xp:1)*offeringTrashMul);
   const receivedXp = grantXp(xp) * (1 + boonSum(S.hero,'xp')/100);
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
                        *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
@@ -10391,6 +10407,8 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
 function nowSec(){ return (performance.now?performance.now():Date.now())/1000; }
 
 /* ---------- 死亡 / 帰還 ---------- */
+/* この回数だけ死んだ代は、街ではなくアビスの口（第51階層）から始まる。 */
+const ABYSS_CALL_AT = [3, 10, 20, 40];
 function die(){
   if(!S.hero || !S.run) return;
   /* 主人公も仲間と同じ（downAlly 参照）。不屈・不死鳥・不滅・広告蘇生は
@@ -10424,6 +10442,12 @@ function die(){
     return;
   }
   S.deaths++;
+  /* ---------- アビスの口が呼ぶ ----------
+     決まった回数だけ死んだ代は、街へ帰さずに**第51階層へ直に落とす。**
+     勝てる相手ではない。だが「いつか行く場所」を数字ではなく1度見せておくと、
+     以後の1階ぶんの意味が変わる。
+     節目を過ぎた次の死は普通に街へ戻る（連続では呼ばれない）。 */
+  S.abyssCall = ABYSS_CALL_AT.includes(S.deaths);
 
   /* ---------- レジェンドだけは戻ってくる ----------
      装備していても、鞄の中でも、死とは無関係に専用の棚へ帰る。
@@ -10531,6 +10555,14 @@ function die(){
       + '黒鉄は持ち帰らないと自分の物にならない</span></div>';
   }
   html += '<div style="color:var(--dim);font-size:12px;margin-top:14px">（倉庫の装備と所持金は無事）</div>';
+  /* 呼ばれた代には、押す前に言う。黙って51階へ落とすと事故に見える。 */
+  if(S.abyssCall){
+    html += '<div style="color:#ff9a5a;margin-top:16px;line-height:1.9">'
+      + '<b>アビスの口が開いている</b><br>'
+      + '<span style="color:var(--dim);font-size:12px">'
+      + 'これで '+S.deaths+' 度。次の代は街を通らず、<b>第'+FINAL_DEPTH+'階層</b>から始まる。<br>'
+      + '勝てる相手ではない。見るだけでいい。</span></div>';
+  }
   /* 次のキャラの出発点をここで言う。
      「また Lv.1 からか」と思わせないことが、この下駄の仕事の半分なので、
      数字が乗る場所ではなく、**心が折れる場所**に書く。 */
@@ -12112,8 +12144,28 @@ const CharacterArt = (function(){
 
 /* ---------- 描画 ---------- */
 let TS=26;
+/* ---------- 見えている高さを測って画面に渡す ----------
+   iOS の position:fixed は「URLバーを隠した状態の高さ」で置かれる。
+   そのままだと画面の下端が枠の裏に潜り、そこに入った行へ指が届かない
+   （器は収まっていると思っているのでスクロールも起きない）。
+
+   visualViewport があればそれが一番正確。無ければ innerHeight。
+   URLバーの出入りでも呼ぶ（visualViewport の resize / scroll）。 */
+function syncViewportHeight(){
+  const vv = window.visualViewport;
+  const h = Math.round((vv && vv.height) || innerHeight || 0);
+  if(h>0) document.documentElement.style.setProperty('--vvh', h+'px');
+}
+addEventListener('resize', syncViewportHeight);
+addEventListener('orientationchange', syncViewportHeight);
+if(window.visualViewport){
+  visualViewport.addEventListener('resize', syncViewportHeight);
+  visualViewport.addEventListener('scroll', syncViewportHeight);
+}
+syncViewportHeight();
 function resize(){
   const dpr=Math.min(2,devicePixelRatio||1);
+  syncViewportHeight();
   _dpr=dpr;
   cv.width=innerWidth*dpr; cv.height=innerHeight*dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -17485,6 +17537,18 @@ bindTap(el('d-ok'), ()=>{
   S.run=null;
   S.hero=newHero();
   S.startDepth=Math.min(S.startDepth, unlockedDepths()[unlockedDepths().length-1]);
+  /* 呼ばれた代は街を通さない。**開始階も動かさない**——
+     ここで S.startDepth を 51 にすると、次の代からも51が既定になってしまう。 */
+  if(S.abyssCall){
+    S.abyssCall = false;
+    startRun(FINAL_DEPTH);
+    enterFloor(FINAL_DEPTH);
+    setScreen('game');
+    log('アビスの口が呼んだ — 第'+FINAL_DEPTH+'階層');
+    showBanner('アビスの口', '呼ばれてここにいる', '#ff9a5a', 3.2);
+    last=performance.now();
+    return;
+  }
   setScreen('town');
   last=performance.now();
 });
