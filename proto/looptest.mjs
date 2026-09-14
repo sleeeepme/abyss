@@ -500,8 +500,10 @@ R.abyssCallStartsAtFinalFloor = await pg.evaluate(()=>{
   S.startDepth=1;
   startRun(3); enterFloor(3);
   S.hero.hpNow=0; die();
-  const announced = document.getElementById('d-html')
-    ? document.getElementById('d-html').innerHTML.indexOf('アビスの口')>=0 : null;
+  /* 死亡画面では**何も言わない**。再開を押した先で街のはずが51階、
+     という驚きのために黙っておく（依頼）。 */
+  const deathText = (el('d-body').textContent||'') + (el('d-lost').innerHTML||'');
+  const spoiled = deathText.indexOf('アビス')>=0 || deathText.indexOf('51')>=0;
   const flagged = !!S.abyssCall;
   el('d-ok').click();
   const at = S.run ? S.run.depth : null;
@@ -515,12 +517,13 @@ R.abyssCallStartsAtFinalFloor = await pg.evaluate(()=>{
   S.abyssCall=false;
   return {deaths:S.deaths, at, screen:scr, startDepthKept,
           flaggedOnThirdDeath: flagged,
+          deathScreenKeepsTheSecret: !spoiled,
           landsOnFinalFloor: at===FINAL_DEPTH,
           skipsTown: scr==='game',
           startDepthUnchanged: startDepthKept===1,
           flagCleared,
           notCalledAgainNextDeath: nextCall===false,
-          ok: flagged && at===FINAL_DEPTH && scr==='game'
+          ok: flagged && !spoiled && at===FINAL_DEPTH && scr==='game'
               && startDepthKept===1 && flagCleared && nextCall===false};
 });
 
