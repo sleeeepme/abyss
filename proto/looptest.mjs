@@ -527,5 +527,31 @@ R.abyssCallStartsAtFinalFloor = await pg.evaluate(()=>{
               && startDepthKept===1 && flagCleared && nextCall===false};
 });
 
+/* ---------- 死亡画面は読ませる場所ではない ----------
+   規則（風化の時間・また死ぬと失う・SPは失われない…）を全部ここに書いていたが、
+   死んだ直後に読む人はいない。文字が多いだけで、一番伝えたい
+   「どこに何が残ったか」が埋もれていた（報告：文字情報が多すぎる）。 */
+R.deathScreenIsShort = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; S.deepest=6; S.deaths=0; S.greatDown={};
+  S.grave={depth:4, items:[], gold:1, ore:{}, xp:1, heroName:'前の代', lv:2, t:Date.now()};
+  startRun(3); enterFloor(3);
+  S.run.gold=12; S.shardsRun=2; S.shards=25;
+  S.hero.hpNow=0; die();
+  const txt=(el('d-lost').innerText||el('d-lost').textContent||'');
+  const gone=[
+    'たどり着くまで分からない','また死ぬと、これも失う','風化がはじまり','完全に朽ちる',
+    '永遠に失われた','取りに戻れば回収できる','SPは死んでも失われない',
+    '能力強化に使える','倉庫の装備と所持金は無事',
+  ].filter(w=>txt.indexOf(w)>=0);
+  const kept=['遺体が','持ち帰った'].filter(w=>txt.indexOf(w)>=0);
+  document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+  S.abyssCall=false; S.grave=null;
+  return {lines:txt.split('\n').filter(x=>x.trim()).length,
+          leftovers:gone, keptWords:kept,
+          removedTheExplanations: gone.length===0,
+          stillSaysWhatHappened: kept.length===2,
+          ok: gone.length===0 && kept.length===2};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));

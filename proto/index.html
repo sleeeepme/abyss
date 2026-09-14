@@ -10490,9 +10490,6 @@ function die(){
     if(n>0){ keptOre[o.id]=n; keptOreN+=n; }
   });
 
-  // 前の遺体は、回収されないまま死んだので消える
-  const prevGrave = S.grave;
-
   /* ---------- 遺体に残る経験値 ----------
      道具と金は戻るのに、**積み上げたレベルだけは丸ごと消えていた**。
      再走で一番つらいのは持ち物ではなくレベル差なので、
@@ -10512,54 +10509,38 @@ function die(){
   /* 何を失ったかはここでは見せない。
      暗闇の中で身ぐるみを剥がされる感覚と、遺体を開けるまでの引きを作る。
      判明するのは遺体を回収したとき（回収できなければ最後まで分からない）。 */
+  /* ---------- ここは読ませる場所ではない ----------
+     規則（風化の時間・また死ぬと失う・遺体に何が残るか）を全部ここに書いていたが、
+     **死んだ直後に読む人はいない。** 文字が多いだけで、一番伝えたい
+     「どこに何が残ったか」が埋もれていた（報告：文字情報が多すぎる）。
+     残すのは**この探索で何が起きたか**だけにする。
+     規則は遺体を回収する場面と「遊び方」に書いてある。 */
   let html='';
-  if(S.grave){
-    html += '<div style="color:#7fe0c0;line-height:1.9">'
-      + `遺体が<b>第${S.grave.depth}階層</b>に残った<br>`
-      + '<span style="color:var(--dim);font-size:12px">'
-      + '何が残っているかは、たどり着くまで分からない。<br>'
-      + '回収する前にまた死ぬと、これも失う。<br>'
-      + '<b>'+GRAVE_FRESH_H+'時間</b>で風化がはじまり、'
-      + '<b>'+GRAVE_GONE_H+'時間</b>で完全に朽ちる。</span></div>';
-  }else{
-    html += '<div style="color:var(--dim);line-height:1.9">遺体には何も残らなかった。</div>';
-  }
-  if(prevGrave){
-    html += `<div style="color:var(--c-relic);margin-top:14px">`
-      + `第${prevGrave.depth}階層の遺体は永遠に失われた</div>`;
-  }
+  html += S.grave
+    ? '<div style="color:#7fe0c0;line-height:1.9">'
+      + `遺体が<b>第${S.grave.depth}階層</b>に残った</div>`
+    : '<div style="color:var(--dim);line-height:1.9">遺体には何も残らなかった。</div>';
   /* 鍛えた武器を持ったまま死んだら、そこははっきり言う。
      黙って消えると「いつの間にか無くなっていた」になり、賭けだったことが伝わらない。 */
   const forged = S.hero.equip.weapon;
   if(forged && (forged.up||0)>0){
     html += '<div style="color:#d6b34a;margin-top:14px">'
-      + '鍛えた <b>'+itemName(forged)+'</b> を失った<br>'
-      + '<span style="color:var(--dim);font-size:12px">'
-      + '黒鉄は口座に残っている — また別の1本を鍛えられる</span></div>';
+      + '鍛えた <b>'+itemName(forged)+'</b> を失った</div>';
   }
   if(S.run.gold>0){
     html += '<div style="color:#d6b34a;margin-top:14px">'
-      + 'この探索の所持金 <b>'+S.run.gold+' G</b> のうち <b>'+bankedOnDeath+' G</b> を持ち帰った<br>'
-      + '<span style="color:var(--dim);font-size:12px">'
-      + (keptGold>0 ? '残り '+keptGold+' G は遺体にある。取りに戻れば回収できる' : '')
-      + '</span></div>';
+      + 'この探索の所持金 <b>'+S.run.gold+' G</b> のうち <b>'+bankedOnDeath+' G</b> を持ち帰った</div>';
   }
   /* 死んだ画面で唯一の前進を見せる。ここが空だと、死＝完全な無駄になる。 */
   if(S.shardsRun>0){
     html += '<div style="color:#8fd8ff;margin-top:14px">'
-      + 'この探索で <b>◆ '+S.shardsRun+' SP</b> を持ち帰った<br>'
-      + '<span style="color:var(--dim);font-size:12px">SPは死んでも失われない。'
-      + '所持 ◆ '+(S.shards||0)+' — 能力強化に使える</span></div>';
+      + 'この探索で <b>◆ '+S.shardsRun+' SP</b> を持ち帰った</div>';
   }
   if(keptOreN>0 || oreRunTotal()>0){
     const lost = oreRunTotal() - keptOreN;
     html += '<div style="color:#c9a06a;margin-top:10px">'
-      + '掘った黒鉄 <b>⛏ '+oreRunTotal()+'</b> のうち <b>'+lost+'</b> を落とした<br>'
-      + '<span style="color:var(--dim);font-size:12px">'
-      + (keptOreN>0 ? '残り '+keptOreN+' は遺体にある。' : '')
-      + '黒鉄は持ち帰らないと自分の物にならない</span></div>';
+      + '掘った黒鉄 <b>⛏ '+oreRunTotal()+'</b> のうち <b>'+lost+'</b> を落とした</div>';
   }
-  html += '<div style="color:var(--dim);font-size:12px;margin-top:14px">（倉庫の装備と所持金は無事）</div>';
   /* ---------- 呼ばれたことは、ここでは言わない ----------
      一度は死亡画面で予告していたが、**それだと驚きが消える。**
      再開を押した先で、街のはずが第51階層に立っている——
@@ -10570,8 +10551,7 @@ function die(){
      数字が乗る場所ではなく、**心が折れる場所**に書く。 */
   if(greatKills()>0){
     html += '<div style="color:#7fe0c0;margin-top:10px;line-height:1.8">'
-      + '倒した大ボス <b>'+greatKills()+'</b> 体ぶん、次の代は <b>Lv.'+rebirthLevel()+'</b> から始まる'
-      + '<br><span style="color:var(--dim);font-size:12px">武器の熟練と遺物もそのまま残っている</span></div>';
+      + '次の代は <b>Lv.'+rebirthLevel()+'</b> から始まる</div>';
   }
   /* 祭壇（街開発）。積み上げた恩寵が完全には消えなくなる。
      全部残すと死のコストが無くなるので、価値の高い順に数個だけ。 */
@@ -15117,7 +15097,12 @@ function startHubWander(){
 function renderHubPlaza(){
   const box=el('hub-avatars'); if(!box || !S.hero) return;
   const members=[S.hero, ...livingParty()];
-  const key=members.map(m=>m===S.hero?'hero':m.uidA).join(',');
+  /* 主人公はいつも 'hero' と数えていたので、**代が変わっても鍵が同じ**になり、
+     広場の絵が作り直されなかった（報告：死んで戻ると前の代の姿のまま）。
+     見た目そのもの（絵の鍵）を混ぜる。名前は下の速い道で追従する。 */
+  const key=members.map(m=>m===S.hero
+    ? 'hero:'+CharacterArt.heroKey(m)
+    : m.uidA).join(',');
   if(box.dataset.hubKey===key){
     /* 構成は変わっていない。徘徊中の位置・タイマーを壊さないよう
        innerHTMLは触らず、名前だけ最新化する。 */

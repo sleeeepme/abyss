@@ -246,5 +246,47 @@ R.adBanner = await pg.evaluate(()=>{
           leavesRoom: town.pad};
 });
 
+/* ---------- 代が変わったら広場の姿も変わる ----------
+   報告「死んで拠点に戻ると、新しいキャラではなく死んだ時のキャラが表示されている」。
+   広場の絵は「誰が並んでいるか」を鍵にして作り直しを省いていたが、
+   主人公はいつも 'hero' と数えていたので**代が変わっても鍵が同じ**になり、
+   絵だけ前の代のまま残っていた（名前は別経路で更新されるので気づきにくい）。 */
+R.plazaFollowsTheNewGeneration = await pg.evaluate(async ()=>{
+  S.hero=newHero(); S.hero.party=[];
+  S.bld={forge:1,stash:1,tavern:1,altar:1};
+  setScreen('town');
+  await new Promise(r=>setTimeout(r,120));
+  const shot=()=>{
+    const img=document.querySelector('#hub-avatars [data-hubava="hero"] img.hub-ava-art');
+    const nm=document.querySelector('#hub-avatars [data-hubava="hero"] .nm');
+    /* base64 は先頭が全部同じなので、長さと末尾で指紋を取る。
+       先頭だけ見ていると「別の絵なのに同じ」と読めてしまう。 */
+    const raw=(img&&img.getAttribute('src'))||'';
+    return {src: raw ? raw.length+':'+raw.slice(-40) : '',
+            name:(nm&&nm.textContent)||'',
+            key:document.getElementById('hub-avatars').dataset.hubKey||''};
+  };
+  const before=shot();
+  // 別の姿の新しい代に差し替える（同じ絵を引くと差が出ないので必ず変える）
+  const keys=CharacterArt.heroArtKeys;
+  const other=keys.find(k=>k!==CharacterArt.heroKey(S.hero));
+  S.hero=newHero(); S.hero.party=[]; S.hero.artKey=other; S.hero.name='次の代';
+  renderTown();
+  await new Promise(r=>setTimeout(r,120));
+  const after=shot();
+  const im=CharacterArt.image(other);
+  const want = im ? im.getAttribute('src').length+':'+im.getAttribute('src').slice(-40) : '';
+  return {beforeKey:before.key, afterKey:after.key,
+          beforeName:before.name, afterName:after.name,
+          hadArt: before.src.length>0,
+          keyChanged: before.key!==after.key,
+          artChanged: before.src!==after.src,
+          showsNewArt: !!want && after.src===want,
+          nameChanged: after.name==='次の代',
+          ok: before.src.length>0 && before.key!==after.key
+              && before.src!==after.src && !!want && after.src===want
+              && after.name==='次の代'};
+});
+
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));
