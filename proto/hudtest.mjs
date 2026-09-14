@@ -638,4 +638,46 @@ R.mapMarksAreOneCell = await pg.evaluate(()=>{
           ok: cells.length>10 && wrongSize.length===0 && offGrid.length===0};
 });
 
+/* ---------- 窓の決定ボタンは指の届く所にある ----------
+   中身が長いと、決定（緑）が箱の下に流れてスクロールしないと押せなかった。
+   押せないボタンは無いのと同じ。箱の底に貼り付けてある。 */
+R.modalPrimaryStaysReachable = await pg.evaluate(async ()=>{
+  const out=[];
+  // 中身が縦に溢れる窓を作る（説明の窓は元から長い）
+  const boxes=[...document.querySelectorAll('.modal .box')];
+  const check=(modalId)=>{
+    const m=document.getElementById(modalId);
+    if(!m) return null;
+    m.classList.add('on');
+    const box=m.querySelector('.box');
+    const btn=m.querySelector('.btnrow, button.primary');
+    if(!box||!btn){ m.classList.remove('on'); return null; }
+    // わざと溢れさせる
+    const filler=document.createElement('div');
+    filler.style.height='2000px';
+    box.insertBefore(filler, btn);
+    box.scrollTop=0;                     // スクロールしていない状態
+    const br=btn.getBoundingClientRect(), xr=box.getBoundingClientRect();
+    const inside = br.bottom <= xr.bottom+1 && br.top >= xr.top-1;
+    const sticky = getComputedStyle(btn).position==='sticky';
+    const overflows = box.scrollHeight > box.clientHeight+1;
+    filler.remove();
+    m.classList.remove('on');
+    return {modalId, overflows, sticky, reachableWithoutScrolling:inside};
+  };
+  for(const id of ['m-artname','m-stairs','m-ret','m-trial']){
+    const r=check(id); if(r) out.push(r);
+  }
+  const tested=out.length;
+  const allReachable=out.every(r=>r.reachableWithoutScrolling);
+  const allSticky=out.every(r=>r.sticky);
+  const allOverflowed=out.every(r=>r.overflows);
+  return {rows:out, tested,
+          someWindowsTested: tested>=3,
+          contentDidOverflow: allOverflowed,
+          buttonsPinned: allSticky,
+          reachableWithoutScrolling: allReachable,
+          ok: tested>=3 && allOverflowed && allSticky && allReachable};
+});
+
 await done(b, errs, R);

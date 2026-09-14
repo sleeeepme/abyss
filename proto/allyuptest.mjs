@@ -265,25 +265,29 @@ R.live = await pg.evaluate(()=>{
 R.beacon = await pg.evaluate(()=>{
   TH.run(1,{seed:3});
   S.beacons=[]; S.deepest=49;                 // 深く潜っていても、倒していなければ開かない
+  S.greatDown={};                             // 大ボスは一度倒すと出なくなる。ここは未撃破から
   const deepOnly=unlockedDepths().slice();
   TH.floor(10);
   const boss=W.enemies.find(e=>e.boss);
   boss.hp=1; killEnemy(boss);
   document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
   const after=unlockedDepths().slice();
-  // 同じ階をもう一度倒しても増えない
+  /* 同じ階に戻っても増えない。
+     **そもそも大ボスがもう出ない**ので、二度目の撃破という経路自体が無い
+     （倒した大ボスは出さない、という変更のあと）。 */
   TH.floor(10);
-  const b2=W.enemies.find(e=>e.boss); b2.hp=1; killEnemy(b2);
-  document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+  const bossAgain=W.enemies.filter(e=>e.boss).length;
   const twice=unlockedDepths().slice();
   const saved=(S.beacons||[]).slice();
   S.beacons=[];
-  return {deepOnly, after, twice, saved,
+  return {deepOnly, after, twice, saved, bossesOnRevisit:bossAgain,
           closedUntilKilled: deepOnly.length===1 && deepOnly[0]===1,
           opensAt11: after.includes(11),
           everyTen: after.length===2,
+          bossGoneOnRevisit: bossAgain===0,
           noDuplicate: twice.length===after.length,
-          ok: deepOnly.length===1 && after.includes(11) && twice.length===after.length};
+          ok: deepOnly.length===1 && after.includes(11)
+              && bossAgain===0 && twice.length===after.length};
 });
 
 // 4-b. 中継地点は10階ごと（11/21/31/41）

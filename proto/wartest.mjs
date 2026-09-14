@@ -557,4 +557,107 @@ R.pauseNeverSticks = await pg.evaluate(()=>{
           ok: stuck===false};
 });
 
+/* ---------- 閃き率とリキャスト ---------- */
+
+/* lv1 の技だけ閃きやすくする。最初の1つが遠いと
+   「閃くという仕組みがある」ことに気づかないまま序盤が終わる。 */
+R.firstArtFlashesTwiceAsOften = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3);
+  const lv1=artFlashChance('sword',1,false);
+  const lv2=artFlashChance('sword',2,false);
+  const lv3=artFlashChance('sword',3,false);
+  return {lv1:+lv1.toFixed(4), lv2:+lv2.toFixed(4), lv3:+lv3.toFixed(4),
+          hitsForFirst: Math.round(Math.log(0.5)/Math.log(1-lv1)),
+          firstIsDoubled: Math.abs(lv1-0.0092)<1e-6,
+          laterUnchanged: Math.abs(lv2-0.0017)<1e-6 && Math.abs(lv3-0.0008)<1e-6,
+          firstIsEasiest: lv1>lv2 && lv2>lv3,
+          ok: Math.abs(lv1-0.0092)<1e-6 && Math.abs(lv2-0.0017)<1e-6
+              && Math.abs(lv3-0.0008)<1e-6};
+});
+
+/* 武器技のリキャストは全段 +1 秒。技が回りすぎて殴る時間が消えていた。 */
+R.artRecastIsOneSecondLonger = await pg.evaluate(()=>{
+  return {cds:ART_CD.slice(),
+          allPlusOne: ART_CD[0]===8 && ART_CD[1]===12 && ART_CD[2]===17,
+          risesWithTier: ART_CD[0]<ART_CD[1] && ART_CD[1]<ART_CD[2],
+          ok: ART_CD[0]===8 && ART_CD[1]===12 && ART_CD[2]===17};
+});
+
+/* 名前の窓の副題は、技が何をするかの説明。
+   既定の名前は入力欄に入っているので、そこで繰り返さない。 */
+R.renameSubShowsWhatItDoes = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.arts={}; S.artName={};
+  const d=artsOf('sword')[0];
+  closeArtRename();
+  openArtRename(d.id, true);
+  const sub=document.getElementById('an-sub').textContent;
+  closeArtRename();
+  return {sub, defDesc:d.desc,
+          showsDescription: sub===d.desc,
+          notJustDefaultName: sub.indexOf('既定の名前')<0,
+          ok: sub===d.desc && sub.indexOf('既定の名前')<0};
+});
+
+/* ---------- 試練の枷「封技」は隊列ごと ---------- */
+R.sealSilencesThePartyToo = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:9,atk:9,wave:1}; S.hero.lv=30;
+  S.deepest=20; startRun(12); enterFloor(12); TH.immortal();
+  S.ultLv={quake:1}; S.ult='quake'; P.ultCd=0; P.waveCd=0; P.artCd=0;
+  const wb=heroWeaponBase();
+  if(wb){ S.arts={}; S.arts[wb]=1; S.artPick=S.artPick||{};
+          const d=artsOf(wb)[0]; if(d) S.artPick[wb]=d.id; }
+  S.hero.party=[];
+  ['warrior','mage','priest','rogue'].forEach((job,i)=>{
+    const a=makeAlly(12,S.hero); a.boons=[]; a.job=job;
+    a.artVariant=pickAllyVariant(job); a.slot=i; a.lv=20;
+    a.str=20; a.dex=20; a.vit=20; a.hpNow=allyStats(a).maxHp;
+    const b2=allyWeaponBase(a); if(b2){ a.arts={}; a.arts[b2]=1; }
+    S.hero.party.push(a);
+  });
+  let allyFired=0;
+  const oFire=window.fireArt;
+  window.fireArt=function(def,src){ if(src && src!==S.hero) allyFired++; return oFire.apply(this,arguments); };
+  const run=(sec)=>{
+    for(let i=0;i<Math.round(sec*60);i++){
+      const e=W.enemies.find(x=>!x.dead);
+      if(e){ const dx=e.x-P.x, dy=e.y-P.y, n=Math.hypot(dx,dy)||1; stickDx=dx/n; stickDy=dy/n; }
+      S.hero.hpNow=stats(S.hero).maxHp;
+      livingParty().forEach(a=>{ a.hpNow=allyStats(a).maxHp; });
+      stepSim(1/60);
+    }
+    stickDx=0; stickDy=0;
+  };
+  /* 技が出たかどうかだけを見ると、敵を倒し切った時間帯では
+     「撃つ相手がいないから出ない」と区別が付かない。
+     技の時計（wartCd）が動き出しているかも併せて見る——
+     封技のあいだは初期化すらされない（undefined のまま）。 */
+  const clocks = ()=>party().map(a=>a.wartCd);
+  const started = ()=>clocks().filter(v=>v!==undefined).length;
+
+  // 封技のあいだ
+  S.run.zoneBane='silent';
+  party().forEach(a=>{ a.wartCd=undefined; a.artCd=undefined; });
+  allyFired=0; run(15);
+  const sealed=allyFired;
+  const clocksSealed=started();
+  const heroUlt=fireUlt(), heroWave=fireWave(), heroArt=firePlayerArt();
+  // 枷が明けたら戻ること（止めただけで壊していない）
+  S.run.zoneBane=null;
+  allyFired=0; run(3);
+  const clocksFree=started();
+  window.fireArt=oFire;
+  return {allyArtsWhileSealed:sealed,
+          allyClocksRunningWhileSealed:clocksSealed,
+          allyClocksRunningWhenFree:clocksFree,
+          partySize:party().length,
+          heroUltBlocked: heroUlt===false,
+          heroWaveBlocked: heroWave===false,
+          heroArtBlocked: heroArt===false,
+          partySilenced: sealed===0 && clocksSealed===0,
+          partyRecovers: clocksFree===party().length,
+          ok: sealed===0 && clocksSealed===0 && clocksFree===party().length
+              && heroUlt===false && heroWave===false && heroArt===false};
+});
+
 await done(b, errs, R);

@@ -439,6 +439,16 @@
      **開いたら二度と閉じられない**状態になった。
      個別に付けて回ると必ず付け忘れが出るので、箱そのものに持たせる。 */
   .modal .box{width:100%;max-width:380px;max-height:88vh;overflow-y:auto}
+  /* ---------- 決定ボタンは必ず指の届く所に ----------
+     箱の中身が長いと、決定（緑）が下に流れてスクロールしないと押せなかった。
+     **押せないボタンは無いのと同じ。** 箱の底に貼り付ける。
+     中身が短い窓では貼り付く先が無いので、見た目は今までどおり。
+     下に敷く帯は、下の行が透けて重なって読めなくなるのを防ぐため。 */
+  .modal .box > .btnrow,
+  .modal .box > button.primary{
+    position:sticky; bottom:0; z-index:2;
+    background:var(--bg); padding:8px 0 2px;
+    box-shadow:0 -12px 16px -10px var(--bg)}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
 
   /* ---------- 街（ハブ） ----------
@@ -4182,11 +4192,16 @@ function rogueHasteBonus(){
 
 /* 段ごとのリキャスト。**一番長い lv3 でも、一番短い大技（24秒）より短い。**
    大技は「ここで切る」1回、武器技は「戦いの中で回す」手——格を時間で分けている。 */
-const ART_CD = [7, 11, 16];
+/* 武器技のリキャスト。段が上がるほど長い。
+   全体に +1 秒したのは、技が回りすぎて「殴る時間」が消えていたため。 */
+const ART_CD = [8, 12, 17];
 /* 1撃ごとの閃き率。上の段ほど遠い。
-   目安（熟練0・中央値）: lv1 約150発 / lv2 約400発 / lv3 約870発。
-   熟練が乗ると縮む（Lv.10 で 2.2倍 出やすい）。 */
-const ART_FLASH_P      = [0.0046, 0.0017, 0.0008];
+   目安（熟練0・中央値）: lv1 約75発 / lv2 約400発 / lv3 約870発。
+   熟練が乗ると縮む（Lv.10 で 2.2倍 出やすい）。
+
+   lv1 だけ倍にしてある。最初の1つが遠いと「閃くという仕組みがある」こと自体に
+   気づかないまま序盤が終わる。**入口は早く、奥は遠く。** */
+const ART_FLASH_P      = [0.0092, 0.0017, 0.0008];
 const ART_FLASH_MAST   = 0.12;   // 熟練1段ごとに閃きやすさ +12%
 /* 仲間はロストする。**同じ確率にすると、覚えた端から失われて何も残らない。**
    覚えやすくしておけば、拾ったばかりの仲間でも道中で1つは閃く。 */
@@ -4563,6 +4578,11 @@ function allySkillSum(a){
 
 /* ---------- 仲間の大技の発動 ---------- */
 function tickAllyArt(a, st, dt){
+  /* 試練の枷「封技」。主人公だけ黙らせても、仲間が同じ技を出し続けるなら
+     枷として何も要求してこない。**隊列ごと黙る。**
+     リキャストも進めない——溜めておいて枷が明けた瞬間に全部出るなら、
+     待っていただけで損をしていない。 */
+  if(baneMul('silence',false)) return;
   // 癒しの輪（聖騎士 Lv.40）。技ではなく常時のにじみなので、ここで一緒に回す。
   const halo=(st.skills&&st.skills.halo)||0;
   if(halo>0){
@@ -5229,10 +5249,18 @@ const OFFERING_BOSS_DEPTH = 50;   // 「初めの供物」。50刻みの並び�
    同じ階に何度潜り直しても、主は同じ1体という扱いにしたい。 */
 function bossBoonTaken(depth){ return !!(S.bossBoon && S.bossBoon[depth]); }
 function markBossBoon(depth){ S.bossBoon = S.bossBoon || {}; S.bossBoon[depth]=1; }
+/* 倒した大ボスの階。**場所で覚える**（恩寵 bossBoon と同じ作法）——
+   同じ大ボスを何度も出すと、中継地点も大技も繰り返し取れてしまうし、
+   何より「倒した」という出来事が記録に残らない。 */
+function greatDowned(depth){ return !!(S.greatDown && S.greatDown[depth]); }
 function bossTierAt(depth){
   if(depth===FINAL_DEPTH) return 'final';
   if(depth<=0 || depth%5!==0) return null;
-  return depth%10===0 ? 'great' : 'mid';
+  if(depth%10!==0) return 'mid';
+  /* 倒した大ボスの階は、次からただの階に戻す。
+     ここで null を返すだけで、大広間も取り巻き無しも帰還ポータルの封鎖も
+     まとめて解ける——判定が1ヶ所に集まっているのはそのためにしてある。 */
+  return greatDowned(depth) ? null : 'great';
 }
 /* ---------- 帰還ポータル ----------
    街へ戻れるのは 5 階ごとの穴だけ。どこからでも帰れるなら、
@@ -5488,6 +5516,7 @@ const S={
   tavern:[],             // 酒場で待っている連れ帰った者（口座側。キャラが死んでも残る）
   tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
   bossBoon:{},           // 恩寵を受け取ったボス階（二度は出さない）
+  greatDown:{},          // 倒した大ボスの階。次からはただの階に戻す（口座側）
   cleared2:{},           // 一度抜けた階。穴の位置を伏せない（口座側）
   moss:{},               // 苔玉を層ごとに何匹倒したか（口座側）
   duranGiven:false,      // ドゥラントリーを渡したか（一度だけ）
@@ -8064,6 +8093,8 @@ function grantBeacon(depth, opt){
 function onGreatBossDown(e){
   const before = greatKills();
   S.greatKills = before + 1;
+  // この階の大ボスは倒した。次からはただの階として作る
+  if(S.run && S.run.depth){ S.greatDown = S.greatDown || {}; S.greatDown[S.run.depth] = 1; }
   // 中継地点。倒した階そのものが次からの入口になる（実際に入るのは +1 階）
   grantBeacon(S.run ? S.run.depth : 0);
   const gotUlt = ULTS.find(u=>u.at===S.greatKills);
@@ -15795,7 +15826,10 @@ function openArtRename(id, flashed){
   _renamingArt=id;
   _renameFrom=S.screen;
   el('an-title').textContent = flashed ? '💡 技を思いついた！' : '技の名前';
-  el('an-sub').textContent = '既定の名前は「'+d.nm+'」';
+  /* 副題は技の説明にする。名前を付けようとしている相手が
+     **何をする技なのか**が分からないと、名前の付けようがない
+     （既定の名前は入力欄に入っているので、ここで繰り返す必要も無い）。 */
+  el('an-sub').textContent = d.desc || d.nm;
   el('an-input').value = artName(d);
   el('m-artname').classList.add('on');
   /* 戦っている最中に開くので、開いているあいだは時間を止める。
@@ -17385,7 +17419,7 @@ bindTap(el('dbg-reset'), ()=>{
   S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
   S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   S.moss={}; S.duranGiven=false;                  // 苔玉の記録も消す
-  S.bossBoon={}; S.cleared2={};                   // ボスの恩寵と踏破の記録も消す
+  S.bossBoon={}; S.cleared2={}; S.greatDown={};   // ボスの恩寵・踏破・大ボス撃破の記録も消す
   setScreen('title');
 });
 
@@ -17425,7 +17459,14 @@ bindTap(el('st-down'), ()=>{
   enterFloor(S.run.depth+1);
   setScreen('game'); last=performance.now();
 });
-bindTap(el('st-ret'),  ()=>{ el('m-stairs').classList.remove('on'); returnToTown(); });
+bindTap(el('st-ret'),  ()=>{
+  el('m-stairs').classList.remove('on');
+  /* この窓は穴の前でしか開かない。**そこまで来たなら出口は見つけている。**
+     降りたときだけ記録していたので、5階で帰還を選ぶと次に来たとき
+     また穴が伏せられていた（報告：5階に再訪すると階段が出ていない）。 */
+  markFloorCleared(S.run.depth);
+  returnToTown();
+});
 bindTap(el('st-cancel'),()=>{ el('m-stairs').classList.remove('on'); setScreen('game'); last=performance.now(); });
 /* 死亡後の再開。ここで確実に新キャラを作って街へ戻す */
 /* 死亡時の広告。1回の死につき1度だけ、引き継げる数を +1 する。

@@ -466,4 +466,64 @@ R.returnNoAutoResume = await pg.evaluate(()=>{
               && noResumeButtonInUi && greatBossBeaconStillWorks};
 });
 
+/* ---------- 帰還ポータルで戻った階も「抜けた」扱い ----------
+   報告「5階を踏破した後に再度到達した際にマップの階段の位置が表示されていない」。
+
+   踏破の記録は**降りたときだけ**付けていた。5階は帰還ポータルのある階なので、
+   そこで街へ帰ると記録が付かず、次に来たときまた穴が伏せられていた。
+   窓は穴の前でしか開かないので、そこまで来たなら出口は見つけている。 */
+R.returnPortalMarksFloorCleared = await pg.evaluate(()=>{
+  const visit=(d)=>{ startRun(d); enterFloor(d); };
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=6; S.cleared2={};
+  visit(5);
+  const yn=(v)=>v?'はい':'いいえ';
+  const beforeRevealed=stairRevealed();
+  const before={revealed:yn(beforeRevealed), cleared:yn(floorCleared(5)), known:yn(knownFloor(5))};
+  // 穴の前で「街へ戻る」を選ぶ
+  el('st-ret').click();
+  const marked=floorCleared(5);
+  visit(5);
+  const afterRevealed=stairRevealed();
+  const after={revealed:yn(afterRevealed), cleared:yn(floorCleared(5)), known:yn(knownFloor(5))};
+  // 降りた場合も今までどおり
+  S.cleared2={};
+  visit(5); markFloorCleared(5); enterFloor(6);
+  S.run=null; visit(5);
+  const descendRevealed=stairRevealed();
+  const afterDescend={revealed:yn(descendRevealed), cleared:yn(floorCleared(5))};
+  return {before, after, afterDescend, marked,
+          hiddenOnFirstVisit: beforeRevealed===false,
+          markedOnReturn: marked===true,
+          shownOnRevisit: afterRevealed===true,
+          descendStillWorks: descendRevealed===true,
+          ok: beforeRevealed===false && marked===true
+              && afterRevealed===true && descendRevealed===true};
+});
+
+/* 地図にも実際に階段の印が出ること（判定が通っても描いていなければ意味が無い）。 */
+R.clearedFloorShowsStairOnMap = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=6; S.cleared2={};
+  startRun(5); enterFloor(5);
+  S.mapOn=true;
+  const box=mapBox(), s=box.s;
+  const stairCell=()=>({x:box.ox+Math.floor(W.fl.stair.x)*s, y:box.oy+Math.floor(W.fl.stair.y)*s});
+  const drewAt=(want)=>{
+    const hits=[];
+    const orig=ctx.fillRect.bind(ctx);
+    ctx.fillRect=(x,y,w,h)=>{ if(Math.abs(x-want.x)<0.6 && Math.abs(y-want.y)<0.6) hits.push(1);
+                              return orig(x,y,w,h); };
+    drawMinimap();
+    ctx.fillRect=orig;
+    return hits.length;
+  };
+  // 未踏破：階段の印は出さない（床の塗りはあるので、印のぶんだけ数が増えるかを見る）
+  const beforeHits=drewAt(stairCell());
+  markFloorCleared(5);
+  const afterHits=drewAt(stairCell());
+  S.mapOn=false;
+  return {beforeHits, afterHits,
+          markUncoveredTheStair: afterHits>beforeHits,
+          ok: afterHits>beforeHits};
+});
+
 await done(b, errs, R);

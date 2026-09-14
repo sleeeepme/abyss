@@ -137,6 +137,7 @@ R.persistence = await pg.evaluate(()=>{
 // 放射弾は固定タイマーではなく「散弾（burst）」という技になったので、
 // 技として撃たれることを見る（詳細は bossaoe.mjs）
 R.phases = await pg.evaluate(async ()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={hp:8}; S.hero=newHero(); startRun(10);
   const boss=W.enemies.find(e=>e.boss);
   W.enemies=[boss];
@@ -161,6 +162,7 @@ R.phases = await pg.evaluate(async ()=>{
    過ごすことになり、それが「攻撃してこない」に見えていた（報告：第10階層）。
    遠くに立たせたまま様子を見て、動き出す（chase に入る）ことを確かめる。 */
 R.arenaAware = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(10); S.hero.party=[];
   const boss=W.enemies.find(e=>e.boss);
   // 広間の対角ぐらい離す。通常の索敵距離（10前後）よりずっと遠い。
@@ -177,6 +179,7 @@ R.arenaAware = await pg.evaluate(()=>{
    代わりに残った方の攻撃が速くなる（teleMul低下・ms上昇）。
    両方倒して初めて、通常のボス撃破処理が1回だけ流れる。 */
 R.twinSequential = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={}; S.hero=newHero(); startRun(20); S.hero.party=[];
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
   const twins=W.enemies.filter(e=>e.boss&&e.twin);
@@ -237,6 +240,7 @@ R.poisonSafeZones = await pg.evaluate(()=>{
    他の「招来」持ちボス（第30階層以外）は跳ばないことも見ておく
    ——1体だけの専用挙動であって、技そのものの仕様変更ではない。 */
 R.bossWarpsOnSummon = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(30); S.hero.party=[];
   const boss=W.enemies.find(e=>e.boss);
   const isMallet = boss.uniqueBoss===POISON_BOSS_DEPTH;
@@ -262,6 +266,7 @@ R.otherSummonBossDoesNotWarp = await pg.evaluate(()=>{
 
 // --- 10. ボス撃破の確定ドロップ
 R.drops = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); startRun(10);
   const boss=W.enemies.find(e=>e.boss);
   W.drops=[];
@@ -299,6 +304,7 @@ R.finalSpawn = await pg.evaluate(()=>{
 
 // --- 17. 51階の主を倒したときだけ「踏破」になる。50階の主を倒しても踏破にならない。
 R.finalClearGate = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={}; S.hero=newHero(); startRun(50); S.hero.party=[];
   const boss50=W.enemies.find(e=>e.boss);
   boss50.hp=1; killEnemy(boss50);
@@ -395,6 +401,7 @@ R.finalCloneMove = await pg.evaluate(()=>{
    「戦いながらレベルを上げる」ための倍率なので、対象は escort / summoned だけ
    ——同じ階の自然湧きの雑魚は変わらない。 */
 R.offeringTrashXp3x = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
   const mk=(extra)=>Object.assign({x:P.x,y:P.y,arch:ARCH[0],fam:FAMILY[0],lv:20,elite:false,aff:[],
     maxHp:999,hp:999,atkV:0,def:0,res:{},dt:'blunt',st:{},bu:{},state:'chase',t:0,cd:99,
@@ -417,6 +424,7 @@ R.offeringTrashXp3x = await pg.evaluate(()=>{
 
 /* --- 24. 主を倒すと：残っていた眷属は消え、パーティは全回復する */
 R.offeringDefeatCleanup = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
   const ally=makeAlly(50, S.hero);
   ally.x=P.x+0.5; ally.y=P.y;
@@ -507,6 +515,7 @@ R.finalBossBaneClearsOnVictory = await pg.evaluate(()=>{
 /* 25-e. 「主」なら誰でもではなく、本物のアビスの口（51階・uniqueBoss===FINAL_DEPTH）
    だけが対象。50階の主（初めの供物）は見つかった状態でも切り替わらない。 */
 R.onlyRealFinalBossCycles = await pg.evaluate(()=>{
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[]; P.invuln=1e9;
   const boss50=W.enemies.find(e=>e.boss);
   boss50.revealed=true;
@@ -582,6 +591,7 @@ R.bottomStopsDescent = await pg.evaluate(()=>{
   const stayed = S.run.depth===d0;
   el('m-stairs').classList.remove('on'); setScreen('game');
   // 50階では今まで通り降りられる
+  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
   startRun(50); P.invuln=1e9;
   openStairs();
   const at50={downShown: el('st-down').style.display!=='none'};
@@ -606,6 +616,58 @@ R.bottomCapsResume = await pg.evaluate(()=>{
           resumeCapped: start<=FINAL_DEPTH,
           noFloorsBeyond: u.every(d=>d<=FINAL_DEPTH),
           ok: start===1 && start<=FINAL_DEPTH && u.every(d=>d<=FINAL_DEPTH)};
+});
+
+/* ---------- 倒した大ボスは二度と出ない ----------
+   同じ大ボスが何度も出ると、中継地点も大技も繰り返し取れてしまう。
+   何より「倒した」という出来事が記録に残らない。 */
+R.greatBossStaysDown = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:9,atk:9}; S.hero.lv=30;
+  S.deepest=25; S.greatKills=0; S.cleared2={}; S.greatDown={};
+  startRun(10); enterFloor(10);
+  const yn=(v)=>v?'はい':'いいえ';
+  const first={tier:S.run.bossTier, bosses:W.enemies.filter(e=>e.boss).length,
+               arena:yn(W.fl.arena), portalShut:yn(S.run.bossAlive)};
+  const bs=W.enemies.find(e=>e.boss);
+  if(bs) onGreatBossDown(bs);
+  const killsAfter=greatKills();
+  enterFloor(10);
+  const secondArena=!!W.fl.arena, secondShut=!!S.run.bossAlive;
+  const second={tier:S.run.bossTier, bosses:W.enemies.filter(e=>e.boss).length,
+                arena:yn(secondArena), portalShut:yn(secondShut)};
+  // まだ倒していない20階は、これまでどおり大ボス階
+  enterFloor(20);
+  const other={tier:S.run.bossTier, bosses:W.enemies.filter(e=>e.boss).length};
+  // 15階（5の倍数）は中ボスのまま
+  enterFloor(15);
+  const mid={tier:S.run.bossTier};
+  return {first, second, other, mid, killsAfter,
+          firstVisitHasBoss: first.tier==='great' && first.bosses>0,
+          goneOnRevisit: second.tier===null && second.bosses===0,
+          revisitIsPlainFloor: !secondArena,
+          portalOpenOnRevisit: !secondShut,
+          untouchedGreatRemains: other.tier==='great' && other.bosses>0,
+          midBossUnaffected: mid.tier==='mid',
+          killCountKept: killsAfter===1,
+          ok: first.tier==='great' && first.bosses>0
+              && second.tier===null && second.bosses===0 && !secondArena
+              && !secondShut && other.tier==='great' && other.bosses>0
+              && mid.tier==='mid' && killsAfter===1};
+});
+
+/* 撃破の記録は口座側。潜り直しても消えない（同じ探索の中だけの話ではない）。 */
+R.greatBossDownSurvivesNewRun = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:9,atk:9}; S.deepest=25;
+  S.greatKills=0; S.greatDown={};
+  startRun(10); enterFloor(10);
+  const bs=W.enemies.find(e=>e.boss);
+  if(bs) onGreatBossDown(bs);
+  // 死んで新しいキャラで潜り直す
+  S.run=null; S.hero=newHero();
+  startRun(10); enterFloor(10);
+  return {tier:S.run.bossTier, bosses:W.enemies.filter(e=>e.boss).length,
+          stillGone: S.run.bossTier===null && W.enemies.filter(e=>e.boss).length===0,
+          ok: S.run.bossTier===null && W.enemies.filter(e=>e.boss).length===0};
 });
 
 await b.close();
