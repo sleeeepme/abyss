@@ -434,7 +434,8 @@ R.renameArt = await pg.evaluate(()=>{
    一度は「探索中に画面を止めたくない」と判断して開かない作りにした。
    依頼と食い違っていたので開くようにした（報告：窓が開かない）。 */
 
-/* A. 閃いたら窓が開き、既定値が入っていること。 */
+/* A. 閃いたら窓が開き、既定値が入っていること。
+      ただし**すぐには開かない**——頭上の💡と輪を出し切ってから訊く。 */
 R.flashOpensRenameWindow = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
   S.hero.party=[]; S.arts={}; S.artName={};
@@ -445,18 +446,75 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
   const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
   const def=tryFlashArt(base);
   window.artFlashChance=chanceOrig;
+  // 閃いた直後は、まだ窓を出さない（演出を見せている最中）
+  const openAtOnce=document.getElementById('m-artname').classList.contains('on');
+  const bulbOverhead = W.pops.some(p=>p.txt==='💡');
+  const ringOut = W.fx.some(f=>f.t==='ultring');
+  // 少しだけ進めても、まだ出ない
+  stepSim(0.4,{draw:true});
+  const openMidway=document.getElementById('m-artname').classList.contains('on');
+  // 演出が出切ったら開く
+  stepSim(0.8,{draw:true});
   const open=document.getElementById('m-artname').classList.contains('on');
   const shown=document.getElementById('an-input').value;
   const sub=document.getElementById('an-sub').textContent;
+  const title=document.getElementById('an-title').textContent;
   const paused=gamePaused();
   closeArtRename();
   const resumed=!gamePaused();
-  return {artNm:def?def.nm:null, shown, sub,
-          learned:!!def, windowOpened:open,
+  return {artNm:def?def.nm:null, shown, sub, title,
+          openedAtOnce: openAtOnce?'はい':'いいえ',
+          openedMidway: openMidway?'はい':'いいえ',
+          learned:!!def,
+          bulbShownFirst: bulbOverhead && ringOut,
+          waitsForEffect: !openAtOnce && !openMidway,
+          windowOpened: open,
           defaultFilled: !!def && shown===def.nm,
+          titleSaysIdea: title.indexOf('技を思いついた！')>=0 && title.indexOf('💡')>=0,
           pausedWhileOpen: paused,
           resumedAfterClose: resumed,
-          ok: !!def && open && !!def && shown===def.nm && paused && resumed};
+          ok: !!def && bulbOverhead && ringOut && !openAtOnce && !openMidway && open
+              && shown===def.nm && title.indexOf('技を思いついた！')>=0
+              && title.indexOf('💡')>=0 && paused && resumed};
+});
+
+/* A-2. ✎ から開いたときは「思いついた！」とは出さない（嘘になる）。 */
+R.pencilOpenUsesPlainTitle = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.arts={}; S.artName={};
+  const id=artsOf('sword')[0].id;
+  closeArtRename();
+  openArtRename(id);                 // ステータス画面の ✎ と同じ開き方
+  const title=document.getElementById('an-title').textContent;
+  closeArtRename();
+  return {title, plain: title==='技の名前', ok: title==='技の名前'};
+});
+
+/* A-3. 決めたらそのまま盤面へ戻る。ステータス画面を挟まない。 */
+R.commitReturnsToGame = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
+  S.hero.party=[]; S.arts={}; S.artName={};
+  closeArtRename();
+  const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
+  tryFlashArt('sword');
+  window.artFlashChance=chanceOrig;
+  stepSim(1.2,{draw:true});
+  const opened=document.getElementById('m-artname').classList.contains('on');
+  document.getElementById('an-input').value='わが新技';
+  commitArtRename(false);
+  const closed=!document.getElementById('m-artname').classList.contains('on');
+  const scr=S.screen;
+  const charShown=document.getElementById('scr-char').classList.contains('on');
+  const named=artName(artDef(artsOf('sword')[0].id));
+  const running=!gamePaused();
+  return {screen:scr, named,
+          windowOpened:opened, windowClosed:closed,
+          backInGame: scr==='game',
+          statusScreenNotShown: !charShown,
+          nameKept: named==='わが新技',
+          boardRunsAgain: running,
+          ok: opened && closed && scr==='game' && !charShown
+              && named==='わが新技' && running};
 });
 
 /* B. 止めているあいだ盤面は動かない。閉じたら動く。
@@ -469,6 +527,7 @@ R.renameWindowFreezesBoard = await pg.evaluate(()=>{
   const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
   tryFlashArt('sword');
   window.artFlashChance=chanceOrig;
+  stepSim(1.2,{draw:true});              // 演出が出切って窓が開くまで
   // 窓が開いている状態で tick を回す
   const t0=S.run.elapsed;
   _drawStage='';

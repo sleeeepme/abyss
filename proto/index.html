@@ -1081,7 +1081,7 @@
      既定値は最初から入れておく（空欄から考えさせない）。
      空にして決定すれば元の名前に戻る＝取り消す道も同じボタンで済ませる。 -->
 <div class="modal" id="m-artname"><div class="box">
-  <h1>技の名前</h1>
+  <h1 id="an-title">技の名前</h1>
   <p class="sub" id="an-sub"></p>
   <input id="an-input" maxlength="12" autocomplete="off" spellcheck="false">
   <div class="btnrow">
@@ -4364,7 +4364,7 @@ function tryFlashArt(baseId){
 
      やめる／決定のどちらでも閉じて戦いに戻る。あとから
      ステータス画面の技欄の ✎ で変えることもできる。 */
-  openArtRename(def.id);
+  queueArtRename(def.id);
   return def;
 }
 function tryFlashArtAlly(a, baseId){
@@ -7272,6 +7272,7 @@ function resLine(res){
 /* ---------- ラン ---------- */
 function startRun(depth){
   S.runs++;
+  _artNamePend=null;        // 前の探索で閃いて、訊きそびれた分は持ち越さない
   if(!S.hero) S.hero=newHero();
   const d = depth||S.startDepth||1;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
@@ -11493,6 +11494,12 @@ let _drawStage='開始前';
    止めるのは update だけで draw は回す——画面まで落とすと、
    何の上に窓が出ているのか分からなくなる。 */
 let _paused=false;
+/* ---------- 閃きの間（ま） ----------
+   閃いたその瞬間に窓を出すと、頭上の💡も広がる輪も一瞬で窓に隠れる。
+   **まず見せて、それから訊く。** 演出が出切るまで待ってから開く。
+   artFlashFx の輪は 0.6 秒なので、それより少し長く取る。 */
+const ART_NAME_DELAY = 0.9;
+let _artNamePend = null;            // {id, t}
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
   /* 窓が閉じているのに止まったままになると、盤面が二度と動かない。
@@ -11576,6 +11583,7 @@ function tickFallWatchdog(dt){
 function update(dt){
   _drawStage='更新';
   updateFeel(dt);
+  tickArtRename(dt);      // 閃きの演出が出切ったら名前の窓を開く
   tickFallWatchdog(dt);
   /* 弔いの残り時間。stats() を取る前に減らす——同じフレーム内で
      「もう切れているのに効いている」状態を作らないため。 */
@@ -15768,10 +15776,25 @@ function artName(def){
   const v = S.artName && S.artName[def.id];
   return (v && v.trim()) ? v : def.nm;
 }
-let _renamingArt=null;
-function openArtRename(id){
+let _renamingArt=null, _renameFrom=null;
+/* 閃いた技の名前を、演出が出切ってから訊くための待ち行列。
+   開くのは tickArtRename（update から毎フレーム進む）。 */
+function queueArtRename(id){ _artNamePend = {id, t:ART_NAME_DELAY}; }
+function tickArtRename(dt){
+  if(!_artNamePend) return;
+  if(!S.run || !S.hero){ _artNamePend=null; return; }   // 探索が終わったら流す
+  _artNamePend.t -= dt;
+  if(_artNamePend.t > 0) return;
+  const id=_artNamePend.id; _artNamePend=null;
+  openArtRename(id, true);
+}
+/* flashed: 閃いたその場で開いたのか、ステータス画面の ✎ から開いたのか。
+   見出しを変える——✎ から開いたときに「思いついた！」と出すのは嘘になる。 */
+function openArtRename(id, flashed){
   const d=artDef(id); if(!d) return;
   _renamingArt=id;
+  _renameFrom=S.screen;
+  el('an-title').textContent = flashed ? '💡 技を思いついた！' : '技の名前';
   el('an-sub').textContent = '既定の名前は「'+d.nm+'」';
   el('an-input').value = artName(d);
   el('m-artname').classList.add('on');
@@ -15787,12 +15810,17 @@ function openArtRename(id){
 }
 function closeArtRename(){
   el('m-artname').classList.remove('on');
-  _renamingArt=null;
+  const back=_renameFrom;
+  _renamingArt=null; _renameFrom=null;
   const i=el('an-input'); if(i && i.blur) i.blur();
   pauseGame(false);
+  /* 閃いて開いた窓は、閉じたらそのまま戦いへ戻す。
+     戦っている最中に画面を1枚挟むと、窓を閉じたのに手が戻らない。 */
+  if(back==='game' && S.screen!=='game') setScreen('game');
 }
 function commitArtRename(reset){
   const id=_renamingArt; if(!id) return closeArtRename();
+  const from=_renameFrom;
   const d=artDef(id);
   S.artName = S.artName || {};
   const v = reset ? '' : (el('an-input').value||'').trim();
@@ -15800,7 +15828,10 @@ function commitArtRename(reset){
   closeArtRename();
   toast('技の名前を「'+artName(d)+'」にした');
   renderArtSlots();
-  if(S.screen==='char') renderKeepScroll('scr-char', renderChar);
+  /* 閃いて開いた窓のときは、ステータス画面を描き直さない——
+     決めたらそのまま盤面へ戻す（依頼）。
+     ✎ から開いたときだけ、下の一覧を新しい名前で描き直す。 */
+  if(from!=='game' && S.screen==='char') renderKeepScroll('scr-char', renderChar);
 }
 bindTap(el('an-ok'),    ()=>commitArtRename(false));
 bindTap(el('an-reset'), ()=>commitArtRename(true));
