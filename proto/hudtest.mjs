@@ -680,4 +680,47 @@ R.modalPrimaryStaysReachable = await pg.evaluate(async ()=>{
           ok: tested>=3 && allOverflowed && allSticky && allReachable};
 });
 
+/* ---------- 底に貼り付けてもボタンの見た目は変えない ----------
+   報告「緑枠のアクションボタンの縦幅が短くなって、文字が中央に来ていない」。
+   貼り付けるための背景と余白を**ボタン自身に**足していたのが原因で、
+   緑の塗りが背景色で潰れて枠だけになり、上下の余白も 8px/2px になっていた。 */
+R.modalPrimaryKeepsItsLook = await pg.evaluate(()=>{
+  const rows=[];
+  for(const id of ['m-stairs','m-ret','m-trial','m-clear']){
+    const m=document.getElementById(id); if(!m) continue;
+    const btn=m.querySelector(':scope > .box > button.primary'); if(!btn) continue;
+    m.classList.add('on');
+    const cs=getComputedStyle(btn);
+    const h=btn.getBoundingClientRect().height;
+    rows.push({id,
+      bg:cs.backgroundColor,
+      padTop:parseFloat(cs.paddingTop), padBottom:parseFloat(cs.paddingBottom),
+      height:Math.round(h), position:cs.position});
+    m.classList.remove('on');
+  }
+  // 素の button の値（比較の基準）
+  const ref=document.createElement('button');
+  ref.className='primary'; ref.textContent='基準';
+  document.body.appendChild(ref);
+  const rcs=getComputedStyle(ref);
+  const refPadTop=parseFloat(rcs.paddingTop), refPadBottom=parseFloat(rcs.paddingBottom);
+  const refBg=rcs.backgroundColor, refH=Math.round(ref.getBoundingClientRect().height);
+  ref.remove();
+
+  const greenKept = rows.every(r=>r.bg===refBg);
+  const centered  = rows.every(r=>Math.abs(r.padTop-r.padBottom)<0.5);
+  const sameAsPlain = rows.every(r=>r.padTop===refPadTop && r.padBottom===refPadBottom);
+  const tallEnough  = rows.every(r=>r.height>=refH-1);
+  const stillPinned = rows.every(r=>r.position==='sticky');
+  return {rows, ref:{bg:refBg, padTop:refPadTop, padBottom:refPadBottom, height:refH},
+          tested: rows.length,
+          keepsGreenFill: greenKept,
+          textVerticallyCentered: centered,
+          paddingSameAsPlainButton: sameAsPlain,
+          heightNotShrunk: tallEnough,
+          stillPinnedToBottom: stillPinned,
+          ok: rows.length>=3 && greenKept && centered && sameAsPlain
+              && tallEnough && stillPinned};
+});
+
 await done(b, errs, R);

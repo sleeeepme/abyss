@@ -455,11 +455,16 @@
      **押せないボタンは無いのと同じ。** 箱の底に貼り付ける。
      中身が短い窓では貼り付く先が無いので、見た目は今までどおり。
      下に敷く帯は、下の行が透けて重なって読めなくなるのを防ぐため。 */
-  .modal .box > .btnrow,
-  .modal .box > button.primary{
+  .modal .box > .btnrow{
     position:sticky; bottom:0; z-index:2;
     background:var(--bg); padding:8px 0 2px;
     box-shadow:0 -12px 16px -10px var(--bg)}
+  /* ボタン単体のときは、**ボタンそのものに背景も余白も足さない。**
+     足すと緑の塗りが消えて枠だけになり、縦幅も縮んで字が中央から外れる（報告）。
+     下に敷く帯は、外へ広げる影で作る（箱が overflow を切るので下側ははみ出さない）。 */
+  .modal .box > button.primary{
+    position:sticky; bottom:0; z-index:2;
+    box-shadow:0 0 0 10px var(--bg), 0 -14px 18px -10px var(--bg)}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
 
   /* ---------- 街（ハブ） ----------
