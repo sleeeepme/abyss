@@ -352,6 +352,32 @@ R.shardSurvivesDeath = await pg.evaluate(()=>{
           goldStillLost: S.gold===0};
 });
 
+// 4-b2. 死ぬと倉庫の所持金も半分失う（今回の探索ぶんは対象外・二重に削らない）
+R.stashHalvesOnDeath = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={hp:8}; startRun(9);
+  S.gold=1000;           // 死ぬ前から倉庫にあった分
+  S.run.gold=200;        // 今回の探索ぶん（別枠で半分だけ銀行に入る）
+  S.hero.hpNow=0;
+  die();
+  const txtHalved=(el('d-lost').innerHTML||'');
+  document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+  const afterHalved=S.gold;
+  // 死ぬ前の倉庫が0なら、半分失ったという表示自体が出ない
+  S.hero=newHero(); S.upg={hp:8}; startRun(9);
+  S.gold=0; S.run.gold=0; S.deaths=0; S.abyssCall=false;
+  S.hero.hpNow=0;
+  die();
+  const txtEmpty=(el('d-lost').innerHTML||'');
+  document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
+  S.abyssCall=false;
+  return {afterHalved, expected:600,
+          halvesPreexistingStash: afterHalved===600,
+          saysHalved: txtHalved.indexOf('所持金を半分失った')>=0,
+          silentWhenNothingToLose: txtEmpty.indexOf('所持金を半分失った')<0,
+          ok: afterHalved===600 && txtHalved.indexOf('所持金を半分失った')>=0
+              && txtEmpty.indexOf('所持金を半分失った')<0};
+});
+
 /* 4-c. 倒した瞬間に口座へ入る（実際の killEnemy 経由）。
         床には落とさない——拾いに行かせると、倒した数と手に入るSPがずれる。
         逃げながら倒した分や、危なくて近寄れなかった分が消えてしまう。 */

@@ -3587,6 +3587,12 @@ const DEATH_GOLD_BANK_RATE = 0.5;
    「取りに行けばレベルが戻る」ではなく「取りに行けば少し楽になる」にしたいから。
    全部返すと死が無料になり、返さないと再走が苦行になる。その間を狙っている。 */
 const GRAVE_XP_RATE   = 0.30;
+/* 死ぬと、今回の探索とは無関係に**倉庫の所持金も半分失う**。
+   死のコストが軽すぎるという要望を受けて、今まで「無事」だった
+   持ち越し分にも手を付ける。今回の探索ぶん（DEATH_GOLD_BANK_RATE で
+   銀行に入る分）は既にGRAVE周りで半分に削ってあるので、二重に削らない
+   ——ここで半分にするのは死ぬ**前から**倉庫にあった分だけ。 */
+const DEATH_STASH_LOSS_RATE = 0.5;
 /* ---------- 遺体の風化 ----------
    「明日また開く理由」を、贈り物ではなく圧力の側から作る。
    デイリー報酬は「得だけの物を置かない」という原則と正面衝突するが、
@@ -10481,6 +10487,10 @@ function die(){
      ——全ロストだと、死んだ直後に選び直した深い階へ丸腰で送り込むことになる。
      残り半分は上の keptGold として遺体に残るので、取り戻せば実質もっと戻る。 */
   const bankedOnDeath = Math.floor(S.run.gold * DEATH_GOLD_BANK_RATE);
+  // 死ぬ前から倉庫にあった分の半分を失う（今回の探索ぶんは対象外）
+  const stashBeforeDeath = S.gold;
+  const stashLost = Math.floor(stashBeforeDeath * DEATH_STASH_LOSS_RATE);
+  S.gold = stashBeforeDeath - stashLost;
   S.gold += bankedOnDeath;
   // 黒鉄も金と同じ割合だけ遺体に残る。取りに戻れば回収できる。
   const keptOre = {};
@@ -10530,6 +10540,10 @@ function die(){
   if(S.run.gold>0){
     html += '<div style="color:#d6b34a;margin-top:14px">'
       + 'この探索の所持金 <b>'+S.run.gold+' G</b> のうち <b>'+bankedOnDeath+' G</b> を持ち帰った</div>';
+  }
+  if(stashLost>0){
+    html += '<div style="color:#e0785a;margin-top:14px">'
+      + '所持金を半分失った</div>';
   }
   /* 死んだ画面で唯一の前進を見せる。ここが空だと、死＝完全な無駄になる。 */
   if(S.shardsRun>0){
