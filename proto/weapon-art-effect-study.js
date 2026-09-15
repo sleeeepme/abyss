@@ -534,6 +534,10 @@
     }
     c.save();c.translate(Math.round(x),Math.round(y));c.rotate(angle);c.scale(scale,scale);
     activation(c,0,0,age-.015,id.startsWith('gt')?1.12:.9);
+    // These multi-hit simulations apply their first hit on the firing frame.
+    // Their study scenes include a short anticipation, so pre-roll only the
+    // attack ribbon while keeping the activation spark on the real clock.
+    const motionAge=age+(id==='dgslash'?.10:id==='gtspin'?.09:0);
     const radius=Math.max(42,range*48),stretch=Math.max(1,radius/92);
     const attack=(kind,a,ang=0,s=1,elem=element)=>normal(c,kind,a,0,0,ang,s,false,elem);
     const lineAttack=(kind,a,s=1,elem=element)=>{c.save();c.scale(stretch,1);attack(kind,a,0,s,elem);c.restore();};
@@ -551,7 +555,7 @@
     else if(id==='bwrain') [0,1,2,3,4,5,6,7].forEach((i)=>{c.save();c.translate((i%4-1.5)*18,-radius*.5+(i%2)*12);attack('bow',age-(.1+i*.04),Math.PI/2,.78);c.restore();});
     else if(id==='bwrapid') [.1,.24,.38,.52,.66].forEach((d,i)=>lineAttack('bow',age-d,1.12));
     else if(id==='bwburst'){const main=age-.14;c.save();c.scale(stretch,1);burstBeam(c,main);attack('bow',main,0,1.52,'fire');c.restore();}
-    else if(id==='dgslash') [.1,.22,.34].forEach((d,i)=>attack('dagger',age-d,[-.48,.42,-.08][i],i===2?1.12:1.03));
+    else if(id==='dgslash') [.1,.22,.34].forEach((d,i)=>attack('dagger',(motionAge-d)*.58,[-.48,.42,-.08][i],i===2?1.12:1.03));
     else if(id==='dgdance') for(let i=0;i<3;i++){const a=age*3.9+i*TAU/3,xx=Math.cos(a)*radius,yy=Math.sin(a)*radius*.82;normal(c,'dagger',(age+i*.11)%.34,xx,yy,a+Math.PI/2,.78,false,element);daggerGlyph(c,xx,yy,a+Math.PI/2,.7);}
     else if(id==='dgmirage'){attack('dagger',age-.1,-1.6,.82);attack('dagger',age-.23,1.55,.72);}
     else if(id==='mcdouble'){attack('hammer',age-.11,.18,1.02);attack('hammer',age-.31,-.16,1.08);}
@@ -559,7 +563,7 @@
     else if(id==='mcshield'){attack('hammer',age-.08,-Math.PI/2,.72);shieldGlyph(c,0,0,age-.14);}
     else if(id==='sticicle') [.18,.38,.58].forEach((d,i)=>iceSpike(c,38+i*42,10,age-d,1+i*.08));
     else if(id==='stbolt') [[.18,35,-28],[.39,72,-12],[.61,68,36],[.84,18,42],[1.06,95,4]].forEach(([d,xx,yy])=>lightningDrop(c,xx,yy,age-d));
-    else if(id==='gtspin'){orbitAttack(c,{t:age,start:.09,cx:0,cy:0,r:radius,width:6.4,angle:-2.55,life:.46});orbitAttack(c,{t:age,start:.31,cx:0,cy:0,r:radius,width:5.5,angle:-2.1,life:.46});}
+    else if(id==='gtspin'){orbitAttack(c,{t:motionAge,start:.09,cx:0,cy:0,r:radius,width:6.4,angle:-2.55,life:.46});orbitAttack(c,{t:motionAge,start:.31,cx:0,cy:0,r:radius,width:5.5,angle:-2.1,life:.46});}
     else if(id==='gtquake'){attack('greatsword',age-.08,0,1.1);c.save();c.scale(Math.max(1,range/5),1);earthWaveSprite(c,0,-69,age-.22);c.restore();}
     else if(id==='gtupper') ragingUpperSprite(c,-18,-116,age-.1);
     c.restore();

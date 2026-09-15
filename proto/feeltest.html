@@ -207,6 +207,15 @@ frame.onload=async()=>{
           before.e===after.e&&before.f===after.f&&pixels.some((v,i)=>i%4===3&&v>0);
       }finally{ctx=save;}
     });
+    check('Reported multi-hit arts paint beyond the activation spark immediately',()=>{
+      const mod=window.WeaponArtEffectStudy,paint=id=>{
+        const c=document.createElement('canvas');c.width=c.height=420;const x=c.getContext('2d');
+        mod.renderEffect(x,{id,age:.05,x:210,y:210,angle:0,scale:.8,range:id==='gtspin'?3.2:1.7});
+        const d=x.getImageData(0,0,420,420).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n;
+      };
+      const activationOnly=paint('unknown');
+      return paint('dgslash')>activationOnly*4&&paint('gtspin')>activationOnly*4;
+    });
     check('All 24 weapon arts reach their real fireArt and draw paths',()=>{
       fresh();enterFloor(1);syncFeel();W.seen.forEach(r=>r.fill(1));
       const defs=Object.values(WEAPON_ARTS).flat(),room=W.fl.rooms.find(r=>r.w>=8&&r.h>=6);
