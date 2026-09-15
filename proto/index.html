@@ -56,14 +56,19 @@
        太さ3の黒縁を敷いているのと同じ見た目を、DOM側でも text-shadow で真似る。
        ぼかし（blur）を使うと、この極小ドットフォントでは輪郭がにじんで
        「…」のような区切り記号が短い横棒＝アンダーバーに潰れて見える事故を招く
-       （報告：固有名詞の後ろに謎の_）。だから blur は 0 に固定し、
-       8方向の1pxオフセットだけで硬い輪郭を作る。
+       (報告：固有名詞の後ろに謎の_)。8方向×{1px,2px} を重ねて
+       label() のstrokeText(lineWidth=3)と同じくらいの太さのリングにする
+       (1pxだけだと label() よりだいぶ細く見える、という指摘への対応)。
        盤面に直置きの文字（HUD・ログ・広場の名札など）にだけ使う——
        すでに背景板を持つバッジやボタンには要らない（二重に敷くと潰れて見える）。 */
     --pxshadow:1px 0 0 rgba(6,8,12,.9), -1px 0 0 rgba(6,8,12,.9),
       0 1px 0 rgba(6,8,12,.9), 0 -1px 0 rgba(6,8,12,.9),
       1px 1px 0 rgba(6,8,12,.9), -1px -1px 0 rgba(6,8,12,.9),
-      1px -1px 0 rgba(6,8,12,.9), -1px 1px 0 rgba(6,8,12,.9);
+      1px -1px 0 rgba(6,8,12,.9), -1px 1px 0 rgba(6,8,12,.9),
+      2px 0 0 rgba(6,8,12,.9), -2px 0 0 rgba(6,8,12,.9),
+      0 2px 0 rgba(6,8,12,.9), 0 -2px 0 rgba(6,8,12,.9),
+      2px 2px 0 rgba(6,8,12,.9), -2px -2px 0 rgba(6,8,12,.9),
+      2px -2px 0 rgba(6,8,12,.9), -2px 2px 0 rgba(6,8,12,.9);
   }
   /* 太字は「本物があるときだけ」。美咲に太字は無いので、
      ここを切らないとブラウザが字をずらして重ね、ドットが潰れる。 */
@@ -4763,10 +4768,11 @@ function tickArts(dt){
       // 予約された着弾。t が尽きた瞬間に1回だけ判定する
       if(f.t<=0 && !f.hit){
         f.hit=true;
-        W.fx.push({t:'ultring', x:f.x, y:f.y, r:0, max:f.r, life:0.18, maxLife:0.18, col:f.col});
+        W.fx.push({t:'ultring', artId:f.artId, x:f.x, y:f.y, r:0, max:f.r, life:0.18, maxLife:0.18, col:f.col});
         nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
           if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
           e.hp-=f.dmg; e.hit=Math.max(e.hit,0.08);
+          if(f.artId && typeof feelImpact==='function') feelImpact(e,{x:f.x,y:f.y},false,'pierce','neutral');
           pop(e.x, e.y-0.3, f.dmg, f.col);
           if(e.hp<=0) killEnemy(e, f.src);
         });
@@ -4801,7 +4807,7 @@ function tickArts(dt){
           artNow(f.c);
           const tgt=artTargetFor(f.c, f.def.r);
           if(tgt){
-            W.fx.push({t:'ultline', x:f.c.x, y:f.c.y, x2:tgt.x, y2:tgt.y,
+            W.fx.push({t:'ultline', artId:f.def.id, x:f.c.x, y:f.c.y, x2:tgt.x, y2:tgt.y,
                        life:0.14, maxLife:0.14, col:f.col});
             artHit(f.c, f.def, tgt, f.def.mult);
           }
@@ -4852,7 +4858,7 @@ function tickArts(dt){
           if(f.c.isPlayer){ if(!solid(lx,ly)){ P.x=lx; P.y=ly; } }
           else if(!solid(lx,ly)){ f.c.ally.x=lx; f.c.ally.y=ly; }
           artNow(f.c);
-          W.fx.push({t:'ultring', x:tgt.x, y:tgt.y, r:0, max:1.8, life:0.35, maxLife:0.35, col:f.col});
+          W.fx.push({t:'ultring', artId:f.def.id, x:tgt.x, y:tgt.y, r:0, max:1.8, life:0.35, maxLife:0.35, col:f.col});
           artHit(f.c, f.def, tgt, f.def.mult);
         }
       }
@@ -5716,8 +5722,13 @@ function outfitForBeacon(h, depth){
    祭壇で恩寵を次のキャラへ渡す仕掛けと辻褄が合うし、
    「何代目で第何階層まで行けたか」が、そのまま記録の読み方になる。 */
 const GEN_KANJI=['','','二','三','四','五','六','七','八','九','十'];
+/* 代を跨いでも変わらない、元の名前そのもの(「　二代目」等は含まない)。
+   広場のような幅の狭い場所で heroName() をそのまま出すと、代が進むほど
+   長くなる「　二代目」が収まらず文字が見切れる(報告)。そういう場所は
+   これを使う。 */
+function heroBaseName(){ return (S.name||'').trim() || '冒険者'; }
 function heroName(){
-  const base=(S.name||'').trim() || '冒険者';
+  const base=heroBaseName();
   const gen=(S.deaths||0)+1;
   if(gen<=1) return base;
   return base+'　'+(GEN_KANJI[gen]||gen)+'代目';
@@ -8420,7 +8431,7 @@ function artFaceAngle(c, fallback){
 }
 function artStrikeRing(c, def, ang){
   artNow(c);
-  W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:def.r, life:0.34, maxLife:0.34, col:def.col});
+  W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:def.r, life:0.34, maxLife:0.34, col:def.col});
   nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
     if(e.dead || Math.hypot(e.x-c.x, e.y-c.y) > def.r+e.r) return;
     artHit(c, def, e, def.mult);
@@ -8429,7 +8440,7 @@ function artStrikeRing(c, def, ang){
 function artStrikeCone(c, def, ang){
   artNow(c);
   const half=(def.arc||90)*Math.PI/180/2;
-  W.fx.push({t:'lwave', x:c.x, y:c.y, a:ang, life:0.3, max:0.3, r:def.r, arc:half,
+  W.fx.push({t:'lwave', artId:def.id, x:c.x, y:c.y, a:ang, life:0.3, max:0.3, r:def.r, arc:half,
              dt:def.dt||c.st.dmgType});
   nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
     if(e.dead) return;
@@ -8443,7 +8454,7 @@ function artStrikeCone(c, def, ang){
 function artStrikeLine(c, def, ang){
   artNow(c);
   const len=def.len, wide=def.wide||0.7;
-  W.fx.push({t:'ultbeam', x:c.x, y:c.y, a:ang, len, wide, life:0.28, maxLife:0.28, col:def.col});
+  W.fx.push({t:'ultbeam', artId:def.id, x:c.x, y:c.y, a:ang, len, wide, life:0.28, maxLife:0.28, col:def.col});
   const onLine=[];
   nearEnemies(c.x, c.y, len+1).forEach(e=>{
     if(e.dead) return;
@@ -8481,13 +8492,14 @@ function fireArt(def, src){
   const ang=Math.atan2(c.diry||0, c.dirx||1);
   sayArt(c.x, c.y, artName(def), def.col);
   if(c.isPlayer) feelUltimate(P, def.col); else feelUltimate(c.ally, def.col);
+  if(typeof feelWeaponArtStart==='function')feelWeaponArtStart(c.isPlayer?P:c.ally,def,c.x,c.y,ang);
 
   if(def.k==='dash'){
     /* 踏み込み。壁は抜けない（瞬歩と同じ作法で、通り道を線分で1回だけ取る）。 */
     const from={x:c.x, y:c.y};
     const stop=dashStop(c.x, c.y, ang, def.dist, (c.ent&&c.ent.r)||0.32);
     const gx=stop.x, gy=stop.y;
-    W.fx.push({t:'ultline', x:from.x, y:from.y, x2:gx, y2:gy, life:0.32, maxLife:0.32, col:def.col});
+    W.fx.push({t:'ultline', artId:def.id, x:from.x, y:from.y, x2:gx, y2:gy, life:0.32, maxLife:0.32, col:def.col});
     W.enemies.forEach(e=>{
       if(e.dead) return;
       const dx=gx-from.x, dy=gy-from.y, len2=dx*dx+dy*dy||1e-6;
@@ -8499,18 +8511,18 @@ function fireArt(def, src){
   }else if(def.k==='single'){
     const tgt=artTargetFor(c, def.r);
     if(tgt){
-      W.fx.push({t:'ultline', x:c.x, y:c.y, x2:tgt.x, y2:tgt.y, life:0.3, maxLife:0.3, col:def.col});
+      W.fx.push({t:'ultline', artId:def.id, x:c.x, y:c.y, x2:tgt.x, y2:tgt.y, life:0.3, maxLife:0.3, col:def.col});
       artHit(c, def, tgt, def.mult);
     }
 
   }else if(def.k==='invuln'){
     if(c.isPlayer) P.invuln=Math.max(P.invuln||0, def.t);
     else c.ally.iframe=Math.max(c.ally.iframe||0, def.t);
-    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:1.8, life:0.45, maxLife:0.45, col:def.col});
+    W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:1.8, life:0.45, maxLife:0.45, col:def.col});
 
   }else if(def.k==='barrier'){
     c.ent.barrier = Math.max(c.ent.barrier||0, 1);
-    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:2.2, life:0.5, maxLife:0.5, col:def.col});
+    W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:2.2, life:0.5, maxLife:0.5, col:def.col});
 
   }else if(def.k==='orbit'){
     /* 回る刃。**本人に付いて回る**ので、置き型（field）とは別に持つ。 */
@@ -8530,7 +8542,7 @@ function fireArt(def, src){
     const st=artStats(c, def);
     for(let i=0;i<n;i++){
       const a2=rnd()*Math.PI*2, rad=Math.sqrt(rnd())*def.r;
-      W.arts.push({kind:'arrow', x:tgt.x+Math.cos(a2)*rad, y:tgt.y+Math.sin(a2)*rad,
+      W.arts.push({kind:'arrow', artId:def.id, x:tgt.x+Math.cos(a2)*rad, y:tgt.y+Math.sin(a2)*rad,
                    t:RAIN_FALL+rnd()*RAIN_SPREAD, fall:RAIN_FALL, r:RAIN_HIT_R,
                    dmg:Math.max(1, Math.round(st.atk*def.mult)), lv:c.ent.lv,
                    src:c.isPlayer?S.hero:c.ally, col:def.col, hit:false});
@@ -8561,7 +8573,7 @@ function fireArt(def, src){
       W.pops.push({x:hx, y:hy-0.5, txt:'+'+Math.round(mx*def.healPct/100), c:'#7fe0c0', life:0.8});
     };
     [S.hero, ...livingParty()].forEach(heal);
-    W.fx.push({t:'ultring', x:c.x, y:c.y, r:0, max:def.healR, life:0.5, maxLife:0.5, col:def.col});
+    W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:def.healR, life:0.5, maxLife:0.5, col:def.col});
 
   }else if(def.hits && def.hits>1){
     // 多段。1発目はその場で、残りは間を置いて刻む
@@ -12920,6 +12932,7 @@ function draw(){
     if(sx<-160||sy<-160||sx>innerWidth+160||sy>innerHeight+160) return;
     const k=clamp(f.t/(f.max||f.fall||1), 0, 1);
     ctx.save();
+    if(typeof drawFeelPersistentArt==='function'&&drawFeelPersistentArt(f,camX,camY)){ctx.restore();return;}
     if(f.kind==='arrow'){
       /* 落ちてくる矢。**落ちる前に置き場所を見せる**——
          予兆なしに25本降ると、何が起きたのか分からないまま敵が減る。 */
@@ -13046,6 +13059,9 @@ function draw(){
   beginPixelFx();
   try{
   W.fx.forEach(f=>{
+    // Weapon arts have approved per-weapon renderers in game-feel.js. Keep these
+    // records for timing only; drawing the old rings/beams here would double the effect.
+    if(f.artId) return;
     if(f.t==='levelup'){       // レベルアップ：広がる二重の輪
       const k=1-f.life/f.max;
       ctx.save();
@@ -13271,6 +13287,7 @@ function draw(){
   });
   // 採用済みの武器別攻撃と、実属性で決まるヒットエフェクト。
   W.fx.forEach(f=>{ if(f.t==='swing') drawSwing(f, camX, camY); });
+  if(typeof drawFeelWeaponArts==='function')drawFeelWeaponArts(camX,camY);
   _drawStage='ヒット効果';
   drawFeelHits(camX,camY);
   // ダメージ数値
@@ -15157,8 +15174,10 @@ function renderHubPlaza(){
       const isHero=(m===S.hero);
       const btn=box.querySelector(`[data-hubava="${CSS.escape(isHero?'hero':String(m.uidA))}"]`);
       const nm=btn && btn.querySelector('.nm');
-      /* 広場の足元は二つ名を出さない（下の理由を参照）。素の名前だけ最新化する。 */
-      if(nm) nm.textContent = m.name;
+      /* 広場の足元は二つ名を出さない（下の理由を参照）。素の名前だけ最新化する。
+         主人公は heroBaseName() ——heroName() だと代が進むほど「　二代目」
+         が伸びて幅に収まらず見切れる（報告）。 */
+      if(nm) nm.textContent = isHero ? heroBaseName() : m.name;
     });
     return;
   }
@@ -15172,8 +15191,11 @@ function renderHubPlaza(){
        text-overflow:ellipsis 頼みだった頃は「…」がこの極小フォントで
        短い横棒に潰れ、固有名詞の後ろに謎の下線が付いたように見えた
        （報告：固有名詞の後ろに_）。二つ名は仲間をタップした先の
-       詳細（openAllyEquip）で読める。 */
-    const nm=m.name;
+       詳細（openAllyEquip）で読める。
+       主人公も同じ理由で heroName() ではなく heroBaseName() を使う——
+       代を重ねるほど「　二代目」が伸びて幅に収まらず見切れていた
+       （報告：字が見切れてる。ここは2代目は出さなくてOK）。 */
+    const nm=isHero ? heroBaseName() : m.name;
     const p=pts[i];
     const seedKey=isHero?'hero':String(m.uidA);
     const seed=hubAnimSeed(seedKey);
@@ -17806,6 +17828,7 @@ initHudOnce();
 resize(); setScreen('title'); requestAnimationFrame(tick);
 </script>
 <script src="ally-effect-study.js"></script>
+<script src="weapon-art-effect-study.js"></script>
 <script src="item-icons.js"></script>
 <script src="game-feel.js"></script>
 <script>

@@ -270,22 +270,28 @@ R.plazaFollowsTheNewGeneration = await pg.evaluate(async ()=>{
   // 別の姿の新しい代に差し替える（同じ絵を引くと差が出ないので必ず変える）
   const keys=CharacterArt.heroArtKeys;
   const other=keys.find(k=>k!==CharacterArt.heroKey(S.hero));
+  // hero.name 自体は代ごとに変わりうる（「　二代目」等が付く）が、
+  // 広場の表示名はそれに引きずられず heroBaseName() で不変にする方針
+  // （「字が見切れてる」報告への対応）。なのでここで hero.name を
+  // わざと変えても、広場の名前表示は変わらないことを確認する。
   S.hero=newHero(); S.hero.party=[]; S.hero.artKey=other; S.hero.name='次の代';
   renderTown();
   await new Promise(r=>setTimeout(r,120));
   const after=shot();
   const im=CharacterArt.image(other);
   const want = im ? im.getAttribute('src').length+':'+im.getAttribute('src').slice(-40) : '';
+  const base=heroBaseName();
   return {beforeKey:before.key, afterKey:after.key,
           beforeName:before.name, afterName:after.name,
           hadArt: before.src.length>0,
           keyChanged: before.key!==after.key,
           artChanged: before.src!==after.src,
           showsNewArt: !!want && after.src===want,
-          nameChanged: after.name==='次の代',
+          // 絵（代）は変わっても、広場の名前表示は heroBaseName() のまま不変
+          nameStaysBase: before.name===base && after.name===base,
           ok: before.src.length>0 && before.key!==after.key
               && before.src!==after.src && !!want && after.src===want
-              && after.name==='次の代'};
+              && before.name===base && after.name===base};
 });
 
 await b.close();

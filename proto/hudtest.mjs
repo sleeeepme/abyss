@@ -767,4 +767,31 @@ R.hudButtonsHaveNoShadow = await pg.evaluate(()=>{
   return {rows, allNone, ok: allNone};
 });
 
+/* 代を重ねるほど heroName() が「　二代目」「　三代目」…と伸びる。
+   広場の名札（幅72px）にそのまま出すと、文字が見切れる
+   （報告：字が見切れてる。ここは2代目は出さなくてOK）。
+   heroBaseName() で代の表記を落として、必ず収まることを確かめる。
+   合わせて、縁取りが敵名の label()（lineWidth:3, rgba(6,8,12,.9)）と
+   同じ太さ・濃さになっているかも見る（報告：太さとアルファが違いそう）。 */
+R.hubNameDropsGenerationSuffix = await pg.evaluate(()=>{
+  S.name='レルエ';
+  S.hero=newHero();
+  S.deaths=3;                 // 四代目まで伸ばして、より厳しい条件で見る
+  S.hero.name=heroName();
+  S.hero.party=[];
+  renderHubPlaza();
+  const nm=document.querySelector('#hub-avatars .hub-ava .nm');
+  const shown=nm.textContent;
+  const fits=nm.scrollWidth<=nm.clientWidth;
+  const shadow=getComputedStyle(nm).textShadow;
+  // rgba(6,8,12,.9) を8方向×2半径（計16個）敷いているはず——1px分だけだと細すぎる、の対応
+  const shadowLayers=(shadow.match(/rgba\(6, 8, 12, 0\.9\)/g)||[]).length;
+  const alphaMatchesLabel = shadow.indexOf('rgba(6, 8, 12, 0.9)')>=0;
+  return {fullName:S.hero.name, shown, fits,
+          droppedSuffix: shown==='レルエ' && shown.indexOf('代目')<0,
+          shadowLayers, alphaMatchesLabel,
+          thickEnough: shadowLayers>=8,   // 1pxだけの8方向より太い
+          ok: shown==='レルエ' && fits && alphaMatchesLabel && shadowLayers>=8};
+});
+
 await done(b, errs, R);
