@@ -52,6 +52,18 @@
        CSS のフォント指定は1文字ずつ解決されるので、並び順が
        そのまま「どの字をどの書体で出すか」の指定になる。 */
     --font:"Silkscreen","Misaki",-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    /* 文字の縁取り。キャンバス側の label()（敵名など）が strokeText で
+       太さ3の黒縁を敷いているのと同じ見た目を、DOM側でも text-shadow で真似る。
+       ぼかし（blur）を使うと、この極小ドットフォントでは輪郭がにじんで
+       「…」のような区切り記号が短い横棒＝アンダーバーに潰れて見える事故を招く
+       （報告：固有名詞の後ろに謎の_）。だから blur は 0 に固定し、
+       8方向の1pxオフセットだけで硬い輪郭を作る。
+       盤面に直置きの文字（HUD・ログ・広場の名札など）にだけ使う——
+       すでに背景板を持つバッジやボタンには要らない（二重に敷くと潰れて見える）。 */
+    --pxshadow:1px 0 0 rgba(6,8,12,.9), -1px 0 0 rgba(6,8,12,.9),
+      0 1px 0 rgba(6,8,12,.9), 0 -1px 0 rgba(6,8,12,.9),
+      1px 1px 0 rgba(6,8,12,.9), -1px -1px 0 rgba(6,8,12,.9),
+      1px -1px 0 rgba(6,8,12,.9), -1px 1px 0 rgba(6,8,12,.9);
   }
   /* 太字は「本物があるときだけ」。美咲に太字は無いので、
      ここを切らないとブラウザが字をずらして重ね、ドットが潰れる。 */
@@ -200,8 +212,14 @@
   #artbtn.on{display:flex}
   #artbtn.ready{border-color:currentColor;box-shadow:0 0 12px -2px currentColor}
   #artbtn i{font-style:normal;font-size:19px;line-height:1}
+  /* 名前変更で長い名前を付けられる（最大12文字）が、このボタンは直径62px。
+     以前は text-overflow:ellipsis で切っていたが、「…」がこの極小ドット
+     フォントでは短い横棒に潰れて見え、名付けた技の後ろに謎の下線が
+     付いたように見えた（報告：固有名詞の後ろに_）。
+     切り捨てず、文字数に応じて fitArtNameSize() が font-size を縮めて
+     必ず全部入るようにする——overflow:hidden は万一のための安全網。 */
   #artbtn b{font-size:10px;font-weight:700;letter-spacing:.02em;margin-top:1px;
-    max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    max-width:58px;overflow:hidden;white-space:nowrap}
   #artbtn s{text-decoration:none;font-size:11px;font-variant-numeric:tabular-nums;
     font-weight:700;margin-top:1px}
   #adbar b{color:var(--dim);font-weight:600;letter-spacing:.14em;font-size:12px;
@@ -268,9 +286,13 @@
      キャンバス側の label() が黒で縁取っているのと同じ理由で、こちらにも影を敷く。
      背景を付けて解決すると画面が箱だらけになるので、影だけで持たせる。 */
   #hud{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;display:none;z-index:5;
-       text-shadow:0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.7);
+       text-shadow:var(--pxshadow);
        padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))}
   #hud.on{display:block}
+  /* ボタン・バッジは自前の背景板を持つので縁取りは要らない。
+     #hud の縁取りをそのまま継承すると、丸背景の上でアイコンや数字が
+     二重に縁取られて潰れて見える。ここだけ打ち消す。 */
+  #guardbtn,#ultbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn{text-shadow:none}
   #topbar{display:flex;gap:10px;align-items:flex-start}
   #bars{flex:1;max-width:230px}
   /* ドットの画面なので、ゲージの角は丸めない（丸めるとそこだけ解像度が違って見える） */
@@ -351,7 +373,7 @@
   /* top は layoutHud() が毎回入れ直す。この 150px は初期値でしかない。 */
   /* 枠も背景も持たせない。数秒で消える1行なので、囲むと「常設のUI」に見えてしまう。
      背景が無くても読めるように、黒フチだけは濃いめに残す。 */
-  #log{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 155px);transform:translateX(-50%);font-size:12px;line-height:1.6;color:#d6dfdb;width:max-content;max-width:min(70%,560px);text-align:center;pointer-events:none;text-shadow:0 1px 2px #000,0 0 5px #000,0 0 9px #000}
+  #log{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 155px);transform:translateX(-50%);font-size:12px;line-height:1.6;color:#d6dfdb;width:max-content;max-width:min(70%,560px);text-align:center;pointer-events:none;text-shadow:var(--pxshadow)}
   #log:empty{display:none}
   #log div{opacity:.9}
 
@@ -480,8 +502,9 @@
   .hubui.banner{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   .hubui>*{pointer-events:auto}
   .hub-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  /* 自前の背景板（rgba(10,12,18,.55)）を持つバッジなので、縁取りは要らない。 */
   .hub-id{background:rgba(10,12,18,.55);border-radius:10px;padding:6px 12px;
-    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7)}
+    text-shadow:none}
   .hub-id .nm{font-size:16px;font-weight:700}
   .hub-id .res{font-size:12px;margin-top:2px;display:flex;gap:10px;white-space:nowrap}
   .hub-id .res b{color:#d6b34a;font-weight:700}
@@ -504,11 +527,11 @@
   .hub-dive{position:absolute;left:50%;top:27%;transform:translate(-50%,-50%);
     display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2;
     width:auto;background:none;border:none;padding:0;
-    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.8)}
+    text-shadow:var(--pxshadow)}
   /* 白い▼。押せることが伝わるよう、常にゆっくり上下に揺らしておく
      （静止画だと石段に埋もれて気付かれにくいため）。 */
   .hub-dive .tri{font-size:22px;line-height:1;color:#fff;
-    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.85);
+    text-shadow:var(--pxshadow);
     animation:hubDiveBob 1.6s ease-in-out infinite}
   .hub-dive b{font-size:15px;font-weight:700;color:#fff}
   @keyframes hubDiveBob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
@@ -528,9 +551,17 @@
     .hub-ava-art{animation:none}
     .hub-ava,.hub-ava-wrap,.hub-dive .tri{transition:none;animation:none}
   }
+  /* 二つ名は出さない（renderHubPlaza 参照）ので、ここでの表示は素の名前だけ。
+     以前は allyFullName（二つ名つき）を出しており、この幅に収まらず
+     text-overflow:ellipsis が働くことがあった。この極小ドットフォントでは
+     「…」が短い横棒に潰れて見え、固有名詞の後ろに謎の下線が付いたように
+     見える事故のもとだった（報告：固有名詞の後ろに_）。
+     素の名前は最大でも数文字で必ず収まるので、ellipsis 自体を持たせない
+     ——万一のため overflow:hidden だけは安全網として残すが、
+     「…」を足す仕組みは使わない。 */
   .hub-ava .nm{font-size:11px;font-weight:700;white-space:nowrap;max-width:72px;
-    overflow:hidden;text-overflow:ellipsis;
-    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.75)}
+    overflow:hidden;
+    text-shadow:var(--pxshadow)}
   .hub-bottom{display:flex;flex-direction:column;gap:8px}
   .hub-row2{display:flex;justify-content:space-between;gap:10px}
   .hub-row5{display:flex;justify-content:space-between;gap:6px}
@@ -14020,7 +14051,9 @@ function updateHUD(){
     ab.classList.toggle('ready', ar);
     hset('artbtn.col', ar ? ad.col : '', v=>ab.style.color=v);
     hset('art-icon.t', ad.icon, v=>el('art-icon').textContent=v);
-    hset('art-nm.t', artName(ad), v=>el('art-nm').textContent=v);
+    const anm=artName(ad);
+    hset('art-nm.t', anm, v=>el('art-nm').textContent=v);
+    hset('art-nm.sz', fitArtNameSize(anm), v=>el('art-nm').style.fontSize=v+'px');
     hset('art-cd.t', ar ? '' : Math.ceil(P.artCd)+'s', v=>el('art-cd').textContent=v);
   }else ab.classList.remove('on');
 
@@ -15124,7 +15157,8 @@ function renderHubPlaza(){
       const isHero=(m===S.hero);
       const btn=box.querySelector(`[data-hubava="${CSS.escape(isHero?'hero':String(m.uidA))}"]`);
       const nm=btn && btn.querySelector('.nm');
-      if(nm) nm.textContent = isHero ? m.name : allyFullName(m);
+      /* 広場の足元は二つ名を出さない（下の理由を参照）。素の名前だけ最新化する。 */
+      if(nm) nm.textContent = m.name;
     });
     return;
   }
@@ -15133,7 +15167,13 @@ function renderHubPlaza(){
   box.innerHTML=members.map((m,i)=>{
     const isHero=(m===S.hero);
     const col=isHero ? '#e8c95a' : jobDef(m.job).col;
-    const nm=isHero ? m.name : allyFullName(m);
+    /* 広場の足元は二つ名（伝説の魔術師、等）を出さず、素の名前だけにする。
+       二つ名込みの allyFullName は幅72pxに収まらないことがあり、
+       text-overflow:ellipsis 頼みだった頃は「…」がこの極小フォントで
+       短い横棒に潰れ、固有名詞の後ろに謎の下線が付いたように見えた
+       （報告：固有名詞の後ろに_）。二つ名は仲間をタップした先の
+       詳細（openAllyEquip）で読める。 */
+    const nm=m.name;
     const p=pts[i];
     const seedKey=isHero?'hero':String(m.uidA);
     const seed=hubAnimSeed(seedKey);
@@ -15859,6 +15899,19 @@ function artName(def){
   if(!def) return '';
   const v = S.artName && S.artName[def.id];
   return (v && v.trim()) ? v : def.nm;
+}
+/* #artbtn の名札は直径62pxの丸ボタンの中、幅58pxしかない。
+   名前変更で最大12文字まで付けられるので、既定の10pxだと長い名前は
+   ほぼ確実に収まらない。以前は text-overflow:ellipsis で切っていたが、
+   この極小ドットフォントは「…」を短い横棒1本に潰して描くため、
+   名付けた技の後ろに謎の下線が付いたように見えていた
+   （報告：固有名詞の後ろに_）。
+   切り捨てずに、全角1文字＝フォントサイズという このフォントの性質を使って
+   「文字数 × サイズ ≦ 58px」になるところまで縮め、全部読める形で収める。 */
+function fitArtNameSize(s){
+  const n=(s||'').length||1, maxW=58, base=10;
+  if(n*base<=maxW) return base;
+  return Math.max(6, Math.floor(maxW/n));
 }
 let _renamingArt=null, _renameFrom=null;
 /* 閃いた技の名前を、演出が出切ってから訊くための待ち行列。

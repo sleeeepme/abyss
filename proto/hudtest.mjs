@@ -723,4 +723,48 @@ R.modalPrimaryKeepsItsLook = await pg.evaluate(()=>{
               && tallEnough && stillPinned};
 });
 
+/* 固有名詞の後ろに謎の_が出る不具合の再発防止。
+   実体は「…」（text-overflow:ellipsis）がこの極小ドットフォントでは
+   短い横棒1本に潰れて描かれること——広場の名札（二つ名込みで幅超過）と
+   技名変更後のHUDバッジ（最大12文字・幅58px）の2箇所で実際に踏んだ。
+   二つ名を落として素の名前だけにする／文字数に応じて縮小する、
+   の2つの直し方をそれぞれ検証する。 */
+R.noStrayUnderscoreOnHubName = await pg.evaluate(()=>{
+  S.hero=newHero(); S.hero.name='カルンル';
+  S.hero.party=[];
+  // 二つ名が付くくらい積んだ仲間（幅72pxに収まらない長さになる）
+  const a=makeAlly(30, S.hero);
+  a.boons=[3,3,3,3,3,3].map((rar,i)=>({id:'b'+i, rar}));
+  a.job='mage'; a.slot=0;
+  S.hero.party.push(a);
+  const full=allyFullName(a);
+  renderHubPlaza();
+  const nm=document.querySelectorAll('#hub-avatars .hub-ava .nm')[1];
+  const shown=nm.textContent;
+  return {epithetWouldHaveShown: full!==a.name && full.length>=6,
+          plazaShowsBareName: shown===a.name,
+          noEllipsisChar: shown.indexOf('…')<0,
+          plazaShadowIsCrisp: getComputedStyle(nm).textShadow.indexOf('rgba(6, 8, 12')>=0
+                            || getComputedStyle(nm).textShadow.indexOf('rgb(6, 8, 12')>=0,
+          ok: shown===a.name && shown.indexOf('…')<0};
+});
+R.longArtNameNeverTruncates = await pg.evaluate(()=>{
+  // 名前変更の上限いっぱい（12文字）でも、切り捨てず縮小して全部見せる
+  const long='ドラゴンの咆哮撃改弐参';
+  const sz=fitArtNameSize(long);
+  const shortName='連撃';
+  const shortSz=fitArtNameSize(shortName);
+  return {long, sz, fitsWidth: long.length*sz<=58+8,   // 最小フォント6pxの床で数px溢れる余地だけ許す
+          shortUnchanged: shortSz===10,
+          shrinksWhenLong: sz<10,
+          neverGoesInvisible: sz>=6,
+          ok: sz<10 && sz>=6 && shortSz===10};
+});
+R.hudButtonsHaveNoShadow = await pg.evaluate(()=>{
+  const ids=['guardbtn','ultbtn','wavebtn','artbtn','bagbtn','statbtn','mapbtn'];
+  const rows=ids.map(id=>({id, shadow:getComputedStyle(document.getElementById(id)).textShadow}));
+  const allNone = rows.every(r=>r.shadow==='none');
+  return {rows, allNone, ok: allNone};
+});
+
 await done(b, errs, R);
