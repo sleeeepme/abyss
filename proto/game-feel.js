@@ -1,6 +1,7 @@
 /* Presentation and timing feedback. Combat formulas, AI and rewards stay in index.html. */
 const updateSimulation=update, resolveEnemyDeath=killEnemy;
 const ALLY_EFFECT_FX=window.AllyEffectStudy;
+const WEAPON_ART_FX=window.WeaponArtEffectStudy;
 const FEEL_ATTACK_SECONDS=.48;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
@@ -8,7 +9,7 @@ const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSl
   characterIdleSeconds:1.28,characterMoveThreshold:.16,
   bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
-  motion:new WeakMap(),motes:[],ripples:[],hits:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
+  motion:new WeakMap(),motes:[],ripples:[],hits:[],weaponArts:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
 const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
 // Deterministic decoration noise is independent of combat / loot RNG.
 function feelHash(x,y,s=0){let n=Math.imul(x+17,374761393)^Math.imul(y+31,668265263)^Math.imul((S.run?.depth||1)+s,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;}
@@ -22,7 +23,14 @@ function feelEntityOffset(e){
   return {x:Math.sin(m.phase)*s*.65+m.recoilX*recoil,
     y:-Math.abs(Math.sin(m.phase))*s*1.8+m.recoilY*recoil};
 }
-function feelBlink(e){const m=feelMotion(e);return m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;}
+function feelBlink(e){
+  const m=feelMotion(e);let alpha=m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;
+  if(m.artLife>0&&m.artId==='dgmirage')alpha*=.42+.12*Math.sin(m.artAge*24);
+  if(m.artLife>0&&m.artId==='iai'){
+    const t=m.artAge;alpha*=t<.08?1:t<.15?1-clamp((t-.08)/.07):t<.21?0:clamp((t-.21)/.09);
+  }
+  return alpha;
+}
 function feelElement(dt,elem){return elem||(['fire','shock','frost','arcane'].includes(dt)?dt:'neutral');}
 function feelWeaponKind(base,dt,proj){
   if(proj==='arrow'||base==='bow')return 'bow';
@@ -61,6 +69,41 @@ function feelJustDodge(){
 function feelUltimate(ent,col='#f7d898'){
   feelKick(FEEL_TUNING.ultimateShake,.3);feelSpray(ent.x,ent.y,col,48,4);
   W.fx.push({t:'feelring',x:ent.x,y:ent.y,col,life:.6,max:.6,r:3});
+}
+function feelWeaponArtStart(ent,def,x,y,angle){
+  if(!WEAPON_ART_FX||!def)return;
+  const m=feelMotion(ent);m.artId=def.id;m.artAge=0;m.artLife=def.id==='dgmirage'?(def.t||2.6):.48;
+  // Long-lived arts are rendered from W.arts so their picture and hit timing share
+  // one clock. Adding a second transient copy here makes flame/rain visibly double.
+  if(!['stflame','stbolt','dgdance','bwrain'].includes(def.id))
+    FEEL.weaponArts.push({id:def.id,x,y,angle,age:0,max:1.45,range:def.r||def.len||def.dist||3,
+      element:feelElement(def.dt),ent,follow:def.k!=='dash'});
+  if(FEEL.weaponArts.length>24)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-24);
+}
+function drawFeelWeaponArts(camX,camY){
+  if(!WEAPON_ART_FX)return;
+  const scale=clamp(TS/48,.58,1.35);
+  for(const f of FEEL.weaponArts){
+    let x=f.x,y=f.y;
+    if(f.follow&&f.ent&&!f.ent.dead){x=f.ent===P?P.x:f.ent.x;y=f.ent===P?P.y:f.ent.y;}
+    WEAPON_ART_FX.renderEffect(ctx,{id:f.id,age:f.age,x:x*TS-camX,y:y*TS-camY,
+      angle:f.angle,scale,range:f.range,element:f.element});
+  }
+}
+function drawFeelPersistentArt(f,camX,camY){
+  if(!WEAPON_ART_FX||!f)return false;
+  const scale=clamp(TS/48,.58,1.35),id=f.def&&f.def.id;
+  if(id==='stflame'||id==='stbolt'||id==='dgdance'){
+    const age=((f.max-f.t)%(id==='stflame'?1.05:1.35));
+    WEAPON_ART_FX.renderEffect(ctx,{id,age,x:f.x*TS-camX,y:f.y*TS-camY,
+      angle:f.a||0,scale,range:f.r||3,element:feelElement(f.def.dt)});return true;
+  }
+  if(f.kind==='arrow'&&f.artId==='bwrain'&&ALLY_EFFECT_FX){
+    const fall=clamp(1-f.t/(f.fall||.45),0,1),h=(1-fall)*TS*1.8;
+    ALLY_EFFECT_FX.render(ctx,{kind:'bow',age:.17,x:f.x*TS-camX,y:f.y*TS-camY-h,
+      angle:Math.PI/2,scale,hit:false,element:'neutral',compact:true});return true;
+  }
+  return false;
 }
 killEnemy=function(e,byAlly){
   if(e.dead)return;
@@ -281,7 +324,7 @@ function drawFeelMagic(f,camX,camY,col){
 }
 function resetFeel(){
   FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
-  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;
+  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.weaponArts=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;
   FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
 }
 function syncFeel(){ if(FEEL.floor!==W.fl) resetFeel(); }
@@ -299,7 +342,7 @@ function updateFeel(dt){
   FEEL.dashCd=Math.max(0,FEEL.dashCd-dt);
   for(const e of new Set([P,...livingParty(),...(W.npc?[W.npc]:[]),...W.enemies])){
     const m=FEEL.motion.get(e);
-    if(m)m.recoil=Math.max(0,m.recoil-dt);
+    if(m){m.recoil=Math.max(0,m.recoil-dt);m.artLife=Math.max(0,(m.artLife||0)-dt);m.artAge=(m.artAge||0)+dt;}
   }
   FEEL.step=feelMotion(P).phase;
   let dx=P.moving?P.mvx:(P.dirx||1), dy=P.moving?P.mvy:(P.diry||0);
@@ -313,6 +356,7 @@ function updateFeel(dt){
   FEEL.motes=FEEL.motes.filter(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=dt*3;return p.life>0;});
   FEEL.ripples=FEEL.ripples.filter(r=>{r.age+=dt;return r.age<.85;});
   FEEL.hits=FEEL.hits.filter(f=>{f.age+=dt;return f.age<.48;});
+  FEEL.weaponArts=FEEL.weaponArts.filter(f=>{f.age+=dt;return f.age<f.max;});
   for(const d of W.drops)if(d.feelDrop)d.feelDrop.age=Math.min(1,d.feelDrop.age+dt);
 }
 function beginFeelWorld(){

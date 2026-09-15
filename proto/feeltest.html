@@ -192,6 +192,62 @@ frame.onload=async()=>{
       for(const dt of ['slash','pierce','blunt','fire','frost','shock','arcane'])drawSwing({x:P.x,y:P.y,a:0,r:2,arc:1,dt,life:.1,max:.2},0,0);
       drawFeelMagic({x:P.x,y:P.y,vx:5,vy:2},0,0,'#f99');return ctx===before;
     });
+    check('All 24 weapon arts render through the production effect module',()=>{
+      const defs=Object.values(WEAPON_ARTS).flat(),mod=window.WeaponArtEffectStudy;
+      if(!mod||typeof mod.renderEffect!=='function'||defs.length!==24||mod.keys.length!==24)return false;
+      if(!defs.every(d=>mod.keys.includes(d.id)))return false;
+      const save=ctx,c=document.createElement('canvas');c.width=420;c.height=320;ctx=c.getContext('2d');
+      const before=ctx.getTransform();
+      try{
+        defs.forEach((d,i)=>[.16,.34,.58,.86,1.12].forEach(age=>mod.renderEffect(ctx,{id:d.id,age,x:150,y:160,
+          angle:(i%8)*Math.PI/4,scale:.72,range:d.r||d.len||d.dist||3,element:feelElement(d.dt)})));
+        for(let i=0;i<8;i++)mod.renderEffect(ctx,{id:'stflame',age:.62,x:150,y:160,angle:i*Math.PI/4,scale:.72,range:3.6,element:'fire'});
+        const after=ctx.getTransform(),pixels=ctx.getImageData(0,0,c.width,c.height).data;
+        return before.a===after.a&&before.b===after.b&&before.c===after.c&&before.d===after.d&&
+          before.e===after.e&&before.f===after.f&&pixels.some((v,i)=>i%4===3&&v>0);
+      }finally{ctx=save;}
+    });
+    check('All 24 weapon arts reach their real fireArt and draw paths',()=>{
+      fresh();enterFloor(1);syncFeel();W.seen.forEach(r=>r.fill(1));
+      const defs=Object.values(WEAPON_ARTS).flat(),room=W.fl.rooms.find(r=>r.w>=8&&r.h>=6);
+      const e=W.enemies.find(e=>!e.boss&&!e.undying);if(!e||!room)return false;
+      const persistent=new Set(['stflame','stbolt','dgdance','bwrain']);
+      for(const d of defs){
+        P.x=room.x+2.5;P.y=room.y+2.5;P.dirx=1;P.diry=0;P.invuln=0;
+        e.x=P.x+1;e.y=P.y;e.dead=false;e.hp=e.maxHp=1e9;e.aff=[];W.enemies=[e];
+        W.fx=[];W.arts=[];FEEL.weaponArts=[];
+        if(!fireArt(d))throw Error(d.id+' did not fire');
+        if(persistent.has(d.id)?!W.arts.length:!FEEL.weaponArts.some(f=>f.id===d.id))
+          throw Error(d.id+' did not reach its visual queue');
+        const legacy=W.fx.filter(f=>['ultring','lwave','ultline','ultbeam'].includes(f.t));
+        if(legacy.some(f=>!f.artId))throw Error(d.id+' left an untagged placeholder');
+        draw();
+      }
+      return true;
+    });
+    check('Persistent weapon arts use approved renderers without duplicate transients',()=>{
+      fresh();const defs=Object.values(WEAPON_ARTS).flat(),byId=id=>defs.find(d=>d.id===id);
+      const persistent=['stflame','stbolt','dgdance','bwrain'];
+      FEEL.weaponArts=[];
+      for(const id of persistent)feelWeaponArtStart(P,byId(id),P.x,P.y,0);
+      if(FEEL.weaponArts.length!==0)return false;
+      const fake=[
+        {kind:'artcone',def:byId('stflame'),x:P.x,y:P.y,a:0,r:3.6,t:2,max:2.5},
+        {kind:'artfield',def:byId('stbolt'),x:P.x,y:P.y,a:0,r:3.2,t:2,max:3},
+        {kind:'artorbit',def:byId('dgdance'),x:P.x,y:P.y,a:0,r:1.9,t:5,max:6},
+        {kind:'arrow',artId:'bwrain',x:P.x,y:P.y,t:.2,fall:.45,r:.5}
+      ];
+      return fake.every(f=>drawFeelPersistentArt(f,0,0))&&!drawFeelPersistentArt({kind:'artrep'},0,0);
+    });
+    check('Weapon-art activation fades iai and mirage actors and suppresses legacy placeholders',()=>{
+      fresh();const defs=Object.values(WEAPON_ARTS).flat(),byId=id=>defs.find(d=>d.id===id);
+      feelWeaponArtStart(P,byId('iai'),P.x,P.y,0);let m=feelMotion(P);m.artAge=.18;m.artLife=.3;
+      const iai=feelBlink(P)===0;
+      feelWeaponArtStart(P,byId('dgmirage'),P.x,P.y,0);m=feelMotion(P);m.artAge=.2;m.artLife=2;
+      const mirage=feelBlink(P)<.6;
+      const tagged={t:'ultring',artId:'swspin',x:P.x,y:P.y,r:0,max:2,life:.2,maxLife:.3,col:'#fff'};
+      W.fx=[tagged];draw();return iai&&mirage&&W.fx[0]===tagged;
+    });
     check('Production draw reaches external feel hooks for world, actors and drops',()=>{
       fresh();enterFloor(1);syncFeel();W.seen.forEach(r=>r.fill(1));
       const e=W.enemies.find(e=>!e.boss&&!e.undying);e.x=P.x+1;e.y=P.y;W.enemies=[e];
@@ -199,8 +255,9 @@ frame.onload=async()=>{
       W.drops=[{x:P.x,y:P.y,it:makeConsum(),feelDrop:{age:.2,x:P.x,y:P.y}}];
       W.fx=[{t:'bolt',x:P.x,y:P.y,vx:1,vy:0,dt:'arcane',life:.5},
         {t:'feelring',x:P.x,y:P.y,col:'#fff',life:.2,max:.4,r:2}];
+      const art=Object.values(WEAPON_ARTS).flat().find(d=>d.id==='swspin');feelWeaponArtStart(P,art,P.x,P.y,0);
       const names=['feelBlink','drawFeelFlash','feelEntityOffset','feelDropOffset',
-        'drawFeelMotes','drawFeelRipples','drawFeelVignette','drawFeelMagic','drawFeelRing'];
+        'drawFeelMotes','drawFeelRipples','drawFeelVignette','drawFeelMagic','drawFeelRing','drawFeelWeaponArts'];
       const originals={},calls={};
       try{
         for(const name of names){originals[name]=window[name];calls[name]=0;
