@@ -1,0 +1,36 @@
+{
+  "size": [
+    16,
+    16
+  ],
+  "icons": [
+    "amulet",
+    "armor",
+    "axe",
+    "bag",
+    "bow",
+    "buckler",
+    "chain",
+    "dagger",
+    "great",
+    "leaf",
+    "mace",
+    "plate",
+    "potion",
+    "ring",
+    "robe",
+    "spear",
+    "staff",
+    "sword",
+    "tower",
+    "vial"
+  ],
+  "tiers": {
+    "common": "#171323",
+    "uncommon": "#6cc24a",
+    "rare": "#5b8dd6",
+    "unique": "#a97fe0",
+    "relic": "#c4433f",
+    "legend": "#e8c95a"
+  }
+}

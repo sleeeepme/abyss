@@ -1,5 +1,5 @@
-/* 24×24 source pixels. Paint interiors first; derive exactly one outline pixel.
-   Keep vertical center axes symmetric; highlights alone may be asymmetric. */
+/* The imported 16×16 PNG data is authoritative. This 24×24 procedural source
+   remains as a synchronous fallback; both paths render without interpolation. */
 const ITEM_ART = (()=>{
   // One dark outline plus five deliberately separated material tones per icon.
   // The ramps borrow the benchmark's deep violet shadows and bright speculars.
@@ -7,7 +7,9 @@ const ITEM_ART = (()=>{
     d:'#4b2930',b:'#8e4d3a',t:'#c77b50',g:'#efb85b',r:'#a32648',h:'#ef4960',
     p:'#ff8b8f',c:'#258eb5',a:'#55d9dc',z:'#17536f',x:'#263783',y:'#4059b8',
     j:'#476f73',k:'#79a1a0',e:'#b9d8d1',v:'#2e733d',n:'#6cbc4e',f:'#b8e778',q:'#343b50',u:'#58777b',i:'#91aaa8'};
-  const sprites={},maps={},cache=new Map();
+  const sprites={},maps={},runtimeMaps={},runtimeSprites={},cache=new Map(),runtimeEdgeCache=new Map();
+  const symmetricRuntime=new Set(['armor','chain','plate','robe','ring','potion','vial','buckler','tower','bag']);
+  const diagonalRuntime=new Set(['sword','great','dagger','spear','mace','bow','staff']);
   function make(name,paint){
     const pixels=Array.from({length:24},()=>Array(24).fill(''));
     const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)pixels[j][i]=c;};
@@ -27,17 +29,60 @@ const ITEM_ART = (()=>{
       maps[name]=rotated;
     }else maps[name]=pixels;
     sprites[name]=render(name,palette.o);
+    runtimeMaps[name]=coarsen(maps[name],symmetricRuntime.has(name),diagonalRuntime.has(name));
+    runtimeSprites[name]=renderPixels(runtimeMaps[name],palette.o);
   }
-  function render(name,outline,edgeOnly=false){
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=24;
-    const ctx=canvas.getContext('2d'),pixels=maps[name];
-    for(let y=0;y<24;y++)for(let x=0;x<24;x++){
+  function renderPixels(pixels,outline,edgeOnly=false){
+    const h=pixels.length,w=pixels[0].length,canvas=document.createElement('canvas');
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       const c=pixels[y][x];
       // Four-connected one-pixel perimeter avoids swollen diagonal corners.
       const edge=!c&&[[0,-1],[0,1],[-1,0],[1,0]].some(([dx,dy])=>pixels[y+dy]?.[x+dx]);
       if((c&&!edgeOnly)||edge){ctx.fillStyle=c?palette[c]:outline;ctx.fillRect(x,y,1,1);}
     }
     return canvas;
+  }
+  function render(name,outline,edgeOnly=false){return renderPixels(maps[name],outline,edgeOnly);}
+  // Rebuild the art on the character's 16-cell grid from interior pixels. A
+  // forward area vote keeps one-pixel shafts connected; outlining afterwards
+  // prevents the broken/doubled edges produced by shrinking a finished bitmap.
+  function coarsen(source,symmetric=false,diagonal=false){
+    const bins=Array.from({length:16},()=>Array.from({length:16},()=>new Map()));
+    for(let y=0;y<24;y++)for(let x=0;x<24;x++){
+      const c=source[y][x];if(!c)continue;
+      const tx=1+Math.min(13,Math.floor(x*14/24));
+      const ty=1+Math.min(13,Math.floor(y*14/24));
+      bins[ty][tx].set(c,(bins[ty][tx].get(c)||0)+1);
+    }
+    const out=Array.from({length:16},()=>Array(16).fill(''));
+    for(let y=1;y<=14;y++)for(let x=1;x<=14;x++){
+      let best='',count=0;
+      for(const [c,n] of bins[y][x])if(n>count){best=c;count=n;}
+      out[y][x]=best;
+    }
+    if(symmetric)for(let y=0;y<16;y++)for(let x=1;x<=7;x++)out[y][15-x]=out[y][x];
+    if(diagonal)for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+      const rx=15-y,ry=15-x;
+      if(out[y][x]&&!out[ry][rx])out[ry][rx]=out[y][x];
+    }
+    return out;
+  }
+  function runtimeEdge(name,color){
+    const id=name+color;
+    if(!runtimeEdgeCache.has(id)){
+      const base=runtimeSprites[name],edge=document.createElement('canvas');
+      edge.width=base.width;edge.height=base.height;
+      const src=base.getContext('2d').getImageData(0,0,base.width,base.height).data;
+      const ec=edge.getContext('2d');ec.fillStyle=color;
+      for(let y=0;y<base.height;y++)for(let x=0;x<base.width;x++){
+        const alpha=(xx,yy)=>xx>=0&&yy>=0&&xx<base.width&&yy<base.height?src[(yy*base.width+xx)*4+3]:0;
+        if(alpha(x,y)&&(!alpha(x-1,y)||!alpha(x+1,y)||!alpha(x,y-1)||!alpha(x,y+1)))ec.fillRect(x,y,1,1);
+      }
+      runtimeEdgeCache.set(id,edge);
+    }
+    return runtimeEdgeCache.get(id);
   }
   // Blade tips are authored on the final diagonal grid, not rotated from a
   // horizontal cap. The taper converges on exactly one interior pixel.
@@ -109,45 +154,46 @@ const ITEM_ART = (()=>{
     rect(15,9,1,1,'g');rect(3,21,1,1,'m');
   });
   make('mace',({rect})=>{
-    // A solid flanged head made from three broad, connected metal planes.
+    // A centered flanged mace: every head cell has a mate across x+y=24.
     for(let i=0;i<=7;i++)rect(6+i,18-i,1,1,'b');
     rect(5,19,1,1,'b');
-    const points=[[18,2],[20,4],[20,5],[22,7],[20,9],[20,11],
-      [18,10],[16,12],[14,10],[15,8],[13,7],[15,5],[14,3],[16,4]];
-    for(let y=2;y<=12;y++)for(let x=13;x<=22;x++){
-      let inside=false;
-      for(let i=0,j=points.length-1;i<points.length;j=i++){
-        const [ax,ay]=points[i],[bx,by]=points[j];
-        if((ay>y+.5)!=(by>y+.5)&&x+.5<(bx-ax)*(y+.5-ay)/(by-ay)+ax)inside=!inside;
+    const radii=[1,2,3,3,2,1,0];
+    for(let i=0;i<radii.length;i++){
+      const cx=14+i,cy=10-i,r=radii[i];
+      for(let k=-r;k<=r;k++){
+        const color=k<0?'l':k>0?'s':'m';
+        rect(cx+k,cy+k,1,1,color);
       }
-      if(inside){const plane=x+y<22?'l':x+y>24?'s':'m';rect(x,y,1,1,plane);}
     }
-    rect(16,5,1,2,'l');rect(17,6,1,3,'m');rect(18,7,1,2,'s');
-    rect(13,12,1,1,'g');rect(14,13,1,1,'g');rect(15,12,1,1,'g');
+    // Paired flange tips and a narrow gold socket separate it from the hand axe.
+    for(const [x,y] of [[13,8],[16,11],[15,6],[18,9],[17,4],[20,7]])rect(x,y,1,1,'s');
+    rect(12,10,1,1,'g');rect(13,11,1,1,'g');rect(14,12,1,1,'g');
   });
   make('axe',({rect})=>{
     // Short wooden haft and compact single blade: a one-handed hatchet.
     for(let i=0;i<=6;i++)rect(8+i,15-i,1,1,i%3?'t':'b');
     rect(7,16,1,1,'b');
-    const points=[[13,8],[16,8],[18,5],[20,5],[21,8],[20,11],
-      [18,14],[15,15],[14,13],[15,11],[13,10]];
-    for(let y=5;y<=15;y++)for(let x=13;x<=21;x++){
+    const points=[[13,8],[16,8],[18,5],[21,5],[22,7],[21,10],
+      [19,13],[16,15],[14,14],[15,11],[13,10]];
+    for(let y=5;y<=15;y++)for(let x=13;x<=22;x++){
       let inside=false;
       for(let i=0,j=points.length-1;i<points.length;j=i++){
         const [ax,ay]=points[i],[bx,by]=points[j];
         if((ay>y+.5)!=(by>y+.5)&&x+.5<(bx-ax)*(y+.5-ay)/(by-ay)+ax)inside=!inside;
       }
-      if(inside)rect(x,y,1,1,x>=19||y>=13?'l':x<=15?'s':'m');
+      if(inside)rect(x,y,1,1,x>=20||y>=13?'l':x<=15?'s':'m');
     }
+    // Dark concave heel plus bright single outer edge: unmistakably one-sided.
     rect(13,7,1,3,'s');rect(14,9,1,2,'t');
+    rect(16,10,1,2,'s');rect(17,11,1,1,'s');rect(21,7,1,3,'l');
   });
   make('potion',({rect,row})=>{
-    row(4,5,'t');row(5,7,'t');row(6,5,'t');
-    row(7,3,'l');row(8,3,'l');
-    row(9,7,'l');row(10,11,'l');
-    for(let y=11;y<=16;y++)row(y,13,y<15?'h':'r');
-    row(17,11,'r');row(18,9,'r');row(19,5,'r');
-    rect(10,7,1,2,'w');rect(6,11,1,3,'w');rect(7,12,1,2,'h');rect(15,12,2,2,'h');
+    row(5,5,'t');row(6,7,'t');row(7,5,'t');
+    row(8,3,'l');row(9,3,'l');
+    row(10,7,'l');row(11,9,'l');
+    for(let y=12;y<=16;y++)row(y,9,y<15?'h':'r');
+    row(17,7,'r');row(18,5,'r');
+    rect(10,8,1,2,'w');rect(7,12,1,2,'w');rect(14,12,1,2,'h');
   });
   make('vial',({rect,row})=>{
     row(5,5,'t');row(6,7,'t');row(7,5,'l');
@@ -206,12 +252,13 @@ const ITEM_ART = (()=>{
     }
     rect(11,7,1,11,'w');row(17,11,'c');
   });
-  make('buckler',({rect})=>{
-    for(let y=5;y<=17;y++)for(let x=5;x<=17;x++){
-      const d=(x-11)**2+(y-11)**2;if(d>38)continue;
-      rect(x,y,1,1,d>25?(x+y<22?'l':'s'):'b');
-    }
-    rect(10,9,3,5,'m');rect(9,10,5,3,'m');rect(10,10,2,2,'w');
+  make('buckler',({rect,row})=>{
+    // Front-facing and fully mirrored: rim, wooden face and central boss.
+    for(const [y,w] of [[5,5],[6,9],[7,11],[8,13],[9,13],[10,13],
+      [11,13],[12,13],[13,13],[14,13],[15,11],[16,9],[17,5]])row(y,w,'b');
+    row(5,3,'l');row(6,7,'l');row(7,9,'l');
+    rect(5,8,2,6,'s');rect(16,8,2,6,'s');row(14,11,'s');row(15,9,'s');row(16,7,'s');row(17,3,'s');
+    rect(10,9,3,5,'m');rect(9,10,5,3,'m');rect(10,10,3,3,'w');
   });
   make('tower',({rect,row})=>{
     row(3,7,'l');row(4,11,'l');
@@ -293,6 +340,21 @@ const ITEM_ART = (()=>{
     row(17,11,'b');row(18,9,'b');row(19,7,'d');
     rect(7,11,1,3,'w');rect(8,11,1,1,'w');
   });
+  // User-edited transparent PNGs are encoded as palette + 256 indices so the
+  // canvases are available synchronously. They replace every generated icon.
+  function decodeImported(entry){
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=16;
+    const ctx=canvas.getContext('2d'),image=ctx.createImageData(16,16),indices=atob(entry.d);
+    const colors=entry.p.map(hex=>[
+      parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),
+      parseInt(hex.slice(5,7),16),parseInt(hex.slice(7,9),16)
+    ]);
+    for(let i=0;i<256;i++)image.data.set(colors[indices.charCodeAt(i)],i*4);
+    ctx.putImageData(image,0,0);return canvas;
+  }
+  if(typeof ITEM_ICON_IMPORTED_DATA!=='undefined')for(const [name,entry] of Object.entries(ITEM_ICON_IMPORTED_DATA)){
+    const imported=decodeImported(entry);sprites[name]=imported;runtimeSprites[name]=imported;
+  }
   function key(it){
     if(it?.consum)return ({draught:'vial',antidote:'leaf'})[it.consum]||'potion';
     if(!it?.ident)return 'bag';
@@ -300,21 +362,33 @@ const ITEM_ART = (()=>{
     return sprites[name]?name:'bag';
   }
   function overlay(it,color){
-    if(!color||it?.rar===0||it?.consum)return null;
+    if(!color||it?.consum)return null;
     const name=key(it),id=name+color;
-    if(!cache.has(id))cache.set(id,render(name,color,true));
+    if(!cache.has(id))cache.set(id,runtimeEdge(name,color));
     return cache.get(id);
   }
   // Static preview/export also composites the same independent edge layer.
   function sprite(it,color){
     const base=sprites[key(it)],edge=overlay(it,color);if(!edge)return base;
-    const canvas=document.createElement('canvas');canvas.width=canvas.height=24;
+    const canvas=document.createElement('canvas');canvas.width=base.width;canvas.height=base.height;
+    const ctx=canvas.getContext('2d');ctx.drawImage(base,0,0);ctx.drawImage(edge,0,0);
+    return canvas;
+  }
+  function runtimeSprite(it,color){
+    const name=key(it),base=runtimeSprites[name];
+    const edge=!color||it?.consum?null:runtimeEdge(name,color);
+    if(!edge)return base;
+    const canvas=document.createElement('canvas');canvas.width=base.width;canvas.height=base.height;
     const ctx=canvas.getContext('2d');ctx.drawImage(base,0,0);ctx.drawImage(edge,0,0);
     return canvas;
   }
   function draw(ctx,it,x,y,size,color,outlineAlpha=1){
-    const art=sprites[key(it)],edge=overlay(it,color);
-    const scale=Math.max(1,Math.round(size/24)),side=24*scale;
+    const name=key(it),art=runtimeSprites[name];
+    const edge=!color||it?.consum?null:runtimeEdge(name,color);
+    // Match CharacterArt's 16-cell source-to-TS transform exactly. The icon's
+    // transparent margins control its apparent size; shrinking the canvas would
+    // also shrink its logical dots and reintroduce the density mismatch.
+    const side=Math.max(16,Math.round(size));
     const left=Math.round(x-side/2),top=Math.round(y-side/2);
     ctx.save();ctx.imageSmoothingEnabled=false;
     ctx.drawImage(art,left,top,side,side);
@@ -324,5 +398,5 @@ const ITEM_ART = (()=>{
     }
     ctx.restore();
   }
-  return {sprites,key,sprite,overlay,draw};
+  return {sprites,key,sprite,runtimeSprite,overlay,draw};
 })();

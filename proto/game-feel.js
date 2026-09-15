@@ -702,9 +702,10 @@ drawShot=function(f,camX,camY,isAlly){
 // Shared pixel art; screen-space integer pixels stay crisp during camera movement.
 function drawFeelItemIcon(it,x,y){
   // The black base stays visible while a separate 1 px color edge fades above it.
-  const outline=it&&!it.consum&&it.rar>0 ? RARCOL[it.rar] : undefined;
+  // Common stays black; higher tiers use the same rarity colors as item names.
+  const outline=it&&!it.consum ? (it.rar===0?'#171323':RARCOL[it.rar]) : undefined;
   const period=FEEL_TUNING.itemOutlinePeriod,min=FEEL_TUNING.itemOutlineMinAlpha;
   const alpha=FEEL_REDUCED.matches||period<=0 ? 1
     : min+(1-min)*(.5+.5*Math.cos(performance.now()/1000/period*Math.PI*2));
-  ITEM_ART.draw(ctx,it,x,y,TS*.8,outline,alpha);
+  ITEM_ART.draw(ctx,it,x,y,TS,outline,alpha);
 }
