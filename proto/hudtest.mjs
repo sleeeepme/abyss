@@ -784,14 +784,19 @@ R.hubNameDropsGenerationSuffix = await pg.evaluate(()=>{
   const shown=nm.textContent;
   const fits=nm.scrollWidth<=nm.clientWidth;
   const shadow=getComputedStyle(nm).textShadow;
-  // rgba(6,8,12,.9) を8方向×2半径（計16個）敷いているはず——1px分だけだと細すぎる、の対応
+  /* rgba(6,8,12,.9) を8方向×1pxで敷いているはず。一度2px方向も足して
+     太くしたが、11px程度の小さい文字では輪郭同士が字の内側までかぶって
+     潰れ、「文字がガビガビになっている」と報告されたので、
+     8方向×1px（計8個）に戻してある。 */
   const shadowLayers=(shadow.match(/rgba\(6, 8, 12, 0\.9\)/g)||[]).length;
   const alphaMatchesLabel = shadow.indexOf('rgba(6, 8, 12, 0.9)')>=0;
   return {fullName:S.hero.name, shown, fits,
           droppedSuffix: shown==='レルエ' && shown.indexOf('代目')<0,
           shadowLayers, alphaMatchesLabel,
-          thickEnough: shadowLayers>=8,   // 1pxだけの8方向より太い
-          ok: shown==='レルエ' && fits && alphaMatchesLabel && shadowLayers>=8};
+          hasOutline: shadowLayers>=8,   // 8方向分は最低限あるはず
+          notTooThick: shadowLayers<=8,  // 2px分を足してガビガビ化させないことの回帰テスト
+          ok: shown==='レルエ' && fits && alphaMatchesLabel
+              && shadowLayers>=8 && shadowLayers<=8};
 });
 
 await done(b, errs, R);
