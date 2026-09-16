@@ -550,6 +550,9 @@ const feelLightCtx=feelLightCanvas.getContext('2d');
 const FEEL_LIGHT_CASTERS=7;
 const FEEL_REFERENCE_TILE=16;
 const FEEL_REFERENCE_LIGHT_RADIUS=112;
+const FEEL_LIGHT_ALPHA=.25;
+const FEEL_SHADOW_FADE_START=13;
+const FEEL_SHADOW_MAX_BEHIND=38;
 const feelActorOcclusionCache=new Map();
 let feelHeroLightTexture=null;
 function feelSmoothstep(a,b,v){const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);}
@@ -563,7 +566,7 @@ function feelHeroLightImage(){
     const cone=d<.01?1:feelSmoothstep(.44,.84,dx/d);
     const safety=1-feelSmoothstep(12,32,d);
     const visibility=Math.max(safety*.86+.12,cone);
-    const a=Math.round(255*falloff*visibility*.39);if(!a)continue;
+    const a=Math.round(255*falloff*visibility*FEEL_LIGHT_ALPHA);if(!a)continue;
     const i=(y*c.width+x)*4;data[i]=116;data[i+1]=198;data[i+2]=164;data[i+3]=a;
   }
   cc.putImageData(im,0,0);feelHeroLightTexture={canvas:c,ax,ay};return feelHeroLightTexture;
@@ -584,16 +587,16 @@ function feelLightCasters(camX,camY,rangePx){
 function feelActorOcclusionImage(radius,strength){
   radius=Math.round(clamp(radius,3,13)*2)/2;
   const key=radius+'|'+strength,old=feelActorOcclusionCache.get(key);if(old)return old;
-  const maxBehind=57,maxPenumbra=radius*1.25,pad=3;
+  const maxBehind=FEEL_SHADOW_MAX_BEHIND,maxPenumbra=radius*1.25,pad=3;
   const ax=Math.ceil(radius+pad),ay=Math.ceil(maxPenumbra+pad),w=ax+maxBehind+pad+1,h=ay*2+1;
   const c=document.createElement('canvas');c.width=w;c.height=h;
   const cc=c.getContext('2d'),im=cc.createImageData(w,h),data=im.data;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     const behind=x-ax,across=Math.abs(y-ay);
     if(behind<=radius*.45||behind>maxBehind)continue;
-    const penumbra=radius*(.70+Math.min(behind/64,.55));
+    const penumbra=radius*(.70+Math.min(behind/52,.55));
     const silhouette=1-feelSmoothstep(penumbra*.43,penumbra,across);
-    const fade=1-feelSmoothstep(20,57,behind);
+    const fade=1-feelSmoothstep(FEEL_SHADOW_FADE_START,FEEL_SHADOW_MAX_BEHIND,behind);
     const a=Math.round(255*silhouette*fade*strength);if(!a)continue;
     const i=(y*w+x)*4;data[i+3]=a;
   }
