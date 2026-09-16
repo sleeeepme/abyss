@@ -589,18 +589,18 @@ function feelGroundShadowImage(length,near,half){
   cc.putImageData(im,0,0);const made={canvas:c,ax,ay};feelGroundShadowCache.set(key,made);return made;
 }
 
-/* 足元の影は、主人公の指向性ライトと反対側へだけ伸ばす。
-   画面基準の固定影にすると、ライトを振ったときに地面とキャラの関係が
-   崩れるので、FEEL.lightX/Y（ライトと同じ、なめらかに追従する向き）を
-   そのまま投影方向へ使う。影はキャラの下だけで完結させ、範囲攻撃や
-   HPバーの読みやすさを奪わない。 */
-function drawFeelGroundShadow(x,y,size,scale=1,alpha=1){
+/* 敵・仲間・道具の影は、光源である主人公から対象へ届く光線の延長へ伸ばす。
+   主人公自身は光源と同じ位置なので、そこだけは向いている方向の反対を使う。
+   sourceX/Y は検証用にも渡せるが、実ゲームでは画面中央の主人公が既定値。 */
+function drawFeelGroundShadow(x,y,size,scale=1,alpha=1,sourceX=innerWidth/2,sourceY=innerHeight/2){
   if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(size)||size<=0)return;
-  let lx=Number.isFinite(FEEL.lightX)?FEEL.lightX:1;
-  let ly=Number.isFinite(FEEL.lightY)?FEEL.lightY:0;
-  const ln=Math.hypot(lx,ly)||1;lx/=ln;ly/=ln;
-  const dx=-lx,dy=-ly;
   const s=Math.max(2,size*scale),footX=Math.round(x),footY=Math.round(y+s*.39);
+  let dx=x-sourceX,dy=y-sourceY,ln=Math.hypot(dx,dy);
+  if(!Number.isFinite(ln)||ln<Math.max(2,s*.22)){
+    const lx=Number.isFinite(FEEL.lightX)?FEEL.lightX:1;
+    const ly=Number.isFinite(FEEL.lightY)?FEEL.lightY:0;
+    ln=Math.hypot(lx,ly)||1;dx=-lx/ln;dy=-ly/ln;
+  }else{dx/=ln;dy/=ln;}
   const length=Math.max(3,Math.round(s*.52)),near=Math.max(2,Math.round(s*.18));
   const half=Math.max(1,Math.round(s*.17)),shadow=feelGroundShadowImage(length,near,half);
   ctx.save();ctx.globalAlpha*=clamp(alpha,0,1);ctx.imageSmoothingEnabled=true;
