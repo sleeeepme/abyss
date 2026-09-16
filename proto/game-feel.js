@@ -550,9 +550,10 @@ const feelLightCtx=feelLightCanvas.getContext('2d');
 const FEEL_LIGHT_CASTERS=7;
 const FEEL_REFERENCE_TILE=16;
 const FEEL_REFERENCE_LIGHT_RADIUS=112;
-const FEEL_LIGHT_ALPHA=.25;
-const FEEL_SHADOW_FADE_START=13;
-const FEEL_SHADOW_MAX_BEHIND=38;
+const FEEL_LIGHT_ALPHA=.20;
+const FEEL_PROJECTED_SHADOW_ALPHA=.80;
+const FEEL_SHADOW_FADE_START=10;
+const FEEL_SHADOW_MAX_BEHIND=32;
 const feelActorOcclusionCache=new Map();
 let feelHeroLightTexture=null;
 function feelSmoothstep(a,b,v){const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);}
@@ -573,31 +574,44 @@ function feelHeroLightImage(){
 }
 function feelLightCasters(camX,camY,rangePx){
   const found=[];
-  const add=(e,radius,strength)=>{
+  const add=(e,radius,strength,size,lift=0)=>{
     if(!e||e.dead||e.hpNow!==undefined&&e.hpNow<=0)return;
-    const x=e.x*TS-camX,y=e.y*TS-camY,dist=Math.hypot(x-innerWidth/2,y-innerHeight/2);
+    const motion=finiteXY(feelEntityOffset(e));
+    // Use the same floor anchor as drawFeelGroundShadow. The projected shadow
+    // now grows directly out of the compact contact shadow instead of the
+    // actor's body centre.
+    const x=e.x*TS-camX+motion.x;
+    const y=e.y*TS-camY+motion.y-lift+size*.39;
+    const dist=Math.hypot(x-innerWidth/2,y-innerHeight/2);
     if(dist>rangePx+radius||dist<radius*.8)return;
     found.push({x,y,radius,strength,dist});
   };
-  for(const e of W.enemies)add(e,TS*(e.r||.32)*.82,e.boss?.72:.56);
-  for(const a of S.hero.party||[])add(a,TS*.17,.56);
+  for(const e of W.enemies){
+    const R=(e.boss||e.looksBoss)?TS*e.r:TS*(e.intruder ? .54 : e.uniq ? .46 : e.elite ? .42 : .32);
+    const size=mossSpriteKey(e)?R*2.6:CharacterArt.enemyKey(e)?(e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1)):R*2;
+    add(e,TS*(e.r||.32)*.82,e.boss?.72:.56,size,typeof hopLift==='function'?hopLift(e):0);
+  }
+  for(const a of S.hero.party||[]){
+    const size=isDurantree(a)?TS*.30*2.6:TS;
+    add(a,TS*.17,.56,size);
+  }
   found.sort((a,b)=>a.dist-b.dist);
   return found.slice(0,FEEL_LIGHT_CASTERS);
 }
 function feelActorOcclusionImage(radius,strength){
   radius=Math.round(clamp(radius,3,13)*2)/2;
   const key=radius+'|'+strength,old=feelActorOcclusionCache.get(key);if(old)return old;
-  const maxBehind=FEEL_SHADOW_MAX_BEHIND,maxPenumbra=radius*1.25,pad=3;
+  const maxBehind=FEEL_SHADOW_MAX_BEHIND,maxPenumbra=radius*1.55,pad=3;
   const ax=Math.ceil(radius+pad),ay=Math.ceil(maxPenumbra+pad),w=ax+maxBehind+pad+1,h=ay*2+1;
   const c=document.createElement('canvas');c.width=w;c.height=h;
   const cc=c.getContext('2d'),im=cc.createImageData(w,h),data=im.data;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     const behind=x-ax,across=Math.abs(y-ay);
-    if(behind<=radius*.45||behind>maxBehind)continue;
-    const penumbra=radius*(.70+Math.min(behind/52,.55));
+    if(behind<=radius*.08||behind>maxBehind)continue;
+    const penumbra=radius*(.90+Math.min(behind/44,.62));
     const silhouette=1-feelSmoothstep(penumbra*.43,penumbra,across);
     const fade=1-feelSmoothstep(FEEL_SHADOW_FADE_START,FEEL_SHADOW_MAX_BEHIND,behind);
-    const a=Math.round(255*silhouette*fade*strength);if(!a)continue;
+    const a=Math.round(255*silhouette*fade*strength*FEEL_PROJECTED_SHADOW_ALPHA);if(!a)continue;
     const i=(y*w+x)*4;data[i+3]=a;
   }
   cc.putImageData(im,0,0);const made={canvas:c,ax,ay};feelActorOcclusionCache.set(key,made);return made;
