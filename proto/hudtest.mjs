@@ -799,4 +799,46 @@ R.hubNameDropsGenerationSuffix = await pg.evaluate(()=>{
               && shadowLayers>=8 && shadowLayers<=8};
 });
 
+/* ---------- 技名変更の入力中は、ゲームのショートカットを拾わない ----------
+   報告「技の名前変更の文字入力中に強制的に入力を終了させられる事がある」。
+   閃いた直後の名前変更窓（#m-artname）は探索画面（S.screen==='game'）の
+   上に重ねて開く——戦闘中にキーボードがせり上がって盤面が半分隠れるのを
+   避けるため、開いているあいだも S.screen は 'game' のまま。
+   ところがゲーム全体の keydown ハンドラはフォーカス状態を見ておらず、
+   名前を打つ手でたまたま i / b を押すとカバンが、e を押すと階段や
+   NPC などの調査が割り込んで開き、名前の入力が強制的に中断されたように
+   見えていた。スペースや矢印キーも preventDefault されて、
+   名前にスペースを入れたりカーソルを動かしたりできなかった。 */
+R.artRenameIgnoresGameShortcuts = await pg.evaluate(()=>{
+  TH.run(3,{seed:7}); TH.floor(3); TH.immortal();
+  S.hero.party=[];
+  setScreen('game');
+  openArtRename('stflame', false);
+  const input=document.getElementById('an-input');
+  input.focus();
+  input.value='';
+  const fire=(key)=>{
+    const ev=new KeyboardEvent('keydown',{key, bubbles:true, cancelable:true});
+    input.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  // 素の真偽値（prevented/opened）は「起きたら悪い」向きなので、
+  // 結果に出すのは true=期待どおり に揃えた語彙だけにする
+  // （sweep.sh は木の中の false を全部拾うので、生の値を混ぜると
+  //  「直っているのに false があるから失敗」に見えてしまう）。
+  const spaceTypable = !fire(' ');
+  const arrowsTypable = !fire('ArrowLeft');
+  fire('i');
+  const bagStaysClosedOnI = !(S.screen==='bag' || document.getElementById('m-bag').classList.contains('on'));
+  fire('b');
+  const bagStaysClosedOnB = !(S.screen==='bag' || document.getElementById('m-bag').classList.contains('on'));
+  fire('e');
+  const renameWindowSurvives = document.getElementById('m-artname').classList.contains('on')
+    && S.screen==='game';
+  closeArtRename();
+  return {spaceTypable, arrowsTypable, bagStaysClosedOnI, bagStaysClosedOnB, renameWindowSurvives,
+          ok: spaceTypable && arrowsTypable && bagStaysClosedOnI && bagStaysClosedOnB
+              && renameWindowSurvives};
+});
+
 await done(b, errs, R);

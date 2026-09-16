@@ -10984,6 +10984,15 @@ function bindRowTap(node, sel, fn){
 /* ---------- 入力 ---------- */
 const keys={};
 addEventListener('keydown',e=>{
+  /* 文字を打っている最中（技名変更の入力欄など）は、ここから下の
+     ゲーム操作ショートカットを一切拾わない。
+     以前はここでフォーカス状態を見ておらず、技の名前に「い」「び」等を
+     ローマ字で打とうとして i / b を押すとカバンが開き、「e」を押すと
+     階段・NPC・イベントなどが割り込んで開いてしまい、名前の入力が
+     強制的に中断されたように見える不具合があった（報告：
+     「技の名前変更の文字入力中に強制的に入力を終了させられる事がある」）。 */
+  const ae=document.activeElement;
+  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')) return;
   keys[e.key.toLowerCase()]=1;
   if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
   const k=e.key.toLowerCase();
