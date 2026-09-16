@@ -8,7 +8,9 @@
 //    付いたり付かなかったりはしない）
 //  ・ランダムなのは効果の種類と強さ（色）だけ——装備の潜在と同じ抽選プール
 //  ・実際に stats() へ乗る（表示だけの飾りではない）
-//  ・カードが出る（m-charpot が開き、S.screen が切り替わる）
+//  ・カードが出る（m-charpot が開き、盤面は画面ごと切り替わらず
+//    pauseGame() で止まったまま見えている——「急に全画面表示をすると
+//    驚く」という報告への対応）
 //  ・一度に複数レベル上がってもカードは1枚ずつ（キューで順番に）
 //  ・仲間（プレイヤーキャラ以外）はレベルアップしても対象外
 import { boot, install, done } from './_h.mjs';
@@ -48,7 +50,11 @@ R.allyNotGranted = await pg.evaluate(()=>{
               && !document.getElementById('m-charpot').classList.contains('on')};
 });
 
-/* ============ 3. カードが出る（演出） ============ */
+/* ============ 3. カードが出る（演出） ============
+   報告「レベルアップ時に急に全画面表示をすると驚く」への対応で、
+   画面を切り替える（S.screen変更）のではなく、止める（pauseGame）方式に
+   変えた。盤面はそのまま見えているのが正しい動作なので、
+   S.screen==='game' のまま変わらないことを確認する。 */
 R.cardShown = await pg.evaluate(()=>{
   TH.run(1,{seed:13}); S.hero.party=[];
   S.hero.charPot=[]; _charPotQueue=[];
@@ -60,17 +66,22 @@ R.cardShown = await pg.evaluate(()=>{
   const col=RARCOL[pot.tier];
   const cardHtml=document.getElementById('cp-card').innerHTML;
   const modalOn=document.getElementById('m-charpot').classList.contains('on');
-  const screenSwitched=S.screen==='charpot';
+  const screenStaysGame=S.screen==='game';
+  const gamePausedNow=gamePaused();
   const showsRarity=cardHtml.includes(RARITY[pot.tier].nm);
   const showsBorderColor=document.getElementById('cp-card').style.borderColor.length>0;
-  // 閉じると探索画面に戻る
+  // 閉じると探索画面に戻る（止めていた時間も動き出す）
   closeCharPotCard();
-  const closedOk = !document.getElementById('m-charpot').classList.contains('on') && S.screen==='game';
-  return {modalOn, screenSwitched, showsRarity, showsBorderColor, closedOk,
-          ok: modalOn && screenSwitched && showsRarity && showsBorderColor && closedOk};
+  const closedOk = !document.getElementById('m-charpot').classList.contains('on')
+                   && S.screen==='game' && !gamePaused();
+  return {modalOn, screenStaysGame, gamePausedNow, showsRarity, showsBorderColor, closedOk,
+          ok: modalOn && screenStaysGame && gamePausedNow && showsRarity && showsBorderColor && closedOk};
 });
 
-/* ============ 4. 一度に複数レベル上がると、カードは1枚ずつキューで出る ============ */
+/* ============ 4. 一度に複数レベル上がると、カードは1枚ずつキューで出る ============
+   複数枚をまたぐ間、盤面はずっと止まったまま（毎回動き出しては止まり直す、
+   のようなチラつきが起きないか）も合わせて見る。動き出すのは最後の1枚を
+   閉じたときだけのはず。 */
 R.queuedMultiLevel = await pg.evaluate(()=>{
   TH.run(1,{seed:14}); S.hero.party=[];
   S.hero.lv=3; S.hero.xp=0; S.hero.charPot=[]; _charPotQueue=[];
@@ -81,20 +92,27 @@ R.queuedMultiLevel = await pg.evaluate(()=>{
   addXp(S.hero, big, true);
   const gained = S.hero.charPot.length;         // 3個ぶん貯まっている
   const queueLenAfterGrant = _charPotQueue.length;
-  // 1枚目が見えている
+  // 1枚目が見えていて、盤面は止まっている
   const modalOnAfterGrant = document.getElementById('m-charpot').classList.contains('on');
-  // 閉じるたびに1つずつ減り、最後に探索へ戻る
+  const pausedAfterGrant = gamePaused();
+  // 閉じるたびに1つずつ減り、最後の1枚まではまだ止まったまま
   const seenBeforeEachClose=[];
+  const pausedDuring=[];
   while(_charPotQueue.length){
     seenBeforeEachClose.push(_charPotQueue.length);
     closeCharPotCard();
+    if(_charPotQueue.length) pausedDuring.push(gamePaused());
   }
   const closesNeeded = seenBeforeEachClose.length;
-  const backToGame = S.screen==='game' && !document.getElementById('m-charpot').classList.contains('on');
-  return {gained, queueLenAfterGrant, modalOnAfterGrant, closesNeeded, backToGame,
+  const stayedPausedBetweenCards = pausedDuring.every(p=>p===true);
+  // 最後の1枚を閉じたら、画面は切り替わらないまま、止めていた時間だけ動き出す
+  const backToGame = S.screen==='game' && !document.getElementById('m-charpot').classList.contains('on')
+                      && !gamePaused();
+  return {gained, queueLenAfterGrant, modalOnAfterGrant, pausedAfterGrant, closesNeeded,
+          stayedPausedBetweenCards, backToGame,
           matchesGain: queueLenAfterGrant===gained && closesNeeded===gained,
-          ok: gained===3 && queueLenAfterGrant===3 && modalOnAfterGrant
-              && closesNeeded===3 && backToGame};
+          ok: gained===3 && queueLenAfterGrant===3 && modalOnAfterGrant && pausedAfterGrant
+              && closesNeeded===3 && stayedPausedBetweenCards && backToGame};
 });
 
 /* ============ 5. 実際に stats() へ乗る（表示だけの飾りではない） ============ */

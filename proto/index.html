@@ -501,6 +501,22 @@
      光ってから収まる——恩寵の静かな一覧選びとははっきり違う体験にする。
      perspective は rotateY を掛ける要素の**親**に置かないと奥行きが出ないので、
      カード本体ではなくラップ側に持たせる。 */
+  /* m-charpot だけ、他のモーダルより背景を薄くする。
+     他の .modal（恩寵・見送り等）は「別の画面に切り替わった」体で
+     ほぼ不透明に盤面を覆う作りだが、こちらは JS 側で S.screen を
+     'game' のまま動かさず pauseGame(true) するだけにした
+     （報告「急に全画面表示をすると驚く」への対応）。
+     背景まで不透明だと「止まった盤面の上にカードが乗る」がまったく
+     見えず、切り替え方を直した意味が消えるので、ここだけ薄くして
+     止まった瞬間の盤面を透かして見せる。 */
+  #m-charpot{background:rgba(8,10,14,.55)}
+  /* .box 自体は他モーダルと共有していて背景を持たない
+     （元々「別画面に切り替わった」体なので、モーダル全体の暗い背景で
+     文字のコントラストを賄っていた）。m-charpot はその背景を薄くしたので、
+     このモーダルの .box にだけ不透明に近いパネル背景を足して、
+     タイトル・説明文・ボタンが盤面に負けて読みにくくならないようにする。
+     色は .card（既存のパネル部品）に合わせる。 */
+  #m-charpot .box{background:var(--panel);border:1px solid var(--line);border-radius:14px}
   .pot-card-wrap{perspective:700px}
   .pot-card{
     border:2px solid var(--line); border-radius:14px;
@@ -9692,8 +9708,16 @@ function openCharPotCard(){
   if(!q || !S.hero) return;
   // 恩寵の選択画面と同じ理由：他のモーダルが下に隠れて開けなくなる事故を防ぐ
   document.querySelectorAll('.modal.on').forEach(m=>{ if(m.id!=='m-charpot') m.classList.remove('on'); });
-  S.screen='charpot';
-  el('hud').classList.remove('on');
+  /* ---------- 画面ごと切り替えず、止めて重ねる ----------
+     以前は S.screen を 'charpot' に切り替え、HUD ごと隠していた。
+     戦っている最中に前触れなく別画面へ差し替わると、盤面が一瞬で
+     消えて驚く（報告：「急に全画面表示をすると驚く」）。
+     技名変更の窓（openArtRename）と同じ作法に直す：
+     S.screen は 'game' のまま動かさず、pauseGame(true) で
+     **update だけ**止める。draw はそのまま回るので（tick() の
+     `S.screen==='game'` 判定が生きている）、盤面は「今の見た目のまま
+     止まる」——切り替わるのではなく、止まって、その上にカードが乗る。 */
+  pauseGame(true);
   const {pot, lv} = q;
   const col=RARCOL[pot.tier];
   el('cp-sub').textContent = 'Lv.'+lv+' に上がった';
@@ -9715,7 +9739,8 @@ function closeCharPotCard(){
   el('m-charpot').classList.remove('on');
   _charPotQueue.shift();
   if(_charPotQueue.length){ openCharPotCard(); return; }
-  if(S.hero && S.run){ setScreen('game'); last=performance.now(); }
+  // 最後の1枚を閉じたときだけ、止めていた時間を戻す
+  pauseGame(false);
 }
 bindTap(el('cp-ok'), closeCharPotCard);
 
@@ -18017,7 +18042,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
-<script src="game-feel.js?v=20260916-shadow3"></script>
+<script src="game-feel.js?v=20260916-shadow5"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
