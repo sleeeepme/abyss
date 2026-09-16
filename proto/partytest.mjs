@@ -248,14 +248,10 @@ R.fallen = await pg.evaluate(()=>{
   const doneFn=_adDone;
   if(doneFn) doneFn();
   const gearAfter=['weapon','shield','armor','accessory'].filter(s=>a.equip[s]).length;
-  /* 報告「帰還した際に味方の装備がなくなる事がある」への対応で、
-     広告蘇生が奪った装備を S.run.equipLost に控えるようにした。
-     ここで**記録の中身**まで検証する——件数だけ合っていて名前や
-     個数がずれている、という壊れ方を拾うため。 */
+  /* 装備ロストは撤廃済み（ユーザー指示「広告蘇生の代償をなくして」）。
+     以前はここで S.run.equipLost に記録が乗るのを確認していたが、
+     今は**何も乗らないこと**を確認するのが正しい形。 */
   const lostRecord = S.run.equipLost.find(r=>r.name===a.name && r.reason==='広告蘇生');
-  const equipLostTracked = (gearAfter<gearBefore)
-    ? !!(lostRecord && lostRecord.items.length===(gearBefore-gearAfter))
-    : !lostRecord;
   return {lvBefore, gearBefore, modalOn, isDead, inPartyStill, notLiving, adOn,
           revivedFlag:a.revived, deadAfter:a.dead, lvAfter:a.lv, gearAfter,
           keptBoons:a.boons.length,
@@ -264,8 +260,8 @@ R.fallen = await pg.evaluate(()=>{
              弔い（欠片に変える道）はレベルを保ったまま数えるので、
              広告を見て連れ戻すほうが常に損になっていた。 */
           keepsLevel: a.lv===lvBefore,
-          lostSomeGear: gearAfter<gearBefore,
-          equipLostTracked,
+          keepsAllGear: gearAfter===gearBefore,
+          noEquipLostRecord: !lostRecord,
           backAlive: !a.dead && livingParty().includes(a)};
 });
 
@@ -322,8 +318,10 @@ R.equipLostSummary = await pg.evaluate(()=>{
   const a=makeAlly(10,S.hero); a.x=P.x; a.y=P.y; S.hero.party.push(a);
   a.equip.weapon = a.equip.weapon || {nm:'テスト用の剣', kind:'weapon'};  // 確実に1枠は埋めておく
   for(let i=0;i<40 && !a.dead;i++){ a.hpNow=5; hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false}); }
-  reviveFallen();
-  const doneFn=_adDone; if(doneFn) doneFn();
+  /* 装備ロストは広告蘇生から撤廃したので（ユーザー指示「広告蘇生の代償をなくして」）、
+     一覧表示が生きているか確認できる材料は「見捨てる」だけになった。 */
+  openFallen(a);
+  letFallenGo();
   finishReturn(0);
   const html = document.getElementById('r-reward').innerHTML;
   document.getElementById('m-ret').classList.remove('on');   // 後続のテストに影響しないよう閉じる

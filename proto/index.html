@@ -1254,8 +1254,8 @@
     ・<b>最大3名</b>。武器種はジョブごとに固定で、能力はあなたより一段弱い。<br>
     ・指示は出せない（操作は移動だけ）。勝手に追ってきて勝手に戦う。<br>
     ・仲間が増えると<b>経験値は頭数で分配</b>される。ただし総量は人数ぶん少し増える。<br>
-    ・倒れると失われる。<b>1人につき1回だけ</b>広告で蘇生できるが、
-      <b>Lv.1</b>に戻り装備をランダムに失う。<br>
+    ・倒れると失われる。広告を見れば<b>レベルも装備もそのまま</b>蘇生できる
+      （パーティ共通で、階層帯ごとに回数制限あり）。<br>
     ・仲間はあなたに属している。<b>あなたが死ねば全員失われる</b>。<br>
     ・あなたの<b>足跡を辿って</b>ついてきます（壁で置いていかれません）。<br>
     ・HPが減ると<b>自分から退きます</b>。ジョブごとに引き際と<b>回避率</b>が違います
@@ -7375,10 +7375,12 @@ function startRun(depth){
            curses:refreshCurses().slice(),   // 潜った時点で確定。途中で掛け替えられない
            /* この探索中に装備（や護符）を失った仲間の記録。帰還画面でまとめて見せる。
               報告「帰還した際に味方の装備がなくなる事がある」への対応——
-              広告蘇生（装備1〜2枠ロスト）と見捨て（全装備ロスト）はどちらも
-              **仕様として意図的に**装備を失わせているが、ログ1行が戦闘の
-              最中に流れて消えるだけでは、後から見て「バグで消えた」ように
-              見えてしまう。帰還時に一覧化して、原因まで分かるようにする。 */
+              見捨て（letFallenGo、全装備ロスト）は**仕様として意図的に**
+              装備を失わせているが、ログ1行が戦闘の最中に流れて消えるだけでは、
+              後から見て「バグで消えた」ように見えてしまう。帰還時に
+              一覧化して、原因まで分かるようにする。
+              （広告蘇生 reviveFallen の装備ロストは、その後の指示
+              「広告蘇生の代償をなくして」で撤廃した——今はここに積まれない。） */
            equipLost:[],
            ft:0, hinted:false,          // 階層に入ってからの秒数と、気配を告げたか
            // 巡回者。潜り全体の時計で動くので、**ここが唯一のリセット点**。
@@ -17252,8 +17254,8 @@ function openFallen(a){
          <span style="color:var(--dim);font-size:12px">装備も恩寵も護符も一緒に消える</span><br>
          <span style="color:#d6b34a;font-size:12px">${allyLossGold(a)} G が残る（慰霊碑で呼び戻せる）</span>
          ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:12px">弔いの恩寵が発動する</span>':''}</span></div>
-       <div class="row"><span class="k">蘇生すると</span><span><b>Lv.1</b> に戻り、装備をランダムに失う<br>
-         <span style="color:var(--dim);font-size:12px">恩寵は残る</span></span></div>
+       <div class="row"><span class="k">蘇生すると</span><span>レベルも装備も恩寵もそのまま<br>
+         <span style="color:var(--dim);font-size:12px">代償は下の蘇生回数を1つ使うだけ</span></span></div>
        <div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}
          <span style="color:var(--dim);font-size:12px">（誰に使ってもよい）</span><br>
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
@@ -17468,21 +17470,15 @@ function reviveFallen(){
        **広告で立たせるほうが厳密に損**という並びになっていた。
        払う物が違うだけで、結果まで劣るなら誰も押さない。
 
-       代償は装備のほう（下で1〜2枠を失う）と、
-       帯ごとの回数制限（revLeft）に寄せる。 */
+       ---------- 装備ロストは撤廃 ----------
+       以前は代償として装備を1〜2枠ランダムに失わせていたが、
+       「帰還した際に味方の装備がなくなる事がある」という報告のあと、
+       ユーザー指示で「広告蘇生の代償をなくして」となったため撤廃した。
+       代償は帯ごとの回数制限（revLeft）だけに絞る。 */
     a.st={}; a.bu={};
-    // 装備はランダムに 1〜2 枠が失われる。全部残ると死んだ意味がなくなる。
-    const slots=['weapon','shield','armor','accessory'].filter(s=>a.equip[s]);
-    const lose=Math.min(slots.length, ri(1,2));
-    const lost=[];
-    for(let i=0;i<lose;i++){
-      const s=slots.splice(Math.floor(rnd()*slots.length),1)[0];
-      lost.push(a.equip[s].nm); a.equip[s]=null;
-    }
-    if(lost.length && S.run) S.run.equipLost.push({name:a.name, reason:'広告蘇生', items:lost.slice()});
     a.x=P.x; a.y=P.y;
     a.hpNow=allyStats(a).maxHp;
-    log(a.name+'が蘇生した（Lv.'+a.lv+(lost.length?' / '+lost.join('・')+'を失った':'')+'）');
+    log(a.name+'が蘇生した（Lv.'+a.lv+'）');
     W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
     closeFallen();
   });
@@ -17869,7 +17865,10 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-effect-study.js?v=20260915b"></script>
 <script src="item-icons-imported-data.js?v=20260915a"></script>
 <script src="item-icons.js?v=20260915a"></script>
-<script src="game-feel.js?v=20260915b"></script>
+<!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
+     描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
+     本体と同じ世代を必ず読み込む。 -->
+<script src="game-feel.js?v=20260916-shadow1"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
