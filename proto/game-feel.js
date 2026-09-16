@@ -567,6 +567,28 @@ function drawPlayerLight(camX,camY){
   ctx.restore();
 }
 
+/* 参照のような拡散影を、半透明のぼかし画像として一度だけ焼く。
+   Canvas filter / shadowBlur はアプリ内ブラウザごとに輪郭が残るため使わない。
+   この画像は中心から端までアルファ値を連続的に下げるので、回転させても
+   多角形の縁が出ない。 */
+const feelGroundShadowCache=new Map();
+function feelGroundShadowImage(length,near,half){
+  const key=length+'|'+near+'|'+half,old=feelGroundShadowCache.get(key);if(old)return old;
+  // 尖った多角形ではなく、光と反対側へ少し寄ったガウス楕円。
+  // どの方向へ回しても、中心から外側まで同じ割合で溶ける。
+  const rx=Math.max(4,Math.round((length+near)*.60)),ry=Math.max(3,Math.round(half*1.55+3));
+  const margin=Math.max(4,Math.ceil(Math.max(rx,ry)*1.45));
+  const w=Math.ceil(near+length+margin*2),h=Math.ceil(ry*2+margin*2);
+  const ax=margin+near,ay=Math.floor(h/2),center=length*.28,c=document.createElement('canvas');c.width=w;c.height=h;
+  const cc=c.getContext('2d'),im=cc.createImageData(w,h),data=im.data;
+  for(let iy=0;iy<h;iy++)for(let ix=0;ix<w;ix++){
+    const x=ix-ax,y=iy-ay,d2=((x-center)/rx)**2+(y/ry)**2;if(d2>3.5)continue;
+    const a=Math.round(180*Math.exp(-d2*1.6));if(!a)continue;
+    const i=(iy*w+ix)*4;data[i]=7;data[i+1]=9;data[i+2]=20;data[i+3]=a;
+  }
+  cc.putImageData(im,0,0);const made={canvas:c,ax,ay};feelGroundShadowCache.set(key,made);return made;
+}
+
 /* 足元の影は、主人公の指向性ライトと反対側へだけ伸ばす。
    画面基準の固定影にすると、ライトを振ったときに地面とキャラの関係が
    崩れるので、FEEL.lightX/Y（ライトと同じ、なめらかに追従する向き）を
@@ -577,33 +599,13 @@ function drawFeelGroundShadow(x,y,size,scale=1,alpha=1){
   let lx=Number.isFinite(FEEL.lightX)?FEEL.lightX:1;
   let ly=Number.isFinite(FEEL.lightY)?FEEL.lightY:0;
   const ln=Math.hypot(lx,ly)||1;lx/=ln;ly/=ln;
-  const dx=-lx,dy=-ly,px=-dy,py=dx;
+  const dx=-lx,dy=-ly;
   const s=Math.max(2,size*scale),footX=Math.round(x),footY=Math.round(y+s*.39);
   const length=Math.max(3,Math.round(s*.52)),near=Math.max(2,Math.round(s*.18));
-  const half=Math.max(1,Math.round(s*.17)),tailHalf=Math.max(1,Math.round(half*.55));
-  const point=(along,side)=>[
-    Math.round(footX+dx*along+px*side),Math.round(footY+dy*along+py*side)
-  ];
-  const a=point(-near*.18,half),b=point(-near*.18,-half);
-  const c=point(length*.72,-tailHalf),d=point(length,0),e=point(length*.72,tailHalf);
-  const paintProjection=(ox=0,oy=0)=>{ctx.beginPath();ctx.moveTo(a[0]+ox,a[1]+oy);ctx.lineTo(b[0]+ox,b[1]+oy);ctx.lineTo(c[0]+ox,c[1]+oy);
-    ctx.lineTo(d[0]+ox,d[1]+oy);ctx.lineTo(e[0]+ox,e[1]+oy);ctx.closePath();ctx.fill();};
-  ctx.save();ctx.imageSmoothingEnabled=false;
-  const baseAlpha=ctx.globalAlpha*clamp(alpha,0,1);
-  /* Canvas の filter は環境によって見え方が揃わない（特にアプリ内ブラウザ）。
-     そこで影の外周を低い不透明度で重ね、常に読める 3〜7px の羽毛を作る。
-     影本体の輪郭を残すので、ドット絵の足元が浮いて見えない。 */
-  const blur=Math.max(3,Math.min(7,Math.round(s*.16)));
-  const feather=[[-1,0],[1,0],[0,-1],[0,1],[-.72,-.72],[.72,-.72],[-.72,.72],[.72,.72]];
-  ctx.fillStyle='#070914';ctx.globalAlpha=baseAlpha*.05;
-  for(const [fx,fy] of feather)paintProjection(Math.round(fx*blur),Math.round(fy*blur));
-  // iOS を含めた Canvas の shadowBlur は filter より安定してぼける。
-  // 上の羽毛レイヤーは、shadowBlur を縮める省電力ブラウザ用の見え方も保つ。
-  ctx.globalAlpha=baseAlpha*.13;ctx.shadowColor='#070914';ctx.shadowBlur=blur*1.6;paintProjection();ctx.shadowBlur=0;
-  ctx.globalAlpha=baseAlpha*.22;paintProjection();
-  // 接地点だけを一段濃くして、影の始点＝足元だと即座に読めるようにする。
-  const ca=point(0,half*.72),cb=point(0,-half*.72),cc=point(near*.42,-half*.42),cd=point(near*.42,half*.42);
-  ctx.globalAlpha=baseAlpha*.34;ctx.beginPath();ctx.moveTo(...ca);ctx.lineTo(...cb);ctx.lineTo(...cc);ctx.lineTo(...cd);ctx.closePath();ctx.fill();
+  const half=Math.max(1,Math.round(s*.17)),shadow=feelGroundShadowImage(length,near,half);
+  ctx.save();ctx.globalAlpha*=clamp(alpha,0,1);ctx.imageSmoothingEnabled=true;
+  ctx.translate(footX,footY);ctx.rotate(Math.atan2(dy,dx));
+  ctx.drawImage(shadow.canvas,-shadow.ax,-shadow.ay);
   ctx.restore();
 }
 
