@@ -12587,6 +12587,9 @@ function draw(){
     if(!tileSeen(d.x, d.y)) return;          // 床と足並みを揃える
     const dropOffset=feelDropOffset(d);
     const sx=(d.x+dropOffset.x)*TS-camX, sy=(d.y+dropOffset.y)*TS-camY+bob;
+    // アイテムは浮遊・着地中でも、影だけは床の位置に残す。
+    // これで拾い物の高さと、主人公ライトに対する向きが一目で分かる。
+    drawFeelGroundShadow(sx,(d.y*TS-camY)+TS*.12,TS*.64,.85);
     if(d.shard){
       /* SP。装備のひし形と混ざらないよう、六角形＋青で描く。
          死んでも失わない物なので、拾いたさが一目で分かるようにする。 */
@@ -18014,7 +18017,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
-<script src="game-feel.js?v=20260916-shadow1"></script>
+<script src="game-feel.js?v=20260916-shadow3"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

@@ -586,15 +586,24 @@ function drawFeelGroundShadow(x,y,size,scale=1,alpha=1){
   ];
   const a=point(-near*.18,half),b=point(-near*.18,-half);
   const c=point(length*.72,-tailHalf),d=point(length,0),e=point(length*.72,tailHalf);
-  const paintProjection=()=>{ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.lineTo(...c);
-    ctx.lineTo(...d);ctx.lineTo(...e);ctx.closePath();ctx.fill();};
-  ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha*=.34*clamp(alpha,0,1);
-  // 先端は柔らかく地面へ溶かし、根元だけは足が接している位置を保つ。
-  // TS に応じた 1〜3px のブラーなので、拡大率が変わっても同じ印象になる。
-  ctx.fillStyle='#070914';ctx.filter=`blur(${clamp(Math.round(s*.055),1,3)}px)`;paintProjection();ctx.filter='none';
+  const paintProjection=(ox=0,oy=0)=>{ctx.beginPath();ctx.moveTo(a[0]+ox,a[1]+oy);ctx.lineTo(b[0]+ox,b[1]+oy);ctx.lineTo(c[0]+ox,c[1]+oy);
+    ctx.lineTo(d[0]+ox,d[1]+oy);ctx.lineTo(e[0]+ox,e[1]+oy);ctx.closePath();ctx.fill();};
+  ctx.save();ctx.imageSmoothingEnabled=false;
+  const baseAlpha=ctx.globalAlpha*clamp(alpha,0,1);
+  /* Canvas の filter は環境によって見え方が揃わない（特にアプリ内ブラウザ）。
+     そこで影の外周を低い不透明度で重ね、常に読める 3〜7px の羽毛を作る。
+     影本体の輪郭を残すので、ドット絵の足元が浮いて見えない。 */
+  const blur=Math.max(3,Math.min(7,Math.round(s*.16)));
+  const feather=[[-1,0],[1,0],[0,-1],[0,1],[-.72,-.72],[.72,-.72],[-.72,.72],[.72,.72]];
+  ctx.fillStyle='#070914';ctx.globalAlpha=baseAlpha*.05;
+  for(const [fx,fy] of feather)paintProjection(Math.round(fx*blur),Math.round(fy*blur));
+  // iOS を含めた Canvas の shadowBlur は filter より安定してぼける。
+  // 上の羽毛レイヤーは、shadowBlur を縮める省電力ブラウザ用の見え方も保つ。
+  ctx.globalAlpha=baseAlpha*.13;ctx.shadowColor='#070914';ctx.shadowBlur=blur*1.6;paintProjection();ctx.shadowBlur=0;
+  ctx.globalAlpha=baseAlpha*.22;paintProjection();
   // 接地点だけを一段濃くして、影の始点＝足元だと即座に読めるようにする。
   const ca=point(0,half*.72),cb=point(0,-half*.72),cc=point(near*.42,-half*.42),cd=point(near*.42,half*.42);
-  ctx.globalAlpha*=1.32;ctx.beginPath();ctx.moveTo(...ca);ctx.lineTo(...cb);ctx.lineTo(...cc);ctx.lineTo(...cd);ctx.closePath();ctx.fill();
+  ctx.globalAlpha=baseAlpha*.34;ctx.beginPath();ctx.moveTo(...ca);ctx.lineTo(...cb);ctx.lineTo(...cc);ctx.lineTo(...cd);ctx.closePath();ctx.fill();
   ctx.restore();
 }
 

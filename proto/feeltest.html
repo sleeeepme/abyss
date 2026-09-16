@@ -156,9 +156,11 @@ frame.onload=async()=>{
       const oldLight={x:FEEL.lightX,y:FEEL.lightY};
       const center=()=>{const p=ctx.getImageData(0,0,128,128).data;let mass=0,sum=0;for(let y=0;y<128;y++)for(let x=0;x<128;x++){const a=p[(y*128+x)*4+3];mass+=a;sum+=x*a;}return mass?sum/mass:NaN;};
       try{
-        FEEL.lightX=1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32);const towardLeft=center();ctx.clearRect(0,0,128,128);
+        FEEL.lightX=1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32);const towardLeft=center();
+        // 投影本体より外に半透明の画素がある＝環境依存の filter だけに頼らない羽毛。
+        const softEdge=ctx.getImageData(0,0,128,128).data[(76*128+43)*4+3];ctx.clearRect(0,0,128,128);
         FEEL.lightX=-1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32);const towardRight=center();
-        return towardLeft<62&&towardRight>66;
+        return towardLeft<62&&towardRight>66&&softEdge>0&&softEdge<32;
       }finally{FEEL.lightX=oldLight.x;FEEL.lightY=oldLight.y;ctx=saved;}
     });
     check('Water footsteps spawn droplets and ripples; rendering stays valid',()=>{
@@ -283,7 +285,8 @@ frame.onload=async()=>{
         for(const name of names){originals[name]=window[name];calls[name]=0;
           window[name]=function(...args){calls[name]++;return originals[name](...args);};}
         draw();
-        return names.every(name=>calls[name]>0)&&calls.feelBlink>=3&&calls.drawFeelFlash>=3;
+        // 影は敵・味方・主人公に加え、床ドロップにも描く。
+        return names.every(name=>calls[name]>0)&&calls.feelBlink>=3&&calls.drawFeelFlash>=3&&calls.drawFeelGroundShadow>=4;
       }finally{for(const name of names)window[name]=originals[name];}
     });
     check('Blurred ambient appears through furnace but not in pale layer',()=>{
