@@ -151,20 +151,27 @@ frame.onload=async()=>{
       fresh();const a=makeAlly(1,S.hero,'warrior');a.x=P.x+3;a.y=P.y;S.hero.party=[a];a.hpNow=allyStats(a).maxHp;
       stepSim(.3);const offset=feelEntityOffset(a);return feelMotion(a).phase>0&&offset.x===0&&offset.y===0;
     });
-    check('Ground shadows extend away from the player light source',()=>{
+    check('Ground shadows stay compact under actors regardless of light direction',()=>{
       const saved=ctx,c=document.createElement('canvas');c.width=c.height=128;ctx=c.getContext('2d');
-      const oldLight={x:FEEL.lightX,y:FEEL.lightY};
-      const center=()=>{const p=ctx.getImageData(0,0,128,128).data;let mass=0,sum=0;for(let y=0;y<128;y++)for(let x=0;x<128;x++){const a=p[(y*128+x)*4+3];mass+=a;sum+=x*a;}return mass?sum/mass:NaN;};
       try{
-        // 光源の右にある対象は右へ、左にある対象は左へ影が伸びる。
-        drawFeelGroundShadow(80,64,32,1,1,64,64);const targetRight=center();
-        // 中心から外側へ連続して薄くなる、焼き込み済みの拡散影になっている。
-        const pixels=ctx.getImageData(0,0,128,128).data,softEdge=pixels[(76*128+96)*4+3],core=pixels[(76*128+85)*4+3];ctx.clearRect(0,0,128,128);
-        drawFeelGroundShadow(48,64,32,1,1,64,64);const targetLeft=center();ctx.clearRect(0,0,128,128);
-        // 主人公自身は光源と重なるため、向いている光の反対へ落とす。
-        FEEL.lightX=1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32,1,1,64,64);const heroFallback=center();
-        return targetRight>82&&targetLeft<46&&heroFallback<62&&softEdge>0&&softEdge<core&&core<255;
-      }finally{FEEL.lightX=oldLight.x;FEEL.lightY=oldLight.y;ctx=saved;}
+        drawFeelGroundShadow(64,50,32,1,1,0,64);
+        const left=ctx.getImageData(0,0,128,128).data.slice();ctx.clearRect(0,0,128,128);
+        drawFeelGroundShadow(64,50,32,1,1,128,64);
+        const right=ctx.getImageData(0,0,128,128).data;
+        let same=true,minX=128,maxX=-1,minY=128,maxY=-1,mass=0,sumX=0;
+        for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+          const i=(y*128+x)*4,a=right[i+3];if(left[i+3]!==a)same=false;
+          if(a){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);mass+=a;sumX+=x*a;}
+        }
+        return same&&Math.abs(sumX/mass-64)<1&&(maxX-minX)<36&&(maxY-minY)<12;
+      }finally{ctx=saved;}
+    });
+    check('Actor occlusion removes light only behind the caster',()=>{
+      const c=document.createElement('canvas');c.width=160;c.height=128;const g=c.getContext('2d');
+      g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+      feelCutActorLight(g,{x:72,y:64,radius:8},32,64,118);
+      const alpha=(x,y)=>g.getImageData(x,y,1,1).data[3];
+      return alpha(54,64)===255&&alpha(72,64)===255&&alpha(86,64)<230&&alpha(150,64)>245;
     });
     check('Water footsteps spawn droplets and ripples; rendering stays valid',()=>{
       fresh();enterFloor(11);syncFeel();W.enemies=[];

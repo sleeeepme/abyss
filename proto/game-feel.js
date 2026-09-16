@@ -545,67 +545,121 @@ function feelLightRay(ang,range){
   }
   return {x:P.x+dx*dist,y:P.y+dy*dist};
 }
+const feelLightCanvas=document.createElement('canvas');
+const feelLightCtx=feelLightCanvas.getContext('2d');
+const FEEL_LIGHT_CASTERS=7;
+const FEEL_REFERENCE_TILE=16;
+const FEEL_REFERENCE_LIGHT_RADIUS=112;
+const feelActorOcclusionCache=new Map();
+let feelHeroLightTexture=null;
+function feelSmoothstep(a,b,v){const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);}
+function feelHeroLightImage(){
+  if(feelHeroLightTexture)return feelHeroLightTexture;
+  const r=FEEL_REFERENCE_LIGHT_RADIUS,pad=2,c=document.createElement('canvas');c.width=c.height=r*2+pad*2+1;
+  const cc=c.getContext('2d'),im=cc.createImageData(c.width,c.height),data=im.data,ax=r+pad,ay=r+pad;
+  for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){
+    const dx=x-ax,dy=y-ay,d=Math.hypot(dx,dy);if(d>r)continue;
+    const radial=clamp(1-d/r,0,1),falloff=radial*radial*(3-2*radial);
+    const cone=d<.01?1:feelSmoothstep(.44,.84,dx/d);
+    const safety=1-feelSmoothstep(12,32,d);
+    const visibility=Math.max(safety*.86+.12,cone);
+    const a=Math.round(255*falloff*visibility*.39);if(!a)continue;
+    const i=(y*c.width+x)*4;data[i]=116;data[i+1]=198;data[i+2]=164;data[i+3]=a;
+  }
+  cc.putImageData(im,0,0);feelHeroLightTexture={canvas:c,ax,ay};return feelHeroLightTexture;
+}
+function feelLightCasters(camX,camY,rangePx){
+  const found=[];
+  const add=(e,radius,strength)=>{
+    if(!e||e.dead||e.hpNow!==undefined&&e.hpNow<=0)return;
+    const x=e.x*TS-camX,y=e.y*TS-camY,dist=Math.hypot(x-innerWidth/2,y-innerHeight/2);
+    if(dist>rangePx+radius||dist<radius*.8)return;
+    found.push({x,y,radius,strength,dist});
+  };
+  for(const e of W.enemies)add(e,TS*(e.r||.32)*.82,e.boss?.72:.56);
+  for(const a of S.hero.party||[])add(a,TS*.17,.56);
+  found.sort((a,b)=>a.dist-b.dist);
+  return found.slice(0,FEEL_LIGHT_CASTERS);
+}
+function feelActorOcclusionImage(radius,strength){
+  radius=Math.round(clamp(radius,3,13)*2)/2;
+  const key=radius+'|'+strength,old=feelActorOcclusionCache.get(key);if(old)return old;
+  const maxBehind=57,maxPenumbra=radius*1.25,pad=3;
+  const ax=Math.ceil(radius+pad),ay=Math.ceil(maxPenumbra+pad),w=ax+maxBehind+pad+1,h=ay*2+1;
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const cc=c.getContext('2d'),im=cc.createImageData(w,h),data=im.data;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const behind=x-ax,across=Math.abs(y-ay);
+    if(behind<=radius*.45||behind>maxBehind)continue;
+    const penumbra=radius*(.70+Math.min(behind/64,.55));
+    const silhouette=1-feelSmoothstep(penumbra*.43,penumbra,across);
+    const fade=1-feelSmoothstep(20,57,behind);
+    const a=Math.round(255*silhouette*fade*strength);if(!a)continue;
+    const i=(y*w+x)*4;data[i+3]=a;
+  }
+  cc.putImageData(im,0,0);const made={canvas:c,ax,ay};feelActorOcclusionCache.set(key,made);return made;
+}
+function feelCutActorLight(c,caster,sourceX,sourceY,rangePx,q=1){
+  const dx=caster.x-sourceX,dy=caster.y-sourceY,dist=Math.hypot(dx,dy);
+  if(!Number.isFinite(dist)||dist<caster.radius||dist>rangePx+caster.radius)return;
+  const shadow=feelActorOcclusionImage(caster.radius/q,caster.strength??.56);
+  c.save();c.translate(caster.x/q,caster.y/q);c.rotate(Math.atan2(dy,dx));
+  c.globalCompositeOperation='destination-out';
+  c.drawImage(shadow.canvas,-shadow.ax,-shadow.ay);
+  c.restore();
+}
 function drawPlayerLight(camX,camY){
   const px=P.x*TS-camX,py=P.y*TS-camY;
-  ctx.save();ctx.globalCompositeOperation='lighter';
-  const paint=(angle,spread,range,col,alpha)=>{
-    ctx.save();ctx.beginPath();ctx.moveTo(px,py);
-    for(let i=0;i<=100;i++){
-      const p=feelLightRay(angle-spread/2+spread*i/100,range);
-      ctx.lineTo(p.x*TS-camX,p.y*TS-camY);
-    }
-    ctx.closePath();ctx.clip();
-    const g=ctx.createRadialGradient(px,py,0,px,py,range*TS);
-    g.addColorStop(0,`rgba(${col},${alpha})`);g.addColorStop(.45,`rgba(${col},${alpha*.5})`);g.addColorStop(1,`rgba(${col},0)`);
-    ctx.fillStyle=g;ctx.fillRect(px-range*TS,py-range*TS,range*TS*2,range*TS*2);ctx.restore();
-  };
-  paint(0,Math.PI*2,3.1,'110,201,162',.25);
+  /* HOLLOWFLUX と同じ役割分担にする。
+     - 低解像度ライトバッファを1枚だけ作る
+     - 足元を保証する近距離全周光と、向いている方向の広い円錐光を合成
+     - 壁はグリッド追跡で遮蔽
+     - 近いキャラ最大7体を円形遮蔽物として、背後の光だけを減らす */
+  const q=Math.max(1,TS/FEEL_REFERENCE_TILE),w=Math.ceil(innerWidth/q),h=Math.ceil(innerHeight/q);
+  if(feelLightCanvas.width!==w||feelLightCanvas.height!==h){feelLightCanvas.width=w;feelLightCanvas.height=h;}
+  const c=feelLightCtx;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,w,h);
   const angle=Math.atan2(FEEL.lightY,FEEL.lightX);
-  paint(angle,1.45,5.8,'125,184,160',.035);
-  paint(angle,1.15,5.8,'125,184,160',.045);
-  paint(angle,.85,5.8,'125,184,160',.055);
-  ctx.restore();
+  // The reference shader evaluates a 112 px radial falloff and its soft cone
+  // per internal pixel. Cache that exact field, then rotate it with facing.
+  const light=feelHeroLightImage(),rangeTiles=FEEL_REFERENCE_LIGHT_RADIUS/FEEL_REFERENCE_TILE;
+  c.save();c.beginPath();c.moveTo(px/q,py/q);
+  for(let i=0;i<=128;i++){
+    const p=feelLightRay(i/128*Math.PI*2,rangeTiles);
+    c.lineTo((p.x*TS-camX)/q,(p.y*TS-camY)/q);
+  }
+  c.closePath();c.clip();c.translate(px/q,py/q);c.rotate(angle);
+  c.imageSmoothingEnabled=true;c.drawImage(light.canvas,-light.ax,-light.ay);c.restore();
+  for(const caster of feelLightCasters(camX,camY,rangeTiles*TS))
+    feelCutActorLight(c,caster,px,py,rangeTiles*TS,q);
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(feelLightCanvas,0,0,innerWidth/q,innerHeight/q,0,0,innerWidth,innerHeight);ctx.restore();
 }
 
-/* 参照のような拡散影を、半透明のぼかし画像として一度だけ焼く。
-   Canvas filter / shadowBlur はアプリ内ブラウザごとに輪郭が残るため使わない。
-   この画像は中心から端までアルファ値を連続的に下げるので、回転させても
-   多角形の縁が出ない。 */
+/* 接地影は光源方向へ回さない。長い影は drawPlayerLight の照明遮蔽で作り、
+   キャラと道具自身には参照ゲーム同様の短い足元影だけを持たせる。 */
 const feelGroundShadowCache=new Map();
-function feelGroundShadowImage(length,near,half){
-  const key=length+'|'+near+'|'+half,old=feelGroundShadowCache.get(key);if(old)return old;
-  // 尖った多角形ではなく、光と反対側へ少し寄ったガウス楕円。
-  // どの方向へ回しても、中心から外側まで同じ割合で溶ける。
-  const rx=Math.max(4,Math.round((length+near)*.60)),ry=Math.max(3,Math.round(half*1.55+3));
+function feelGroundShadowImage(width,half){
+  const key=width+'|'+half,old=feelGroundShadowCache.get(key);if(old)return old;
+  const rx=Math.max(3,width*.5),ry=Math.max(1.5,half);
   const margin=Math.max(4,Math.ceil(Math.max(rx,ry)*1.45));
-  const w=Math.ceil(near+length+margin*2),h=Math.ceil(ry*2+margin*2);
-  const ax=margin+near,ay=Math.floor(h/2),center=length*.28,c=document.createElement('canvas');c.width=w;c.height=h;
+  const w=Math.ceil(rx*2+margin*2),h=Math.ceil(ry*2+margin*2);
+  const ax=Math.floor(w/2),ay=Math.floor(h/2),c=document.createElement('canvas');c.width=w;c.height=h;
   const cc=c.getContext('2d'),im=cc.createImageData(w,h),data=im.data;
   for(let iy=0;iy<h;iy++)for(let ix=0;ix<w;ix++){
-    const x=ix-ax,y=iy-ay,d2=((x-center)/rx)**2+(y/ry)**2;if(d2>3.5)continue;
-    const a=Math.round(180*Math.exp(-d2*1.6));if(!a)continue;
+    const x=ix-ax,y=iy-ay,d2=(x/rx)**2+(y/ry)**2;if(d2>3.5)continue;
+    const a=Math.round(145*Math.exp(-d2*1.8));if(!a)continue;
     const i=(iy*w+ix)*4;data[i]=7;data[i+1]=9;data[i+2]=20;data[i+3]=a;
   }
   cc.putImageData(im,0,0);const made={canvas:c,ax,ay};feelGroundShadowCache.set(key,made);return made;
 }
 
-/* 敵・仲間・道具の影は、光源である主人公から対象へ届く光線の延長へ伸ばす。
-   主人公自身は光源と同じ位置なので、そこだけは向いている方向の反対を使う。
-   sourceX/Y は検証用にも渡せるが、実ゲームでは画面中央の主人公が既定値。 */
 function drawFeelGroundShadow(x,y,size,scale=1,alpha=1,sourceX=innerWidth/2,sourceY=innerHeight/2){
   if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(size)||size<=0)return;
   const s=Math.max(2,size*scale),footX=Math.round(x),footY=Math.round(y+s*.39);
-  let dx=x-sourceX,dy=y-sourceY,ln=Math.hypot(dx,dy);
-  if(!Number.isFinite(ln)||ln<Math.max(2,s*.22)){
-    const lx=Number.isFinite(FEEL.lightX)?FEEL.lightX:1;
-    const ly=Number.isFinite(FEEL.lightY)?FEEL.lightY:0;
-    ln=Math.hypot(lx,ly)||1;dx=-lx/ln;dy=-ly/ln;
-  }else{dx/=ln;dy/=ln;}
-  const length=Math.max(3,Math.round(s*.52)),near=Math.max(2,Math.round(s*.18));
-  const half=Math.max(1,Math.round(s*.17)),shadow=feelGroundShadowImage(length,near,half);
+  const width=Math.max(5,Math.round(s*.52)),half=Math.max(1,Math.round(s*.065));
+  const shadow=feelGroundShadowImage(width,half);
   ctx.save();ctx.globalAlpha*=clamp(alpha,0,1);ctx.imageSmoothingEnabled=true;
-  ctx.translate(footX,footY);ctx.rotate(Math.atan2(dy,dx));
-  ctx.drawImage(shadow.canvas,-shadow.ax,-shadow.ay);
+  ctx.drawImage(shadow.canvas,footX-shadow.ax,footY-shadow.ay);
   ctx.restore();
 }
 
