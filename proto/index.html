@@ -492,6 +492,42 @@
     box-shadow:0 0 0 10px var(--bg), 0 -14px 18px -10px var(--bg)}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
 
+  /* ---------- 潜在カードの演出 ----------
+     ユーザー要望「プレイヤーキャラのレベルアップごとにランダムに1個潜在が
+     手に入るようにしたい。テキストだけだと分かりづらいのでカードが出るような
+     演出を入れたい」への対応。選ぶ操作がある恩寵（m-boon の3択）と違い、
+     こちらは自動で1枚もらえるだけなので、なおさら「今、何かが起きた」が
+     ひと目で伝わる動きが要る。裏返りながら出て、潜在の強さ（色）でふわっと
+     光ってから収まる——恩寵の静かな一覧選びとははっきり違う体験にする。
+     perspective は rotateY を掛ける要素の**親**に置かないと奥行きが出ないので、
+     カード本体ではなくラップ側に持たせる。 */
+  .pot-card-wrap{perspective:700px}
+  .pot-card{
+    border:2px solid var(--line); border-radius:14px;
+    padding:22px 16px; margin:16px 0;
+    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
+  }
+  .pot-card .pc-rar{font-size:12px;font-weight:700;letter-spacing:.05em}
+  .pot-card .pc-name{font-size:21px;font-weight:700;margin-top:8px;line-height:1.4}
+  @keyframes potCardIn{
+    0%{transform:scale(.5) rotateY(80deg); opacity:0}
+    55%{transform:scale(1.05) rotateY(0deg); opacity:1}
+    100%{transform:scale(1) rotateY(0deg); opacity:1}
+  }
+  @keyframes potCardGlow{
+    0%{box-shadow:0 0 0 0 var(--pot-glow, transparent)}
+    35%{box-shadow:0 0 28px 4px var(--pot-glow, transparent)}
+    100%{box-shadow:0 0 0 0 var(--pot-glow, transparent)}
+  }
+  /* アニメーションだけを別クラスに分け、連続レベルアップ（一度に大量の
+     経験値が入って2回以上上がる）でも remove→reflow→add で毎回再生できる
+     ようにする——.pot-card 自体を差し替えると中身のHTMLごと作り直す
+     羽目になるので、クラスの付け外しだけで済ませる。 */
+  .pot-card.pot-card-anim{
+    animation:potCardIn .45s cubic-bezier(.25,.9,.35,1.15),
+              potCardGlow .7s ease-out;
+  }
+
   /* ---------- 街（ハブ） ----------
      背景はループアニメ（docs/HUB_BACKGROUND_HANDOFF.md）を敷き、
      UIはその上に重ねる絶対配置の別レイヤー。背景側は pointer-events を持たない。
@@ -706,6 +742,9 @@
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">死ぬまで有効</span></h2>
   <div class="grid" id="town-boons"></div>
 
+  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップで1つずつ手に入る</span></h2>
+  <div class="grid" id="town-charpot"></div>
+
   <h2>仲間 <span style="color:var(--dim);font-weight:400;font-size:12px">タップで装備と技</span></h2>
   <div class="grid" id="town-party"></div>
 
@@ -904,6 +943,9 @@
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">ボス撃破で得た・死ぬまで有効</span></h2>
   <div class="grid" id="bag-boons"></div>
 
+  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップで1つずつ手に入る</span></h2>
+  <div class="grid" id="bag-charpot"></div>
+
   <h2>仲間 <span style="color:var(--dim);font-weight:400;font-size:12px">最大3名・あなたが死ぬと一緒に失われる</span></h2>
   <div class="grid" id="bag-party"></div>
 
@@ -933,6 +975,15 @@
   <p class="sub" id="boon-sub"></p>
   <div class="grid" id="boon-choices" style="grid-template-columns:repeat(3,1fr)"></div>
   <p class="sub" style="margin-top:14px">効果は<b>このキャラが死ぬまで</b>続きます</p>
+</div></div>
+
+<!-- ============ 資質カード（レベルアップ） ============ -->
+<div class="modal" id="m-charpot"><div class="box">
+  <h1>資質を獲得！</h1>
+  <p class="sub" id="cp-sub"></p>
+  <div class="pot-card-wrap"><div class="pot-card" id="cp-card"></div></div>
+  <p class="sub" style="margin-top:6px">レベルアップのたびに1つ、ずっと効果が続きます</p>
+  <button class="primary" id="cp-ok">閉じる</button>
 </div></div>
 
 <!-- ============ 恩寵の付与先（主人公 / 仲間） ============ -->
@@ -5755,6 +5806,11 @@ function newHero(){
           // 恩寵は死ぬまで残る（街に戻っても消えない）。
           // 祭壇があれば、前のキャラの恩寵をいくつか引き継いで生まれる。
           boons:(S.legacyBoons||[]).slice(),
+          /* 潜在（レベルアップで1つずつ手に入る）。生まれ変わりで最初から
+             高いレベルで始まっても、ここは空から始める——実際にレベルアップを
+             跨いだ回数ぶんだけ増える物として揃えたいので、開始レベルぶんを
+             後から埋め合わせるような遡及はしない。 */
+          charPot:[],
           // 見た目も新規ゲームのたびに抽選する（毎回同じ顔で始まらないように）
           artKey: pick(CharacterArt.heroArtKeys),
           party:[]};   // 仲間も同じ。主人公が死ねば一緒に失われる
@@ -5807,6 +5863,10 @@ function stats(h){
                         a[f.stat]=(a[f.stat]||0)+f.v;
                         if(f.stat2) a[f.stat2]=(a[f.stat2]||0)+(f.v2||0); });
   });
+  /* プレイヤーキャラの潜在（レベルアップで1つずつ増える）。装備の潜在と
+     まったく同じ形（{stat, v}）で持たせてあるので、同じ加算1行で乗る。
+     h.charPot が無いキャラ（仲間・古いセーブ）は空配列扱いで何も足さない。 */
+  (h.charPot||[]).forEach(f=>{ if(!f.stat) return; a[f.stat]=(a[f.stat]||0)+f.v; });
   // 節目で付いた技。武器に紐づくので、武器を持ち替えれば当然消える。
   if(wItem) upSkills(wItem).forEach(sk=>sk.ap(a, wItem));
   /* レジェンドの固有効果のうち、数値で片が付くぶん。技とまったく同じ作法で
@@ -9591,9 +9651,73 @@ function onLevelUp(h, isPlayer){
   if(isPlayer){
     showBanner('Lv.'+h.lv, '', '#ffd06a', 2.2);
     _lvFlash = 1.0;              // HPバーを光らせる
+    grantCharPotential(h);       // レベルアップごとに1個、必ず潜在が手に入る（ユーザー要望）
   }
 }
 let _lvFlash=0;
+
+/* ---------- プレイヤーの潜在（レベルアップ演出） ----------
+   ユーザー要望：「プレイヤーキャラのレベルアップごとにランダムに1個潜在が
+   手に入るようにしたい。テキストだけだと分かりづらいのでカードが出るような
+   演出を入れたい」。
+
+   装備の潜在（POTENTIALS/POTENTIAL_TIER_W/POTENTIAL_SCALE、2062行目付近）と
+   まったく同じ抽選プール・同じ強さ倍率をそのまま流用する——「潜在」という
+   語感と効果の中身を装備側と揃えるため。違うのは1点だけ：
+   装備側は「付くかどうか」を装備のレア度で確率抽選するが、
+   こちらは要望の言葉どおり**レベルアップのたびに必ず1個**手に入る
+   （ランダムなのは、どの効果・どの強さ（色）が出るかだけ）。
+   値のスケールは装備と同じ scaleOf() を使うが、引数は装備の ilvl ではなく
+   「そのレベルアップで到達したレベル」——潜り続けて装備が強くなるのとは
+   別に、レベルそのものが上がるほど1枚あたりの価値も上がるようにする。 */
+function rollCharPotential(h){
+  const tier=rollPotentialTier();
+  const def=pick(POTENTIALS);
+  const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(h.lv)));
+  return {t:'pt', id:def.id, stat:def.stat, v, tier};
+}
+/* 一度に複数レベル上がる（大きな経験値を一気に得た）と、この関数が
+   同期的に連続で呼ばれる。カードは1枚ずつ見せたいので、キューに積んで
+   閉じるたびに次を出す（_fallenQueue と同じ考え方）。 */
+let _charPotQueue=[];
+function grantCharPotential(h){
+  const pot=rollCharPotential(h);
+  h.charPot=h.charPot||[];
+  h.charPot.push(pot);
+  _charPotQueue.push({pot, lv:h.lv});
+  if(_charPotQueue.length===1) openCharPotCard();
+}
+function openCharPotCard(){
+  const q=_charPotQueue[0];
+  if(!q || !S.hero) return;
+  // 恩寵の選択画面と同じ理由：他のモーダルが下に隠れて開けなくなる事故を防ぐ
+  document.querySelectorAll('.modal.on').forEach(m=>{ if(m.id!=='m-charpot') m.classList.remove('on'); });
+  S.screen='charpot';
+  el('hud').classList.remove('on');
+  const {pot, lv} = q;
+  const col=RARCOL[pot.tier];
+  el('cp-sub').textContent = 'Lv.'+lv+' に上がった';
+  const card=el('cp-card');
+  card.style.borderColor=col;
+  card.style.setProperty('--pot-glow', col);
+  card.innerHTML =
+    `<div class="pc-rar" style="color:${col}">${RARITY[pot.tier].nm}の資質</div>`
+    + `<div class="pc-name">${STATNM[pot.stat].replace('%v',pot.v)}</div>`;
+  /* クラスの付け外しで強制的に reflow を挟み、連続して同じ強さの潜在が
+     出たときにもアニメーションを毎回頭から再生させる（既に付いている
+     クラスに add し直すだけではブラウザが「変化なし」として再生しない）。 */
+  card.classList.remove('pot-card-anim');
+  void card.offsetWidth;
+  card.classList.add('pot-card-anim');
+  el('m-charpot').classList.add('on');
+}
+function closeCharPotCard(){
+  el('m-charpot').classList.remove('on');
+  _charPotQueue.shift();
+  if(_charPotQueue.length){ openCharPotCard(); return; }
+  if(S.hero && S.run){ setScreen('game'); last=performance.now(); }
+}
+bindTap(el('cp-ok'), closeCharPotCard);
 
 /* 精鋭の性質「影の」。こちらの攻撃をたまにすり抜ける。
    当てても通らないことがある相手は、手数で押す戦い方を否定する。 */
@@ -14980,6 +15104,7 @@ function renderChar(){
     : '<div class="empty">素手・裸。道具屋で買うか、潜って拾おう。</div>';
   renderArtSlots();          // 技は街でも付け替えられる（#char-arts に書く）
   el('town-boons').innerHTML = boonListHTML(S.hero);
+  el('town-charpot').innerHTML = charPotListHTML(S.hero);
   renderCurses();
   el('town-party').innerHTML = livingParty().length ? livingParty().map(a=>{
     const j=jobDef(a.job), as=allyStats(a), sk=allySkills(a), nx=allyNextSkill(a);
@@ -16644,6 +16769,26 @@ function boonListHTML(h){
     </div>`;
   }).join('');
 }
+/* ---------- 潜在の一覧（ステータス画面） ----------
+   カードの演出はその場限りなので、後から見返す場所も要る
+   （ユーザー要望「テキストだけだと分かりづらい」の裏返し——演出は
+   「今起きたこと」を伝える役、この一覧は「今の合計」を伝える役、で分担する）。
+   boonListHTML と同じ形：同じ効果が複数あれば合算し、色は一番強い物で塗る。 */
+function charPotListHTML(h){
+  if(!h || !h.charPot || !h.charPot.length) return '<div class="empty">まだ無い（レベルアップで手に入る）</div>';
+  const statKeys=[...new Set(h.charPot.map(x=>x.stat))];
+  return statKeys.map(stat=>{
+    const list=h.charPot.filter(x=>x.stat===stat);
+    const bestTier=Math.max(...list.map(x=>x.tier));
+    const total=list.reduce((s,x)=>s+x.v,0);
+    const col=RARCOL[bestTier];
+    return `<div class="item" style="border-left-color:${col}">
+      <div class="nm" style="color:${col}">${RARITY[bestTier].nm}
+        <span style="font-size:12px;color:var(--dim)">${list.length>1?'×'+list.length:''}</span></div>
+      <div class="af">${STATNM[stat].replace('%v',total)}</div>
+    </div>`;
+  }).join('');
+}
 function renderBag(){
   if(!S.run || !S.hero) return;
   const st=stats(S.hero);
@@ -16675,6 +16820,7 @@ function renderBag(){
 
   renderArtSlots();
   el('bag-boons').innerHTML = boonListHTML(S.hero);
+  el('bag-charpot').innerHTML = charPotListHTML(S.hero);
   el('bag-party').innerHTML = livingParty().length ? livingParty().map(a=>{
     const j=jobDef(a.job), as=allyStats(a);
     const bl=(a.boons&&a.boons.length)
