@@ -7373,6 +7373,13 @@ function startRun(depth){
   const d = depth||S.startDepth||1;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
            curses:refreshCurses().slice(),   // 潜った時点で確定。途中で掛け替えられない
+           /* この探索中に装備（や護符）を失った仲間の記録。帰還画面でまとめて見せる。
+              報告「帰還した際に味方の装備がなくなる事がある」への対応——
+              広告蘇生（装備1〜2枠ロスト）と見捨て（全装備ロスト）はどちらも
+              **仕様として意図的に**装備を失わせているが、ログ1行が戦闘の
+              最中に流れて消えるだけでは、後から見て「バグで消えた」ように
+              見えてしまう。帰還時に一覧化して、原因まで分かるようにする。 */
+           equipLost:[],
            ft:0, hinted:false,          // 階層に入ってからの秒数と、気配を告げたか
            // 巡回者。潜り全体の時計で動くので、**ここが唯一のリセット点**。
            // 帰還は S.run を捨てて次にここを通るので、帰ることだけが解除になる。
@@ -10849,6 +10856,10 @@ function finishReturn(overflow){
   // 直したい装備がどれだけあるかを、帰った瞬間に見せる。
   // 道具屋の奥に隠れていると、壊れたまま次に潜ってしまう。
   const fixes=repairables(), fixCost=repairAllCost();
+  /* 今回の探索で装備（や護符）を失った仲間がいれば、帰還のタイミングで
+     はっきり見せる。**S.run=null にする前に取り出す**——控えておかないと
+     このあと消える。 */
+  const equipLost=(S.run.equipLost||[]).slice();
   el('r-reward').innerHTML =
     `<div class="row"><span class="k">到達</span><span>${zone.nm}・第${depth}階層</span></div>`
   + `<div class="row"><span class="k">帰還報酬</span><span style="color:#d6b34a"><b>+${bonus} G</b>`
@@ -10860,6 +10871,12 @@ function finishReturn(overflow){
       ? `<div class="row"><span class="k" style="color:#ffb08a">要修理</span>`
         + `<span style="color:#ffb08a"><b>${fixes.length} 点</b> / ${fixCost} G`
         + `<span style="color:var(--dim);font-size:12px">（道具屋で直せる）</span></span></div>`
+      : '')
+  + (equipLost.length
+      ? `<div class="row"><span class="k" style="color:#ff8a8a">今回失った装備</span>`
+        + `<span style="color:#ff8a8a">`
+        + equipLost.map(r=>`<b>${r.name}</b>（${r.reason}）: ${r.items.join('・')}`).join('<br>')
+        + `</span></div>`
       : '')
   + `<div class="row"><span class="k">次にやること</span><span style="color:var(--dim);font-size:12px">`
   + `修理 → 装備を整える → 街開発</span></div>`;
@@ -17420,6 +17437,9 @@ function tryPhoenix(h, isPlayer){
 /* ロストを確定させる。パーティから外す。 */
 function letFallenGo(){
   const a=_fallen; if(!a) return;
+  // 見捨てる＝装備ごと失う。帰還画面の一覧に残すため、外す前に名前を控えておく。
+  const equipNames=['weapon','shield','armor','accessory']
+    .map(s=>a.equip && a.equip[s] && a.equip[s].nm).filter(Boolean);
   S.hero.party = party().filter(x=>x!==a);
   // 持たせていた護符も一緒に失われる（装備と同じ扱い）
   const lostCharms=dropCharmsOf(a);
@@ -17428,6 +17448,10 @@ function letFallenGo(){
   S.gold += sh;
   log(a.name+'を失った（'+sh+' G が残された'
       + (lostCharms.length ? ' / '+lostCharms.map(c=>c.nm).join('・')+'も失った' : '')+'）');
+  if(S.run){
+    const items=equipNames.concat(lostCharms.map(c=>c.nm));
+    if(items.length) S.run.equipLost.push({name:a.name, reason:'見捨てた', items});
+  }
   igniteAvenge();
   closeFallen();
 }
@@ -17455,6 +17479,7 @@ function reviveFallen(){
       const s=slots.splice(Math.floor(rnd()*slots.length),1)[0];
       lost.push(a.equip[s].nm); a.equip[s]=null;
     }
+    if(lost.length && S.run) S.run.equipLost.push({name:a.name, reason:'広告蘇生', items:lost.slice()});
     a.x=P.x; a.y=P.y;
     a.hpNow=allyStats(a).maxHp;
     log(a.name+'が蘇生した（Lv.'+a.lv+(lost.length?' / '+lost.join('・')+'を失った':'')+'）');
@@ -17844,10 +17869,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-effect-study.js?v=20260915b"></script>
 <script src="item-icons-imported-data.js?v=20260915a"></script>
 <script src="item-icons.js?v=20260915a"></script>
-<!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
-     描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
-     本体と同じ世代を必ず読み込む。 -->
-<script src="game-feel.js?v=20260916-shadow1"></script>
+<script src="game-feel.js?v=20260915b"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

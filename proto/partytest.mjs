@@ -248,6 +248,14 @@ R.fallen = await pg.evaluate(()=>{
   const doneFn=_adDone;
   if(doneFn) doneFn();
   const gearAfter=['weapon','shield','armor','accessory'].filter(s=>a.equip[s]).length;
+  /* 報告「帰還した際に味方の装備がなくなる事がある」への対応で、
+     広告蘇生が奪った装備を S.run.equipLost に控えるようにした。
+     ここで**記録の中身**まで検証する——件数だけ合っていて名前や
+     個数がずれている、という壊れ方を拾うため。 */
+  const lostRecord = S.run.equipLost.find(r=>r.name===a.name && r.reason==='広告蘇生');
+  const equipLostTracked = (gearAfter<gearBefore)
+    ? !!(lostRecord && lostRecord.items.length===(gearBefore-gearAfter))
+    : !lostRecord;
   return {lvBefore, gearBefore, modalOn, isDead, inPartyStill, notLiving, adOn,
           revivedFlag:a.revived, deadAfter:a.dead, lvAfter:a.lv, gearAfter,
           keptBoons:a.boons.length,
@@ -257,6 +265,7 @@ R.fallen = await pg.evaluate(()=>{
              広告を見て連れ戻すほうが常に損になっていた。 */
           keepsLevel: a.lv===lvBefore,
           lostSomeGear: gearAfter<gearBefore,
+          equipLostTracked,
           backAlive: !a.dead && livingParty().includes(a)};
 });
 
@@ -288,12 +297,39 @@ R.reviveShared = await pg.evaluate(()=>{
   S.run.depth=11;
   const backNextBand = revivesLeft()===REVIVE_PER_BAND && canRevive(a);
   S.run.depth=10;
+  const gearBeforeLetGo=['weapon','shield','armor','accessory'].filter(s=>a.equip[s]).length;
   letFallenGo();
+  /* 見捨てたときも同じ帰還一覧に載る必要がある。広告蘇生と混ざらないよう
+     reason で見分けているので、その値まで確かめる。 */
+  const letGoRecord = S.run.equipLost.find(r=>r.name===a.name && r.reason==='見捨てた');
+  const equipLostTrackedOnLetGo = gearBeforeLetGo>0
+    ? !!(letGoRecord && letGoRecord.items.length>=gearBeforeLetGo)
+    : true;   // たまたま丸腰だった場合は記録が無くて正しい
   return {per:REVIVE_PER_BAND, band:REVIVE_BAND,
           canAgainSamePerson:canAgain, showsLeft,
           blockedWhenSpent:blocked && noAd, tellsWhen, backNextBand,
           removedOnLetGo: !party().includes(a),
-          ok: canAgain && blocked && noAd && backNextBand};
+          equipLostTrackedOnLetGo,
+          ok: canAgain && blocked && noAd && backNextBand && equipLostTrackedOnLetGo};
+});
+
+/* 5-b2. 帰還画面に「今回失った装備」が実際に表示されるか。
+   S.run.equipLost に積むだけでは、報告「帰還した際に味方の装備が
+   なくなる事がある」への答えにならない——**帰った瞬間に見えて**
+   初めて、バグに見えていたものが仕様として腑に落ちる。 */
+R.equipLostSummary = await pg.evaluate(()=>{
+  S.hero=newHero(); startRun(10); S.hero.party=[];
+  const a=makeAlly(10,S.hero); a.x=P.x; a.y=P.y; S.hero.party.push(a);
+  a.equip.weapon = a.equip.weapon || {nm:'テスト用の剣', kind:'weapon'};  // 確実に1枠は埋めておく
+  for(let i=0;i<40 && !a.dead;i++){ a.hpNow=5; hitAlly(a, {lv:30, atkV:9999, dt:'blunt', dead:false}); }
+  reviveFallen();
+  const doneFn=_adDone; if(doneFn) doneFn();
+  finishReturn(0);
+  const html = document.getElementById('r-reward').innerHTML;
+  document.getElementById('m-ret').classList.remove('on');   // 後続のテストに影響しないよう閉じる
+  const showsHeading = html.includes('今回失った装備');
+  const showsName = html.includes(a.name);
+  return {showsHeading, showsName, ok: showsHeading && showsName};
 });
 
 // 5-c. 主人公が死ぬと仲間ごと失われる
