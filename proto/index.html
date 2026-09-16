@@ -12522,6 +12522,8 @@ function draw(){
     // 「当たり判定は大きいのに見た目は雑魚」という一番まずい状態になる。
     // looksBoss は門番の幻。大きさまで本体と同じにしないと、輪を消しても一目で分かる。
     const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
+    const shadowSize = mossSpriteKey(e) ? R*2.6 : CharacterArt.enemyKey(e) ? (e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1)) : R*2;
+    drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?Math.max(0,e.fade/0.3):1);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast) drawBossCast(e, sx, sy, R);
@@ -12684,6 +12686,7 @@ function draw(){
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
        同じ絵でも敵と混ざらない。 */
     const mspr = isDurantree(a) ? 'moss-ball' : null;
+    drawFeelGroundShadow(sx,sy,mspr?R*2.6:TS,aScale);
     ctx.save(); ctx.globalAlpha*=feelBlink(a);
     if(mspr && sprite(mspr)){
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
@@ -13224,6 +13227,17 @@ function draw(){
   drawEnemyPixels(camX,camY);
   drawFeelMotes(camX,camY);
   const px=innerWidth/2, py=innerHeight/2;
+  /* 主人公の影は攻撃範囲リングのさらに下。影が届く範囲の読み取りを
+     邪魔しないようにしてから、キャラ本体の直前で重ねる。 */
+  const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
+  const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
+  const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
+  const heroBlinkOff = vanishGuard(P, (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0), _drawDt);
+  /* 演出の揺れは NaN になり得る（位相・反動が一度でも壊れると戻らない）。
+     ctx.translate(NaN) は例外を出さずに**そのフレームの絵を捨てる**ので、
+     ここで有限に丸めておかないと「主人公だけ消える」が起きる。 */
+  const heroBob=finiteXY(feelHeroOffset());
+  if(!heroBlinkOff) drawFeelGroundShadow(px+heroBob.x,py+heroBob.y,TS,heroScale);
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
   ctx.strokeStyle = P.target ? 'rgba(127,224,192,.45)' : 'rgba(127,224,192,.16)';
@@ -13256,15 +13270,7 @@ function draw(){
 
   /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
      戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
-  const heroFallK = P.fallAnim ? clamp(P.fallAnim.t/P.fallAnim.dur,0,1) : 0;
-  const heroScale = P.fallAnim ? Math.max(0.04, 1-heroFallK) : 1;
-  const heroRot = P.fallAnim ? heroFallK*Math.PI*2.4 : 0;
   _drawStage='主人公';
-  const heroBlinkOff = vanishGuard(P, (P.fallBlink>0) && (Math.floor(P.fallBlink*16)%2===0), _drawDt);
-  /* 演出の揺れは NaN になり得る（位相・反動が一度でも壊れると戻らない）。
-     ctx.translate(NaN) は例外を出さずに**そのフレームの絵を捨てる**ので、
-     ここで有限に丸めておかないと「主人公だけ消える」が起きる。 */
-  const heroBob=finiteXY(feelHeroOffset());
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){

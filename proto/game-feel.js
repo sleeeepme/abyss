@@ -18,10 +18,12 @@ function feelMotion(e){let m=FEEL.motion.get(e);if(!m){m={speed:0,phase:0,flash:
   idlePhase:feelHash(Math.floor((e?.x||0)*17),Math.floor((e?.y||0)*17),11)*Math.PI*2};FEEL.motion.set(e,m);}return m;}
 function feelEntityOffset(e){
   if(FEEL_REDUCED.matches)return {x:0,y:0};
-  const m=feelMotion(e),s=clamp(m.speed/FEEL_TUNING.normalMoveSpeed,0,1);
+  const m=feelMotion(e);
   const recoil=(m.recoil/FEEL_TUNING.recoilSeconds)**2*TS;
-  return {x:Math.sin(m.phase)*s*.65+m.recoilX*recoil,
-    y:-Math.abs(Math.sin(m.phase))*s*1.8+m.recoilY*recoil};
+  // 歩行はスプライト内の脚だけで表現する。ここで座標まで揺らすと、
+  // 新しい歩行アニメーションと二重になり、味方が不自然に跳ねて見える。
+  // 被弾時の反動は移動アニメーションではないので残す。
+  return {x:m.recoilX*recoil,y:m.recoilY*recoil};
 }
 function feelBlink(e){
   const m=feelMotion(e);let alpha=m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;
@@ -369,9 +371,10 @@ function beginFeelWorld(){
     ctx.translate(x,y);ctx.scale(zoom,zoom);ctx.translate(-x,-y);
   }
   const kick=FEEL.strength*FEEL.kick/FEEL.kickMax;
-  const walk=clamp(feelMotion(P).speed/FEEL_TUNING.normalMoveSpeed,0,1)*.8;
-  ctx.translate(Math.sin(FEEL.time*83)*kick+Math.sin(FEEL.step)*walk,
-                Math.cos(FEEL.time*71)*kick+Math.cos(FEEL.step*2)*walk);
+  // 移動時の画面揺れも止める。歩行のリズムはキャラの脚でのみ見せ、
+  // 画面を揺らすのはクリティカルなどの衝撃演出に限る。
+  ctx.translate(Math.sin(FEEL.time*83)*kick,
+                Math.cos(FEEL.time*71)*kick);
 }
 function feelHeroOffset(){
   if(FEEL_REDUCED.matches) return {x:0,y:0};
@@ -561,6 +564,37 @@ function drawPlayerLight(camX,camY){
   paint(angle,1.45,5.8,'125,184,160',.035);
   paint(angle,1.15,5.8,'125,184,160',.045);
   paint(angle,.85,5.8,'125,184,160',.055);
+  ctx.restore();
+}
+
+/* 足元の影は、主人公の指向性ライトと反対側へだけ伸ばす。
+   画面基準の固定影にすると、ライトを振ったときに地面とキャラの関係が
+   崩れるので、FEEL.lightX/Y（ライトと同じ、なめらかに追従する向き）を
+   そのまま投影方向へ使う。影はキャラの下だけで完結させ、範囲攻撃や
+   HPバーの読みやすさを奪わない。 */
+function drawFeelGroundShadow(x,y,size,scale=1,alpha=1){
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(size)||size<=0)return;
+  let lx=Number.isFinite(FEEL.lightX)?FEEL.lightX:1;
+  let ly=Number.isFinite(FEEL.lightY)?FEEL.lightY:0;
+  const ln=Math.hypot(lx,ly)||1;lx/=ln;ly/=ln;
+  const dx=-lx,dy=-ly,px=-dy,py=dx;
+  const s=Math.max(2,size*scale),footX=Math.round(x),footY=Math.round(y+s*.39);
+  const length=Math.max(3,Math.round(s*.52)),near=Math.max(2,Math.round(s*.18));
+  const half=Math.max(1,Math.round(s*.17)),tailHalf=Math.max(1,Math.round(half*.55));
+  const point=(along,side)=>[
+    Math.round(footX+dx*along+px*side),Math.round(footY+dy*along+py*side)
+  ];
+  const a=point(-near*.18,half),b=point(-near*.18,-half);
+  const c=point(length*.72,-tailHalf),d=point(length,0),e=point(length*.72,tailHalf);
+  const paintProjection=()=>{ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.lineTo(...c);
+    ctx.lineTo(...d);ctx.lineTo(...e);ctx.closePath();ctx.fill();};
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha*=.34*clamp(alpha,0,1);
+  // 先端は柔らかく地面へ溶かし、根元だけは足が接している位置を保つ。
+  // TS に応じた 1〜3px のブラーなので、拡大率が変わっても同じ印象になる。
+  ctx.fillStyle='#070914';ctx.filter=`blur(${clamp(Math.round(s*.055),1,3)}px)`;paintProjection();ctx.filter='none';
+  // 接地点だけを一段濃くして、影の始点＝足元だと即座に読めるようにする。
+  const ca=point(0,half*.72),cb=point(0,-half*.72),cc=point(near*.42,-half*.42),cd=point(near*.42,half*.42);
+  ctx.globalAlpha*=1.32;ctx.beginPath();ctx.moveTo(...ca);ctx.lineTo(...cb);ctx.lineTo(...cc);ctx.lineTo(...cd);ctx.closePath();ctx.fill();
   ctx.restore();
 }
 

@@ -141,14 +141,25 @@ frame.onload=async()=>{
       e.boss=true;feelImpact(e,{x:e.x-1,y:e.y},false);
       return FEEL_REDUCED.matches||Math.abs(feelEntityOffset(e).x-.035*TS)<.001;
     });
-    check('Actual slow movement produces less bob; walking emits dust',()=>{
+    check('Walking keeps the render anchor fixed and emits dust',()=>{
       const r=fresh();P.x=r.x+2.5;P.y=r.y+2.5;stickDx=.3;
       stepSim(.1);const slow=feelMotion(P).speed;stickDx=1;stepSim(.1);const fast=feelMotion(P).speed;stickDx=0;
-      return slow>0&&fast>slow*2&&FEEL.motes.some(p=>p.kind==='dust');
+      const offset=feelEntityOffset(P);
+      return slow>0&&fast>slow*2&&offset.x===0&&offset.y===0&&FEEL.motes.some(p=>p.kind==='dust');
     });
-    check('Moving ally receives measured motion and bob',()=>{
+    check('Moving ally advances its animation phase without render bob',()=>{
       fresh();const a=makeAlly(1,S.hero,'warrior');a.x=P.x+3;a.y=P.y;S.hero.party=[a];a.hpNow=allyStats(a).maxHp;
-      stepSim(.3);return feelMotion(a).phase>0;
+      stepSim(.3);const offset=feelEntityOffset(a);return feelMotion(a).phase>0&&offset.x===0&&offset.y===0;
+    });
+    check('Ground shadows point opposite the player light',()=>{
+      const saved=ctx,c=document.createElement('canvas');c.width=c.height=128;ctx=c.getContext('2d');
+      const oldLight={x:FEEL.lightX,y:FEEL.lightY};
+      const center=()=>{const p=ctx.getImageData(0,0,128,128).data;let mass=0,sum=0;for(let y=0;y<128;y++)for(let x=0;x<128;x++){const a=p[(y*128+x)*4+3];mass+=a;sum+=x*a;}return mass?sum/mass:NaN;};
+      try{
+        FEEL.lightX=1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32);const towardLeft=center();ctx.clearRect(0,0,128,128);
+        FEEL.lightX=-1;FEEL.lightY=0;drawFeelGroundShadow(64,64,32);const towardRight=center();
+        return towardLeft<62&&towardRight>66;
+      }finally{FEEL.lightX=oldLight.x;FEEL.lightY=oldLight.y;ctx=saved;}
     });
     check('Water footsteps spawn droplets and ripples; rendering stays valid',()=>{
       fresh();enterFloor(11);syncFeel();W.enemies=[];
@@ -265,7 +276,7 @@ frame.onload=async()=>{
       W.fx=[{t:'bolt',x:P.x,y:P.y,vx:1,vy:0,dt:'arcane',life:.5},
         {t:'feelring',x:P.x,y:P.y,col:'#fff',life:.2,max:.4,r:2}];
       const art=Object.values(WEAPON_ARTS).flat().find(d=>d.id==='swspin');feelWeaponArtStart(P,art,P.x,P.y,0);
-      const names=['feelBlink','drawFeelFlash','feelEntityOffset','feelDropOffset',
+      const names=['feelBlink','drawFeelFlash','feelEntityOffset','drawFeelGroundShadow','feelDropOffset',
         'drawFeelMotes','drawFeelRipples','drawFeelVignette','drawFeelMagic','drawFeelRing','drawFeelWeaponArts'];
       const originals={},calls={};
       try{
