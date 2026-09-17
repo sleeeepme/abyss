@@ -607,16 +607,46 @@
   .hub-ava .glyph{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:19px;background:rgba(18,20,28,.8);border:2px solid var(--line)}
   /* 実キャラアート版。台座は置かず、キャラ絵だけを広場に立たせる。
-     影は付けない（見下ろし視点の背景に、絵ごとの落射影が乗ると足元が濁るため）。
-     向き（scaleX）と歩行中の弾みはJS側（hubWander）が実移動に合わせて操作する。 */
-  .hub-ava-wrap{display:block;transition:transform .2s ease}
+     向き（scaleX）と歩行中の弾みはJS側（hubWander）が実移動に合わせて操作する。
+
+     足元の影（.hub-ava-sh）はユーザー要望で後から入れた。
+     以前は「見下ろし視点の背景に、絵ごとの落射影が乗ると足元が濁る」として
+     付けていなかったが、影が無いとキャラが石畳から浮いて見える。
+     濁らせない作り方で入れる——**輪郭のある落射影ではなく、中心だけ濃くて
+     外へ完全に消える楕円**にして、背景の石畳の模様を潰さない。 */
+  .hub-ava-wrap{display:block;transition:transform .2s ease;position:relative}
+  /* 跳ねているあいだ、影は縮んで薄くなる（＝浮いている高さが影で読める）。
+     跳ねは .hub-ava-art 側のアニメで、位相はキャラごとに inline の
+     animation-delay でずらしてある。影にも**同じ delay を渡す**こと——
+     渡し忘れると、跳ねと影が別の位相で動いて足元がちらつく。 */
+  /* 位置は実測で合わせてある。キャラ絵は64pxの画像を50pxで描いていて、
+     色が乗っている一番下の行は64px中の55行目——つまり**箱の下端から約7px上**が
+     足の裏になる。楕円の中心をそこへ置くと、影が足元に敷かれて見える。 */
+  .hub-ava-sh{position:absolute;left:50%;bottom:2px;width:32px;height:11px;margin-left:-16px;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,.62) 0%, rgba(0,0,0,.38) 45%, rgba(0,0,0,0) 72%);
+    animation:hubHopShadow 1.7s ease-in-out infinite;pointer-events:none}
   .hub-ava-art{display:block;width:50px;height:50px;image-rendering:pixelated;
-    animation:hubHop 1.7s ease-in-out infinite}
+    animation:hubHop 1.7s ease-in-out infinite;position:relative}
   @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-5px)}}
+  @keyframes hubHopShadow{0%,58%,100%{transform:scale(1);opacity:1}22%{transform:scale(.7);opacity:.55}}
   @media (prefers-reduced-motion: reduce){
     .hub-ava-art{animation:none}
+    .hub-ava-sh{animation:none}
     .hub-ava,.hub-ava-wrap,.hub-dive .tri{transition:none;animation:none}
   }
+  /* ---------- 入場と出発（playHubIntro / playHubDeparture） ----------
+     入場：初めてこの街に来たときだけ、主人公が画面の下から歩いてくる。
+     歩いているあいだ他のUIを伏せるのは、最初の数秒に
+     「ここは自分が今たどり着いた場所だ」以外を見せたくないから。
+     出発：潜るとき、全員が並んで門（画面の上）へ抜けてから暗転する。
+     名前は伏せる——隊列が画面の外へ出ていくとき、文字だけが残ると
+     「キャラが去った」ではなく「要素が動いた」に見える。 */
+  .hubui .hub-top,.hubui .hub-bottom,.hubui .hub-dive{transition:opacity .45s ease}
+  .hubui.hub-intro .hub-top,.hubui.hub-intro .hub-bottom,.hubui.hub-intro .hub-dive,
+  .hubui.hub-leaving .hub-top,.hubui.hub-leaving .hub-bottom,.hubui.hub-leaving .hub-dive{
+    opacity:0;pointer-events:none}
+  .hubui .hub-ava .nm{transition:opacity .3s ease}
+  .hubui.hub-leaving .hub-ava .nm{opacity:0}
   /* 二つ名は出さない（renderHubPlaza 参照）ので、ここでの表示は素の名前だけ。
      以前は allyFullName（二つ名つき）を出しており、この幅に収まらず
      text-overflow:ellipsis が働くことがあった。この極小ドットフォントでは
@@ -5681,6 +5711,7 @@ const S={
   artName:{},            // 閃いた技に自分で付けた名前（技ID→名前）。既定は WEAPON_ARTS の nm
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
+  hubIntroSeen:false,    // 街への入場演出を一度見せたか（代が変わっても二度は出さない）
   hero:null, run:null, screen:'title', prevScreen:'town'
 };
 
@@ -12252,6 +12283,17 @@ function flashFade(ms){
     f.style.opacity='0';
   });
 }
+/* 逆向き——**黒を被せてから**次の画面へ渡す。
+   flashFade は「もう切り替わった画面の上で黒を抜く」役で、こちらは
+   「切り替える前に黒で隠す」役。出発の演出（隊列が門をくぐる）を
+   見せ切ってから潜りたいので、被せ終わってから cb を呼ぶ。 */
+function fadeToBlack(ms, cb){
+  const f=el('scr-fade');
+  if(!f){ cb(); return; }
+  f.style.transition='opacity '+ms+'ms ease';
+  f.style.opacity='1';
+  setTimeout(cb, ms);
+}
 
 const SPRITES = {
   'moss-ball': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAlElEQVR42mNgGLRAXsP5PzImWXN9gwMKJskQkOKcHAu4ZhibKENgtoM0JSYYg2kYJtoAkMaXD7eBNcFoog2BOR9kCLILQOzAAF38BsBsBykEYZhmEBsmDqJxGgKSQFbs6a6Fwobx8RoAUgTzBkwTCMOcD5PH6w2QIliAwTDMK0QFIszJMM2wMCFoO3oyxpasB1+mAwB4q7UO8TomnwAAAABJRU5ErkJggg==',
@@ -14600,7 +14642,9 @@ function setScreen(s){
   if(s==='town') startHubBg(); else stopHubBg();
   // 広場のランダム徘徊も同様に、街を離れたら止める（残ったタイマーが
   // 消えた要素を触りにいかないように）。
-  if(s==='town') startHubWander(); else stopHubWander();
+  // 入場演出の最中は始めない——歩いて来ている途中で徘徊が行き先を上書きすると、
+  // 主人公が画面の下から来ずに、いきなり広場の中で歩き出す。
+  if(s==='town'){ if(!_hubIntroOn) startHubWander(); } else stopHubWander();
 }
 /* ---------- 苔玉の1行 ----------
    6層ぶん通う話なので、**どこまで進んでいるか**が見えないと積み上がらない。
@@ -15444,11 +15488,15 @@ function renderHubPlaza(){
     /* 実キャラアートがあれば置き換える。無ければ（未制作ジョブ等）従来の色付き絵文字へ戻す。
        CharacterArt は index.html 冒頭で base64 済みの Image を持っているので、
        .image() が返す Image の .src をそのまま <img> に流用する（読み込み直しなし）。
-       台座（円い背景）は置かない——影も付けない。キャラ絵だけを広場に立たせる。 */
+       台座（円い背景）は置かない。キャラ絵だけを広場に立たせる。
+       足元の影だけは後から入れた（ユーザー要望）——跳ねと位相を合わせるため、
+       影にもキャラ絵と**同じ animation-delay** を渡す。絵の無いジョブ（.glyph）は
+       円い台座付きの絵文字で、それ自体が地面から浮いた記号なので影は付けない。 */
     const artKey = isHero ? CharacterArt.heroKey(m) : CharacterArt.allyKey(m);
     const im = CharacterArt.image(artKey);
     const body = im
       ? `<span class="hub-ava-wrap">
+           <span class="hub-ava-sh" style="animation-delay:${hd}s"></span>
            <img class="hub-ava-art" src="${im.src}" style="animation-delay:${hd}s" alt="">
          </span>`
       : `<span class="glyph" style="border-color:${col};color:${col}">${isHero?'🧍':hubGlyph(m.job)}</span>`;
@@ -15459,6 +15507,113 @@ function renderHubPlaza(){
   }).join('');
   startHubWander();
 }
+/* ---------- 街へ入る／街から発つ、その一瞬 ----------
+   ユーザー要望：
+     ・「初回プレイ時で拠点を開いた際にはプレイヤーキャラが画面下から
+        歩いてくる（この街に初めてやってきたように見せる）。その後でUIを表示する」
+     ・「拠点からアビスに入る際には、キャラが整列してみんなでアビスに入る
+        （画面上に移動する）ような演出を挟んでから暗転したい」
+
+   どちらも `.hub-ava` の left/top を動かすだけで作る。広場のキャラはDOMで、
+   位置は％、動きはCSSの transition が持っている（徘徊と同じ仕組み）ので、
+   **演出のためだけの描画経路を1本も増やさない。**
+
+   HUB_ANIM_INSTANT は**自動操作のときだけ**立てる逃げ道。
+   潜る操作（#btn-dive）は多くのスイートが「押した直後に S.screen==='game'」で
+   確かめていて、そこへ1秒の演出が挟まると全部が非同期待ちに化ける。
+   入場のほうも、歩いている間はボタンを伏せるので、その2秒はタップが通らない。
+
+   判定に navigator.webdriver を使っているのは、**共通の仕込み口が無い**から。
+   回帰スイート54本のうち25本は _h.mjs を通さず自前でブラウザを起動しており、
+   install() に旗を立てても届かない（実際にそれで bagtest/gravetest/verify/
+   touchtest/fxtest が落ちた）。webdriver は自動操作のときだけ真になるので、
+   人が遊ぶ側の挙動は一切変わらない。
+   演出そのものは towntest が、この旗を自分で降ろして直接見ている。 */
+let HUB_ANIM_INSTANT = (typeof navigator!=='undefined' && navigator.webdriver===true);
+let _hubIntroOn = false;             // 入場の最中か（徘徊を割り込ませないため）
+let _hubAnimTimers = [];
+function clearHubAnimTimers(){ _hubAnimTimers.forEach(clearTimeout); _hubAnimTimers=[]; }
+function hubAnimLater(fn, ms){ _hubAnimTimers.push(setTimeout(fn, ms)); }
+const HUB_INTRO_WALK_MS = 2100;      // 画面の下から広場まで歩く
+const HUB_LINEUP_MS     = 560;       // 門の手前に並ぶ
+const HUB_MARCH_MS      = 820;       // 門をくぐる
+const HUB_DEPART_FADE   = 300;       // 暗転
+
+/* 一度きりの門番。startAdventure はこちらを呼ぶ。
+   「出したかどうか」の判断を playHubIntro の中に混ぜないのは、
+   演出そのもの（下から歩かせる）と、出す/出さないの決まりを別々に
+   確かめられるようにしておきたいため。 */
+function maybePlayHubIntro(){
+  if(S.hubIntroSeen) return false;
+  S.hubIntroSeen=true;
+  return playHubIntro();
+}
+function playHubIntro(){
+  const box=el('hub-avatars');
+  const hero=box && box.querySelector('[data-hubava="hero"]');
+  const ui=el('hubui');
+  if(HUB_ANIM_INSTANT || hubReducedMotion() || !hero || !ui) return false;
+  clearHubAnimTimers();
+  _hubIntroOn=true;
+  stopHubWander();                   // 歩いて来る途中で徘徊に横取りさせない
+  ui.classList.add('hub-intro');
+  const dest=hero.style.top;         // renderHubPlaza が決めた立ち位置
+  hero.style.transition='none';
+  hero.style.top='126%';             // 画面の下、外側
+  void hero.offsetWidth;             // ここで一度確定させないと下端から動き出さない
+  hero.style.transition='';
+  hero.style.transitionDuration=(HUB_INTRO_WALK_MS/1000)+'s';
+  hero.style.top=dest;
+  hubAnimLater(()=>{
+    _hubIntroOn=false;
+    hero.style.transitionDuration='';
+    ui.classList.remove('hub-intro');
+    if(S.screen==='town') startHubWander();
+  }, HUB_INTRO_WALK_MS);
+  return true;
+}
+
+/* 潜る前の出発。done() が実際の startRun。
+   **演出を飛ばす場合も必ず done() を呼ぶ**——ここで呼び忘れると
+   「潜るボタンが効かない」になる。分岐の一番外側で返しているのはそのため。 */
+function playHubDeparture(done){
+  const box=el('hub-avatars');
+  const avas=box ? [...box.querySelectorAll('.hub-ava')] : [];
+  const ui=el('hubui');
+  if(HUB_ANIM_INSTANT || hubReducedMotion() || !avas.length || !ui){ done(); return false; }
+  clearHubAnimTimers();
+  stopHubWander();
+  ui.classList.add('hub-leaving');   // ボタンを伏せる＝連打で二重に潜らせない
+  // 1. 門の手前へ横一列。間隔は人数で詰めて、3人でも画面からはみ出させない
+  const n=avas.length, span=Math.min(44, 15*n);
+  avas.forEach((b,i)=>{
+    const x = n===1 ? 50 : 50-span/2 + span*(i/(n-1));
+    b.style.transitionDuration=(HUB_LINEUP_MS/1000)+'s';
+    b.style.left=x+'%'; b.style.top='52%';
+    const wrap=b.querySelector('.hub-ava-wrap');
+    if(wrap) wrap.style.transform='scaleX(1)';   // 並んだら全員おなじ向き
+  });
+  // 2. 揃ってから門の奥（画面の上）へ。少しずつ遅らせて、隊列のまま吸い込ませる
+  hubAnimLater(()=>{
+    avas.forEach((b,i)=>{
+      b.style.transitionDuration=(HUB_MARCH_MS/1000)+'s';
+      b.style.transitionDelay=(i*80)+'ms';
+      b.style.top='-18%';
+    });
+  }, HUB_LINEUP_MS+140);
+  // 3. 最後のひとりが抜けるころに暗転。黒の向こう側が探索画面
+  const marchEnd = HUB_LINEUP_MS+140 + HUB_MARCH_MS + (n-1)*80;
+  hubAnimLater(()=>{
+    fadeToBlack(HUB_DEPART_FADE, ()=>{
+      ui.classList.remove('hub-leaving');
+      avas.forEach(b=>{ b.style.transitionDelay=''; b.style.transitionDuration=''; });
+      done();
+      flashFade(360);                // 黒はもう乗っている。探索画面の上でそれを抜く
+    });
+  }, Math.max(0, marchEnd-140));
+  return true;
+}
+
 bindRowTap(el('hub-avatars'), '[data-hubava]', (t)=>{
   const id=t.dataset.hubava;
   if(id==='hero'){ setScreen('char'); return; }
@@ -17761,11 +17916,14 @@ bindRowTap(el('partybar'), '[data-ally]', t=>{
 /* 「アビスへ潜る」。中継地点があって選べる階層が2つ以上あるときだけ
    階層選択のウインドウを開く。まだ第1階層しか無ければ、選ばせずそのまま潜る
    （選択肢が1つしか無い問いは、ただの手間）。 */
+/* 潜る。出発の演出（整列→門をくぐる→暗転）を挟んでから startRun へ渡す。
+   演出を startRun の中に入れていないのは、startRun がテストの唯一の入口
+   （TH.run）でもあるため——状態を作る関数と、見せる関数は分けておく。 */
 bindTap(el('btn-dive'), ()=>{
   if(unlockedDepths().length>1) openDepthSelect();
-  else startRun();
+  else playHubDeparture(()=>startRun());
 });
-bindTap(el('ds-go'),    ()=>{ closeDepthSelect(); startRun(); });
+bindTap(el('ds-go'),    ()=>{ closeDepthSelect(); playHubDeparture(()=>startRun()); });
 bindTap(el('ds-close'), closeDepthSelect);
 /* 街のサブ画面へ。「ステータス」は無くなった——広場の自分自身をタップする入口に替えた。 */
 bindTap(el('btn-go-shop'),  ()=>setScreen('shop'));
@@ -17926,6 +18084,12 @@ function confirmName(){
   S.salt = (Math.random()*4294967296)>>>0;
   closeNameEntry();
   startAdventure();
+  /* この街に初めて来たときだけ、下から歩いて入る（ユーザー要望）。
+     **名前を決めた直後＝初回プレイ**なので、入場演出の置き場所はここが正しい。
+     startAdventure 側に置くと、タイトルから street へ戻るたびに条件を見る
+     ことになる（見た目は一度きりの旗で止まるが、意味が一段ぼやける）。
+     一度きりにしてあるのは、3回目には演出ではなく待ち時間になるから。 */
+  maybePlayHubIntro();
 }
 /* 街へ入る。ここで初めて主人公を作る
    （タイトルにいるあいだは、まだ誰でもない）。 */

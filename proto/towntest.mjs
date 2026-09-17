@@ -254,4 +254,85 @@ R.forgeCloseReachable = await pg.evaluate(()=>{
           ok: onScreen && hits && scrollable};
 });
 
+/* ================= 5. 広場の演出 =================
+   入場・出発の演出は _h.mjs の install() が既定で飛ばしている
+   （潜る操作を「押した直後に S.screen==='game'」で確かめているスイートが
+   多く、そこへ1秒の演出が挟まると全部が非同期待ちに化けるため）。
+   **その演出を実際に見るのはここだけ**なので、旗を自分で降ろして確かめ、
+   終わったら必ず立て直す——降ろしたまま抜けると、後ろのテストが揺れる。 */
+
+/* 5-a. 足元の影。跳ねと位相が合っていること（ずれると足元がちらつく）。 */
+R.hubShadows = await pg.evaluate(()=>{
+  el('hub-avatars').dataset.hubKey='';        // 作り直させる
+  setScreen('town'); renderTown();
+  const arts=[...document.querySelectorAll('#hub-avatars .hub-ava-art')];
+  const rows=arts.map(img=>{
+    const wrap=img.closest('.hub-ava-wrap');
+    const sh=wrap && wrap.querySelector('.hub-ava-sh');
+    return {has:!!sh, sameDelay: !!sh && sh.style.animationDelay===img.style.animationDelay};
+  });
+  return {n:arts.length,
+          everyArtHasShadow: rows.length>0 && rows.every(r=>r.has),
+          phaseMatchesHop:   rows.length>0 && rows.every(r=>r.sameDelay),
+          ok: rows.length>0 && rows.every(r=>r.has && r.sameDelay)};
+});
+
+/* 5-b. 入場：初回だけ、主人公が画面の外（下）から歩いてくる。
+        歩いているあいだ他のUIは伏せたまま。 */
+R.hubIntroWalk = await pg.evaluate(()=>{
+  HUB_ANIM_INSTANT=false;
+  S.hubIntroSeen=false;
+  el('hub-avatars').dataset.hubKey='';
+  setScreen('town'); renderTown();
+  const started=maybePlayHubIntro();
+  const hero=document.querySelector('[data-hubava="hero"]');
+  /* style.top はもう行き先（広場の立ち位置）に戻してある——動かしているのは
+     CSSの transition なので、**今どこに居るか**は実寸で見るしかない。
+     始まった直後なので、まだ画面の下の方に居るはず。 */
+  const y = hero.getBoundingClientRect().top;
+  const startsLow = y > innerHeight*0.75;
+  const uiHidden = el('hubui').classList.contains('hub-intro');
+  // 二度目は出さない（毎回2秒待たされる入場は、演出ではなく待ち時間になる）
+  const secondCallSkipped = (maybePlayHubIntro()===false);
+  return {started, y:Math.round(y), vh:innerHeight, startsLow, uiHidden, secondCallSkipped,
+          ok: started===true && startsLow && uiHidden && secondCallSkipped};
+});
+await pg.waitForTimeout(2500);        // 歩き切るのを待つ（HUB_INTRO_WALK_MS ＋ 余白）
+// 5-c. 着いたらUIが出て、立ち位置は広場の中に収まっている
+R.hubIntroSettles = await pg.evaluate(()=>{
+  const hero=document.querySelector('[data-hubava="hero"]');
+  const top=parseFloat(hero.style.top);
+  const uiShown = !el('hubui').classList.contains('hub-intro');
+  const insidePlaza = top>0 && top<100;
+  const landedOnScreen = hero.getBoundingClientRect().top < innerHeight*0.9;
+  return {top, uiShown, insidePlaza, landedOnScreen,
+          ok: uiShown && insidePlaza && landedOnScreen};
+});
+
+/* 5-d. 出発：整列してから門をくぐる。**くぐり終わるまで潜らない。** */
+R.departureMarch = await pg.evaluate(()=>{
+  S.run=null; S.beacons=[]; S.hero.party=[];
+  const a=TH.ally(8,'knight',12); uniqueAllyName(a,party()); S.hero.party.push(a);
+  el('hub-avatars').dataset.hubKey='';
+  setScreen('town'); renderTown();
+  el('btn-dive').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const avas=[...document.querySelectorAll('#hub-avatars .hub-ava')];
+  const stillTown = S.screen==='town';
+  const noRunYet  = !S.run;
+  const uiHidden  = el('hubui').classList.contains('hub-leaving');
+  const linedUp   = avas.length>0 && avas.every(b=>b.style.top==='52%');
+  return {n:avas.length, stillTown, noRunYet, uiHidden, linedUp,
+          ok: stillTown && noRunYet && uiHidden && linedUp};
+});
+await pg.waitForTimeout(2800);        // 整列＋行進＋暗転を待つ
+// 5-e. 抜けた先が探索画面。演出用のクラスは残さない
+R.departureArrives = await pg.evaluate(()=>{
+  const dove    = S.screen==='game' && !!S.run;
+  const cleaned = !el('hubui').classList.contains('hub-leaving');
+  HUB_ANIM_INSTANT=true;              // 旗を立て直す（降ろしたままにしない）
+  if(dove) setScreen('town');
+  S.run=null; S.hero.party=[];
+  return {dove, cleaned, ok: dove && cleaned};
+});
+
 await done(b, errs, R);
