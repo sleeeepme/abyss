@@ -7,6 +7,8 @@ const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSl
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
   itemOutlinePeriod:1.8,itemOutlineMinAlpha:.25,
   characterIdleSeconds:1.28,characterMoveThreshold:.16,
+  tiltBlur:5,tiltFocus:.50,tiltBand:.40,tiltFade:.30,
+  vignetteDarkness:.90,vignetteClear:.15,
   bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
   motion:new WeakMap(),motes:[],ripples:[],hits:[],weaponArts:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
@@ -215,26 +217,102 @@ function drawFeelRipples(camX,camY){
    draw が 4.2ms、update が 0.8ms、残り 74% が「空き」に見えていた。
 
    模様は画面サイズが変わらない限り動かないので、焼いておける。 */
-const feelVignetteCanvas=document.createElement('canvas');
-let feelVignetteKey='';
-function drawFeelVignette(){
-  const w=innerWidth,h=innerHeight;
-  /* 拡大率は index.html 側（resize）が掛けている物をそのまま読む。
-     ここで 1 に決め打つと、DPR ぶん小さく貼って画面の一部しか覆わない。 */
-  const s=ctx.getTransform().a || 1;
-  const key=w+'x'+h+'@'+s;
-  if(feelVignetteKey!==key){
-    feelVignetteKey=key;
-    const cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
-    feelVignetteCanvas.width=cw; feelVignetteCanvas.height=ch;
-    const a=feelVignetteCanvas.getContext('2d');
-    a.setTransform(1,0,0,1,0,0); a.clearRect(0,0,cw,ch);
-    a.translate(cw/2,ch/2); a.scale(cw/2,ch/2);
-    const g=a.createRadialGradient(0,0,.25,0,0,1.35);
-    g.addColorStop(0,'#02070b00');g.addColorStop(.55,'#02070b25');g.addColorStop(1,'#02070bae');
-    a.fillStyle=g; a.fillRect(-1,-1,2,2);
+// Post effects use screen-space CSS pixels, independently of the game canvas DPR.
+// ?tiltshift=off provides a cheap device-side A/B check, retaining the vignette.
+const FEEL_POST=window.FEEL_POST={tiltEnabled:new URLSearchParams(location.search).get('tiltshift')!=='off',
+  vignetteEnabled:true,stats:{rebuilds:0,workPixels:0,vignettePixels:0}};
+const feelTiltGame={key:'',bands:[]},feelTiltHub={key:'',bands:[]};
+function feelTiltSurface(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function prepareFeelTilt(w,h,cache){
+  const t=FEEL_TUNING,key=[w,h,t.tiltBlur,t.tiltFocus,t.tiltBand,t.tiltFade].join(':');
+  if(cache.key===key)return;
+  cache.key=key;cache.bands=[];FEEL_POST.stats.rebuilds++;
+  const top=Math.max(0,Math.floor((t.tiltFocus-t.tiltBand/2)*h));
+  const bottom=Math.min(h,Math.ceil((t.tiltFocus+t.tiltBand/2)*h));
+  // Limit scratch pixels, never enlarge to DPR 2/3. No full-screen texture copy.
+  const scale=Math.min(1,384/w),width=Math.max(1,Math.round(w*scale));
+  for(const [y,height]of [[0,top],[bottom,h-bottom]]){
+    if(height<=0)continue;
+    const maxDistance=Math.max(Math.abs(y/h-t.tiltFocus),Math.abs((y+height)/h-t.tiltFocus))-t.tiltBand/2;
+    const maxBlur=Math.min(1,maxDistance/t.tiltFade);
+    if(maxBlur<=0)continue;
+    const sigma=t.tiltBlur*(w/342)*maxBlur*scale,pad=Math.ceil(sigma*3)+2;
+    const bh=Math.max(1,Math.round(height*scale)),bw=width+pad*2,hh=bh+pad*2;
+    const a=feelTiltSurface(bw,hh),b=feelTiltSurface(bw,hh),mask=feelTiltSurface(width,bh);
+    const m=mask.getContext('2d'),gradient=m.createLinearGradient(0,0,0,bh);
+    for(let i=0;i<=32;i++){
+      const distance=Math.max(0,Math.abs((y+height*i/32)/h-t.tiltFocus)-t.tiltBand/2);
+      // Blend by variance: approximate the sample's smoothly varying blur radius.
+      const alpha=Math.min(1,distance/t.tiltFade/maxBlur)**2;
+      gradient.addColorStop(i/32,'rgba(0,0,0,'+alpha+')');
+    }
+    m.fillStyle=gradient;m.fillRect(0,0,width,bh);
+    cache.bands.push({y,height,width,bh,pad,scale,sigma,a,b,mask,ac:a.getContext('2d'),bc:b.getContext('2d')});
   }
-  ctx.save(); ctx.drawImage(feelVignetteCanvas,0,0,w,h); ctx.restore();
+  FEEL_POST.stats.workPixels=[feelTiltGame,feelTiltHub].reduce((n,c)=>n+c.bands.reduce((v,b)=>v+b.a.width*b.a.height*2+b.mask.width*b.mask.height,0),0);
+}
+function applyFeelTilt(canvas,target,w,h,cache,region){
+  if(!FEEL_POST.tiltEnabled||FEEL_TUNING.tiltBlur<=0)return;
+  prepareFeelTilt(w,h,cache);
+  target.save();target.imageSmoothingEnabled=true;
+  const sourceX=(region?region.width:canvas.width)/w,sourceY=(region?region.height:canvas.height)/h;
+  const sourceLeft=region?region.x:0,sourceTop=region?region.y:0;
+  for(const band of cache.bands){
+    const {y,height,width,bh,pad,scale,sigma,a,b,mask,ac,bc}=band,bw=a.width,hh=a.height;
+    ac.globalCompositeOperation='source-over';ac.globalAlpha=1;ac.clearRect(0,0,bw,hh);
+    const y0=Math.max(0,y-pad/scale),y1=Math.min(h,y+height+pad/scale);
+    const dy=pad+(y0-y)*scale,dh=(y1-y0)*scale;
+    ac.drawImage(canvas,sourceLeft,sourceTop+y0*sourceY,w*sourceX,(y1-y0)*sourceY,pad,dy,width,dh);
+    // Clamp the outside edge to its last pixel instead of fading it to black.
+    if(dy>0)ac.drawImage(a,pad,dy,width,1,pad,0,width,dy);
+    if(dy+dh<hh)ac.drawImage(a,pad,dy+dh-1,width,1,pad,dy+dh,width,hh-dy-dh);
+    ac.drawImage(a,pad,0,1,hh,0,0,pad,hh);ac.drawImage(a,pad+width-1,0,1,hh,pad+width,0,pad,hh);
+    // Separable three-tap blur: six small blits, supported on mobile Safari.
+    const offset=sigma*Math.SQRT2;
+    bc.clearRect(0,0,bw,hh);bc.globalCompositeOperation='lighter';
+    bc.globalAlpha=.25;bc.drawImage(a,-offset,0);bc.drawImage(a,offset,0);bc.globalAlpha=.5;bc.drawImage(a,0,0);
+    ac.clearRect(0,0,bw,hh);ac.globalCompositeOperation='lighter';
+    ac.globalAlpha=.25;ac.drawImage(b,0,-offset);ac.drawImage(b,0,offset);ac.globalAlpha=.5;ac.drawImage(b,0,0);
+    ac.globalAlpha=1;ac.globalCompositeOperation='destination-in';ac.drawImage(mask,pad,pad);
+    ac.globalCompositeOperation='source-over';
+    target.drawImage(a,pad,pad,width,bh,0,y,w,height);
+  }
+  target.restore();
+}
+function drawFeelTiltShift(){applyFeelTilt(cv,ctx,innerWidth,innerHeight,feelTiltGame);}
+function drawFeelHubTiltShift(canvas,target){
+  // Cover-cropped background: align the focus and vignette to the visible viewport.
+  const wrap=canvas.parentElement,zoom=parseFloat(canvas.style.width)/canvas.width;
+  let region={x:0,y:0,width:canvas.width,height:canvas.height};
+  if(wrap&&zoom>0){
+    const x=Math.max(0,-parseFloat(canvas.style.left||0)/zoom),y=Math.max(0,-parseFloat(canvas.style.top||0)/zoom);
+    region={x,y,width:Math.min(canvas.width-x,wrap.clientWidth/zoom),height:Math.min(canvas.height-y,wrap.clientHeight/zoom)};
+  }
+  if(region.width<=0||region.height<=0)return;
+  target.save();target.translate(region.x,region.y);
+  applyFeelTilt(canvas,target,region.width,region.height,feelTiltHub,region);
+  paintFeelVignette(target,region.width,region.height,feelHubVignetteCanvas);
+  target.restore();
+}
+const feelVignetteCanvas=feelTiltSurface(1,1);
+const feelHubVignetteCanvas=feelTiltSurface(1,1);
+function drawFeelVignette(){paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);}
+function paintFeelVignette(target,w,h,canvas){
+  if(!FEEL_POST.vignetteEnabled)return;
+  const t=FEEL_TUNING;
+  const key=[w,h,t.vignetteDarkness,t.vignetteClear].join(':');
+  if(canvas.feelVignetteKey!==key){
+    canvas.feelVignetteKey=key;
+    const scale=Math.min(1,512/w,1024/h),cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
+    canvas.width=cw;canvas.height=ch;FEEL_POST.stats.vignettePixels=feelVignetteCanvas.width*feelVignetteCanvas.height+feelHubVignetteCanvas.width*feelHubVignetteCanvas.height;
+    const a=canvas.getContext('2d');a.translate(cw/2,ch/2);a.scale(cw/2,ch/2);
+    // Match CSS ellipse farthest-corner, including the requested 15% clear center.
+    const g=a.createRadialGradient(0,0,0,0,0,Math.SQRT2),clear=t.vignetteClear,dark=t.vignetteDarkness;
+    g.addColorStop(clear,'rgba(2,5,9,0)');
+    g.addColorStop(clear+(1-clear)*.55,'rgba(2,5,9,'+dark*.48+')');
+    g.addColorStop(1,'rgba(2,5,9,'+dark+')');a.fillStyle=g;a.fillRect(-1,-1,2,2);
+  }
+  target.save();target.imageSmoothingEnabled=true;target.drawImage(canvas,0,0,w,h);target.restore();
 }
 const feelFlashCanvas=document.createElement('canvas');
 const feelAmbientCache=new Map();
