@@ -299,9 +299,13 @@
   #topbar{display:flex;gap:10px;align-items:flex-start}
   #bars{flex:1;max-width:230px}
   /* ドットの画面なので、ゲージの角は丸めない（丸めるとそこだけ解像度が違って見える） */
-  .bar{height:8px;background:#1b2029;border:1px solid var(--line);overflow:hidden;margin-bottom:4px}
+  .bar{height:8px;background:#1b2029;border:1px solid var(--line);overflow:hidden;margin-bottom:4px;position:relative}
   .bar>i{display:block;height:100%;transition:width .12s linear}
-  #hpfill{background:var(--hp)}
+  #hpfill{background:var(--hp);position:relative}
+  /* 受けたダメージを白で残す帯。HPバーの**裏**に敷いて、減った直後だけ
+     赤より右に食み出して見える（＝食み出している白が、今さっき失った分）。
+     幅は updateHUD が毎フレーム計算するので、CSSのwidth遷移は掛けない。 */
+  #hpghost{position:absolute;left:0;top:0;height:100%;background:#fff;transition:none;width:100%}
   #xpfill{background:var(--xp);}
   .bar.thin{height:5px}
   #stat{font-size:12px;color:var(--dim);margin-top:2px}
@@ -514,10 +518,16 @@
      .box に足していたパネル背景（不透明に近い箱）を撤廃。
      カードと文字が、止まった盤面の上に直接浮くだけの見た目に戻す。 */
   .pot-card-wrap{perspective:700px}
+  /* カードの背景だけは入れる（ユーザー要望「潜在のカードの背景だけは入れて欲しい」）。
+     窓（.box）を外したぶん、カードの下は止まった盤面が直接透ける。そのままだと
+     カードが「浮いている札」ではなく「文字が乗っているだけ」に見えるので、
+     カード自体は不透明にして、その上に今までの薄い白のツヤを重ねる。
+     影は、止まった盤面から一段手前に浮かせるため。 */
   .pot-card{
     border:2px solid var(--line); border-radius:14px;
     padding:22px 16px; margin:16px 0;
-    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
+    background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)), var(--panel);
+    box-shadow:0 6px 20px rgba(0,0,0,.55);
   }
   .pot-card .pc-rar{font-size:12px;font-weight:700;letter-spacing:.05em}
   /* ユーザー要望「%とかが太字にすると読みづらいので、太字は数字だけに適用する
@@ -914,7 +924,7 @@
 <div id="hud">
   <div id="topbar">
     <div id="bars">
-      <div class="bar"><i id="hpfill" style="width:100%"></i></div>
+      <div class="bar"><i id="hpghost" style="width:100%"></i><i id="hpfill" style="width:100%"></i></div>
       <div class="bar thin"><i id="xpfill" style="width:0%"></i></div>
       <div id="stat"></div>
     </div>
@@ -12202,6 +12212,7 @@ function drawHubBgFrame(){
   const frame = reduced ? 0 : Math.floor((performance.now()-_hubBgT0)/1000*HUB_BG.fps) % HUB_BG.frames;
   const sx=(frame%HUB_BG.cols)*HUB_BG.fw, sy=Math.floor(frame/HUB_BG.cols)*HUB_BG.fh;
   ctx.drawImage(hubBgImg, sx, sy, HUB_BG.fw, HUB_BG.fh, 0, 0, HUB_BG.fw, HUB_BG.fh);
+  if(typeof drawFeelHubTiltShift==='function') drawFeelHubTiltShift(c,ctx);
 }
 /* ---------- 街の背景は 12fps の絵。60回描く意味は無い ----------
    スプライトシートは 12fps・72コマ。rAF は 60回/秒で回るので、
@@ -13500,6 +13511,7 @@ function draw(){
   drawAir(Z, _drawDt);
   _drawStage='カメラ復帰';
   ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
+  drawFeelTiltShift();
   drawFeelVignette();
   // 被弾フラッシュ
   const hu=W.fx.find(f=>f.t==='hurt');
@@ -14157,6 +14169,39 @@ function drawMinimap(){
   dot(P.x, P.y, '#fff');
 }
 
+/* ---------- 受けたダメージを、少しのあいだ白で残す ----------
+   ユーザー要望「ダメージを受けた際に少しの間だけHPが減った箇所を白くしておいて
+   どれくらいダメージを受けたか分かるようにしたい」。
+
+   このゲームは攻撃ボタンが無く、操作は移動だけ。**どれだけ削られたか**は
+   「次の一手でまだ寄れるか、引くか」を決める唯一の材料なのに、赤が縮むのは
+   一瞬で、数字（HP 43/120）は戦闘中に読む余裕が無い。
+   減った分が白く残れば、**視線を盤面から外さずに被弾の重さが読める。**
+
+   白は「今さっき失った分」だけを意味させる。だから回復したら即座に畳む——
+   回復ぶんまで白く残すと、白が「減った量」ではなく「満タンとの差」になり、
+   一番知りたい被弾の重さが読めなくなる。
+   連続で殴られている間は止め直すので、白はそのぶん伸びて溜まっていく。 */
+const HP_GHOST_HOLD = 0.35;   // 減った直後、白いまま止めておく秒数
+const HP_GHOST_RATE = 22;     // そのあと詰める速さ（%/秒の下限。差が大きいほど速くなる）
+let _hpGhostPct = 100;        // 白い帯の今の幅（%）
+let _hpGhostHold = 0;         // 止めておく残り秒数
+let _hpLastPct  = 100;        // 前フレームのHP（%）。減った瞬間の検出だけに使う
+function updateHpGhost(curPct){
+  // 減った瞬間（このフレームで下がった）なら、止める時間を取り直す
+  if(curPct < _hpLastPct - 0.01) _hpGhostHold = HP_GHOST_HOLD;
+  _hpLastPct = curPct;
+  if(curPct >= _hpGhostPct - 0.01){
+    _hpGhostPct = curPct; _hpGhostHold = 0;      // 回復・全快・代替わり：白は残さない
+  }else if(_hpGhostHold > 0){
+    _hpGhostHold -= _drawDt;                     // まだ見せている最中
+  }else{
+    const gap=_hpGhostPct-curPct;
+    _hpGhostPct = Math.max(curPct, _hpGhostPct - (HP_GHOST_RATE + gap*3)*_drawDt);
+  }
+  return _hpGhostPct;
+}
+
 /* ---------- HUD ---------- */
 function updateHUD(){
   const st=stats(S.hero);
@@ -14184,7 +14229,10 @@ function updateHUD(){
      外さずに強さが読める（描画は draw() の敵ラベル側）。
      弱点・耐性は一旦しまう。属性の見せ方は図鑑で引ける形が残っている。
      常に非表示で固定なので、初期化時に一度だけ消せば足りる（initHudOnce 参照）。 */
-  hset('hpfill.w', clamp(S.hero.hpNow/st.maxHp*100,0,100)+'%', v=>el('hpfill').style.width=v);
+  const hpPct = clamp(S.hero.hpNow/st.maxHp*100,0,100);
+  hset('hpfill.w', hpPct+'%', v=>el('hpfill').style.width=v);
+  // 赤の裏に敷いた白。食み出している分が「今さっき失った量」になる
+  hset('hpghost.w', updateHpGhost(hpPct).toFixed(1)+'%', v=>el('hpghost').style.width=v);
   /* レベルアップ直後だけHPバーが光る。バーが一気に満ちる瞬間と重ねることで、
      「上がった」と「全快した」を1つの出来事として見せる。 */
   if(_lvFlash>0){
@@ -18050,7 +18098,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
-<script src="game-feel.js?v=20260916-hollowflux-light7"></script>
+<script src="game-feel.js?v=20260917-postfx2"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

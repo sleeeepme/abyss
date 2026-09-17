@@ -841,4 +841,48 @@ R.artRenameIgnoresGameShortcuts = await pg.evaluate(()=>{
               && renameWindowSurvives};
 });
 
+/* ============ 被弾した分が白く残る ============
+   ユーザー要望「ダメージを受けた際に少しの間だけHPが減った箇所を白くしておいて
+   どれくらいダメージを受けたか分かるようにしたい」。
+
+   見たいのは白の**意味**が保たれているか：
+     ・殴られた直後は、白が赤より右に食み出している（＝失った量が読める）
+     ・その瞬間は止まっている（すぐ詰まると、見る間もなく消えて意味がない）
+     ・放っておけば赤に追い付く（白が残りっぱなしだと、次の被弾が読めない）
+     ・回復したら即座に畳む（白が「満タンとの差」になると被弾の重さが読めない）
+   時間は _drawDt を直に入れて送る——実時間で待つとテストが不安定になる。 */
+R.hpGhost = await pg.evaluate(()=>{
+  TH.run(1,{seed:31}); TH.floor(3);
+  const w = id => parseFloat(document.getElementById(id).style.width);
+  const st=stats(S.hero);
+
+  S.hero.hpNow=st.maxHp; _drawDt=0.016; updateHUD();
+  const fullGhost=w('hpghost');
+
+  // 4割ぶん削る
+  S.hero.hpNow=st.maxHp*0.6; _drawDt=0.016; updateHUD();
+  const hitFill=w('hpfill'), hitGhost=w('hpghost');
+
+  // 止めているあいだは詰まらない
+  _drawDt=0.2; updateHUD();
+  const holdGhost=w('hpghost');
+
+  // 時間を送れば赤に追い付く
+  for(let i=0;i<40;i++){ _drawDt=0.1; updateHUD(); }
+  const settled=w('hpghost');
+
+  // 回復したら白は残らない
+  S.hero.hpNow=st.maxHp; _drawDt=0.016; updateHUD();
+  const healedGhost=w('hpghost'), healedFill=w('hpfill');
+
+  const startsFull     = Math.abs(fullGhost-100)<0.5;
+  const whiteShowsLoss = hitGhost > hitFill+5;
+  const holdsAMoment   = Math.abs(holdGhost-hitGhost)<0.5;
+  const catchesUp      = Math.abs(settled-hitFill)<1;
+  const healSnaps      = Math.abs(healedGhost-healedFill)<0.5;
+  return {fullGhost, hitFill, hitGhost, holdGhost, settled, healedGhost, healedFill,
+          startsFull, whiteShowsLoss, holdsAMoment, catchesUp, healSnaps,
+          ok: startsFull && whiteShowsLoss && holdsAMoment && catchesUp && healSnaps};
+});
+
 await done(b, errs, R);
