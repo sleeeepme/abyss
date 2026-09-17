@@ -510,13 +510,9 @@
      見えず、切り替え方を直した意味が消えるので、ここだけ薄くして
      止まった瞬間の盤面を透かして見せる。 */
   #m-charpot{background:rgba(8,10,14,.55)}
-  /* .box 自体は他モーダルと共有していて背景を持たない
-     （元々「別画面に切り替わった」体なので、モーダル全体の暗い背景で
-     文字のコントラストを賄っていた）。m-charpot はその背景を薄くしたので、
-     このモーダルの .box にだけ不透明に近いパネル背景を足して、
-     タイトル・説明文・ボタンが盤面に負けて読みにくくならないようにする。
-     色は .card（既存のパネル部品）に合わせる。 */
-  #m-charpot .box{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  /* ユーザー要望「レベルアップ時の潜在に敷いてるウインドウを無くす」で、
+     .box に足していたパネル背景（不透明に近い箱）を撤廃。
+     カードと文字が、止まった盤面の上に直接浮くだけの見た目に戻す。 */
   .pot-card-wrap{perspective:700px}
   .pot-card{
     border:2px solid var(--line); border-radius:14px;
@@ -524,7 +520,12 @@
     background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0));
   }
   .pot-card .pc-rar{font-size:12px;font-weight:700;letter-spacing:.05em}
-  .pot-card .pc-name{font-size:21px;font-weight:700;margin-top:8px;line-height:1.4}
+  /* ユーザー要望「%とかが太字にすると読みづらいので、太字は数字だけに適用する
+     ようにしたい」への対応。以前は行全体（「物理ダメージ +12%」の「%」まで）
+     を font-weight:700 にしていた。ここは通常の太さに戻し、数値だけを
+     JS側で <b> に包んで、その <b> だけ太くする。 */
+  .pot-card .pc-name{font-size:21px;font-weight:400;margin-top:8px;line-height:1.4}
+  .pot-card .pc-name b{font-weight:700}
   @keyframes potCardIn{
     0%{transform:scale(.5) rotateY(80deg); opacity:0}
     55%{transform:scale(1.05) rotateY(0deg); opacity:1}
@@ -9724,9 +9725,10 @@ function openCharPotCard(){
   const card=el('cp-card');
   card.style.borderColor=col;
   card.style.setProperty('--pot-glow', col);
+  // 数字だけ太くする（「%」まで太字だと読みづらい、という指摘への対応）
   card.innerHTML =
     `<div class="pc-rar" style="color:${col}">${RARITY[pot.tier].nm}の資質</div>`
-    + `<div class="pc-name">${STATNM[pot.stat].replace('%v',pot.v)}</div>`;
+    + `<div class="pc-name">${STATNM[pot.stat].replace('%v','<b>'+pot.v+'</b>')}</div>`;
   /* クラスの付け外しで強制的に reflow を挟み、連続して同じ強さの潜在が
      出たときにもアニメーションを毎回頭から再生させる（既に付いている
      クラスに add し直すだけではブラウザが「変化なし」として再生しない）。 */
