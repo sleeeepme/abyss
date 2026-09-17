@@ -2515,9 +2515,14 @@ function weaponShape(it){
   delete o.spdMul;             // 速度は it.spd 側で済ませてある
   return o;
 }
-/* ---------- 名前の絵文字 ----------
-   持ち物の一覧は文字だけの行が縦に並ぶので、**何の種類かを読む前に見分けたい**。
-   色はレア度に使い切っていて種別には回せないため、行頭のアイコンで担当する。
+/* ---------- 名前の絵文字（表示名からは撤廃） ----------
+   以前は持ち物の一覧で「何の種類かを読む前に見分けたい」ために、
+   行頭に種別の絵文字を置いていた（色はレア度に使い切っていて種別には
+   回せなかったため）。ドロップ時のアイテムアイコンに実際の絵
+   （drawFeelItemIcon）が入ったことで、この役目はそちらに移ったので、
+   itemName() の表示名からは絵文字を外した（下記ユーザー要望）。
+   BASE_IC/SLOT_IC/CONSUM_IC 自体は、武器熟練のログ・バナー・鍛冶画面
+   （まだ絵が付いていない場所）で引き続き使うので残す。
    ベース種ごとに1つ。未鑑定のときは種別（スロット）だけの薄い絵文字にして、
    武器の種類が漏れないようにする。 */
 const BASE_IC = {
@@ -2543,16 +2548,17 @@ function itemIcon(it){
    一番知りたい「これは何なのか」が語の途中に埋まっていた。
    日本語は最後の名詞が主役なので、種別を末尾に置くほうが読み下しやすい。 */
 function itemName(it){
-  const ic = itemIcon(it);
-  const head = ic ? ic+' ' : '';
-  if(isConsum(it)) return head+it.nm;
-  if(!it.ident) return head+'未鑑定の'+(SLOTNM[it.slot]||'装備');
+  // ユーザー要望「ドロップしたアイテムアイコンに絵が入ったので表示名に
+  // 入れている絵文字をなくす」への対応。以前は itemIcon(it) を行頭に
+  // 付けていたが、盤面の実際のアイコンと二重表示になるので外した。
+  if(isConsum(it)) return it.nm;
+  if(!it.ident) return '未鑑定の'+(SLOTNM[it.slot]||'装備');
   const p=it.aff.find(a=>a.t==='p'), s=it.aff.find(a=>a.t==='s');
   /* 装飾品の付帯は一字で頭に並べる（灼裂の指輪）。中身を開かなくても
      何が付いているかが分かる——装飾品は見た目の差が無いので、
      名前が唯一の見分けになる。 */
   const c=charmAffs(it).map(a=>a.nm).join('');
-  return head+(it.up?'+'+it.up+' ':'')
+  return (it.up?'+'+it.up+' ':'')
        + c + (p?p.nm:'') + (s?s.nm+'の':'') + it.nm
        + (isBroken(it)?'（破損）':'');
 }

@@ -542,9 +542,9 @@ R.labels = await pg.evaluate(()=>{
   const skNames=upSkills(it).map(s=>s.nm);
   return {plainName:nm0, name:nm, lines:lines.slice(0,180), skNames,
           plainHasNoPlus: !nm0.includes('+'),
-          // 行頭は種別の絵文字なので、+N はその次に来る（先頭一致では見ない）
+          // 表示名からは絵文字を撤廃したので、+N は行頭に来る
           showsPlus: nm.includes('+'+UP_MAX+' '),
-          startsWithIcon: nm.startsWith(BASE_IC.sword),
+          startsWithPlus: nm.startsWith('+'+UP_MAX+' '),
           listsSkills: skNames.every(n=>lines.includes(n))};
 });
 

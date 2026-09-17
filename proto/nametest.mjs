@@ -1,7 +1,11 @@
-// 装備の名前。語順（接頭辞→接尾辞→種別）と、行頭の種別アイコン。
+// 装備の名前。語順（接頭辞→接尾辞→種別）。
 //
 // 名前は「読めるか」でしか価値が決まらないので、
 // 出来上がりの文字列そのものを見る検証にしてある。
+//
+// 行頭の種別絵文字は、ドロップ時のアイテムアイコンに実際の絵が
+// 入ったことで表示名からは撤廃した（ユーザー要望）。BASE_IC/SLOT_IC/
+// CONSUM_IC 自体（他の場所でまだ使う）が揃っていることは 2-a/2-b で見る。
 import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
@@ -17,7 +21,7 @@ R.order = await pg.evaluate(()=>{
   it.aff=[{t:'p',id:'sharp',nm:'鋭利な',stat:'dmgPct',v:10},
           {t:'s',id:'guard',nm:'守護',  stat:'def',   v:3}];
   const nm=itemName(it);
-  const body=nm.replace(BASE_IC.sword,'').trim();
+  const body=nm.trim();
   return {name:nm, body,
           exact: body==='鋭利な守護の剣',
           endsWithBase: body.endsWith('剣'),
@@ -31,7 +35,7 @@ R.partial = await pg.evaluate(()=>{
   const mk = aff => { const it=genBaseItem('axe',12,1);
                       it.ident=true; it.up=0; it.aff=aff;
                       it.nm=BASES.find(b=>b.id==='axe').nm;   // 階級別の土台名は固定しておく
-                      return itemName(it).replace(BASE_IC.axe,'').trim(); };
+                      return itemName(it).trim(); };
   const p = mk([{t:'p',id:'stout',nm:'頑健な',stat:'hp',v:12}]);
   const s = mk([{t:'s',id:'flame',nm:'業火', stat:'fire',v:6}]);
   const n = mk([]);
@@ -60,12 +64,15 @@ R.decorations = await pg.evaluate(()=>{
   it.durMax=50; it.dur=0;
   const broken=itemName(it);
   return {plus, broken,
-          plusAfterIcon: plus.startsWith(BASE_IC.mace+' +4 '),
+          plusAtStart:  plus.startsWith('+4 '),
           brokenAtEnd:   broken.endsWith('（破損）'),
-          ok: plus.startsWith(BASE_IC.mace+' +4 ') && broken.endsWith('（破損）')};
+          ok: plus.startsWith('+4 ') && broken.endsWith('（破損）')};
 });
 
-/* ================= 2. アイコン ================= */
+/* ================= 2. アイコン =================
+   行頭の絵文字は表示名から撤廃したが（ドロップ時の実絵アイコンと二重に
+   なるため）、BASE_IC/SLOT_IC/CONSUM_IC 自体は武器熟練のログ・バナー・
+   鍛冶画面でまだ使うので、揃っていることだけ見る。 */
 
 // 2-a. すべてのベース種にアイコンがあり、武器はそれぞれ別の絵文字
 R.iconsComplete = await pg.evaluate(()=>{
@@ -76,33 +83,30 @@ R.iconsComplete = await pg.evaluate(()=>{
           ok: missing.length===0 && uniqW===weapons.length};
 });
 
-// 2-b. 消耗品にもアイコンが付く
+// 2-b. 消耗品のアイコン定義自体は揃っているが、表示名には出ない
 R.consumIcons = await pg.evaluate(()=>{
   const bad = CONSUMABLES.filter(c=>!CONSUM_IC[c.id]).map(c=>c.id);
   const nm  = itemName(makeConsum('salve'));
-  return {bad, nm, hasIcon: nm.startsWith(CONSUM_IC.salve),
-          ok: bad.length===0 && nm.startsWith(CONSUM_IC.salve)};
+  return {bad, nm, noIconInName: !nm.startsWith(CONSUM_IC.salve),
+          ok: bad.length===0 && !nm.startsWith(CONSUM_IC.salve)};
 });
 
-/* 2-c. 未鑑定はスロットのアイコンまで。ここで武器の種類が漏れると、
+/* 2-c. 未鑑定はスロット名だけ（絵文字は付かない）。ここで武器の種類が漏れると、
         攻撃力レンジを推測されて「鑑定するまで分からない」が壊れる。 */
 R.unidentLeaks = await pg.evaluate(()=>{
   S.hero=newHero();
-  const leaks=[], icons=new Set();
+  const leaks=[];
   for(let i=0;i<60;i++){
     const it=genItem(20,300); it.ident=false;
     const nm=itemName(it);
-    icons.add(nm.split(' ')[0]);
     if(nm.includes(it.nm) && it.nm!==SLOTNM[it.slot]) leaks.push(nm+' / '+it.nm);
-    if(nm!==itemIcon(it)+' 未鑑定の'+SLOTNM[it.slot]) leaks.push('形が違う: '+nm);
+    if(nm!=='未鑑定の'+SLOTNM[it.slot]) leaks.push('形が違う: '+nm);
   }
-  const slotIcons=new Set(Object.values(SLOT_IC));
-  const stray=[...icons].filter(i=>!slotIcons.has(i));
-  return {leaks:leaks.slice(0,4), icons:[...icons], stray,
-          ok: leaks.length===0 && stray.length===0};
+  return {leaks:leaks.slice(0,4), ok: leaks.length===0};
 });
 
-// 2-d. 護符も行頭にアイコンが付く（持ち込み一覧で装備と並ぶので）
+// 2-d. 護符は道中の獲得選択に出るだけで、まだ実絵アイコンが付いていない
+//      ので、行頭の絵文字はこれまで通り残す（持ち込み一覧で装備と並ぶので）。
 R.charmIcon = await pg.evaluate(()=>{
   const nm=charmName(CHARMS[0]);
   return {nm, ok: nm.startsWith('🔮') && nm.includes(CHARMS[0].nm)};
@@ -122,9 +126,8 @@ R.inBag = await pg.evaluate(()=>{
   openBag();
   const html=el('bag-loot').innerHTML;
   return {shown: html.includes('冴えた氷結の弓'),
-          icon:  html.includes(BASE_IC.bow),
           notOldOrder: !html.includes('弓の氷結'),
-          ok: html.includes(BASE_IC.bow) && html.includes('冴えた氷結の弓')};
+          ok: html.includes('冴えた氷結の弓')};
 });
 
 // 3-b. 拾ったときのログにも出る（名前を作る道が1本しかないことの確認）
@@ -133,7 +136,7 @@ R.inLog = await pg.evaluate(()=>{
   const it=genBaseItem('staff',10,1); it.ident=true; it.up=0; it.aff=[];
   it.nm=BASES.find(b=>b.id==='staff').nm;   // 階級別の土台名は固定しておく
   log('拾った：'+itemName(it));
-  return {line:logs[0], ok: logs[0]===('拾った：'+BASE_IC.staff+' 杖')};
+  return {line:logs[0], ok: logs[0]===('拾った：杖')};
 });
 
 await done(b, errs, R);
