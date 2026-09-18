@@ -281,7 +281,7 @@ function applyFeelTilt(canvas,target,w,h,cache,region){
 }
 function drawFeelTiltShift(){applyFeelTilt(cv,ctx,innerWidth,innerHeight,feelTiltGame);}
 function drawFeelHubTiltShift(canvas,target){
-  // Cover-cropped background: align the focus and vignette to the visible viewport.
+  // Cover-cropped background: align the focus to the visible viewport.
   const wrap=canvas.parentElement,zoom=parseFloat(canvas.style.width)/canvas.width;
   let region={x:0,y:0,width:canvas.width,height:canvas.height};
   if(wrap&&zoom>0){
@@ -291,11 +291,9 @@ function drawFeelHubTiltShift(canvas,target){
   if(region.width<=0||region.height<=0)return;
   target.save();target.translate(region.x,region.y);
   applyFeelTilt(canvas,target,region.width,region.height,feelTiltHub,region);
-  paintFeelVignette(target,region.width,region.height,feelHubVignetteCanvas);
   target.restore();
 }
 const feelVignetteCanvas=feelTiltSurface(1,1);
-const feelHubVignetteCanvas=feelTiltSurface(1,1);
 function drawFeelVignette(){paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);}
 function paintFeelVignette(target,w,h,canvas){
   if(!FEEL_POST.vignetteEnabled)return;
@@ -304,7 +302,7 @@ function paintFeelVignette(target,w,h,canvas){
   if(canvas.feelVignetteKey!==key){
     canvas.feelVignetteKey=key;
     const scale=Math.min(1,512/w,1024/h),cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
-    canvas.width=cw;canvas.height=ch;FEEL_POST.stats.vignettePixels=feelVignetteCanvas.width*feelVignetteCanvas.height+feelHubVignetteCanvas.width*feelHubVignetteCanvas.height;
+    canvas.width=cw;canvas.height=ch;FEEL_POST.stats.vignettePixels=feelVignetteCanvas.width*feelVignetteCanvas.height;
     const a=canvas.getContext('2d');a.translate(cw/2,ch/2);a.scale(cw/2,ch/2);
     // Match CSS ellipse farthest-corner, including the requested 15% clear center.
     const g=a.createRadialGradient(0,0,0,0,0,Math.SQRT2),clear=t.vignetteClear,dark=t.vignetteDarkness;
