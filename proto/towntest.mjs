@@ -324,8 +324,25 @@ R.departureMarch = await pg.evaluate(()=>{
   return {n:avas.length, stillTown, noRunYet, uiHidden, linedUp,
           ok: stillTown && noRunYet && uiHidden && linedUp};
 });
-await pg.waitForTimeout(2800);        // 整列＋行進＋暗転を待つ
-// 5-e. 抜けた先が探索画面。演出用のクラスは残さない
+await pg.waitForTimeout(1500);        // 整列＋行進が終わるころ
+/* 5-e. 洞窟の口で**止まる**こと。画面の外まで歩かせると、岩壁より上＝
+        宙に浮いて見える（報告：「画面の一番上まで行くと中に浮いているように
+        見える」）。止まった位置から、そのまま消えていく。 */
+R.departureStopsAtCave = await pg.evaluate(()=>{
+  const avas=[...document.querySelectorAll('#hub-avatars .hub-ava')];
+  const stopsAtCave = avas.length>0 && avas.every(b=>b.style.top===HUB_CAVE_TOP+'%');
+  // 画面の中に留まっている（＝外へ歩き抜けていない）
+  const staysOnScreen = avas.every(b=>{
+    const r=b.getBoundingClientRect(); return r.top>0 && r.bottom<innerHeight;
+  });
+  const aboveTheGate = HUB_CAVE_TOP < 27;     // 門（.hub-dive）は 27%
+  const fadingOut = avas.some(b=>b.style.opacity==='0');
+  return {tops:avas.map(b=>b.style.top), caveTop:HUB_CAVE_TOP,
+          stopsAtCave, staysOnScreen, aboveTheGate, fadingOut,
+          ok: stopsAtCave && staysOnScreen && aboveTheGate && fadingOut};
+});
+await pg.waitForTimeout(1500);        // 消え切って暗転するまで
+// 5-f. 抜けた先が探索画面。演出用のクラスは残さない
 R.departureArrives = await pg.evaluate(()=>{
   const dove    = S.screen==='game' && !!S.run;
   const cleaned = !el('hubui').classList.contains('hub-leaving');

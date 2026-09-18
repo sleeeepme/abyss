@@ -15535,9 +15535,23 @@ let _hubAnimTimers = [];
 function clearHubAnimTimers(){ _hubAnimTimers.forEach(clearTimeout); _hubAnimTimers=[]; }
 function hubAnimLater(fn, ms){ _hubAnimTimers.push(setTimeout(fn, ms)); }
 const HUB_INTRO_WALK_MS = 2100;      // 画面の下から広場まで歩く
-const HUB_LINEUP_MS     = 560;       // 門の手前に並ぶ
-const HUB_MARCH_MS      = 820;       // 門をくぐる
+const HUB_LINEUP_MS     = 520;       // 門の手前に並ぶ
+const HUB_MARCH_MS      = 700;       // 階段を上って洞窟の口まで
+const HUB_VANISH_MS     = 380;       // 洞窟の口で消える
+const HUB_VANISH_GAP    = 110;       // ひとりずつ間を置いて消える
 const HUB_DEPART_FADE   = 300;       // 暗転
+/* 洞窟の口の高さ（.hub-plaza に対する％）。**実測値。**
+   以前は -18%（画面の外）まで歩かせていたが、階段を上り切った先は
+   岩壁のあいだの霧で、そこを通り過ぎると**宙に浮いて見える**
+   （報告：「画面の一番上まで行くと中に浮いているように見える」）。
+   測り方：iPhone 13相当で .hub-plaza の rect を取り、背景の
+   「階段の上の門（.hub-dive と同じ 27%）」を基準に％へ逆算した。
+   22% にしてあるのは、**足が石段の上に乗る**高さだから。
+   .hub-ava は中心で位置を取る（translate -50%）ので、足は中心より約10px下。
+   22% → 中心 CSS165・足 CSS173 で、ちょうど門の敷居のあたりに立つ。
+   これより上（16%で試した）だと足の下が霧だけになり、
+   「洞窟の前に立っている」ではなく「霧に浮いている」に戻ってしまう。 */
+const HUB_CAVE_TOP      = 22;
 
 /* 一度きりの門番。startAdventure はこちらを呼ぶ。
    「出したかどうか」の判断を playHubIntro の中に混ぜないのは、
@@ -15593,24 +15607,38 @@ function playHubDeparture(done){
     const wrap=b.querySelector('.hub-ava-wrap');
     if(wrap) wrap.style.transform='scaleX(1)';   // 並んだら全員おなじ向き
   });
-  // 2. 揃ってから門の奥（画面の上）へ。少しずつ遅らせて、隊列のまま吸い込ませる
+  // 2. 揃ってから、階段を上って洞窟の口へ。少しずつ遅らせて隊列のまま歩かせる
+  const marchStart = HUB_LINEUP_MS+140;
   hubAnimLater(()=>{
     avas.forEach((b,i)=>{
       b.style.transitionDuration=(HUB_MARCH_MS/1000)+'s';
       b.style.transitionDelay=(i*80)+'ms';
-      b.style.top='-18%';
+      b.style.top=HUB_CAVE_TOP+'%';
     });
-  }, HUB_LINEUP_MS+140);
-  // 3. 最後のひとりが抜けるころに暗転。黒の向こう側が探索画面
-  const marchEnd = HUB_LINEUP_MS+140 + HUB_MARCH_MS + (n-1)*80;
+  }, marchStart);
+  /* 3. 洞窟の口で**止まって**、そこから消える。
+        画面の外まで歩かせると、岩壁より上＝宙に浮いて見える（報告）。
+        先頭から順に消すので、隊列が1人ずつ洞窟に飲まれていくように見える。 */
+  const marchEnd = marchStart + HUB_MARCH_MS + (n-1)*80;
+  avas.forEach((b,i)=>{
+    hubAnimLater(()=>{
+      b.style.transition='opacity '+HUB_VANISH_MS+'ms ease';
+      b.style.opacity='0';
+    }, marchEnd + i*HUB_VANISH_GAP);
+  });
+  // 4. 最後のひとりが消えたら暗転。黒の向こう側が探索画面
+  const vanishEnd = marchEnd + (n-1)*HUB_VANISH_GAP + HUB_VANISH_MS;
   hubAnimLater(()=>{
     fadeToBlack(HUB_DEPART_FADE, ()=>{
       ui.classList.remove('hub-leaving');
-      avas.forEach(b=>{ b.style.transitionDelay=''; b.style.transitionDuration=''; });
+      avas.forEach(b=>{
+        b.style.transitionDelay=''; b.style.transitionDuration='';
+        b.style.transition=''; b.style.opacity='';
+      });
       done();
       flashFade(360);                // 黒はもう乗っている。探索画面の上でそれを抜く
     });
-  }, Math.max(0, marchEnd-140));
+  }, Math.max(0, vanishEnd-60));
   return true;
 }
 
