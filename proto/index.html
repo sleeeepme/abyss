@@ -2597,14 +2597,52 @@ function itemName(it){
   /* 装飾品の付帯は一字で頭に並べる（灼裂の指輪）。中身を開かなくても
      何が付いているかが分かる——装飾品は見た目の差が無いので、
      名前が唯一の見分けになる。 */
-  const c=charmAffs(it).map(a=>a.nm).join('');
+  /* 区切りの「の」を入れる。入れていなかったので、付帯が2つ3つ付いた装飾品が
+     「痩守貪る耐火のミスリルの指輪」のように、頭の一字が接頭辞と地続きになって
+     **読めない一語**になっていた（店で実際に並んだ）。上のコメントにある
+     「灼裂の指輪」という形は、の が無いと成立しない。
+
+     数を絞ろうとして一度2つまでに切ったが、`zakotest.charmsAreLegible.marksInName`
+     が落ちて戻した——あれは「付いている物が名前だけで分かる」という約束を
+     守っているテストで、装飾品は見た目の差が無いぶん**名前が唯一の見分け**になる。
+     切ってよいのは数ではなく、読めなさのほうだった。 */
+  const cm=charmAffs(it).map(a=>a.nm);
+  const c=cm.length ? cm.join('')+'の' : '';
   return (it.up?'+'+it.up+' ':'')
        + c + (p?p.nm:'') + (s?s.nm+'の':'') + it.nm
        + (isBroken(it)?'（破損）':'');
 }
+/* ---------- 個体差を値段に乗せる ----------
+   itemValue はレア度と ilvl しか見ていなかった。
+   **同じ名前・同じレア度なら、性能が2倍違っても同じ値段**になる。
+   店に「防御力7の革鎧 14G」と「防御力3の革鎧 14G」が並んで、
+   どちらを買うかの判断が値段から消えていた（2026-09-21 の実プレイで確認）。
+
+   レア度と ilvl は値段の**基準**として残す（経済の土台なのでここは動かさない）。
+   そのうえに、同じ基準の中での振れ——素の数値の引きと付帯の数——を
+   倍率として掛ける。0.6〜1.8 に挟んであるのは、値段の桁を動かさないため。
+   桁が動くと、店と売却と修理費のバランスを全部取り直すことになる。 */
+function itemRollQ(it){
+  const b = BASES.find(x=>x.id===it.base);
+  if(!b) return 1;
+  const s = scaleOf(it.ilvl||1);
+  let now=0, mid=0;
+  // 武器は毎秒火力で見る。攻撃力だけで見ると、遅くて重い武器が不当に高くなる
+  if(b.atk){ now += (it.atk||0)*(it.spd||1); mid += (b.atk[0]+b.atk[1])/2*s*(b.spd||1); }
+  if(b.def){ now += (it.def||0);             mid += (b.def[0]+b.def[1])/2*s; }
+  if(b.block){ now += (it.block||0)*0.25;    mid += (b.block[0]+b.block[1])/2*0.25; }
+  /* 付帯の数は、そのレア度の**期待本数との差**だけを見る。
+     本数そのものを掛けるとレア度の値段に二重に乗る（レア度の val が
+     既に「何本付くか」を織り込んでいる）。 */
+  const ra = RARITY[it.rar] && RARITY[it.rar].aff;
+  const affMid = ra ? (ra[0]+ra[1])/2 : 0;
+  const affQ = 1 + (((it.aff||[]).length) - affMid)*0.08;
+  const rollQ = mid>0 ? now/mid : 1;
+  return clamp(rollQ*affQ, 0.6, 1.8);
+}
 function itemValue(it){
   if(isConsum(it)) return consumDef(it.consum) ? consumDef(it.consum).price : 20;
-  return Math.round(RARITY[it.rar].val*(1+it.ilvl*0.12));
+  return Math.max(1, Math.round(RARITY[it.rar].val*(1+it.ilvl*0.12)*itemRollQ(it)));
 }
 /* 耐久 0 = 破損。捨てられはせず、性能を一切失う。街で修理できる。 */
 function isBroken(it){ return it.durMax>0 && it.dur<=0; }
@@ -2861,7 +2899,22 @@ const UPGRADES=[
      段の割り当てで一点だけ直したことがある。当初案は第2段を
      「5階の中ボス撃破」で開ける形だったが、そこに不屈を置くと
      **5階を越える道具が5階を越えた後にしか手に入らない**という
-     循環になる。だから5階までに要る物（瞬足）は第1段に置く。 */
+     循環になる。だから5階までに要る物（瞬足）は第1段に置く。
+
+     ---- 2026-09-21：衝撃波も第1段へ降ろした ----
+     上の「循環」は瞬足1つでは切れていなかった。実測（プレイ評価）では
+     累計SP 60→700 のどこでも到達階の中央値が 5.0F から動かず、
+     S.bossClear=5 を先に立てて第2段を開けた世界だけが 6.0F / 9.0F に伸びた。
+     **つまり5階を越える力は、いまも全部5階の向こうにあった。**
+
+     第1段で買える物が「+n%」10項目だけだったことも同じ話で、
+     最初の数十回の探索に**遊び方が変わる物が1つも無い**状態だった。
+     瞬足は回避の腕前を要求するので、踏めない人には何も起きない
+     （--dash の実測では、瞬足に払ったぶん到達階がむしろ下がった）。
+     腕前を要求せず、かつ盤面の読み方を変える物——衝撃波を降ろす。
+
+     不屈と治癒は第2段に残す。あれは「10階のための道具」という
+     上の見立てのままで、5階のために配る物ではない。 */
 
   {id:'dash',   nm:'瞬足',  max:5, shard:30,  tier:1,
    step:'ダッシュ（段ごとに 距離+ / 待ち- / 回避受付+）',
@@ -2871,7 +2924,8 @@ const UPGRADES=[
    step:'倒れても一度だけ立ち上がる',
    desc:'探索1回につき一度／HPは全快で戻る'},
 
-  {id:'wave',   nm:'衝撃波', max:1, shard:70, tier:2,
+  /* 第1段。5階の壁を越えるための物なので、壁の手前で買えないと意味がない。 */
+  {id:'wave',   nm:'衝撃波', max:1, shard:70, tier:1,
    step:'技を覚える（'+WAVE_CD+'秒ごと）',
    desc:'前方をまとめて薙ぐ。下がりながらでも出せる'},
 
@@ -5563,8 +5617,14 @@ const BOSS_MOVESET={
 
    **五十階＝初めの供物。** この世界で唯一、番号を持たない。 */
 const UNIQUE_BOSSES={
+  /* 通常技を slam + cleave にしてある（2026-09-21 に pillars と入れ替えた）。
+     slam は半径2.7の円、pillars は半径1.7の円が4つで、**画面に出る形が同じ**。
+     最初に会うボスが「赤い円から逃げる」だけになっていて、
+     この game で唯一そこでしか教えられない「横に回れば当たらない」を
+     誰も教わらないまま5階の壁に当たっていた。
+     cleave（正面75度の扇）を通常技に上げ、逃げ先を潰す pillars は激昂へ。 */
   5:  {nm:'灰の大蛙',      reg:'現象体・一号／乾',   fam:'beast',  dt:'blunt',
-       moves:['slam','pillars'],            rage:['cleave'],
+       moves:['slam','cleave'],             rage:['pillars'],
        line:'石の層が最初に濃くなる場所。ここまでが信仰で、ここから先が商売だ。'},
 
   10: {nm:'空引きのヴェラ', reg:'登録：弓・百四番',   fam:'undead', dt:'pierce',
@@ -12701,8 +12761,11 @@ function draw(){
     }
     const c=RARCOL[d.it.rar];
     drawDropIcon(d.it,sx,sy,c);
-    // 名前は近づいたときだけ。常時出すと画面が文字で埋まる
-    if(Math.hypot(d.x-P.x,d.y-P.y)<3.2)
+    /* 名前は近づいたときだけ。常時出すと画面が文字で埋まる。
+       さらに、ボスが技を溜めている間は名前を伏せる——
+       いま読むべきは予兆であって、足元に落ちている革鎧の名前ではない。
+       絵（drawDropIcon）は出したままなので、落ちていること自体は分かる。 */
+    if(Math.hypot(d.x-P.x,d.y-P.y)<3.2 && !bossCasting())
       label(itemName(d.it), sx, sy-TS*0.6, c, 0.95);
   });
 
@@ -13503,6 +13566,31 @@ function draw(){
   /* 落とし穴の演出。縮みながら回って消え（fallAnim）、
      戻った直後は点滅する（fallBlink）——神々のトライフォースの穴落ちと同じ形。 */
   _drawStage='主人公';
+  /* ---------- 重なったときだけ、足元に切り離しの輪を敷く ----------
+     近接は敵と同じマスに重なり続ける作りなので、ボスのような大きい絵に乗ると
+     **主人公が完全に見えなくなる**（2026-09-21 の実プレイ：5階の灰の大蛙戦で、
+     予兆の円・ダメージ数字・敵名・落ちている装備の名前と全部が同じ50px四方に
+     集まり、自分がどこにいるか判らなくなった）。
+
+     スプライトそのものは game-feel.js 側（Codex 担当）なので触らない。
+     ここで足すのは**絵の下に敷く影と輪だけ**で、しかも重なっている間だけ出す。
+     常時出すと、攻撃範囲の点線の輪と合わせて足元に輪が2本並ぶ。 */
+  const heroCovered = (W.enemies||[]).some(e=>!e.dead &&
+        Math.hypot(e.x-P.x, e.y-P.y) < (e.r||0.4) + 0.5);
+  if(heroCovered && !heroBlinkOff){
+    const hx=px+heroBob.x, hy=py+heroBob.y, hr=TS*0.30*heroScale;
+    ctx.save();
+    /* 絵の後ろに暗い面を敷く。主人公も灰の大蛙もドット絵の明るい灰色なので、
+       輪だけでは「どこからが自分か」が出ない。後ろを沈めると明るい画素が立つ。 */
+    ctx.fillStyle='rgba(8,10,14,0.42)';
+    ctx.beginPath(); ctx.arc(hx, hy, TS*0.44*heroScale, 0, 7); ctx.fill();
+    // 足元。影で地面に着地させてから、細い輪で縁を立てる
+    ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.beginPath(); ctx.ellipse(hx, hy+TS*0.30*heroScale, hr, hr*0.44, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle='rgba(232,238,245,0.9)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(hx, hy+TS*0.30*heroScale, hr*1.06, hr*0.47, 0, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   ctx.globalAlpha*=feelBlink(P);
   if(!heroBlinkOff){
@@ -14746,16 +14834,31 @@ function rerollShop(){
   const base=Math.max(1,Math.min(S.deepest, 60));
   S.shop=[];
   const slots = 4 + shopSlotBonus();      // 商館のレベルで品揃えが増える
+  /* 同じ種別が並ばないようにする。抽選をそのまま並べていたので、
+     4枠のうち3枠が「革鎧」という日が普通に出ていた（実プレイで確認）。
+     店の役目は「今日は何がある」を見せることなので、同じ物が3つ並ぶと
+     枠が1つに減ったのと同じになる。同種は2つまで、数回だけ引き直す。 */
+  const usedBase = {};
   for(let i=0;i<slots;i++){
-    const it=genItem(Math.max(1, base+ri(-2,4)), 20+S.deepest*0.5);
+    let it=null;
+    for(let t=0;t<6;t++){
+      const cand=genItem(Math.max(1, base+ri(-2,4)), 20+S.deepest*0.5);
+      it=cand;
+      if((usedBase[cand.base]||0) < 2) break;   // 2つまでは許す（同種の上位・下位が並ぶのは自然）
+    }
+    usedBase[it.base]=(usedBase[it.base]||0)+1;
     it.ident=true;                       // 店の品は鑑定済み（買う判断ができないと店の意味がない）
     it.price=Math.round(itemValue(it)*2.0);
     S.shop.push(it);
   }
   // 消耗品は常に2枠。ドロップ待ちにすると、要るときに手に入らない。
   // ただし装備（2.0倍）より高くして、気軽な連打にはさせない。
+  // 2枠は**別の物**にする。同じ香が2つ並ぶと、実質1枠になる。
+  const usedConsum = {};
   for(let i=0;i<2;i++){
-    const c=makeConsum();
+    let c=null;
+    for(let t=0;t<6;t++){ c=makeConsum(); if(!usedConsum[c.consum]) break; }
+    usedConsum[c.consum]=1;
     c.price=Math.round(itemValue(c)*CONSUM_SHOP_MUL);
     S.shop.push(c);
   }
@@ -16779,6 +16882,11 @@ bindTap(el('wear-cancel'), closeWearPick);
    予兆で描く図形＝実際に当たる範囲、を厳守する。
    ここがズレた瞬間に「避けたのに当たった」が生まれ、
    回避ボタンの無いこのゲームでは即座に理不尽になる。 */
+/* いまボスが技を溜めているか。予兆が出ている間だけ、
+   優先度の低い文字（床の戦利品の名前）を伏せるのに使う。 */
+function bossCasting(){
+  return !!(W.enemies||[]).some(e=>e.boss && !e.dead && e.cast);
+}
 function drawBossCast(e, sx, sy, R){
   const m = BOSS_MOVES[e.cast.id];
   const p = 1 - e.cast.t/e.cast.max;          // 0 → 1 で着弾

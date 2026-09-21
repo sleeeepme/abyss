@@ -32,9 +32,18 @@ const arg = (k, d) => {
 const SP_LIST = arg('sp', '0,130,300,450').split(',').map(Number);
 const SEEDS   = +arg('seeds', 8);
 const DEPTH   = +arg('depth', 5);
-/* 段の解禁具合。倒したボスの最深階（S.bossClear）で指定する。
-   0 のままだと不屈も衝撃波も無い世界を測ることになる。 */
-const DEEPEST = +arg('tier', 0);
+/* 段の解禁具合。**倒したボスの最深階**（S.bossClear）で指定する。
+   取るのは階であって段番号ではない。有効な値は 0 / 5 / 10 / 20（= UPG_TIERS の need）。
+   0 のままだと不屈も衝撃波も無い世界を測ることになる。
+   段番号で書きたいときは `--dan 2` のように書く（下で階へ変換する）。
+   名前の罠に一度はまった経緯は _balance.mjs の同じ箇所に書いてある。 */
+const DAN     = arg('dan', null);
+const DEEPEST = DAN != null ? -1 : +arg('tier', 0);
+if (DAN == null && DEEPEST > 0 && DEEPEST < 5) {
+  console.error('--tier は「倒したボスの最深階」を取る（0 / 5 / 10 / 20）。'
+    + '段番号のつもりなら --dan ' + DEEPEST + ' と書く。');
+  process.exit(2);
+}
 /* 何回ぶん装備を引くか。多くするほど「その階で出うる最良」に近づく。
    実際に潜って着いた人の装備は最良ではないので、
    **実測の攻撃力（_balance の 5F 行）に合う回数**で測らないと
@@ -49,6 +58,17 @@ pg.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
 await pg.goto('file://' + path.resolve('proto/index.html'));
 await pg.waitForTimeout(400);
 await pg.evaluate(() => { if (!S.hero) { S.name = '測定'; startAdventure(); } });
+
+/* --dan（段番号）で来たときだけ、本編の UPG_TIERS を引いて階に直す。
+   以降は BOSSCLEAR（階）だけを使う。 */
+const BOSSCLEAR = DAN == null ? DEEPEST : await pg.evaluate(d => {
+  const t = UPG_TIERS.find(x => x.t === d);
+  return t ? t.need : null;
+}, +DAN);
+if (BOSSCLEAR == null) {
+  console.error('--dan ' + DAN + ' に対応する段が UPG_TIERS に無い。');
+  process.exit(2);
+}
 
 const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
   const order = ['hp', 'def', 'dr', 'atk', 'wave', 'regen', 'revive',
@@ -174,12 +194,12 @@ const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
     out.push(acc);
   }
   return out;
-}, { spList: SP_LIST, seeds: SEEDS, depth: DEPTH, rolls: ROLLS, deep: DEEPEST });
+}, { spList: SP_LIST, seeds: SEEDS, depth: DEPTH, rolls: ROLLS, deep: BOSSCLEAR });
 
 const med = a => { const v = [...a].sort((x, y) => x - y); return v[Math.floor(v.length / 2)]; };
 const pad = (s, n) => String(s).padEnd(n);
 
-console.log(`\n=== 第${DEPTH}階の一戦（シード ${SEEDS} 本の中央値 / 段は tier=${DEEPEST}）===\n`);
+console.log(`\n=== 第${DEPTH}階の一戦（シード ${SEEDS} 本の中央値 / 撃破済みの最深階 bossClear=${BOSSCLEAR}F${DAN != null ? `（--dan ${DAN}）` : ''}）===\n`);
 console.log(pad('SP', 5) + pad('ボスHP', 9) + pad('こちらHP', 10) + pad('攻撃', 7)
           + pad('倒しきる', 10) + pad('倒される', 10) + pad('部屋で', 9) + 'あと何倍要るか');
 console.log('-'.repeat(78));

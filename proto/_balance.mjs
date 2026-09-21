@@ -39,13 +39,31 @@ const FILE     = arg('file', 'proto/index.html');   // 別案を測るとき用
 /* --dash: 予兆の切れ際にダッシュを踏んでジャスト回避を狙う操縦。
    上手い人の側の値を出すために使う。既定は踏まない（下手な人の側）。 */
 const DASH     = process.argv.includes('--dash');
-/* --tier: 段の解禁具合。倒したボスの最深階（S.bossClear）を固定して測る。
+/* --tier: 段の解禁具合。**倒したボスの最深階**（S.bossClear）を固定して測る。
    キーストーンは段2以降にあるので、これを 0 のままにすると
    **不屈も衝撃波も持っていない世界**を測ることになる。
      0  … まだ中ボスを倒していない（段1のみ）
      5  … 第5階層の中ボスを倒した（段2が開く）
-     10 … 第10階層の大ボスを倒した（段3が開く） */
-const DEEPEST  = +arg('tier', 0);
+     10 … 第10階層の大ボスを倒した（段3が開く）
+     20 … 第20階層の大ボスを倒した（段4が開く）
+
+   ---- 名前の罠（2026-09-21 に踏んだ）----
+   引数名は `--tier` だが、受け取るのは**段番号ではなく階**。
+   `--tier 3`（＝段3のつもり）と書くと S.bossClear=3 になり、
+   段2の条件（bossClear>=5）を満たさないので**黙って段1を測る**。
+   `--tier 0/1/2/3` の出力が撃破数まで完全一致するのはこれが理由。
+   CLAUDE.md 4章の「10Fの比（SP450・段3）」も、この読み違えで
+   一度も検証されていなかった。
+
+   なので段番号で書きたいときは `--dan 3` を使う（下で階へ変換する）。
+   `--tier` に段番号らしい値（1〜4）が来たら警告を出して止まる。 */
+const DAN      = arg('dan', null);
+const DEEPEST  = DAN != null ? -1 : +arg('tier', 0);   // -1 は「ページ側で段から引く」印
+if (DAN == null && DEEPEST > 0 && DEEPEST < 5) {
+  console.error('--tier は「倒したボスの最深階」を取る（0 / 5 / 10 / 20）。'
+    + '段番号のつもりなら --dan ' + DEEPEST + ' と書く。');
+  process.exit(2);
+}
 
 const b   = await chromium.launch();
 const ctx = await b.newContext({ ...devices['iPhone 13'], hasTouch: true, isMobile: true });
@@ -56,6 +74,19 @@ pg.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text(
 await pg.goto('file://' + path.resolve(FILE));
 await pg.waitForTimeout(400);
 await pg.evaluate(() => { if (!S.hero) { S.name = '測定'; startAdventure(); } });
+
+/* --dan（段番号）で指定されたときだけ、本編の UPG_TIERS を引いて階に直す。
+   段の解禁条件はページ側にしか無いので、ここで一度だけ読んで数にしてしまう。
+   以降は BOSSCLEAR（階）だけを使う——node 側に段番号を持ち回らない。 */
+const BOSSCLEAR = DAN == null ? DEEPEST : await pg.evaluate(d => {
+  const t = UPG_TIERS.find(x => x.t === d);
+  return t ? t.need : null;
+}, +DAN);
+if (BOSSCLEAR == null) {
+  console.error('--dan ' + DAN + ' に対応する段が UPG_TIERS に無い。'
+    + '段は ' + (await pg.evaluate(() => UPG_TIERS.map(x => x.t + '(' + x.need + 'F)').join(' / '))));
+  process.exit(2);
+}
 
 /* ---- 自動操縦をページ側に置く ---------------------------------------
    ここでやることは3つだけ。
@@ -396,6 +427,14 @@ await pg.evaluate(() => {
         /* 詰んだときに原因が分かるように、最後の状態を持ち帰る。
            「動けなかった」のか「倒せなかった」のかで直す場所が違う。 */
         why: {
+          /* 詰んだ階と、その階の広さ・残り敵数。
+             「遠くて歩ききれない」のか「敵に絡まれて進めない」のかは、
+             距離だけ見ても分からない（2026-09-21：距離のせいだと誤読した）。 */
+          atDepth: S.run ? S.run.depth : null,
+          floorWH: W.fl ? [W.fl.W, W.fl.H] : null,
+          enemiesLeft: W.enemies ? W.enemies.filter(e => !e.dead).length : null,
+          enemiesNear: (W.enemies && S.run)
+            ? W.enemies.filter(e => !e.dead && Math.hypot(e.x - P.x, e.y - P.y) < 8).length : null,
           p: S.run ? [+P.x.toFixed(1), +P.y.toFixed(1)] : null,
           stair: W.fl ? [+W.fl.stair.x.toFixed(1), +W.fl.stair.y.toFixed(1)] : null,
           flowOk: !!dist,
@@ -418,7 +457,7 @@ for (const sp of SP_LIST) {
   let warned = false;
   for (let s = 0; s < SEEDS; s++) {
     const r = await pg.evaluate(([seed, sp, md, cap, opt]) => BAL.run(seed, sp, md, cap, opt),
-      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, tier: DEEPEST }]);
+      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, tier: BOSSCLEAR }]);
     if (r.missing && r.missing.length && !warned) {
       warned = true;
       console.log('\n  ⚠ 買う順に入っていない項目:', r.missing.join(','),
@@ -438,7 +477,10 @@ const q = (a, p) => {
   return lo === hi ? v[lo] : v[lo] + (v[hi] - v[lo]) * (i - lo);
 };
 
-console.log('\n=== 到達階の分布（シード ' + SEEDS + ' 本 / 上限 ' + MAXDEPTH + 'F / 段は deepest=' + DEEPEST + '）===');
+/* 段は「階」で出す。段番号と階を混ぜて書くと、また同じ読み違えを呼ぶ。 */
+console.log('\n=== 到達階の分布（シード ' + SEEDS + ' 本 / 上限 ' + MAXDEPTH + 'F'
+  + ' / 撃破済みの最深階 bossClear=' + BOSSCLEAR + 'F'
+  + (DAN != null ? '（--dan ' + DAN + '）' : '') + '）===');
 console.log('  SP  使った  到達階 中央値   25%   75%   最浅  最深   撃破  獲得SP  詰み   内訳');
 for (const sp of SP_LIST) {
   const r = rows.filter(x => x.sp === sp);
