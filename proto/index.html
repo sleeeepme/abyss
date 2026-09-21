@@ -5630,6 +5630,18 @@ const UNIQUE_BOSSES={
   10: {nm:'空引きのヴェラ', reg:'登録：弓・百四番',   fam:'undead', dt:'pierce',
        // 遠くから射続ける相手。散弾（burst）＝矢を撒く動作にあたる
        moves:['beam','burst','wave'],       rage:['pillars'],
+       /* ---------- 第一形態（人型・遠距離だけ） ----------
+          倒し切ると、ここに書いてある姿から上の姿（第二形態）へ変わる。
+          まだ人の形をしていたころのヴェラ——弓を引く者なので、
+          撃つ技しか持たない。範囲攻撃（wave/pillars/slam）は一つも渡さない。
+          `arch:'range'` が間合い取り（keep 5.5）と矢（bolt）の両方を連れてくる。
+          倒し方が第二形態と別物になるのが狙いで、
+          寄って殴る相手の前に**寄らせてくれない相手**を置く。 */
+       form1:{arch:'range', moves:['beam','burst'], rage:[],
+              r:0.52, cr:0.32,          // 人型・Mサイズ（規格外0.44と中ボス0.85の間）
+              atkMul:1.0,               // 矢は軽くない。範囲が無いぶん一発で払う
+              defMul:0.75,              // まだ鎧ではない。顔見せを長引かせない
+              msMul:1.05},              // 間合いを保てるだけの足
        line:'矢はとうに尽きている。それでも引く動作をやめない。'},
 
   15: {nm:'沼の大蛭',      reg:'現象体・二号／滞',   fam:'slime',  dt:'blunt',
@@ -6778,7 +6790,80 @@ function makeBoss(fl, depth, tier){
     revealed:false
   };
   e.hp=e.maxHp;
+  /* 二形態のボスは、ここまでで組んだ姿を**第二形態**として控えに回し、
+     第一形態の値で上書きする（applyBossFirstForm）。 */
+  if(U && U.form1) applyBossFirstForm(e, U.form1);
   return e;
+}
+
+/* ---------- 二形態のボス ----------
+   ユーザー要望（第10階層のヴェラ）：
+     「10階のボスを倒した後に第二形態に変身するようにしたい。
+       第一形態は人型でMサイズにして範囲攻撃は使わない遠距離攻撃がメインに。
+       第二形態は今の状態とする。」
+
+   設定側でもこの階だけは形が二つある相手として書かれている——
+   ヴェラは大ボス四体の中で**最も人に近い**（`abyss-キャラアート制作リスト.md`
+   BR-01「顔がまだある。矢筒は空」）。弓を引く人の姿から、還り損ないの姿へ。
+   第一形態が遠距離だけなのは、キャラ設定をそのまま戦い方にしたもの。
+
+   HPの配分。**合計は1形態だったころの 1.10 倍に収める。**
+   増えるぶんは全部「安全な側」に乗せてある——第一形態は範囲攻撃を持たず、
+   間合いを取って撃つだけなので、同じ秒数でも受ける量は第二形態より少ない。
+   つまり戦いの「長さ」は1割増えるが、「危険度」はほぼ据え置き。
+   第10階層は作者判断で「丁度良い」とされている階なので、
+   形態を足したことを理由に壁を上げない。
+
+   第一形態を 0.35 に留めてあるのは、**安全な時間は長いほど退屈**だから。
+   顔見せとして成立する最短の長さにして、本番は第二形態に残す。 */
+const BOSS_FORM_HP = {first:0.30, second:0.75};
+/* 変身直後に技を撃たない秒数。ここで殴れる時間を作らないと、
+   「ゲージがもう一本増えただけ」になる。 */
+const BOSS_FORM_PAUSE = 1.6;
+
+/* 第一形態の値を被せる。元の姿（＝第二形態）は e.form2 に控える。 */
+function applyBossFirstForm(e, spec){
+  const baseHp = e.maxHp;
+  // 控え：変身で戻す値だけを持つ。ここに無い物は変身しても変わらない
+  e.form2 = {
+    maxHp: Math.max(1, Math.round(baseHp*BOSS_FORM_HP.second)),
+    arch:e.arch, moves:e.moves.slice(), r:e.r, cr:e.cr,
+    atkV:e.atkV, def:e.def, ms:e.ms
+  };
+  const a = ARCH.find(x=>x.id===spec.arch) || e.arch;
+  e.arch = a;                                   // 間合いを取って撃つ型にする
+  e.moves = (spec.moves||[]).slice();           // 範囲攻撃は持たせない
+  e.formRage = spec.rage || [];                 // 激昂しても範囲技は開かない
+  e.maxHp = Math.max(1, Math.round(baseHp*BOSS_FORM_HP.first));
+  e.hp = e.maxHp;
+  e.r  = spec.r  != null ? spec.r  : 0.52;      // 人型・Mサイズ
+  e.cr = spec.cr != null ? spec.cr : 0.32;
+  e.atkV *= (spec.atkMul!=null ? spec.atkMul : 1);
+  e.def  *= (spec.defMul!=null ? spec.defMul : 1);
+  /* 速さは**強制した型から**組み直す。元の型の足のままだと、
+     寄り型が引かれていたときに「離れる相手なのに異様に速い」になる。 */
+  e.ms = Math.max(a.ms,1.25)*0.85*(spec.msMul!=null ? spec.msMul : 1);
+}
+
+/* 倒し切られた第一形態を、第二形態へ変える。
+   **ここで e.dead を立てないのが肝。** 立てると killEnemy の先にある
+   報酬・恩寵・中継地点・撃破ログが全部走ってしまう。
+   演出側（game-feel.js）の撃破ズームも `if(!e.dead) return;` で弾かれるので、
+   倒したときの見せ場は第二形態のぶん1回だけになる。 */
+function bossChangeForm(e){
+  const f = e.form2; if(!f) return;
+  e.form2 = null;
+  e.arch=f.arch; e.moves=f.moves; e.r=f.r; e.cr=f.cr;
+  e.atkV=f.atkV; e.def=f.def; e.ms=f.ms;
+  e.maxHp=f.maxHp; e.hp=f.maxHp;
+  e.formRage=null;
+  // 激昂はやり直し。第一形態で上げた速さは f.ms で戻っている
+  e.rage=false; e.teleMul=1;
+  e.cast=null; e.tele=0; e.moveCd=BOSS_FORM_PAUSE;
+  e.hit=0.4;
+  if(e.revealed) log(e.name+'——姿が変わった');
+  W.fx.push({t:'parry', x:e.x, y:e.y, life:0.9, max:0.9});
+  W.fx.push({t:'shock', x:e.x, y:e.y, r:3.2, life:0.55, max:0.55, col:e.col});
 }
 
 
@@ -9875,6 +9960,11 @@ function killEnemy(e, byAlly){
     pop(e.x, e.y-0.5, 0, '#cfd6e4', '無傷');
     return;
   }
+  /* ---------- 二形態のボス ----------
+     第一形態を削り切っても死なない。第二形態へ変わって戦いが続く。
+     **e.dead を立てずに返すこと**で、この先の報酬・恩寵・中継地点・
+     撃破ログ・撃破演出を全部やり過ごす（＝倒した扱いは最後の形態だけ）。 */
+  if(e.form2){ bossChangeForm(e); return; }
   /* 精鋭の性質「裂ける」。倒すと小さいのが2体に分かれる。
      倒した瞬間に盤面が終わらないので、片付ける順番を考えさせられる。 */
   if(affOf(e,'split') && !e.wasSplit && S.run){
@@ -10320,9 +10410,13 @@ function bossRage(e){
     e.rage=true; e.teleMul=0.65; e.ms*=1.3;
     // 激昂で新しい技が解禁される。「速くなるだけ」の第2段階にしない。
     /* 激昂で開く技。名前つきのボスは個別に持っている
-       （持たせないと、10体が同じ第2段階になって作り分けた意味が消える）。 */
+       （持たせないと、10体が同じ第2段階になって作り分けた意味が消える）。
+       二形態のボスの第一形態だけは e.formRage（その形態ぶんの表）を先に見る
+       ——ヴェラの第一形態は「範囲攻撃を持たない」ことが形の定義なので、
+       激昂で落石（範囲）が開いてしまうと、その形が別物になる。 */
     const U = e.uniqueBoss ? uniqueBossAt(e.uniqueBoss) : null;
-    ((U ? U.rage : BOSS_RAGE_MOVES[e.tier])||[]).forEach(m=>{ if(!e.moves.includes(m)) e.moves.push(m); });
+    const rageMoves = e.formRage || (U ? U.rage : BOSS_RAGE_MOVES[e.tier]) || [];
+    rageMoves.forEach(m=>{ if(!e.moves.includes(m)) e.moves.push(m); });
     e.moveCd = Math.min(e.moveCd, 1.2);
     if(e.revealed) log(e.name+'が激昂した');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.5,max:0.5});

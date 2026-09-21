@@ -232,7 +232,9 @@ R.bossCleared = await pg.evaluate(()=>{
   hitEnemy(boss, stats(S.hero), 1);
   updateHUD();
   const shown=document.getElementById('bossbar').style.display==='block';
-  boss.hp=1; killEnemy(boss);
+  /* 二形態のボスなら、1回削り切っても帯は消えない（変身して戦いが続く）。
+     帯が消えるのは**最後の形態を倒したとき**なので、倒し切るまで回す。 */
+  while(!boss.dead){ boss.hp=1; killEnemy(boss); }
   updateHUD();
   const after=document.getElementById('bossbar').style.display==='block';
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;

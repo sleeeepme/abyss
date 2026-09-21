@@ -96,6 +96,14 @@ const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
      そこへ寄せる。 */
   const arrive = (sp, seed) => {
     S.bossClear = deep;                     // loadout より先に（段の判定が見る）
+    /* 大ボスの階（10/20/30/40）は、一度倒すと次からボスが湧かなくなる
+       （bossTierAt が greatDowned を見て null を返す）。この道具は同じ階へ
+       何度も入り直すので、**前の一戦の撃破記録が残っていると2回目以降が
+       空振りする**——`arrive` が null を返し、行が丸ごと落ちて表が空になる。
+       実際 --depth 10 は「①倒しきる」で倒した瞬間に記録が付き、
+       続く「②倒される」で湧かず、10F の行が1つも出ていなかった。
+       中ボスの階（5/15/…）は greatDowned を見ないので、5F だけは動いていた。 */
+    S.greatDown = {};
     S.salt = seed; S.runs = 0; S.upg = loadout(sp); S.deaths = 0;
     S.hero = newHero(); S.grave = null;
     startRun(depth); setScreen('game'); S.hero.party = [];
@@ -136,7 +144,10 @@ const rows = await pg.evaluate(({ spList, seeds, depth, rolls, deep }) => {
       W.enemies = [boss]; gridBuild();
       boss.atkV = 0;
       P.invuln = 1e9;
-      const bMax = boss.maxHp, st = stats(S.hero);
+      /* 二形態のボス（第10階層のヴェラ）は、到着時点の maxHp が第一形態ぶんしか
+         無い。表の「ボスHP」は削り切るまでに要る総量であってほしいので、
+         控えている第二形態ぶんを足して数える。 */
+      const bMax = boss.maxHp + (boss.form2 ? boss.form2.maxHp : 0), st = stats(S.hero);
       let t = 0;
       while (!boss.dead && t < 300) {
         const d = Math.hypot(boss.x - P.x, boss.y - P.y);

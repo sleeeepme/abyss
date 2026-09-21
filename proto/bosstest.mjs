@@ -270,10 +270,18 @@ R.drops = await pg.evaluate(()=>{
   S.hero=newHero(); startRun(10);
   const boss=W.enemies.find(e=>e.boss);
   W.drops=[];
+  /* 第10階層は二形態になった。1回削り切っただけでは変身するだけで、
+     落とし物は**最後の形態を倒したとき**に1回だけ出る。
+     ここで「変身の時点では何も落ちない」ことも一緒に見ておく
+     ——落ちてしまうと、形態のぶんだけ報酬が二度もらえることになる。 */
   boss.hp=1; killEnemy(boss);
+  const afterForm1=W.drops.length;
+  while(!boss.dead){ boss.hp=1; killEnemy(boss); }
   const n=W.drops.length;
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
-  return {dropped:n, expected:BOSS_STATS.great.drops, ok:n>=BOSS_STATS.great.drops};
+  return {dropped:n, expected:BOSS_STATS.great.drops, afterForm1,
+          nothingOnFormChange: afterForm1===0,
+          ok:n>=BOSS_STATS.great.drops && afterForm1===0};
 });
 
 /* --- 15. ラストボスは51階。50階の主（初めの供物）はそのまま大ボスとして残る。
@@ -668,6 +676,99 @@ R.greatBossDownSurvivesNewRun = await pg.evaluate(()=>{
   return {tier:S.run.bossTier, bosses:W.enemies.filter(e=>e.boss).length,
           stillGone: S.run.bossTier===null && W.enemies.filter(e=>e.boss).length===0,
           ok: S.run.bossTier===null && W.enemies.filter(e=>e.boss).length===0};
+});
+
+/* ============ 二形態のボス（第10階層・空引きのヴェラ） ============
+   ユーザー要望：「10階のボスを倒した後に第二形態に変身する。
+   第一形態は人型でMサイズ、範囲攻撃は使わず遠距離攻撃がメイン。
+   第二形態は今の状態」。
+
+   ここで守りたいのは3つ。
+     ・第一形態は**範囲攻撃を1つも持たない**（形の定義そのもの）
+     ・削り切っても**死なず**、報酬も撃破記録も出ない（出したら二度もらえる）
+     ・変身したら第二形態は**元の姿とまったく同じ値**に戻る */
+
+// 10-a. 第一形態：人型Mサイズ・間合いを取る型・範囲技なし
+R.formFirstShape = await pg.evaluate(()=>{
+  S.greatDown={}; S.hero=newHero(); startRun(10); enterFloor(10);
+  const e=W.enemies.find(x=>x.boss);
+  // 範囲で当てる技（円・扇・輪・落石）は1つも持っていないこと
+  const AOE=['slam','cleave','wave','pillars'];
+  const hasAoe = e.moves.some(m=>AOE.includes(m));
+  return {name:e.name, arch:e.arch.id, moves:e.moves.slice(), r:e.r, cr:e.cr,
+          keepsDistance: e.arch.keep>0,          // 間合いを取る（回り型）
+          shootsFromAfar: e.arch.range>3,        // 遠距離＝弾を撃つ側
+          noAoe: !hasAoe,
+          mSized: e.r>0.44 && e.r<0.85,          // 規格外(0.44)より大きく中ボス(0.85)より小さい
+          hasSecondForm: !!e.form2,
+          ok: e.arch.keep>0 && e.arch.range>3 && !hasAoe
+              && e.r>0.44 && e.r<0.85 && !!e.form2};
+});
+
+// 10-b. 削り切っても死なない。報酬も撃破記録も出ない
+R.formChangeGivesNoReward = await pg.evaluate(()=>{
+  S.greatDown={}; S.beacons=[]; S.greatKills=0; S.bossClear=0; S.bossBoon={};
+  S.hero=newHero(); startRun(10); enterFloor(10);
+  const e=W.enemies.find(x=>x.boss);
+  e.revealed=true;
+  const before={hp:e.maxHp, moves:e.moves.slice()};
+  e.hp=1; killEnemy(e);
+  return {before, after:{hp:e.maxHp, moves:e.moves.slice()},
+          survives: !e.dead,
+          refilled: e.hp===e.maxHp,
+          grew: e.maxHp>before.hp,
+          noGreatKill: (S.greatKills||0)===0,
+          noBeacon: (S.beacons||[]).length===0,
+          noBossClear: (S.bossClear||0)===0,
+          bossStillAlive: S.run.bossAlive!==false,
+          ok: !e.dead && e.hp===e.maxHp && (S.greatKills||0)===0
+              && (S.beacons||[]).length===0 && (S.bossClear||0)===0};
+});
+
+// 10-c. 第二形態は「今までのヴェラ」そのもの（技・大きさ・攻防が元に戻る）
+R.formSecondIsTheOldBoss = await pg.evaluate(()=>{
+  S.greatDown={}; S.hero=newHero(); startRun(10); enterFloor(10);
+  const e=W.enemies.find(x=>x.boss);
+  const stash=Object.assign({}, e.form2);       // 変身で戻るはずの値
+  e.hp=1; killEnemy(e);
+  const U=uniqueBossAt(10);
+  const same = e.r===stash.r && e.cr===stash.cr
+            && Math.abs(e.atkV-stash.atkV)<1e-6 && Math.abs(e.def-stash.def)<1e-6
+            && Math.abs(e.ms-stash.ms)<1e-6 && e.maxHp===stash.maxHp;
+  return {moves:e.moves.slice(), want:U.moves,
+          movesMatchTable: JSON.stringify(e.moves)===JSON.stringify(U.moves),
+          statsRestored: same,
+          rageReset: e.rage===false,
+          formConsumed: !e.form2,                // 二度は変身しない
+          ok: JSON.stringify(e.moves)===JSON.stringify(U.moves) && same
+              && e.rage===false && !e.form2};
+});
+
+// 10-d. 第一形態は激昂しても範囲技を開かない（形の定義が壊れない）
+R.formFirstRageStaysRanged = await pg.evaluate(()=>{
+  S.greatDown={}; S.hero=newHero(); startRun(10); enterFloor(10);
+  const e=W.enemies.find(x=>x.boss);
+  e.hp=Math.floor(e.maxHp*0.5);  bossRage(e);
+  const AOE=['slam','cleave','wave','pillars'];
+  return {raged:e.rage, moves:e.moves.slice(),
+          stillNoAoe: !e.moves.some(m=>AOE.includes(m)),
+          ok: e.rage===true && !e.moves.some(m=>AOE.includes(m))};
+});
+
+/* 10-e. 合計HPの配分。1形態だったころ（＝第二形態の素の値）に対して、
+        合計が 1.05 倍に収まっていること。増えたぶんは範囲攻撃を持たない
+        第一形態に乗っているので、長さは増えても危険度は据え置き。 */
+R.formHpBudget = await pg.evaluate(()=>{
+  S.greatDown={}; S.hero=newHero(); startRun(10); enterFloor(10);
+  const e=W.enemies.find(x=>x.boss);
+  const first=e.maxHp, second=e.form2.maxHp;
+  const base=second/BOSS_FORM_HP.second;        // 1形態だったころのHP
+  const ratio=(first+second)/base;
+  return {first, second, base:Math.round(base), ratio:+ratio.toFixed(3),
+          split:BOSS_FORM_HP,
+          firstIsShorter: first<second,          // 顔見せの方を短くする
+          withinBudget: Math.abs(ratio-1.05)<0.02,
+          ok: first<second && Math.abs(ratio-1.05)<0.02};
 });
 
 await b.close();

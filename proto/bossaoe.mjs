@@ -20,7 +20,13 @@ R.size = await pg.evaluate(()=>{
     RNG=mulberry32(d*7919);
     const fl=genFloor(d);
     const boss=spawnEnemies(fl,d).find(e=>e.boss);
-    out[tier]={r:boss.r, cr:boss.cr, tier:boss.tier};
+    /* 二形態のボス（第10階層のヴェラ）は、湧いた時点では**人型の第一形態**で
+       中ボスより小さい。ここで見たいのは階層ごとの「主役の大きさ」なので、
+       比べるのは戦いの本体＝最後の形態のほう。第一形態が小さいのは
+       意図した形（人だったころの姿）であって、段の逆転ではない。 */
+    const r  = boss.form2 ? boss.form2.r  : boss.r;
+    const cr = boss.form2 ? boss.form2.cr : boss.cr;
+    out[tier]={r, cr, tier:boss.tier, firstFormR: boss.form2 ? boss.r : null};
   });
   /* 比べる相手は**普通の階**から取る。10階ごとは大広間＝ボス戦だけの階になり、
      雑魚が1体も湧かない（比較用に湧かせ直すと、そのぶん主役がぼやける）。 */

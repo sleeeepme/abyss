@@ -269,7 +269,9 @@ R.beacon = await pg.evaluate(()=>{
   const deepOnly=unlockedDepths().slice();
   TH.floor(10);
   const boss=W.enemies.find(e=>e.boss);
-  boss.hp=1; killEnemy(boss);
+  /* 第10階層は二形態になった。1回削り切っただけでは変身するだけなので、
+     中継地点が開くのは**最後の形態を倒したとき**。倒し切るまで回す。 */
+  while(!boss.dead){ boss.hp=1; killEnemy(boss); }
   document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
   const after=unlockedDepths().slice();
   /* 同じ階に戻っても増えない。
