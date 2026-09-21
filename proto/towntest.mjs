@@ -320,8 +320,14 @@ R.departureMarch = await pg.evaluate(()=>{
   const stillTown = S.screen==='town';
   const noRunYet  = !S.run;
   const uiHidden  = el('hubui').classList.contains('hub-leaving');
-  const linedUp   = avas.length>0 && avas.every(b=>b.style.top==='52%');
-  return {n:avas.length, stillTown, noRunYet, uiHidden, linedUp,
+  /* 縦一列であること：left は全員そろって 50%、top は一人ずつ下へずれる。
+     横一列だと全員が同時に口へ着いてしまい「一斉に消えた」に見えるので、
+     **同じ列で前後に並んでいる**ことがこの演出の形そのもの。 */
+  const sameColumn = avas.length>0 && avas.every(b=>b.style.left==='50%');
+  const tops = avas.map(b=>parseFloat(b.style.top));
+  const stacked = tops.every((t,i)=> i===0 || t>tops[i-1]);   // 後ろの人ほど下
+  const linedUp = sameColumn && stacked;
+  return {n:avas.length, stillTown, noRunYet, uiHidden, tops, sameColumn, stacked, linedUp,
           ok: stillTown && noRunYet && uiHidden && linedUp};
 });
 await pg.waitForTimeout(1500);        // 整列＋行進が終わるころ

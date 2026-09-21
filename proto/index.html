@@ -5642,6 +5642,13 @@ const UNIQUE_BOSSES={
               atkMul:1.0,               // 矢は軽くない。範囲が無いぶん一発で払う
               defMul:0.75,              // まだ鎧ではない。顔見せを長引かせない
               msMul:1.05},              // 間合いを保てるだけの足
+       /* 第二形態の名。姿が石の魔物に変わるので、名前も変える
+          （ユーザー要望「〇〇の狩人、ヴェラのようなイメージ」）。
+          「凍てついた盾、オルト」と同じ 〈特徴、人名〉 の形——大ボス四体のうち
+          二体がこの形なので、世界の中では既にある書き方。
+          「礫」を選んだのは、第一形態の「空引き」と対になるから。
+          引くものが何も無かった者が、石そのものを射る者になる。 */
+       nm2:'礫の狩人、ヴェラ',
        line:'矢はとうに尽きている。それでも引く動作をやめない。'},
 
   15: {nm:'沼の大蛭',      reg:'現象体・二号／滞',   fam:'slime',  dt:'blunt',
@@ -6792,7 +6799,7 @@ function makeBoss(fl, depth, tier){
   e.hp=e.maxHp;
   /* 二形態のボスは、ここまでで組んだ姿を**第二形態**として控えに回し、
      第一形態の値で上書きする（applyBossFirstForm）。 */
-  if(U && U.form1) applyBossFirstForm(e, U.form1);
+  if(U && U.form1) applyBossFirstForm(e, U.form1, U.nm2);
   return e;
 }
 
@@ -6822,13 +6829,14 @@ const BOSS_FORM_HP = {first:0.30, second:0.75};
 const BOSS_FORM_PAUSE = 1.6;
 
 /* 第一形態の値を被せる。元の姿（＝第二形態）は e.form2 に控える。 */
-function applyBossFirstForm(e, spec){
+function applyBossFirstForm(e, spec, nm2){
   const baseHp = e.maxHp;
   // 控え：変身で戻す値だけを持つ。ここに無い物は変身しても変わらない
   e.form2 = {
     maxHp: Math.max(1, Math.round(baseHp*BOSS_FORM_HP.second)),
     arch:e.arch, moves:e.moves.slice(), r:e.r, cr:e.cr,
-    atkV:e.atkV, def:e.def, ms:e.ms
+    atkV:e.atkV, def:e.def, ms:e.ms,
+    nm:nm2 || null                 // 姿が変われば名前も変わる（無ければ据え置き）
   };
   const a = ARCH.find(x=>x.id===spec.arch) || e.arch;
   e.arch = a;                                   // 間合いを取って撃つ型にする
@@ -6857,13 +6865,59 @@ function bossChangeForm(e){
   e.atkV=f.atkV; e.def=f.def; e.ms=f.ms;
   e.maxHp=f.maxHp; e.hp=f.maxHp;
   e.formRage=null;
+  if(f.nm) e.name=f.nm;            // 石の魔物になる。名前もそこで変わる
   // 激昂はやり直し。第一形態で上げた速さは f.ms で戻っている
   e.rage=false; e.teleMul=1;
   e.cast=null; e.tele=0; e.moveCd=BOSS_FORM_PAUSE;
   e.hit=0.4;
   if(e.revealed) log(e.name+'——姿が変わった');
-  W.fx.push({t:'parry', x:e.x, y:e.y, life:0.9, max:0.9});
-  W.fx.push({t:'shock', x:e.x, y:e.y, r:3.2, life:0.55, max:0.55, col:e.col});
+  startBossFormFx(e);
+}
+
+/* ---------- 形態変化の見せ場 ----------
+   ユーザー要望：「ボスが形態変化する時に簡単な演出を入れたい。
+   一度戦闘を停止して、姿が変わったら咆哮のようなエフェクトを
+   入れてから戦闘再開させる。」
+
+   止め方に注意がいる。**pauseGame は使えない**——あれは窓（.modal）が
+   開いているあいだだけ止める仕掛けで、窓が無いと gamePaused() が
+   「止めている理由が消えた」と見なして自分で解除してしまう
+   （盤面が二度と動かなくなる事故を防ぐための作りなので、そちらが正しい）。
+
+   代わりに S.run.formFx を立て、update() の頭で**盤面の更新だけ**を飛ばす。
+   効果（W.fx）と演出の時間は進めるので、止まった盤面の上で咆哮だけが走る。 */
+const BOSS_FORM_FX = {roarAt:0.42, dur:1.5};
+function startBossFormFx(e){
+  if(!S.run) return;
+  S.run.formFx = {e, t:0, roared:false};
+  // 変わった瞬間。足元から石が起き上がる体で、内から外へ一度
+  W.fx.push({t:'shock', x:e.x, y:e.y, r:Math.max(1.2, e.r*1.6), life:0.45, max:0.45, col:e.col});
+  W.fx.push({t:'parry', x:e.x, y:e.y, life:0.5, max:0.5});
+  if(typeof feelKick==='function') feelKick(3.2, 0.25);
+}
+/* 咆哮。音は無いので（このビルドに音の仕組みが入っていない）、絵だけで鳴らす。
+   輪を三重にして外へ抜けさせ、画面を揺らし、塵を外向きに散らす。 */
+function bossFormRoar(e){
+  if(!e || e.dead) return;
+  [[2.2,0.55],[4.4,0.52],[7.0,0.50]].forEach(([r,life])=>{
+    W.fx.push({t:'shock', x:e.x, y:e.y, r, life, max:life, col:e.col});
+  });
+  if(typeof feelKick==='function') feelKick(7.5, 0.42);
+  if(typeof feelSpray==='function') feelSpray(e.x, e.y, e.col||'#cfd6e4', 46, 3.4);
+  if(e.revealed) showBanner(e.name, '石が起き上がった', e.col||'#cfd6e4', 2.4);
+}
+/* 止めているあいだ。true を返すと update() は盤面を触らずに戻る。 */
+function tickBossFormFx(dt){
+  const f = S.run && S.run.formFx;
+  if(!f) return false;
+  // 対象が盤面から消えていたら（階を移った等）、止めたままにしない
+  if(!f.e || f.e.dead || !W.enemies.includes(f.e)){ S.run.formFx=null; return false; }
+  f.t += dt;
+  W.fx = W.fx.filter(x=>{ x.life-=dt; return x.life>0; });
+  if(typeof updateFeel==='function') updateFeel(dt);
+  if(!f.roared && f.t>=BOSS_FORM_FX.roarAt){ f.roared=true; bossFormRoar(f.e); }
+  if(f.t>=BOSS_FORM_FX.dur) S.run.formFx=null;
+  return true;
 }
 
 
@@ -9307,6 +9361,60 @@ function resolveAllyOverlap(){
     }
   }
 }
+
+/* ---------- 敵も重ならない ----------
+   報告：「キャラクター同士が被ることがあって見づらい」
+
+   仲間には前から resolveAllyOverlap があったが、**敵には何も無かった**。
+   実測（敵10体＋仲間3人・14秒840フレーム）で重なっていた組は
+   敵×敵 104／敵×仲間 63。全フレームの 16.4% で誰かが誰かに重なっていて、
+   しかも**囲まれるほど重なる**——一番読みたい場面で一番読めなくなっていた。
+
+   やり方は仲間側と同じ。力で押し合うのではなく、**動かし終わったあとに
+   めり込んだぶんだけ位置を直す。** 力を強くして解こうとすると震える
+   （ALLY_SEP_PUSH のコメントに、その失敗が書いてある）。
+
+   動かさない側を決めておく。どちらも「押す側」にはなるが「押される側」には
+   ならない：
+     ・**主人公**。押されると操作が取られる
+     ・**ボス**。雑魚に押されて動くと近接が届かなくなるし、
+       的が逃げ回るのは戦いとして別物になる
+   間合いは半径から決めるが上限を付ける。ボスの半径（1.25）をそのまま使うと
+   体の周りに大きな空白の輪ができて、群がっている絵にならない。 */
+const ENEMY_GAP_MAX = 0.62;      // どれだけ体が大きくても、これ以上は空けない
+function sepGap(a,b){ return Math.min(ENEMY_GAP_MAX, ((a.r||0.3)+(b.r||0.3))*0.78); }
+/* 押される側か。飛びかかり・跳ねの最中は触らない——
+   軌道の途中で横へずらすと、狙った所に着地しない。 */
+function sepMovable(e){
+  return e && !e.dead && !e.boss && !e.pinned && !e.lunge && !e.hop && !e.fallAnim;
+}
+function resolveEnemyOverlap(){
+  if(!W.enemies || !W.enemies.length) return;
+  const allies=livingParty();
+  for(const e of W.enemies){
+    if(!sepMovable(e)) continue;
+    let px=0, py=0;
+    const push=(o)=>{
+      if(!o || o===e || o.dead) return;
+      const gap=sepGap(e,o);
+      let dx=e.x-o.x, dy=e.y-o.y, d=Math.hypot(dx,dy);
+      if(d>=gap) return;
+      if(d<1e-4){                      // 完全に重なったら座標から決めた向きへ逃がす
+        const t=(e.x*7.3+e.y*3.1); dx=Math.cos(t); dy=Math.sin(t); d=1;
+      }
+      /* 相手も動けるなら半分ずつ、動けない相手（主人公・ボス）なら自分が全部退く。
+         半分にしておかないと、両側が同じぶん直して行き過ぎ、次のフレームで
+         逆向きに直して——を繰り返して震える。 */
+      const need=(gap-d)*(sepMovable(o) ? 0.5 : 1);
+      px+=dx/d*need; py+=dy/d*need;
+    };
+    for(const o of nearEnemies(e.x, e.y, ENEMY_GAP_MAX+0.8)) push(o);
+    for(const a of allies) push(a);
+    push(P);
+    if(px||py) moveEnt(e, px, py);
+  }
+}
+
 
 /* ---------- 追いつき ----------
    重騎士や戦士はジョブ係数で素の移動速度が主人公より遅い。
@@ -12062,6 +12170,9 @@ function tickFallWatchdog(dt){
 }
 function update(dt){
   _drawStage='更新';
+  /* 形態変化の見せ場のあいだは、盤面を止めて演出だけ進める。
+     （tickBossFormFx の中で W.fx と演出時間だけを送っている） */
+  if(tickBossFormFx(dt)) return;
   updateFeel(dt);
   tickArtRename(dt);      // 閃きの演出が出切ったら名前の窓を開く
   tickFallWatchdog(dt);
@@ -12216,6 +12327,7 @@ function update(dt){
   tickPits(dt);                  // 根の層。縁の外に立っていたら落ちる
   if(!S.hero || !S.run) return;
   W.enemies.forEach(e=>enemyUpdate(e,dt));
+  resolveEnemyOverlap();          // 敵も、動かしたあとにめり込みだけ直す
   if(!S.hero || !S.run) return;   // このフレームで死亡した場合はここで抜ける
   // 弾（敵の弾と主人公の飛び道具）
   W.fx=W.fx.filter(f=>{
@@ -15735,7 +15847,14 @@ const HUB_INTRO_WALK_MS = 2100;      // 画面の下から広場まで歩く
 const HUB_LINEUP_MS     = 520;       // 門の手前に並ぶ
 const HUB_MARCH_MS      = 700;       // 階段を上って洞窟の口まで
 const HUB_VANISH_MS     = 380;       // 洞窟の口で消える
-const HUB_VANISH_GAP    = 110;       // ひとりずつ間を置いて消える
+/* 縦一列の並び（.hub-plaza に対する％）。先頭が一番上＝洞窟に近い側。
+   HUB_MARCH_GAP は次の一人が歩き出すまでの間。**消える時間（HUB_VANISH_MS）
+   より長く**しておくこと——短いと、前の一人がまだ消え切らないうちに次が
+   口へ着いて、そこで重なる。完全に順番待ちさせる（歩く時間ぶん空ける）と
+   4人で4秒を超えて、毎回潜るたびに待たされるほうが気になる。 */
+const HUB_COLUMN_TOP    = 46;
+const HUB_COLUMN_GAP    = 10;
+const HUB_MARCH_GAP     = 420;
 const HUB_DEPART_FADE   = 300;       // 暗転
 /* 洞窟の口の高さ（.hub-plaza に対する％）。**実測値。**
    以前は -18%（画面の外）まで歩かせていたが、階段を上り切った先は
@@ -15795,36 +15914,36 @@ function playHubDeparture(done){
   clearHubAnimTimers();
   stopHubWander();
   ui.classList.add('hub-leaving');   // ボタンを伏せる＝連打で二重に潜らせない
-  // 1. 門の手前へ横一列。間隔は人数で詰めて、3人でも画面からはみ出させない
-  const n=avas.length, span=Math.min(44, 15*n);
+  /* 1. 門へ向かう**縦一列**に並ぶ（ユーザー要望「縦に整列させて順番に消えて
+        いくように」）。横一列だと全員が同時に口へ着いてしまい、
+        「連れ立って入っていく」ではなく「一斉に消えた」に見えていた。
+        先頭が一番前＝洞窟に近い側。 */
+  const n=avas.length;
   avas.forEach((b,i)=>{
-    const x = n===1 ? 50 : 50-span/2 + span*(i/(n-1));
     b.style.transitionDuration=(HUB_LINEUP_MS/1000)+'s';
-    b.style.left=x+'%'; b.style.top='52%';
+    b.style.transitionDelay='';
+    b.style.left='50%';
+    b.style.top=(HUB_COLUMN_TOP + i*HUB_COLUMN_GAP)+'%';
     const wrap=b.querySelector('.hub-ava-wrap');
     if(wrap) wrap.style.transform='scaleX(1)';   // 並んだら全員おなじ向き
   });
-  // 2. 揃ってから、階段を上って洞窟の口へ。少しずつ遅らせて隊列のまま歩かせる
+  /* 2〜3. 先頭から順に、洞窟の口まで歩いて、着いたところで消える。
+     歩き出しをずらしてあるので、口の前で重なる瞬間が無い
+     ——前の一人が消えてから次が着く。 */
   const marchStart = HUB_LINEUP_MS+140;
-  hubAnimLater(()=>{
-    avas.forEach((b,i)=>{
-      b.style.transitionDuration=(HUB_MARCH_MS/1000)+'s';
-      b.style.transitionDelay=(i*80)+'ms';
-      b.style.top=HUB_CAVE_TOP+'%';
-    });
-  }, marchStart);
-  /* 3. 洞窟の口で**止まって**、そこから消える。
-        画面の外まで歩かせると、岩壁より上＝宙に浮いて見える（報告）。
-        先頭から順に消すので、隊列が1人ずつ洞窟に飲まれていくように見える。 */
-  const marchEnd = marchStart + HUB_MARCH_MS + (n-1)*80;
   avas.forEach((b,i)=>{
+    const go = marchStart + i*HUB_MARCH_GAP;
+    hubAnimLater(()=>{
+      b.style.transitionDuration=(HUB_MARCH_MS/1000)+'s';
+      b.style.top=HUB_CAVE_TOP+'%';
+    }, go);
     hubAnimLater(()=>{
       b.style.transition='opacity '+HUB_VANISH_MS+'ms ease';
       b.style.opacity='0';
-    }, marchEnd + i*HUB_VANISH_GAP);
+    }, go+HUB_MARCH_MS);
   });
   // 4. 最後のひとりが消えたら暗転。黒の向こう側が探索画面
-  const vanishEnd = marchEnd + (n-1)*HUB_VANISH_GAP + HUB_VANISH_MS;
+  const vanishEnd = marchStart + (n-1)*HUB_MARCH_GAP + HUB_MARCH_MS + HUB_VANISH_MS;
   hubAnimLater(()=>{
     fadeToBlack(HUB_DEPART_FADE, ()=>{
       ui.classList.remove('hub-leaving');

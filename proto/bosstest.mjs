@@ -735,13 +735,40 @@ R.formSecondIsTheOldBoss = await pg.evaluate(()=>{
   const same = e.r===stash.r && e.cr===stash.cr
             && Math.abs(e.atkV-stash.atkV)<1e-6 && Math.abs(e.def-stash.def)<1e-6
             && Math.abs(e.ms-stash.ms)<1e-6 && e.maxHp===stash.maxHp;
-  return {moves:e.moves.slice(), want:U.moves,
+  return {moves:e.moves.slice(), want:U.moves, name:e.name, firstName:U.nm, secondName:U.nm2,
           movesMatchTable: JSON.stringify(e.moves)===JSON.stringify(U.moves),
           statsRestored: same,
           rageReset: e.rage===false,
           formConsumed: !e.form2,                // 二度は変身しない
+          // 姿が石の魔物に変わるので、名前も変わる（〈特徴、人名〉の形）
+          renamed: e.name===U.nm2 && e.name!==U.nm,
           ok: JSON.stringify(e.moves)===JSON.stringify(U.moves) && same
-              && e.rage===false && !e.form2};
+              && e.rage===false && !e.form2 && e.name===U.nm2};
+});
+
+/* 10-f. 形態変化の見せ場。一度盤面を止めて、姿が変わったら咆哮を出し、
+        そのあと戦闘へ戻る（ユーザー要望）。
+        止め方に pauseGame は使えない——窓が無いと gamePaused() が自分で
+        解除してしまうので、S.run.formFx で update() の頭を止めている。 */
+R.formChangeFreezesThenRoars = await pg.evaluate(()=>{
+  S.greatDown={}; S.hero=newHero(); startRun(10); enterFloor(10);
+  if(typeof TH!=='undefined' && TH.immortal) TH.immortal();
+  const e=W.enemies.find(x=>x.boss); e.revealed=true;
+  e.hp=1; killEnemy(e);
+  const froze = !!S.run.formFx;
+  // 止まっているあいだ、主人公もボスも動かない
+  const px=P.x, py=P.y, ex=e.x, ey=e.y;
+  stepSim(0.3);
+  const heldStill = Math.abs(P.x-px)+Math.abs(P.y-py)<1e-6
+                 && Math.abs(e.x-ex)+Math.abs(e.y-ey)<1e-6;
+  const stillFrozen = !!S.run.formFx;
+  stepSim(0.4);                       // 咆哮の頃
+  const roared = !S.run.formFx || S.run.formFx.roared===true;
+  stepSim(1.4);                       // 明ける
+  const resumed = !S.run.formFx;
+  const stillAlive = !e.dead;
+  return {froze, heldStill, stillFrozen, roared, resumed, stillAlive,
+          ok: froze && heldStill && stillFrozen && roared && resumed && stillAlive};
 });
 
 // 10-d. 第一形態は激昂しても範囲技を開かない（形の定義が壊れない）
