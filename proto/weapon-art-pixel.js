@@ -2148,7 +2148,7 @@
     const a = o.ang, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, x = o.x, y = o.y, fr = Math.floor(t * 24);
     if (isStone(o)) {                                                                   // 礫：回りながら飛ぶ岩と砂の尾
       for (let k = 1; k <= 3; k++) px(x - ux * (3 + k * 3), y - uy * (3 + k * 3) + k, P.st2, 0.7 - k * 0.18);
-      rock(x, y, 3, fr >> 1, 1, 0.9);
+      rockBullet(x, y, a, 11, 3, fr >> 1, 1, 0.9);
       return;
     }
     for (let s = 0; s < 10; s++) px(x - ux * s, y - uy * s, s < 4 ? P.W : P.vg1, s < 7 ? 1 : 0.6);
@@ -2196,7 +2196,8 @@
     const pos = g => [sx + (o.x - sx) * g, sy - 10 + (o.y + 4 - sy + 10) * g - 70 * 4 * g * (1 - g)];
     for (let k = 1; k <= 3; k++) { const g = f - k * 0.06; if (g < 0) continue; const [x, y] = pos(g); px(x, y, P.st2, 0.8 - k * 0.2); px(x + 1, y + 1, P.st3, 0.6 - k * 0.15); }
     const [x, y] = pos(f);
-    rock(x, y, 5 + 2 * Math.sin(Math.PI * f), Math.floor(t * 10), 1, 1);
+    const [xa, ya] = pos(Math.max(0, f - 0.04)), [xb, yb] = pos(Math.min(1, f + 0.04));
+    rockBullet(x, y, Math.atan2(yb - ya, xb - xa), 15, 4.5, Math.floor(t * 12), 1, 1);   // 弧の向きに先を向ける
   }
   function bvRockHitGround(t, o) {
     if (t < 0 || t > 1.2) return;
@@ -2238,6 +2239,27 @@
       px(cx + dx, cy + dy, c, c === P.vg1 ? lv * rim : lv);
     }
   }
+  /* 岩の弾丸：後ろは丸く、先は尖る。向き ang に沿って伸びた岩。
+     芯に稜線（明るい筋）、先端に光、輪郭はごつごつ。spin は稜線の位置を回して「きりもみ」に見せる */
+  function rockBullet(cx, cy, ang, len, wid, spin = 0, lv = 1, rim = 0.8) {
+    const ux = Math.cos(ang), uy = Math.sin(ang), tail = len * 0.35, tip = len - tail, ext = Math.ceil(len) + 2;
+    cx = Math.round(cx); cy = Math.round(cy);
+    const ridge = Math.sin(spin * 1.3) * wid * 0.35;                                  // 回ると稜線が上下に動く
+    for (let dy = -ext; dy <= ext; dy++) for (let dx = -ext; dx <= ext; dx++) {
+      const u = dx * ux + dy * uy, v = -dx * uy + dy * ux;
+      if (u < -tail || u > tip) continue;
+      const seg = Math.floor((u + tail) / 2.5);
+      let w = u < 0 ? wid * Math.sqrt(Math.max(0, 1 - (u / tail) * (u / tail))) : wid * Math.pow(1 - u / tip, 0.85);
+      w *= 0.84 + 0.16 * hash(seg + (v > 0 ? 7 : 0), 1101 + (spin & 3));             // ごつごつ
+      if (Math.abs(v) > w) continue;
+      const edge = Math.abs(v) > w - 1, lit = (-dx * 0.6 - dy * 0.8) / Math.max(1, Math.hypot(dx, dy));
+      let c = Math.abs(v - ridge) < 0.8 ? P.st0 : lit > 0.35 ? P.st1 : lit > -0.35 ? P.st2 : P.st3;
+      if (edge) c = lit > 0.2 && rim ? P.vg1 : P.st4;
+      if (u > tip - 2.5) c = u > tip - 1.2 ? P.W : P.vg0;                             // 尖った先の光
+      if (((seg * 3 + Math.round(v) + spin) % 7) === 0 && !edge && u < tip - 3) c = P.st3;   // 割れ目
+      px(cx + dx, cy + dy, c, c === P.vg1 ? lv * rim : lv);
+    }
+  }
   /* 溜め：床から岩が浮き上がって周りを回り、前に構えた大岩へ寄り集まる */
   function rockChargeGround(t, o) {
     for (let k = 0; k < 6; k++) {                                                     // 岩が抜けた床の穴と土煙
@@ -2258,7 +2280,8 @@
       x += (hx - x) * gather; y += (hy - y) * gather;
       if (gather < 1) rock(x, y, 1.6 + hash(k, 1004) * 1.2, Math.floor(t * 8) + k, 1, 0.6);
     }
-    rock(hx, hy, 1.5 + 6.5 * clamp((p - 0.45) / 0.55), Math.floor(t * 6), 1, 1);
+    const g = clamp((p - 0.45) / 0.55);
+    if (g > 0) rockBullet(hx, hy, o.ang, 6 + 18 * g, 1.5 + 5.5 * g, Math.floor(t * 6), 1, 1);
     if (p > 0.8 && (Math.floor(t * 12) & 1)) plus(hx - 3, hy - 4, P.vg0, 1);
   }
   /* 貫き：大岩を投げる。回りながら帯をまっすぐ飛び、道の床を削り、小岩が後を追い、終わりで砕ける */
@@ -2285,12 +2308,12 @@
         const bx = x - ux * k * 5, by = y - uy * k * 5;
         px(bx + nx * 5, by + ny * 5, P.st2, 0.8 - k * 0.14); px(bx - nx * 5, by - ny * 5, P.st2, 0.8 - k * 0.14); px(bx, by + 6, P.vg2, 0.6 - k * 0.1);
       }
-      rock(x, y, 9, Math.floor(t * 30), 1, 1);
+      rockBullet(x, y, o.ang, 26, 8, Math.floor(t * 30), 1, 1);
     }
     for (let i = 0; i < 6; i++) {                                                     // 後を追う小岩（帯の幅の中）
       const g = clamp((t - 0.03 - i * 0.02) / BOULDER_T); if (g <= 0 || g >= 1) continue;
       const j = (hash(i, 1021) - 0.5) * Wd * 1.4, d = L * g;
-      rock(x0 + ux * d + nx * j, y0 + uy * d + ny * j + 6 * g, 1.8 + hash(i, 1022) * 1.2, Math.floor(t * 24) + i, 1, 0.5);
+      rockBullet(x0 + ux * d + nx * j, y0 + uy * d + ny * j + 6 * g, o.ang, 8 + hash(i, 1022) * 4, 2 + hash(i, 1023) * 1.2, Math.floor(t * 24) + i, 1, 0.5);
     }
     const b = t - BOULDER_T;
     if (b >= 0) bvRockHitAir(b, { x: x0 + ux * L, y: y0 + uy * L + 6 });
