@@ -42,7 +42,9 @@
     bw0: '#c8f0b8', bw1: '#7fc08a', bw2: '#3f7a4c',                                   // 弓の緑
     hl0: '#e8ffe0', hl1: '#9ff0b0', hl2: '#4fc07a', hl3: '#2a6a48',                   // 癒し
     ho0: '#fff6d0', ho1: '#e8d9a0', ho2: '#c0a050', ho3: '#7a6030',                   // 聖（戦鎚）
-    du0: '#8b8672', du1: '#5f5b4c', du2: '#3d3a30'                                    // 土煙
+    du0: '#8b8672', du1: '#5f5b4c', du2: '#3d3a30',                                   // 土煙
+    ag0: '#e0f0ff', ag1: '#8fc7ff', ag2: '#4a7fc0', ag3: '#26406a',                   // 鉄壁の青
+    lf0: '#f0ffd0', lf1: '#c8e880', lf2: '#8ab848', lf3: '#4a6a28', lf4: '#ffc8e0'    // 生気の若葉（＋花）
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -61,7 +63,9 @@
     holy: [P.W, P.ho0, P.ho1, P.ho2, P.ho3],
     dust: [P.du0, P.du1, P.du2],
     wood: [P.wd0, P.wd1, P.wd2],
-    bow: [P.W, P.bw0, P.bw1, P.bw2]
+    bow: [P.W, P.bw0, P.bw1, P.bw2],
+    aegis: [P.W, P.ag0, P.ag1, P.ag2, P.ag3],
+    leaf: [P.W, P.lf0, P.lf1, P.lf2, P.lf3]
   };
   const rampAt = (r, f) => r[f <= 0 ? 0 : f >= 1 ? r.length - 1 : Math.floor(f * r.length)];
 
@@ -75,7 +79,9 @@
     shock:  ['#3b3a26', '#48462c', '#5e5a36', '#2b2a1c'],
     heal:   ['#24403a', '#2a4c42', '#386656', '#1c3129'],
     holy:   ['#3a3a2a', '#464430', '#5e5a3c', '#2a2a1e'],
-    steel:  ['#2a3a3c', '#304446', '#3e5858', '#1e2c2c']
+    steel:  ['#2a3a3c', '#304446', '#3e5858', '#1e2c2c'],
+    aegis:  ['#243650', '#2a405e', '#34507a', '#1c2a40'],
+    bloom:  ['#2c3e24', '#34492a', '#445e34', '#20301c']
   };
   const LIT_MAP = {};
   for (const k in LIT) {
@@ -168,9 +174,9 @@
   /* 床の照り返し（見本では床の色だけを差し替える。実機では床が別なので薄いディザで代用） */
   function lightPool(cx, cy, r, level, tint) {
     if (level <= 0 || r <= 0) return;
-    const m = LIT_MAP[tint], ri = Math.ceil(r);
-    for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
-      const d = Math.sqrt(dx * dx + dy * dy) / r; if (d > 1) continue;
+    const m = LIT_MAP[tint], ri = Math.ceil(r), rj = Math.ceil(r * 0.62);      // 床なので上下につぶす
+    for (let dy = -rj; dy <= rj; dy++) for (let dx = -ri; dx <= ri; dx++) {
+      const d = Math.sqrt(dx * dx + (dy / 0.62) * (dy / 0.62)) / r; if (d > 1) continue;
       const lv = clamp(level * 1.7 * (1 - d * d));
       const X = Math.round(cx + dx + SX), Y = Math.round(cy + dy + SY);
       if (X < 0 || Y < 0 || X >= CUR.w || Y >= CUR.h || !dith(X, Y, lv)) continue;
@@ -225,6 +231,14 @@
             '.....bdb.bdb.f..', '.....bb..bb.....', '................', '................'],
       pal: { a: '#dae5b3', b: '#1e222d', c: '#58855f', d: '#56352a', e: '#7fc08a', f: '#b87740', g: '#d3b282', h: '#18202a', i: '#e5c79b', j: '#dad2b6', k: '#ffffff', l: '#965b39' },
       staff: () => false, gem: [12, 8], outline: 'b'
+    },
+    priest: {
+      map: ['................', '................', '.....aaaa.......', '....abbbba...c..', '...abddddda.cec.', '...abdfghgha.c..',
+            '...abdfhhhha.c..', '....aadddaa.ac..', '..aaabddbaahhc..', '..abbbddbbaa.c..', '..abbbiibba..c..', '..abbbibbbba.c..',
+            '..abbbibbbba.c..', '..aaaaaaaaaa.c..', '................', '................'],
+      pal: { a: '#1f2843', b: '#454a68', c: '#cd8e38', d: '#f2e8d0', e: '#f2c14e', f: '#e6c593', g: '#3a405c', h: '#e8d6ba', i: '#7fe0c0' },
+      staff: (x, y) => (x === 13 && y >= 3 && y <= 13) || ((x === 12 || x === 14) && y === 4),
+      gem: [13, 4], outline: 'a'
     },
     moss: {
       map: ['................', '................', '......aaaa......', '.....abbbba.....', '.....acbbcba....', '....abcdccca....',
@@ -332,7 +346,8 @@
      t = 発動からの秒（負なら溜め中）、hold = 出している長さ、elem = 色の組 */
   const CIRCLE_COL = {
     arcane: [P.ar1, P.cy1, P.ar3, P.cy0], fire: [P.fi2, P.fi1, P.fi4, P.fi0], frost: [P.fr2, P.fr1, P.fr4, P.fr0],
-    shock: [P.sh2, P.sh1, P.sh4, P.sh0], heal: [P.hl2, P.hl1, P.hl3, P.hl0], holy: [P.ho1, P.ho0, P.ho3, P.W]
+    shock: [P.sh2, P.sh1, P.sh4, P.sh0], heal: [P.hl2, P.hl1, P.hl3, P.hl0], holy: [P.ho1, P.ho0, P.ho3, P.W],
+    aegis: [P.ag1, P.ag0, P.ag3, P.W], bloom: [P.lf2, P.lf1, P.lf3, P.lf4]
   };
   const GLYPH = [[1, 1, 0, 1], [0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 1, 0]];   // 2x2 の文字片
   function magicCircle(cx, cy, t, hold, elem, size = 1, chargeDur = 0.3) {
@@ -1372,6 +1387,415 @@
   }
 
   /* ============================================================
+     通常攻撃（武器7系統）・ヒット（属性5種）・弾（矢・魔弾）
+     実機では 1秒に何十回も出るので、軽く・短く・読みやすく。
+     ============================================================ */
+  const ELEM = {
+    neutral: { cols: [P.W, P.fr0, P.fl0], ramp: RAMP.steel, acc: P.ac0, tint: 'steel' },
+    fire:    { cols: [P.fi0, P.fi2, P.fi4], ramp: RAMP.fire, acc: P.fi1, tint: 'fire' },
+    shock:   { cols: [P.W, P.sh1, P.sh3], ramp: RAMP.shock, acc: P.sh0, tint: 'shock' },
+    frost:   { cols: [P.W, P.fr1, P.fr3], ramp: RAMP.frost, acc: P.fr0, tint: 'frost' },
+    arcane:  { cols: [P.W, P.ar1, P.ar3], ramp: RAMP.arcane, acc: P.ar0, tint: 'arcane' }
+  };
+  const elemOf = o => ELEM[o.elem] || ELEM.neutral;
+
+  /* ---------- 振り（武器ごとの形） ---------- */
+  function swingAir(t, o) {
+    const E = elemOf(o), [bx, by] = body(o), [ux, uy] = dirv(o), R = Math.max(14, o.R), a = o.ang, k = o.kind || 'swordaxe';
+    if (k === 'swordaxe') slash(bx, by, R * 0.8, a - 1.0, a + 0.95, 4, 0.78, E.cols, t, 0.2, 501);
+    else if (k === 'greatsword') { slash(bx, by, R * 0.85, a - 1.35, a + 1.2, 6, 0.78, E.cols, t, 0.26, 502); }
+    else if (k === 'dagger') {
+      const cx = bx + ux * 8, cy = by + uy * 8;
+      slash(cx, cy, 10, a - 2.2, a + 0.3, 2, 0.8, E.cols, t, 0.11, 503);
+      slash(cx, cy, 10, a + 2.2, a - 0.3, 2, 0.8, E.cols, t - 0.07, 0.11, 504);
+    } else if (k === 'hammer') {
+      const sg = ux >= 0 ? 1 : -1, hx = bx + ux * R * 0.75, hy = by + uy * R * 0.75 + 4;
+      slash(bx + sg * 3, by - 2, 11, -Math.PI / 2 - sg * 0.5, Math.atan2(hy - by, hx - bx), 5, 0.9, E.cols, t, 0.12, 505);
+      spark(hx, hy - 2, t - 0.07, E.ramp, 506, 6, 1);
+    } else if (k === 'spear') {
+      if (t < 0 || t > 0.22) return;
+      const ext = R * easeOut(clamp(q24(t) / 0.06)), cut = t < 0.1 ? 0 : clamp((t - 0.1) / 0.12) * ext, nx = -uy, ny = ux;
+      for (let s = Math.round(cut); s <= ext; s++) {
+        const x = bx + ux * s, y = by + uy * s;
+        px(x, y, E.cols[0]); if (s > ext * 0.3 && t < 0.12) { px(x + nx, y + ny, E.cols[1]); px(x - nx, y - ny, E.cols[2]); }
+      }
+      if (ext > cut) plus(bx + ux * ext, by + uy * ext, E.cols[0], t < 0.08 ? 2 : 1);
+    } else if (k === 'bow') {
+      if (t >= 0 && t < 0.1) { plus(bx + ux * 5, by + uy * 5, P.W, t < 0.05 ? 2 : 1); speedLines(bx, by, bx - ux * 10, by - uy * 10, t, 0.1, 2, 507, [P.bw0, P.bw1, P.bw0]); }
+    } else if (k === 'magicbolt') {
+      if (t >= 0 && t < 0.14) { const hx = bx + ux * 6, hy = by + uy * 6 - 2; ellRing(hx, hy, 2 + t * 30, 1 + t * 14, E.cols[1], 1 - t / 0.14); plus(hx, hy, E.cols[0], t < 0.06 ? 2 : 1); }
+    }
+  }
+  function swingGround(t, o) {
+    const k = o.kind || 'swordaxe', [ux, uy] = dirv(o), R = Math.max(14, o.R);
+    if (k === 'hammer') {
+      const hx = o.x + ux * R * 0.75, hy = o.y + uy * R * 0.75;
+      groundRing(hx, hy, t - 0.07, 9, 0.22, elemOf(o).ramp, 0.45);
+      cracks(hx, hy, t - 0.07, 4, 6, 511, 0.06, 0.5, P.W, P.fl1);
+    }
+    if (k === 'greatsword') dust(o.x + ux * R * 0.7, o.y + uy * R * 0.7, t - 0.12, 3, 512, 5, 0.3);
+  }
+
+  /* ---------- 当たり（属性ごと） ---------- */
+  function hitAir(t, o) {
+    if (t < 0 || t > 0.5) return;
+    const E = elemOf(o), x = o.x, y = o.y, big = o.target === 'ally' ? 0.7 : 1, e = o.elem || 'neutral', fr = Math.floor(t * 24);
+    spark(x, y, t, E.ramp, 520 + (o.seed || 0), e === 'neutral' ? 7 : 5, big);
+    if (e === 'fire' && t < 0.42) for (let i = 0; i < 3; i++) {
+      const b = t - i * 0.04; if (b < 0) continue; const f = b / 0.38;
+      if (f < 1) flamePuff(x + (i - 1) * 3 * big, y - f * 9 * big, f < 0.4 ? 2 : 1, Math.min(5, Math.floor(f * 6)), (fr + i) % 3 - 1);
+    }
+    if (e === 'shock' && t < 0.2) for (let i = 0; i < 3; i++) {
+      const a = i * TAU / 3 + (fr & 1) * 0.5, L = (7 + (fr & 1) * 2) * big;
+      const mx = x + Math.cos(a) * L * 0.5 + (hash(i, fr) - 0.5) * 3, my = y + Math.sin(a) * L * 0.5 + (hash(i + 3, fr) - 0.5) * 3;
+      line(x, y, mx, my, P.sh0); line(mx, my, x + Math.cos(a) * L, y + Math.sin(a) * L, P.sh1);
+    }
+    if (e === 'frost' && t < 0.35) {
+      ellRing(x, y, (3 + t * 22) * big, (2 + t * 10) * big, t < 0.12 ? P.fr0 : P.fr2, 1 - t / 0.35);
+      for (let i = 0; i < 5; i++) {
+        const a = i * TAU / 5 + 0.3, d = (3 + t * 40) * big, sx = x + Math.cos(a) * d, sy = y + Math.sin(a) * d * 0.7 + t * t * 60;
+        px(sx, sy - 1, P.W); px(sx, sy, P.fr1); px(sx, sy + 1, P.fr3);
+      }
+    }
+    if (e === 'arcane' && t < 0.4) {
+      ring(x, y, (2 + t * 26) * big, rampAt(RAMP.arcane, t / 0.4), 1 - t / 0.4);
+      for (let i = 0; i < 4; i++) { const g = GLYPH[i], gx = Math.round(x + (i - 1.5) * 4 * big), gy = Math.round(y - t * 22 - (i & 1) * 2);
+        for (let k = 0; k < 4; k++) if (g[k]) px(gx + (k & 1), gy + (k >> 1), i & 1 ? P.ar1 : P.cy1, 1 - t / 0.4); }
+    }
+  }
+
+  /* ---------- 弾（その場の位置に描く。age は揺らぎだけに使う） ---------- */
+  function shotAirN(t, o) {
+    const E = elemOf(o), x = o.x, y = o.y, a = o.ang, ux = Math.cos(a), uy = Math.sin(a), fr = Math.floor(t * 24);
+    if (o.kind === 'arrow') {
+      drawArrow(x, y, a, 1, o.elem === 'fire');
+      if (o.elem && o.elem !== 'neutral') plus(x, y, E.acc, 1);
+      for (let k = 1; k <= 3; k++) px(x - ux * (8 + k * 3), y - uy * (8 + k * 3), k === 1 ? P.bw0 : P.bw1, 1 - k / 4);
+      return;
+    }
+    // 魔弾：芯＋属性色の輪＋うねる尾
+    for (let k = 7; k >= 1; k--) {
+      const wob = ((fr + k) & 1) ? 1 : -1, sx = x - ux * k * 1.6 - uy * wob * (k > 3 ? 1 : 0), sy = y - uy * k * 1.6 + ux * wob * (k > 3 ? 1 : 0);
+      px(sx, sy, rampAt(E.ramp, k / 8), 1 - k / 9);
+    }
+    disc(x, y, 1, E.cols[1]); plus(x, y, E.cols[0], (fr & 1) ? 2 : 1); px(x, y, P.W);
+  }
+
+  /* ============================================================
+     大技（主人公8種）・仲間の大技（Lv.50）・スキル技・効いている間の足元の輪
+     支える技は「本人の足元の魔法陣」と「仲間ひとりずつに乗る印（*_on）」に分けて描く。
+     実機では仲間ごとに *_on を積み、その仲間に付いて動かす。
+     ============================================================ */
+  const onEach = (o, t, fn) => (o.allies || []).forEach(([x, y], i) => fn(t - 0.1 - i * 0.05, { x, y }));
+
+  /* ---------- 大技：震撼（周囲を叩き割る） ---------- */
+  function uQuakeGround(t, o) {
+    const R = o.R;
+    groundRing(o.x, o.y, t, R, 0.36, RAMP.holy, 0.5);
+    groundRing(o.x, o.y, t - 0.1, R * 0.7, 0.32, RAMP.dust, 0.5);
+    cracks(o.x, o.y, t, 10, R * 0.55, 601, 0.12, 1.1, P.ho0, P.ho2);
+    for (let i = 0; i < 12; i++) { const a = i * TAU / 12 + 0.2; dust(o.x + Math.cos(a) * R * 0.85, o.y + Math.sin(a) * R * 0.42, t - 0.2, 1, 602 + i, 4, 0.4); }
+    if (t >= 0 && t < 0.7) lightPool(o.x, o.y, R * 0.9, t < 0.1 ? 0.9 : 0.4, 'holy');
+  }
+  function uQuakeAir(t, o) {
+    const R = o.R, [bx, by] = body(o);
+    if (t >= 0 && t < 0.1) { plus(bx, o.y - 2, P.W, 5); disc(bx, o.y - 2, 2, P.ho0); }
+    for (let i = 0; i < 14; i++) {                         // 輪が通った所から岩が突き出して沈む
+      const a = hash(i, 611) * TAU, r = R * (0.4 + 0.55 * hash(i, 612)), ts = 0.36 * (1 - Math.sqrt(Math.max(0, 1 - r / R))), b = t - ts;
+      if (b < 0 || b > 0.45) continue;
+      const x = Math.round(o.x + Math.cos(a) * r), y = Math.round(o.y + Math.sin(a) * r * 0.5), h = 4 + hash(i, 613) * 4;
+      const g = b < 1 / 12 ? 0.5 : b < 0.25 ? 1 : 1 - (b - 0.25) / 0.2;
+      if (g > 0) rockSpike(x, y, h * g, 2);
+      if (b > 0.02 && b < 0.3) px(x + (hash(i, 614) - 0.5) * 12 * b * 6, y - h - b * 40 + b * b * 200, P.st1);
+    }
+  }
+
+  /* ---------- 大技：瞬歩（走り抜けた線が光る） ---------- */
+  const BLINK_T = 0.28;
+  function uBlinkGround(t, o) {
+    const [ux, uy] = dirv(o), L = o.R;
+    dust(o.x, o.y, t, 6, 621, 8, 0.4); dust(o.x + ux * L, o.y + uy * L, t - BLINK_T, 5, 622, 8, 0.4);
+    if (t >= 0 && t < 0.6) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.55, 0.4 * (1 - t / 0.6), 'frost');
+  }
+  function uBlinkAir(t, o) {
+    if (t < 0 || t > 0.8) return;
+    const [ux, uy] = dirv(o), [bx, by] = body(o), L = o.R, nx = -uy, ny = ux, d = L * easeOut(clamp(t / BLINK_T));
+    for (let s = 0; s <= d; s++) {
+      const as = t - BLINK_T * (1 - Math.sqrt(Math.max(0, 1 - s / L))); if (as > 0.45) continue;
+      const x = bx + ux * s, y = by + uy * s, lv = as < 0.15 ? 1 : 1 - (as - 0.15) / 0.3;
+      px(x, y, as < 0.08 ? P.W : as < 0.2 ? P.fr1 : P.fl1, lv);
+      if (as < 0.18) { px(x + nx, y + ny, P.cy1, lv); px(x - nx, y - ny, P.fr2, lv); }
+      if (as < 0.1 && (s % 4) === 0) { px(x + nx * 2, y + ny * 2, P.fr0); px(x - nx * 2, y - ny * 2, P.fr0); }
+    }
+    speedLines(bx, by, bx + ux * L, by + uy * L, t, BLINK_T + 0.1, 5, 623, [P.W, P.cy0, P.fr1]);
+    const b = t - BLINK_T;
+    if (b >= 0 && b < 0.3) { const ex = bx + ux * L, ey = by + uy * L; ellRing(ex, ey + 6, 3 + b * 50, 1 + b * 22, b < 0.1 ? P.W : P.cy1, 1 - b / 0.3); if (b < 0.08) plus(ex, ey, P.W, 3); }
+  }
+
+  /* ---------- 大技：業火（前方へ炎の柱） ---------- */
+  function uBlazeGround(t, o) {
+    magicCircle(o.x, o.y + 1, t, 0.7, 'fire', 1.3, o.charge || 0);
+    const [ux, uy] = dirv(o), L = o.R;
+    if (t >= 0 && t < 1.0) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.5, 0.6 * (1 - t), 'fire');
+    for (let s = 8; s < L; s += 3) {
+      const b = t - 0.25 * (s / L); if (b < 0 || b > 0.9) continue;
+      const j = (hash(s, 631) * 2 - 1) * o.wide * 0.8;
+      px(o.x + ux * s - uy * j, o.y + uy * s + ux * j, b < 0.3 ? P.fi3 : P.fi5, b < 0.5 ? 1 : 1 - (b - 0.5) / 0.4);
+    }
+  }
+  function uBlazeAir(t, o) {
+    if (t < 0) return;
+    const [ux, uy] = dirv(o), [bx, by] = body(o), L = o.R, fr = Math.floor(t * 12);
+    if (t < 0.12) { disc(bx + ux * 6, by + uy * 6, 3 - t * 16, P.fi0); plus(bx + ux * 6, by + uy * 6, P.fi1, 3); }
+    for (let s = 6; s < L; s += 5) {
+      const b = t - 0.25 * (s / L); if (b < 0 || b > 0.6) continue;
+      for (let lane = 0; lane < 2; lane++) {
+        const j = (hash(s * 3 + lane, 632) * 2 - 1) * o.wide * 0.7, f = b / 0.6, ci = Math.min(5, 1 + Math.floor(f * 5));
+        flamePuff(bx + ux * s - uy * j, by + uy * s + ux * j - b * 16, f < 0.35 ? 2 : 1, ci, (fr + s + lane) % 3 - 1);
+      }
+      if (b < 0.12) { px(bx + ux * s, by + uy * s, P.W); px(bx + ux * (s + 2), by + uy * (s + 2), P.fi0); }
+    }
+    for (let i = 0; i < 10; i++) {                                     // 舞い上がる火の粉
+      const t0 = hash(i, 633) * 0.6, a = t - t0; if (a < 0 || a > 0.6) continue;
+      const s = L * hash(i, 634); px(bx + ux * s + (hash(i, 635) - 0.5) * o.wide, by + uy * s - a * 30, rampAt(RAMP.fire, a / 0.6));
+    }
+  }
+
+  /* ---------- 大技：守護・鉄壁・号令・生気（支える4つ） ---------- */
+  function wardOn(t, p) {                                                  // 守護：体を覆う半球（上から閉じる）＋ 状態異常のかけらが剥がれ落ちる
+    if (t < 0 || t > 0.9) return;
+    const grow = clamp(t / 0.15), lv = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.3, fr = Math.floor(t * 12), rx = 10, ry = 14;
+    ellRing(p.x, p.y + 1, rx, 4, t < 0.12 ? P.W : P.hl1, lv);
+    const n = 22;
+    for (let i = 0; i <= n; i++) {
+      const a = Math.PI + (i / n) * Math.PI; if (i / n > grow && 1 - i / n > grow) continue;
+      const x = p.x + Math.cos(a) * rx, y = p.y + 1 + Math.sin(a) * ry;
+      if (((i + fr) % 3) !== 0 || t < 0.2) px(x, y, t < 0.15 ? P.W : (i & 1) ? P.hl0 : P.hl1, lv);
+    }
+    if (t < 0.15) plus(p.x, p.y + 1 - ry, P.W, 2);
+    for (let i = 0; i < 4; i++) {                                        // 剥がれ落ちる黒いかけら
+      const b = t - 0.1 - i * 0.05; if (b < 0 || b > 0.4) continue;
+      const x = p.x + (hash(i, 642) - 0.5) * 14 + (i & 1 ? 1 : -1) * b * 20, y = p.y - 8 + b * b * 90;
+      px(x, y, P.ink, 1 - b / 0.4); px(x + 1, y, P.sm0, 1 - b / 0.4);
+    }
+  }
+  function aegisOn(t, p) {
+    if (t < 0 || t > 1.0) return;
+    const grow = t < 1 / 12 ? 0.6 : 1, lv = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3, flash = t >= 0.06 && t < 0.14, fr = Math.floor(t * 12);
+    ellRing(p.x, p.y - 5, Math.round(9 * grow), Math.round(11 * grow), flash ? P.W : P.ag1, lv);
+    ellRing(p.x, p.y - 5, Math.round(8 * grow), Math.round(10 * grow), P.ag3, lv * 0.5);
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + fr * 0.4; if ((fr + i) & 1) px(p.x + Math.cos(a) * 9, p.y - 5 + Math.sin(a) * 11, P.W, lv); }
+  }
+  function rallyOn(t, p) {
+    if (t < 0 || t > 0.9) return;
+    for (let i = 0; i < 4; i++) { const b = t - i * 0.07; if (b < 0 || b > 0.7) continue; healCross(p.x + (hash(i, 641) - 0.5) * 12, p.y - 6 - b * 20, b < 0.25 ? P.hl0 : P.hl1, 1 - b / 0.7); }
+    if (t < 0.12) plus(p.x, p.y - 6, P.W, 2);
+  }
+  function bloomOn(t, p) {
+    if (t < 0 || t > 1.0) return;
+    for (let i = 0; i < 4; i++) {
+      const b = t - i * 0.06; if (b < 0 || b > 0.8) continue;
+      const a = i * TAU / 4 + b * 7, r = 7 - b * 4, x = p.x + Math.cos(a) * r, y = p.y - 2 - b * 18 + Math.sin(a) * r * 0.4;
+      px(x, y, P.lf1, 1 - b / 0.8); px(x + 1, y, P.lf2, 1 - b / 0.8); px(x, y - 1, i & 1 ? P.lf4 : P.lf0, 1 - b / 0.8);
+    }
+  }
+  function supportGround(elem, ramp, R) {
+    return (t, o) => {
+      magicCircle(o.x, o.y + 1, t, 0.8, elem, 1.5, o.charge || 0);
+      groundRing(o.x, o.y, t - 0.05, R != null ? R : o.R, 0.45, ramp, 0.5);
+    };
+  }
+  const uWardGround = supportGround('heal', RAMP.heal), uAegisGround = supportGround('aegis', RAMP.aegis),
+        uRallyGround = supportGround('heal', RAMP.heal), uBloomGround = supportGround('bloom', RAMP.leaf);
+  function uWardAir(t, o) { wardOn(t, o); onEach(o, t, wardOn); }
+  function uAegisAir(t, o) { aegisOn(t, o); onEach(o, t, aegisOn); }
+  function uRallyAir(t, o) {
+    if (t >= 0 && t < 0.6) {                                             // 頭上の大きな十字
+      const b = t, y = o.y - 22 - b * 10, lv = b < 0.4 ? 1 : 1 - (b - 0.4) / 0.2, c = b < 0.1 ? P.W : P.hl1;
+      for (let k = -3; k <= 3; k++) { px(o.x + k, y, c, lv); px(o.x, y + k, c, lv); }
+      px(o.x, y, P.W, lv);
+    }
+    rallyOn(t, o); onEach(o, t, rallyOn);
+  }
+  function uBloomAir(t, o) {
+    if (t >= 0 && t < 0.9) for (let i = 0; i < 10; i++) {                 // 渦を巻いて昇る葉
+      const b = t - i * 0.04; if (b < 0 || b > 0.7) continue;
+      const a = i * TAU / 10 + b * 6, r = 12 - b * 8, x = o.x + Math.cos(a) * r, y = o.y - 3 - b * 26 + Math.sin(a) * r * 0.4;
+      px(x, y, P.lf1); px(x + 1, y, P.lf2); if (i % 3 === 0) px(x, y - 1, P.lf4);
+    }
+    bloomOn(t, o); onEach(o, t, bloomOn);
+  }
+
+  /* ---------- 大技：崩落（画面内の敵それぞれへ紫の雷） ---------- */
+  function uRuinGround(t, o) {
+    magicCircle(o.x, o.y + 1, t, 0.6, 'arcane', 1.6, o.charge || 0);
+    if (t >= 0 && t < 0.25) ellRing(o.x, o.y, 20 + t * 200, (20 + t * 200) * 0.5, t < 0.08 ? P.ar0 : P.ar2, 0.6 * (1 - t / 0.25));
+    (o.targets || []).forEach(([x, y], i) => ruinHitGround(t - 0.1 - i * 0.05, { x, y }));
+  }
+  function uRuinAir(t, o) {
+    const [bx, by] = body(o);
+    if (t >= 0 && t < 0.14) { const top = o.skyY != null ? o.skyY : 0; line(bx, by - 8, bx, top, P.W); line(bx - 1, by - 8, bx - 1, top, P.ar1, 0.8); line(bx + 1, by - 8, bx + 1, top, P.ar1, 0.8); plus(bx, by - 8, P.W, 3); }
+    (o.targets || []).forEach(([x, y], i) => ruinHitAir(t - 0.1 - i * 0.05, { x, y, skyY: o.skyY }));
+  }
+  function ruinHitGround(t, o) {
+    if (t < 0 || t > 0.8) return;
+    groundRing(o.x, o.y, t, 16, 0.3, RAMP.arcane, 0.5);
+    cracks(o.x, o.y, t, 5, 8, 651, 0.1, 0.8, P.ar0, P.ar2);
+    if (t < 0.2) lightPool(o.x, o.y, 16, t < 0.08 ? 0.9 : 0.4, 'arcane');
+  }
+  function ruinHitAir(t, o) {
+    if (t < 0 || t > 0.5) return;
+    const top = o.skyY != null ? o.skyY : o.y - 80, x = o.x, y = o.y - 6;
+    if (t < 0.12) boltPath(x, y, top, Math.round(x * 13 + y), Math.floor(t * 24) & 1, (a, c, d, e) => { line(a, c, d, e, t < 0.05 ? P.W : P.ar0); line(a + 1, c, d + 1, e, P.ar1); });
+    spark(x, y, t, RAMP.arcane, 652, 8, 1.1);
+    if (t < 0.3) ring(x, y, 2 + t * 30, rampAt(RAMP.arcane, t / 0.3), 1 - t / 0.3);
+  }
+
+  /* ============ 仲間の大技（Lv.50） ============ */
+  function aSpinGround(t, o) { groundRing(o.x, o.y, t - 0.06, o.R, 0.34, RAMP.dust, 0.5); cracks(o.x, o.y, t - 0.04, 6, 8, 661, 0.08, 0.7, P.ho0, P.ho2); }
+  function aSpinAir(t, o) { const [bx, by] = body(o); slash(bx, by, o.R * 0.85, o.ang + 0.5, o.ang + 0.5 - TAU * 1.02, 7, 0.78, [P.W, P.ho1, P.ho3], t, 0.32, 662); }
+
+  function bulwarkOn(t, p) {
+    if (t < 0 || t > 1.3) return;
+    const lv = t < 1.0 ? 1 : 1 - (t - 1.0) / 0.3, pop = t < 0.1 ? -3 : t < 0.2 ? -1 : 0, ox = p.x - 3, oy = p.y - 24 + pop;
+    SHIELD_ICON.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') px(ox + x, oy + y, ch === 'a' ? P.ag3 : ch === 'b' ? P.ag1 : P.W, lv); }));
+    if (t < 0.12) plus(p.x, p.y - 21, P.W, 3);
+  }
+  const aBulwarkGround = supportGround('aegis', RAMP.aegis);
+  function aBulwarkAir(t, o) { bulwarkOn(t, o); onEach(o, t, bulwarkOn); }
+
+  function aRainGround(t, o) { bwrainGround(t, o); }
+  function aRainAir(t, o) { bwrainAir(t, o); }
+
+  /* 焦土（置き型・6秒）：燃える円 */
+  function aFieldGround(t, o) {
+    if (t < 0 || t > o.life + 0.3) return;
+    const R = o.R, fade = t > o.life ? 1 - (t - o.life) / 0.3 : clamp(t / 0.15), fr = Math.floor(t * 12);
+    ellRing(o.x, o.y, R, R * 0.5, (fr & 1) ? P.fi2 : P.fi3, fade);
+    ellRing(o.x, o.y, R - 3, (R - 3) * 0.5, P.fi4, 0.7 * fade, 24, t * 3);
+    lightPool(o.x, o.y, R * 0.9, 0.55 * fade, 'fire');
+    for (let i = 0; i < 24; i++) {                                       // 焦げ跡
+      const a = hash(i, 671) * TAU, r = Math.sqrt(hash(i, 672)) * R * 0.9;
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.5, (i & 1) ? P.fi5 : P.sm0, 0.8 * fade);
+    }
+  }
+  function aFieldAir(t, o) {
+    if (t < 0 || t > o.life + 0.3) return;
+    const R = o.R, k1 = Math.floor(Math.min(t, o.life) * 26), fr = Math.floor(t * 12);
+    for (let k = Math.max(0, k1 - 13); k <= k1; k++) {
+      const a = t - k / 26; if (a < 0 || a > 0.5) continue;
+      const ang = hash(k, 673) * TAU, r = Math.sqrt(hash(k, 674)) * R * 0.85, f = a / 0.5;
+      flamePuff(o.x + Math.cos(ang) * r, o.y + Math.sin(ang) * r * 0.5 - 2 - f * 10, f < 0.3 ? 2 : 1, Math.min(5, Math.floor(f * 6)), (fr + k) % 3 - 1);
+    }
+  }
+
+  function aVanishGround(t, o) { dgmirageGround(t, o); }
+  function aVanishAir(t, o) { dgmirageAir(t, o); }
+
+  function graceOn(t, p) { rallyOn(t, p); }
+  const aGraceGround = supportGround('heal', RAMP.heal);
+  function aGraceAir(t, o) { graceOn(t, o); onEach(o, t, graceOn); }
+
+  /* 聖域（置き型・8秒）：大きな金の陣と光の柱 */
+  function aSanctGround(t, o) {
+    if (t < 0 || t > o.life + 0.3) return;
+    const R = o.R, fade = t > o.life ? 1 - (t - o.life) / 0.3 : clamp(t / 0.2), tq = q12(t), fr = Math.floor(t * 12);
+    ellRing(o.x, o.y, R, R * 0.5, t < 0.12 ? P.W : P.ho1, fade);
+    ellRing(o.x, o.y, R - 3, (R - 3) * 0.5, P.ho3, 0.8 * fade, 32, tq * 1.5);
+    ellRing(o.x, o.y, R * 0.55, R * 0.27, (fr & 1) ? P.ho1 : P.ho2, 0.8 * fade, 16, -tq * 2);
+    for (let i = 0; i < 8; i++) {
+      const a = i * TAU / 8 + tq * 0.5, x = Math.round(o.x + Math.cos(a) * (R - 7)), y = Math.round(o.y + Math.sin(a) * (R - 7) * 0.5), g = RUNES[i & 3];
+      for (let j = 0; j < 9; j++) if (g[j]) px(x - 1 + (j % 3), y - 1 + Math.floor(j / 3), P.ho0, fade);
+    }
+    lightPool(o.x, o.y, R, 0.35 * fade, 'holy');
+  }
+  function aSanctAir(t, o) {
+    if (t < 0 || t > o.life + 0.3) return;
+    const R = o.R, fade = t > o.life ? 1 - (t - o.life) / 0.3 : 1, fr = Math.floor(t * 12);
+    for (let i = 0; i < 4; i++) {                                         // 陣の四方に立つ光の柱
+      const a = i * TAU / 4 + Math.PI / 4, x = Math.round(o.x + Math.cos(a) * R), y = Math.round(o.y + Math.sin(a) * R * 0.5), h = 22 + ((fr + i) % 3) * 2;
+      for (let k = 0; k < h; k++) px(x, y - k, k < 3 ? P.W : P.ho0, fade * (1 - k / h));
+      if ((fr + i) & 1) px(x - 1, y - h * 0.5, P.ho1, fade);
+    }
+    for (let i = 0; i < 10; i++) {
+      const t0 = (i * 0.37) % 1.2, a = (t % 1.2) - t0; if (a < 0 || a > 0.8) continue;
+      const ang = hash(i, 681) * TAU, r = Math.sqrt(hash(i, 682)) * R * 0.8;
+      px(o.x + Math.cos(ang) * r, o.y + Math.sin(ang) * r * 0.5 - a * 24, a < 0.3 ? P.W : P.ho1, fade * (1 - a / 0.8));
+    }
+  }
+
+  /* ============ スキル技 ============ */
+  /* 衝撃波：前へ広がる弧の波（通常攻撃とは別の形） */
+  function sWaveGround(t, o) {
+    const half = (o.arc || 1.5) / 2, p = clamp(t / 0.3), d = 10 + (o.R - 10) * easeOut(p);
+    if (t >= 0 && t < 0.4) for (let k = -3; k <= 3; k++) { const a = o.ang + k / 3 * half; dust(o.x + Math.cos(a) * d, o.y + Math.sin(a) * d * 0.9, t * 0.8, 1, 690 + k, 3, 0.35); }
+    if (t >= 0 && t < 0.5) lightPool(o.x + Math.cos(o.ang) * o.R * 0.5, o.y + Math.sin(o.ang) * o.R * 0.5, o.R * 0.5, 0.4 * (1 - t / 0.5), 'frost');
+  }
+  function sWaveAir(t, o) {
+    if (t < 0 || t > 0.45) return;
+    const [bx, by] = body(o), half = (o.arc || 1.5) / 2, p = clamp(t / 0.3), d = 10 + (o.R - 10) * easeOut(p);
+    slash(bx, by, 14, o.ang - 1.2, o.ang + 1.1, 5, 0.78, [P.W, P.fr0, P.cy1], t, 0.16, 691);
+    const lv = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4 - (t > 0.3 ? (t - 0.3) / 0.15 : 0);
+    if (lv <= 0) return;
+    const n = Math.round(d * half * 2.2);
+    for (let i = 0; i <= n; i++) {
+      const a = o.ang - half + (i / n) * half * 2, e = Math.abs(i / n - 0.5) * 2;
+      for (let w = 0; w < 3; w++) {
+        const r = d - w, x = bx + Math.cos(a) * r, y = by + Math.sin(a) * r * 0.78;
+        if (e > 0.85 && w > 0) continue;
+        px(x, y, w === 0 ? P.W : w === 1 ? P.fr0 : P.cy1, lv * (e > 0.7 ? 0.6 : 1));
+      }
+    }
+  }
+  /* 瞬足：短い踏み込み */
+  function sDashGround(t, o) {
+    dust(o.x, o.y, t, 4, 701, 6, 0.35);
+    if (t >= 0 && t < 0.2) ellRing(o.x, o.y + 1, 4 + t * 30, 2 + t * 12, t < 0.08 ? P.W : P.hl1, 1 - t / 0.2);
+  }
+  function sDashAir(t, o) {
+    const [bx, by] = body(o), [ux, uy] = dirv(o), L = o.R;
+    speedLines(bx, by + 2, bx + ux * L, by + uy * L + 2, t, 0.3, 4, 702, [P.W, P.hl0, P.hl1]);
+    for (let k = 0; k < 4; k++) {                                          // 通り道に残る足跡の粒
+      const s = L * (k + 0.5) / 4, b = t - 0.2 * (s / L); if (b < 0 || b > 0.25) continue;
+      px(o.x + ux * s, o.y + uy * s, P.hl1, 1 - b / 0.25); px(o.x + ux * s + 1, o.y + uy * s, P.hl0, 1 - b / 0.25);
+    }
+  }
+  /* 不屈：空から光が降り、立ち上がる */
+  function sReviveGround(t, o) {
+    magicCircle(o.x, o.y + 1, t, 1.0, 'holy', 1.5, o.charge || 0);
+    groundRing(o.x, o.y, t - 0.1, 40, 0.5, RAMP.holy, 0.5);
+  }
+  function sReviveAir(t, o) {
+    if (t < 0 || t > 1.3) return;
+    const [bx] = body(o), top = o.skyY != null ? o.skyY : o.y - 90;
+    if (t < 0.45) {
+      const w = t < 0.1 ? 3 : t < 0.25 ? 2 : 1;
+      for (let y = Math.round(o.y - 2); y > top; y--) for (let dx = -w; dx <= w; dx++) px(bx + dx, y, Math.abs(dx) === w ? P.ho1 : P.W, t < 0.25 ? 1 : 0.6);
+    }
+    if (t < 0.1) { plus(bx, o.y - 8, P.W, 6); disc(bx, o.y - 8, 3, P.ho0); }
+    for (let i = 0; i < 10; i++) {                                          // 舞い落ちる羽と、昇る光の粒
+      const b = t - 0.1 - hash(i, 711) * 0.4; if (b < 0 || b > 0.8) continue;
+      const x = bx + (hash(i, 712) - 0.5) * 30 + Math.sin(b * 8 + i) * 3;
+      if (i & 1) { const y = o.y - 40 + b * 40; px(x, y, P.W, 1 - b / 0.8); px(x + 1, y + 1, P.ho0, 1 - b / 0.8); }
+      else px(x, o.y - 4 - b * 30, P.ho1, 1 - b / 0.8);
+    }
+  }
+  /* 治癒：回復した瞬間に小さな十字 */
+  function sRegenGround(t, o) { if (t >= 0 && t < 0.3) ellRing(o.x, o.y + 1, 6 + t * 12, 2 + t * 5, P.hl1, 1 - t / 0.3); }
+  function sRegenAir(t, o) { for (let i = 0; i < 3; i++) { const b = t - i * 0.08; if (b < 0 || b > 0.6) continue; healCross(o.x + (i - 1) * 5, o.y - 8 - b * 16, b < 0.2 ? P.hl0 : P.hl1, 1 - b / 0.6); } }
+
+  /* ============ 効いている間の足元の輪（守護・鉄壁・生気・聖域・恩寵） ============ */
+  const AURA_COL = { ward: [P.hl1, P.hl0], aegis: [P.ag1, P.ag0], bloom: [P.lf2, P.lf1], sanct: [P.ho1, P.ho0], grace: [P.hl0, P.W] };
+  function auraGround(t, o) {
+    const c = AURA_COL[o.aura] || AURA_COL.ward, tq = q12(t), r = 8 + (o.ring || 0) * 2;
+    ellRing(o.x, o.y + 1, r, Math.max(2, Math.round(r * 0.4)), c[0], 0.9, 10, tq * 1.5);
+  }
+  function auraAir(t, o) {
+    const c = AURA_COL[o.aura] || AURA_COL.ward, cyc = t % 0.9, a = hash(Math.floor(t / 0.9), 721) * TAU;
+    if (cyc < 0.6) px(o.x + Math.cos(a) * 6, o.y - 2 - cyc * 14, c[1], 1 - cyc / 0.6);
+  }
+
+  /* ============================================================
      技の一覧（見本シーンの配置・段取り・当たりの時刻）
      ============================================================ */
   const T16 = v => Math.round(v * TILE);
@@ -1401,7 +1825,40 @@
     }
   };
 
-  const MAGIC = { collapse: 'arcane', stflame: 'fire', sticicle: 'frost', stbolt: 'shock', mcheal: 'heal', mcshield: 'holy' };
+  const MAGIC = { collapse: 'arcane', stflame: 'fire', sticicle: 'frost', stbolt: 'shock', mcheal: 'heal', mcshield: 'holy',
+                  u_blaze: 'fire', u_ruin: 'arcane', u_ward: 'heal', u_aegis: 'aegis', u_rally: 'heal', u_bloom: 'leaf',
+                  a_field: 'fire', a_bulwark: 'aegis', a_grace: 'heal', a_sanct: 'holy', s_revive: 'holy' };
+  /* 通常攻撃の見本：振り＋当たり（近接）／放つ＋飛ぶ＋当たり（弓・杖） */
+  function nMelee(kind, caster, label, rTiles, enemies) {
+    return { group: 'normal', label, who: '通常攻撃（' + kind + '）', caster, kind, castAt: 0.25, span: 0.3, loop: 0.95, charge: 0.08, recover: [0.2, 0.35], pose: 'melee', swings: [0],
+      cx: 50, cy: 66, ang: 0, R: T16(rTiles), enemies,
+      hits: (o, e) => Math.hypot(e[0] - o.x, e[1] - o.y) <= o.R + 12 ? [{ t: kind === 'dagger' ? 0.04 : 0.06, k: 1.5 }].concat(kind === 'dagger' ? [{ t: 0.11, k: 1 }] : []) : [],
+      ground: swingGround,
+      air(t, o) { swingAir(t, o); (o.targets || []).forEach((e, i) => { for (const h of this.hits(o, e)) hitAir(t - h.t, { x: e[0], y: e[1] - 6, elem: o.elem, seed: i }); }); } };
+  }
+  const SHOT_TRAVEL = 0.22;
+  function nShot(kind, shot, caster, label, enemies, elems, note) {
+    const gap = elems.length > 1 ? 0.28 : 0;
+    const d = { group: 'normal', label, who: note || '通常攻撃（' + kind + '）', caster, kind, castAt: 0.3, span: 0.3, loop: 0.7 + gap * elems.length + 0.5, charge: 0.1, recover: [0.25 + gap * elems.length, 0.4 + gap * elems.length],
+      pose: kind === 'magicbolt' ? 'thrust' : 'melee', swings: elems.map((_, i) => i * gap), cx: 26, cy: 70, ang: 0, R: T16(6), enemies, ramp: 'arcane', rimCol: P.ar1,
+      hits: (o, e, i) => [{ t: i * gap + SHOT_TRAVEL, k: 1 }],
+      ground() {},
+      air(t, o) {
+        const [bx, by] = body(o);
+        (o.targets || []).forEach((e, i) => {
+          const tt = t - i * gap, elem = elems[i] || elems[0], ang = Math.atan2(e[1] - 6 - by, e[0] - bx);
+          swingAir(tt, { ...o, ang, elem });
+          if (tt >= 0 && tt < SHOT_TRAVEL) { const f = tt / SHOT_TRAVEL; shotAirN(tt, { x: bx + (e[0] - bx) * f, y: by + (e[1] - 6 - by) * f, ang, kind: shot, elem }); }
+          hitAir(tt - SHOT_TRAVEL, { x: e[0], y: e[1] - 6, elem, seed: i });
+        });
+      } };
+    return d;
+  }
+  /* 支える大技の見本：本人＋仲間2人 */
+  function uSupport(label, id, ramp, rimCol, ground, air, who, group = 'ult', caster = 'warrior') {
+    return { group, label, who: (group === 'ult' ? '大技・' : '') + who, caster, ramp, rimCol, castAt: 0.5, span: 1.4, loop: 2.4, charge: 0.35, recover: [0.6, 1.0], pose: caster === 'priest' ? 'high' : 'melee', swings: [0],
+      cx: 80, cy: 62, ang: 0, R: T16(2.6), enemies: [], allies: [['hunter', 46, 78], ['mage', 116, 80]], hits: () => [], ground, air };
+  }
   const DEFS = {
     /* ---- 大魔導士 ---- */
     collapse: {
@@ -1562,12 +2019,121 @@
       cx: 80, cy: 68, ang: 0, R: T16(1), enemies: [[112, 66]],
       hits: () => [], ground: mcshieldGround, air: mcshieldAir
     },
+    /* ==== 通常攻撃（武器7系統・属性5種） ==== */
+    n_sword: nMelee('swordaxe', 'warrior', '剣・斧', 1.5, [[74, 64]]),
+    n_great: nMelee('greatsword', 'knight', '大剣', 1.8, [[78, 60], [80, 74]]),
+    n_dagger: nMelee('dagger', 'rogue', '短剣', 1.1, [[70, 66]]),
+    n_hammer: nMelee('hammer', 'knight', '戦鎚', 1.6, [[76, 70]]),
+    n_spear: nMelee('spear', 'warrior', '槍', 2.4, [[92, 68]]),
+    n_bow: nShot('bow', 'arrow', 'hunter', '弓', [[124, 62]], ['neutral']),
+    n_bolt: nShot('magicbolt', 'bolt', 'mage', '杖（魔弾）', [[120, 60]], ['arcane']),
+    n_elem: nShot('magicbolt', 'bolt', 'mage', '属性ごとの当たり', [[110, 34], [124, 52], [128, 72], [118, 92], [100, 104]],
+                  ['neutral', 'fire', 'shock', 'frost', 'arcane'], '無・炎・雷・氷・魔の順。剣や弓でも当たりの形は属性で決まる'),
+
+    /* ==== 大技（主人公） ==== */
+    u_quake: {
+      group: 'ult', label: '震撼', who: '大技・周囲を叩き割る', caster: 'warrior', castAt: 0.4, span: 1.0, loop: 2.2, charge: 0.3, recover: [0.4, 0.7], pose: 'melee', swings: [0], shake: [[0.02, 2], [0.2, 1]],
+      cx: 80, cy: 64, ang: 0, R: T16(3.9), enemies: [[40, 56], [124, 60], [100, 86], [60, 84]],
+      hits: (o, e) => { const d = Math.hypot(e[0] - o.x, (e[1] - o.y) / 0.5); return d <= o.R + 8 ? [{ t: 0.36 * (1 - Math.sqrt(Math.max(0, 1 - Math.min(1, d / o.R)))), k: 3, z: 5, zt: 0.3 }] : []; },
+      ground: uQuakeGround, air: uQuakeAir
+    },
+    u_blink: {
+      group: 'ult', label: '瞬歩', who: '大技・走り抜けて斬る', caster: 'warrior', castAt: 0.35, span: 0.9, loop: 2.0, charge: 0.2, recover: [0.4, 0.8], pose: 'blink', dashT: BLINK_T,
+      cx: 26, cy: 70, ang: 0, R: T16(4.5), enemies: [[62, 66], [84, 74]],
+      hits: H.line([0], BLINK_T, false, 10, 2), ground: uBlinkGround, air: uBlinkAir
+    },
+    u_blaze: {
+      group: 'ult', label: '業火', who: '大技・前方へ炎の柱', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.2, loop: 2.4, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
+      cx: 14, cy: 70, ang: 0, R: T16(6.5), wide: T16(1.15), enemies: [[60, 64], [92, 76], [116, 66]],
+      hits: H.line([0], 0.25, true, 20, 1.5), ground: uBlazeGround, air: uBlazeAir
+    },
+    u_ward: uSupport('守護', 'ward', 'heal', P.hl1, uWardGround, uWardAir, '6秒〜・被ダメージを削り、状態異常を消す'),
+    u_aegis: uSupport('鉄壁', 'aegis', 'aegis', P.ag1, uAegisGround, uAegisAir, '防御を掛け算する'),
+    u_rally: uSupport('号令', 'rally', 'heal', P.hl1, uRallyGround, uRallyAir, '全員をその場で回復'),
+    u_bloom: uSupport('生気', 'bloom', 'leaf', P.lf1, uBloomGround, uBloomAir, 'しばらく自動回復'),
+    u_ruin: {
+      group: 'ult', label: '崩落', who: '大技・画面内の敵すべてへ紫の雷', caster: 'warrior', ramp: 'arcane', rimCol: P.ar1, castAt: 0.55, span: 1.0, loop: 2.4, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'arcane',
+      cx: 30, cy: 76, ang: 0, R: T16(1.6), enemies: [[74, 40], [110, 58], [132, 84], [86, 96], [124, 30]],
+      hits: (o, e, i) => [{ t: 0.1 + i * 0.05, k: 2 }], ground: uRuinGround, air: uRuinAir
+    },
+    /* ==== 仲間の大技（Lv.50） ==== */
+    a_spin: {
+      group: 'ally', label: '回転斬り', who: '戦士 Lv.50', caster: 'warrior', castAt: 0.35, span: 0.6, loop: 1.8, charge: 0.2, recover: [0.35, 0.6], pose: 'spin', spinEnd: 0.32, shake: [[0.06, 1]],
+      cx: 80, cy: 64, ang: 0, R: T16(2.4), enemies: [[52, 56], [110, 56], [100, 84], [58, 84]],
+      hits: (o, e) => H.ring([0], 0.32, 0.5, -1)(o, e).map(h => ({ ...h, k: 2.5 })), ground: aSpinGround, air: aSpinAir
+    },
+    a_bulwark: uSupport('守護陣', 'bulwark', 'aegis', P.ag1, aBulwarkGround, aBulwarkAir, '騎士 Lv.50・全員に3発ぶんの盾', 'ally', 'knight'),
+    a_rain: {
+      group: 'ally', label: '矢の雨', who: '狩人 Lv.50（25本）', caster: 'hunter', castAt: 0.35, span: 0.4, loop: 2.6, charge: 0.2, recover: [0.25, 0.5], pose: 'melee', swings: [0],
+      cx: 22, cy: 78, ang: 0, R: T16(2.6), rainAt: [104, 62], enemies: [[96, 56], [116, 66], [100, 74], [86, 64]],
+      hits: (o, e) => (o._rain || []).filter(a => Math.hypot(a[1] - e[0], a[2] - e[1]) < 10).map(a => ({ t: a[0], k: 1 })),
+      ground: aRainGround, air: aRainAir
+    },
+    a_field: {
+      group: 'ally', label: '焦土', who: '魔法使い Lv.50（実機は6秒）', caster: 'mage', ramp: 'fire', rimCol: P.fi2, castAt: 0.5, span: 6.3, loop: 3.4, charge: 0.3, recover: [2.4, 2.7], life: 2.4, pose: 'thrust', status: 'burn',
+      cx: 24, cy: 68, ang: 0, at: [104, 68], R: T16(2.6), enemies: [[96, 60], [116, 74], [134, 58]],
+      hits: (o, e) => Math.hypot(e[0] - o.x, (e[1] - o.y) / 0.5) <= o.R ? [0.2, 0.7, 1.2, 1.7, 2.2].map(t => ({ t, k: 0 })) : [],
+      ground: aFieldGround, air: aFieldAir
+    },
+    a_vanish: {
+      group: 'ally', label: '幻影', who: '盗賊 Lv.50（3秒無敵）', caster: 'rogue', castAt: 0.3, span: 3.3, loop: 3.8, charge: 0.15, recover: [3.0, 3.2], life: 3.0, pose: 'mirage',
+      cx: 80, cy: 66, ang: 0, R: T16(1), enemies: [[52, 62], [108, 70]],
+      hits: () => [], ground: aVanishGround, air: aVanishAir
+    },
+    a_grace: uSupport('恩寵', 'grace', 'heal', P.hl1, aGraceGround, aGraceAir, '僧侶 Lv.50・6秒のあいだ回復し続ける', 'ally', 'priest'),
+    a_sanct: {
+      group: 'ally', label: '聖域', who: '聖騎士 Lv.50（実機は8秒）', caster: 'knight', ramp: 'holy', rimCol: P.ho1, castAt: 0.5, span: 8.3, loop: 3.6, charge: 0.3, recover: [2.6, 2.9], life: 2.6, pose: 'high',
+      cx: 80, cy: 66, ang: 0, R: T16(4.0), enemies: [], allies: [['hunter', 50, 58], ['mage', 108, 74]],
+      hits: () => [], ground: aSanctGround, air: aSanctAir
+    },
+    /* ==== スキル技 ==== */
+    s_wave: {
+      group: 'skill', label: '衝撃波', who: 'スキル・前へ扇の波', caster: 'warrior', castAt: 0.3, span: 0.5, loop: 1.7, charge: 0.15, recover: [0.3, 0.55], pose: 'melee', swings: [0],
+      cx: 34, cy: 68, ang: 0, R: T16(3.4), arc: 1.5, enemies: [[70, 56], [86, 70], [74, 86]],
+      hits: (o, e) => { const d = Math.hypot(e[0] - o.x, e[1] - o.y); return d <= o.R + 8 ? [{ t: 0.3 * Math.min(1, (d - 10) / (o.R - 10)) * 0.6, k: 3 }] : []; },
+      ground: sWaveGround, air: sWaveAir
+    },
+    s_dash: {
+      group: 'skill', label: '瞬足', who: 'スキル・短い踏み込み', caster: 'warrior', castAt: 0.25, span: 0.45, loop: 1.4, charge: 0.1, recover: [0.25, 0.5], pose: 'blink', dashT: 0.2,
+      cx: 40, cy: 70, ang: 0, R: T16(2.6), enemies: [],
+      hits: () => [], ground: sDashGround, air: sDashAir
+    },
+    s_revive: {
+      group: 'skill', label: '不屈', who: 'スキル・倒れても一度だけ立つ', caster: 'warrior', ramp: 'holy', rimCol: P.ho1, castAt: 0.6, span: 1.4, loop: 2.6, charge: 0.4, recover: [0.6, 1.2], pose: 'revive',
+      cx: 80, cy: 72, ang: 0, R: T16(1), enemies: [[118, 66]],
+      hits: () => [], ground: sReviveGround, air: sReviveAir
+    },
+    s_regen: {
+      group: 'skill', label: '治癒', who: 'スキル・一定時間ごとに少し回復', caster: 'warrior', castAt: 0.3, span: 0.7, loop: 1.4, charge: 0.05, recover: [0.5, 0.7], pose: 'idle',
+      cx: 80, cy: 68, ang: 0, R: T16(1), enemies: [],
+      hits: () => [], ground: sRegenGround, air: sRegenAir
+    },
+    aura: {
+      group: 'skill', label: '効いている間の輪', who: '守護・鉄壁・生気・聖域・恩寵が続くあいだ、各自の足元に', caster: 'knight', castAt: 0.1, span: 1e9, loop: 2.7, charge: 0.05, recover: [2.5, 2.6], pose: 'idle',
+      cx: 80, cy: 60, ang: 0, R: T16(1), enemies: [], allies: [['hunter', 44, 70], ['mage', 116, 72], ['priest', 62, 92], ['rogue', 100, 94]],
+      hits: () => [],
+      ground: (t, o) => { const ts = t + 0.1; auraGround(ts, { x: o.x, y: o.y, aura: 'ward' }); ['aegis', 'bloom', 'sanct', 'grace'].forEach((k, i) => o.allies && o.allies[i] && auraGround(ts + i * 0.2, { x: o.allies[i][0], y: o.allies[i][1], aura: k })); },
+      air: (t, o) => { const ts = t + 0.1; auraAir(ts, { x: o.x, y: o.y, aura: 'ward' }); ['aegis', 'bloom', 'sanct', 'grace'].forEach((k, i) => o.allies && o.allies[i] && auraAir(ts + i * 0.2, { x: o.allies[i][0], y: o.allies[i][1], aura: k })); }
+    },
+
     /* ---- 実機だけで使う部品（見本シーンなし） ---- */
+    n_swing: { aux: true, span: 0.3, ext: 44, pad: 8, ground: swingGround, air: swingAir },
+    n_hit: { aux: true, span: 0.5, ext: 12, pad: 8, ground() {}, air: hitAir },
+    n_shot: { aux: true, span: 1e9, ext: 12, pad: 6, ground() {}, air: shotAirN },
+    u_ward_on: { aux: true, span: 0.8, ext: 16, pad: 8, sky: 24, ground() {}, air: wardOn },
+    u_aegis_on: { aux: true, span: 1.0, ext: 16, pad: 8, sky: 20, ground() {}, air: aegisOn },
+    u_rally_on: { aux: true, span: 0.9, ext: 16, pad: 8, sky: 24, ground() {}, air: rallyOn },
+    u_bloom_on: { aux: true, span: 1.0, ext: 16, pad: 8, sky: 24, ground() {}, air: bloomOn },
+    a_bulwark_on: { aux: true, span: 1.3, ext: 16, pad: 8, sky: 28, ground() {}, air: bulwarkOn },
+    a_grace_on: { aux: true, span: 0.9, ext: 16, pad: 8, sky: 24, ground() {}, air: graceOn },
+    u_ruin_hit: { aux: true, span: 0.8, ext: 20, pad: 10, sky: 110, ground: ruinHitGround, air: ruinHitAir },
+    aura_on: { aux: true, span: 1e9, ext: 14, pad: 6, sky: 16, ground: auraGround, air: auraAir },
     bwshot: { aux: true, span: 0.45, ground() {}, air: bwshotAir },
     bwrain_hit: { aux: true, span: 0.5, ground() {}, air: (t, o) => rainHit(o.x, o.y, t) },
+    a_rain_hit: { aux: true, span: 0.5, ground() {}, air: (t, o) => rainHit(o.x, o.y, t) },
     bwrain_arrow: { aux: true, span: 1, ground: (t, o) => rainRing(o.x, o.y, o.fall != null ? o.fall : t), air: (t, o) => rainArrow(o.x, o.y, o.fall != null ? o.fall : t) }
   };
-  const GROUPS = [['archmage', '大魔導士'], ['staff', '杖'], ['sword', '剣'], ['great', '大剣'], ['dagger', '短剣'], ['axe', '斧'], ['spear', '槍'], ['bow', '弓'], ['mace', '戦鎚']];
+  const GROUPS = [['archmage', '大魔導士'], ['staff', '杖'], ['sword', '剣'], ['great', '大剣'], ['dagger', '短剣'], ['axe', '斧'], ['spear', '槍'], ['bow', '弓'], ['mace', '戦鎚'], ['normal', '通常攻撃'], ['ult', '大技'], ['ally', '仲間の大技'], ['skill', 'スキル技']];
 
   function timeline(key) {
     const d = DEFS[key];
@@ -1582,13 +2148,20 @@
     const pose = { bob: 0, lift: 0, fwd: 0, sway: 0, rim: 0, rimCol: d.rimCol || P.W, gemFlash: 0, dx: 0, dy: 0, z: 0, ghost: 1, hidden: false, face: 1 };
     const recS = d.recover[0], recE = d.recover[1];
     const staff = d.pose === 'thrust' || (d.pose === 'high' && SPR[d.caster].stf.length);
-    if (tc < 0 || t > recE) { pose.bob = Math.floor(tq * 4) & 1; if (d.pose === 'dash' && t > recE) pose.dx = Math.round(o.R); return pose; }
+    if (d.pose === 'idle') { pose.bob = Math.floor(tq * 4) & 1; return pose; }
+    if (d.pose === 'revive') {                                              // 倒れている → 光で立つ
+      if (t < 0.1) { pose.ghost = 0.45; pose.bob = 1; pose.dy = 1; return pose; }
+      if (t < 0.3) { pose.z = Math.round(3 * Math.sin(Math.PI * (t - 0.1) / 0.2)); pose.rim = 1; pose.rimCol = P.ho0; return pose; }
+      pose.bob = Math.floor(tq * 4) & 1; return pose;
+    }
+    if (tc < 0 || t > recE) { pose.bob = Math.floor(tq * 4) & 1; if ((d.pose === 'dash' || d.pose === 'blink') && t > recE) pose.dx = Math.round(o.R); return pose; }
     if (t < 0) {                                                         // 溜め
       const p = clamp(tc / d.charge);
       if (staff) { pose.lift = Math.round(3 * easeOut(p)); pose.rim = p; pose.gemFlash = (Math.floor(tq * ANIM_FPS) & 1) ? 2 : 1; }
       else { pose.bob = 1; pose.dx = -1; }
       return pose;
     }
+    if (d.pose === 'blink') { const p = clamp(t / d.dashT); pose.dx = Math.round(o.R * easeOut(p)); pose.ghost = p < 1 ? ((Math.floor(t * 24) & 1) ? 0.45 : 0.75) : 1; pose.sway = p < 1 ? -1 : 0; return pose; }
     if (d.pose === 'dash') { pose.dx = Math.round(o.R * clamp(t / 0.06)); pose.sway = t < 0.2 ? -1 : 0; if (t > recS) pose.bob = Math.floor(tq * 4) & 1; return pose; }
     if (d.pose === 'spin' && t < d.spinEnd) { pose.face = (Math.floor(t * 16) & 1) ? -1 : 1; pose.bob = 1; return pose; }
     if (d.pose === 'mirage') { pose.ghost = t < d.life ? ((Math.floor(t * 12) & 1) ? 0.45 : 0.7) : 1; return pose; }
@@ -1648,7 +2221,9 @@
   function sceneO(key, d, gx, gy) {
     const o = d._o || (d._o = {});
     Object.assign(o, { x: d.cx, y: d.cy, R: d.R, ang: d.ang || 0, arc: d.arc || 0, life: d.life || 0, gx, gy, skyY: 0, charge: d.charge,
-                       targets: d.enemies, healR: d.healR, allies: d.allies ? d.allies.map(a => [a[1], a[2]]) : null, cx: null, cy: null, tx: null, ty: null });
+                       targets: d.enemies, healR: d.healR, allies: d.allies ? d.allies.map(a => [a[1], a[2]]) : null, cx: null, cy: null, tx: null, ty: null,
+                       kind: d.kind, elem: d.elem, wide: d.wide || 0 });
+    if (d.at) { o.x = d.at[0]; o.y = d.at[1]; }
     if (key === 'collapse') Object.assign(o, { x: d.target[0], y: d.target[1], cx: d.cx, cy: d.cy });
     if (d.target === 0) { const e = d.enemies[0]; o.tx = e[0]; o.ty = e[1]; if (key === 'spdragoon') { o.tx = e[0] - 10; o.ty = e[1] + 2; } }
     if (d.rainAt) { o.tx = d.rainAt[0]; o.ty = d.rainAt[1]; if (!o._rain) o._rain = rainArrows(o); }
@@ -1717,6 +2292,8 @@
      fall      … アローレインの矢1本の落ち具合 0..1
      ============================================================ */
   const GAME_O = {};
+  const SKY = { stbolt: 72, collapse: 130, spdragoon: 90, gtupper: 60, bwrain: 60, a_rain: 60, u_ruin: 130, s_revive: 110, u_rally: 40, u_bloom: 40,
+                u_ward: 24, u_aegis: 24, a_bulwark: 32, a_grace: 24, a_sanct: 34, a_field: 24, u_quake: 24, u_blaze: 30 };
   function span(id) { const d = DEFS[id]; return d ? d.span : 0; }
   function renderEffect(ctx, p) {
     const id = p.id, d = DEFS[id], age = p.age || 0;
@@ -1724,10 +2301,10 @@
     const k = 3 * (p.scale || 1);
     const R = Math.round((p.range != null ? p.range : (d.R || TILE) / TILE) * TILE);
     const toBuf = (sx, sy, ox, oy) => [ox + (sx - p.x) / k, oy + (sy - p.y) / k];
-    let ext = Math.max(R, d.healR || 0, 24);
+    let ext = d.ext != null ? (id === 'n_swing' ? Math.max(d.ext, R + 8) : d.ext) : Math.max(R, d.healR || 0, 24);
     if (p.tx != null) ext = Math.max(ext, Math.hypot(p.tx - p.x, p.ty - p.y) / k + 20);
     if (p.casterX != null) ext = Math.max(ext, Math.hypot(p.casterX - p.x, p.casterY - p.y) / k + 20);
-    const pad = 26, sky = (id === 'stbolt' ? 72 : id === 'collapse' ? 130 : id === 'spdragoon' ? 90 : id === 'gtupper' ? 60 : id === 'bwrain' ? 60 : 14);
+    const pad = d.pad != null ? d.pad : 26, sky = d.sky != null ? d.sky : (SKY[id] || 14);
     const w = Math.ceil(2 * (ext + pad)), h = Math.ceil(2 * (ext + pad) + sky), ox = Math.ceil(ext + pad), oy = Math.ceil(ext + pad + sky);
     CUR = FX_BUF; SCENE_MODE = false; SX = 0; SY = 0;
     prep(FX_BUF, w, h);
@@ -1736,7 +2313,9 @@
     const ang = p.angle || 0;
     Object.assign(o, { x: ox, y: oy, R, ang, arc: d.arc || 0, life: p.life != null ? p.life : (d.life || 0), skyY: 4, charge: 0,
                        gx: ox + Math.round(Math.cos(ang) * 6), gy: oy - 9, targets: null, healR: d.healR, orbitA: p.orbitA, fall: p.fall,
-                       arrows: false, shots: false });
+                       arrows: false, shots: false, kind: p.kind || d.kind, elem: p.elem || d.elem, target: p.target, aura: p.aura, ring: p.ring || 0,
+                       wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0 });
+    if (p.arc != null) o.arc = p.arc;
     if (p.tx != null) { const [a, b] = toBuf(p.tx, p.ty, ox, oy); o.tx = a; o.ty = b; }
     if (id === 'collapse') { o.gx = null; if (p.casterX != null) { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; o.gx = a + 5; o.gy = b - 12; } }
     if (id === 'stbolt') o.gx = null;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>武器技のドット演出</title>
+<title>Abyss ドット演出見本帳</title>
 <style>
   :root{
     --bg:#131019; --panel:#1c1826; --panel2:#231e30; --line:#332c44; --ink:#ece6f5; --mute:#a59cb8; --dim:#6f6684;
@@ -76,9 +76,9 @@
 </head>
 <body>
 <div class="wrap">
-  <p class="eyebrow">ABYSS — WEAPON ARTS / PIXEL STUDY</p>
-  <h1>武器技24種と「崩落」をドットで描き直す</h1>
-  <p class="lede">論理解像度（1マス＝16ドット）で描いて補間なしで拡大、色は固定パレット、フェードはディザ、形は12fpsで段付き——というやり方で、武器技24種と大魔導士の「崩落」を作り直した見本です。魔法系（杖・崩落・癒し打ち・ホーリーシールド）は足元に魔法陣を敷きます。右に今の実機の演出を並べてあります。すべてコードだけで描いていて、画像素材は使っていません。</p>
+  <p class="eyebrow">ABYSS — PIXEL EFFECTS STUDY</p>
+  <h1>武器技・大技・スキル・通常攻撃をドットで描き直す</h1>
+  <p class="lede">論理解像度（1マス＝16ドット）で描いて補間なしで拡大、色は固定パレット、フェードはディザ、形は12fpsで段付き——というやり方で、武器技24種と大魔導士の「崩落」、主人公の大技8種、仲間の Lv.50 の大技、スキル技、通常攻撃（武器7系統×属性5種）を作り直した見本です。魔法系と支える技は足元に魔法陣を敷きます。右に今の実機の演出を並べてあります。すべてコードだけで描いていて、画像素材は使っていません。</p>
 
   <div class="bar" role="toolbar" aria-label="再生の操作">
     <button class="btn" id="play" type="button" aria-pressed="true">❚❚ 一時停止</button>
@@ -118,6 +118,8 @@
         <li>持続技（フレイム・ライトニング・ダンシングソード）は <code>W.arts</code> の時計（周期で割らない実時間）で描く。ダンシングソードの刃は当たり判定と同じ角度 <code>f.a</code>。</li>
         <li>崩落は <b>発動の0.55秒後に着弾</b>（<code>COLLAPSE_DELAY</code>）。ダメージも着弾に予約した。</li>
         <li>レイジングアッパー・ドラグーンは狙った相手の座標、連射は1発ごとの相手の座標で描く。</li>
+        <li>大技・仲間の大技・スキル技は <code>feelPixelArt(id, x, y, {ent, delay, …})</code> で積む。支える技は本人の足元の陣と、仲間ひとりずつの印（<code>*_on</code>）に分けて、それぞれの人に付いて動かす。</li>
+        <li>通常攻撃の振り・弾・当たりは <code>n_swing</code> / <code>n_shot</code> / <code>n_hit</code>。守護・鉄壁・生気・聖域・恩寵が効いている間は、全員の足元に小さな輪（<code>aura_on</code>）。</li>
       </ul>
     </div>
   </section>
@@ -156,8 +158,72 @@
     bwburst: ['直線7.5マス・炎', '燃える矢が通った道に火の粒と焦げが残る。', '現行：白芯＋橙の残光'],
     mcdouble: ['前方2マス×2回', '振り下ろして左右の床を2度打つ。金の火花・床のひび・土煙。', '現行：戦鎚衝撃を2度'],
     mcheal: ['打って周囲4マスの味方を9%回復', '緑の魔法陣。打った所から癒しの輪が広がり、味方の上に十字が立ちのぼる。', '現行：淡い緑の粒'],
-    mcshield: ['1回だけ攻撃を無効化', '金の魔法陣と、体を包む殻。消えたあと頭の上に小さな盾が残る。', '現行：盾形を短く']
+    mcshield: ['1回だけ攻撃を無効化', '金の魔法陣と、体を包む殻。消えたあと頭の上に小さな盾が残る。', '現行：盾形を短く'],
+    n_sword: ['剣・斧', '三日月を1枚。外の縁が白、内へ行くほど鋼の青。当たりは白い火花。', '現行：ベクターの軌跡＋ぼかし'],
+    n_great: ['大剣', '太く長い三日月。振り切った先に土煙。', '現行：ベクターの軌跡（太い）'],
+    n_dagger: ['短剣', '細い斬り跡を2回、交差させる。当たりも2回。', '現行：ベクターの軌跡（細い）'],
+    n_hammer: ['戦鎚', '頭上から振り下ろし、打った床に輪とひび。', '現行：衝撃の円'],
+    n_spear: ['槍', '一瞬で伸びる線。根元から消えていく。', '現行：刺突の線'],
+    n_bow: ['弓', '弦のはじけ＋矢羽の付いた矢と3ドットの尾。', '現行：矢の絵を回転'],
+    n_bolt: ['杖（魔弾）', '杖先に小さな輪、うねる尾の魔弾、魔の当たりは文字片が昇る。', '現行：ぼかした光の弾'],
+    n_elem: ['無・炎・雷・氷・魔', '属性ごとに当たりの形を変えた。炎は火の粒が昇る、雷は3本の稲妻、氷は輪と結晶、魔は輪と文字片。', '現行：属性色の粒'],
+    u_quake: ['周囲3.2＋マス・よろめき', '振り下ろした一点から金の輪が走り、通った所から岩が突き出して沈む。床に放射状のひび。', '現行：金の輪が広がるだけ'],
+    u_blink: ['4.2＋マス走り抜け・無敵', '走った線が白→水色→灰と冷えていき、抜けた先で輪が弾ける。', '現行：太い線＋丸い残像'],
+    u_blaze: ['前方6.5マス・火傷', '足元に炎の魔法陣、前方へ火柱が根元から順に立ち、火の粉が昇る。', '現行：グラデーションの帯'],
+    u_ward: ['被ダメージ -30%〜・状態異常を消す', '緑の魔法陣。全員を半球が覆い、黒いかけら（状態異常）が剥がれ落ちる。', '現行：緑の輪'],
+    u_aegis: ['防御を掛け算', '青の魔法陣。全員を縦長の殻が包み、縁で光が回る。', '現行：青い輪を人数分'],
+    u_rally: ['全員を回復', '頭上に大きな十字、全員の上に小さな十字が立ちのぼる。', '現行：緑の輪'],
+    u_bloom: ['しばらく自動回復', '若葉色の魔法陣。葉が渦を巻いて昇る。', '現行：緑の輪'],
+    u_ruin: ['画面内の敵すべて', '本人から空へ紫の柱、少し遅れて敵ひとりずつへ雷が順に落ちる。', '現行：画面全体が紫に光る'],
+    a_spin: ['戦士・周囲2.4マス', '重い金の三日月で一周、床に土煙の輪とひび。', '現行：輪'],
+    a_bulwark: ['騎士・全員に3発の盾', '青の魔法陣。全員の頭上に盾の印が出て、しばらく残る。', '現行：輪'],
+    a_rain: ['狩人・25本', 'アローレインと同じ作り。空へ放ち、着地点の輪 → 降る矢 → 刺さった矢。', '現行：線と輪'],
+    a_field: ['魔法使い・6秒の燃える地面', '回る破線の輪と焦げ跡、ランダムに立つ炎の粒。', '現行：赤い円が脈打つ'],
+    a_vanish: ['盗賊・3秒無敵', 'ミラージュと同じ鏡のかけらと残像。', '現行：輪'],
+    a_grace: ['僧侶・6秒回復し続ける', '緑の魔法陣、全員の上に十字。効いている間は足元の輪。', '現行：輪'],
+    a_sanct: ['聖騎士・8秒 全能力+20%', '大きな金の陣が二重に回り、四方に光の柱。文字片が縁を回る。', '現行：金の円が脈打つ'],
+    s_wave: ['前方3.4マス・扇', '振りの三日月から、扇の波が外へ走る。通常の斬撃とは別の形。', '現行：通常の斬撃と同じ絵'],
+    s_dash: ['短い踏み込み', '足元の輪と速度線、通った道に粒。', '現行：丸い残像'],
+    s_revive: ['倒れても一度だけ', '空から白い光の柱が落ち、金の魔法陣の上で立ち上がる。羽が舞う。', '現行：金の輪'],
+    s_regen: ['10秒ごとに少し回復', '回復した瞬間だけ、足元の輪と小さな十字。', '現行：数字だけ'],
+    aura: ['効いている間', '守護・鉄壁・生気・聖域・恩寵が続くあいだ、全員の足元に回る破線の輪。一番強い物を1つだけ。', '現行：なし']
   };
+  /* 現行の見比べ（新しく足した分）。実機の ultring / ultbeam / ultline / 通常攻撃をそのまま小さく描く */
+  const ALLY = window.AllyEffectStudy;
+  const OLDN = { n_sword: 'swordaxe', n_great: 'greatsword', n_dagger: 'dagger', n_hammer: 'hammer', n_spear: 'spear', n_bow: 'bow', n_bolt: 'magicbolt' };
+  const OLDR = { u_quake: ['#d6b34a', 3.9, 0.42], u_ward: ['#7fe0c0', 2.6, 0.5], u_aegis: ['#7fc8e0', 2.4, 0.5], u_rally: ['#7fe0c0', 2.8, 0.5], u_bloom: ['#9fe07f', 2.6, 0.5],
+                 a_spin: ['#d0a25a', 2.4, 0.4], a_bulwark: ['#8e9bb0', 4.2, 0.55], a_vanish: ['#d6b34a', 1.6, 0.4], a_grace: ['#7fe0c0', 4.5, 0.6], a_sanct: ['#e8d9a0', 4.0, 0.6], s_revive: ['#e5d18c', 2.4, 0.7], a_field: ['#e0552e', 2.6, 6], a_rain: ['#7fc08a', 1.2, 0.45] };
+  function oldFloor(ctx) {
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.fillStyle = '#22352c'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#26392e';
+    for (let y = 0; y < h; y += 12) for (let x = (y / 12 % 2) * 12; x < w; x += 24) ctx.fillRect(x + 1, y + 1, 22, 10);
+  }
+  function drawOldNew(c, t) {
+    const ctx = c.octx, w = ctx.canvas.width, h = ctx.canvas.height, TS = 24, lt = t % 1.4;
+    oldFloor(ctx);
+    if (OLDN[c.key] && ALLY) { try { ALLY.render(ctx, { kind: OLDN[c.key], age: lt % 0.5, x: w * 0.35, y: h * 0.55, angle: 0, scale: 1, heavy: /great|hammer/.test(OLDN[c.key]), hit: true, element: c.key === 'n_bolt' ? 'arcane' : 'neutral', compact: true }); } catch (e) {} return; }
+    if (c.key === 'n_elem' && ALLY) { ['neutral', 'fire', 'shock', 'frost', 'arcane'].forEach((el, i) => { try { ALLY.renderElementHit(ctx, { element: el, age: lt % 0.5, x: 36 + i * 62, y: h * 0.5, scale: 0.8, target: 'enemy', compact: true }); } catch (e) {} }); return; }
+    ctx.save();
+    if (OLDR[c.key]) {
+      const [col, r, life] = OLDR[c.key], k = Math.min(1, lt / Math.min(life, 1.2)), rr = r * TS * (life > 1 ? 1 : k);
+      ctx.globalAlpha = (1 - (life > 1 ? 0.3 : k)) * 0.9; ctx.strokeStyle = col; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.max(0, rr), 0, 7); ctx.stroke();
+      ctx.globalAlpha *= 0.25; ctx.fillStyle = col; ctx.fill();
+    } else if (c.key === 'u_blaze') {
+      const k = Math.max(0, 1 - lt / 0.5), g = ctx.createLinearGradient(20, 0, 20 + 6.5 * TS, 0);
+      g.addColorStop(0, '#e0705a'); g.addColorStop(1, 'rgba(224,112,90,0)');
+      ctx.globalAlpha = k * 0.8; ctx.fillStyle = g; ctx.fillRect(20, h / 2 - 1.15 * TS, 6.5 * TS, 2.3 * TS);
+    } else if (c.key === 'u_blink' || c.key === 's_dash') {
+      const k = Math.max(0, 1 - lt / 0.45); ctx.globalAlpha = k * 0.85; ctx.strokeStyle = c.key === 'u_blink' ? '#7fc8e0' : '#91dfcb'; ctx.lineWidth = TS * 0.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(40, h / 2); ctx.lineTo(40 + (c.key === 'u_blink' ? 4.5 : 2.4) * TS, h / 2); ctx.stroke();
+    } else if (c.key === 'u_ruin') {
+      const k = Math.max(0, 1 - lt / 0.45); ctx.globalAlpha = k * 0.3; ctx.fillStyle = '#c98adf'; ctx.fillRect(0, 0, w, h);
+    } else if (c.key === 's_wave') {
+      const k = Math.min(1, lt / 0.48); ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = '#dbe6f2'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(60, h / 2, 3.4 * TS * (0.4 + 0.6 * k), -0.75, 0.75); ctx.stroke();
+    } else { ctx.fillStyle = '#a59cb8'; ctx.font = '13px sans-serif'; ctx.fillText('（絵なし）', 12, 24); }
+    ctx.restore();
+  }
   const $ = id => document.getElementById(id);
   const root = $('cards'), jump = $('jump');
   const cards = [];
@@ -214,6 +280,7 @@
   }
   function drawOld(c, t) {
     if (c.key === 'collapse') return drawOldCollapse(c.octx, t);
+    if (NOTES[c.key] && (c.key.indexOf('_') > 0 || c.key === 'aura')) return drawOldNew(c, t);
     if (!OLD) { c.octx.fillStyle = '#1c1826'; c.octx.fillRect(0, 0, 320, 170); return; }
     try { OLD.scene(c.octx, c.key, t % (OLD.duration || 1.4)); } catch (e) {}
   }

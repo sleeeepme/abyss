@@ -41,6 +41,29 @@
   **`age` は周期で割らず** 発動からの実時間（`f.max - f.t`）、`life` に `f.max`。旧版は `% 1.05` / `% 1.35` で巻き戻していた。
 - ダンシングソードの刃は当たり判定と同じ角度 `f.a`（旧版は判定1本に対して刃3本を描いていた）。
 
+## 2026-09-23（2回目）大技・スキル技・通常攻撃もドットへ
+ユーザー依頼「大技とスキル技、通常攻撃のエフェクトも同じように見直して」。見本ページに4つの組（通常攻撃・大技・仲間の大技・スキル技）を足した。
+ソースは `weapon-art-pixel.js` の中の「通常攻撃」「大技」の節（Claude 側の作業場では `src/60_normal.js` と `src/70_ult.js`）。
+
+| 種類 | id | 実機で積む場所 |
+|---|---|---|
+| 通常攻撃の振り | `n_swing`（`kind` = swordaxe / greatsword / dagger / hammer / spear、`elem` で色） | `game-feel.js` `drawFeelSwing`（`f.skill` のある振り＝衝撃波は描かない） |
+| 弾 | `n_shot`（`kind` = arrow / bolt） | `drawFeelWeaponShot` |
+| 当たり | `n_hit`（`elem` = neutral / fire / shock / frost / arcane、`target:'ally'` で小さく） | `drawFeelHits`（`FEEL.hits` はそのまま） |
+| 大技8種 | `u_quake` `u_blink` `u_blaze` `u_ward` `u_aegis` `u_rally` `u_bloom` `u_ruin` | `index.html` `fireUlt` |
+| 支える大技の仲間ごとの印 | `u_ward_on` `u_aegis_on` `u_rally_on` `u_bloom_on` `a_bulwark_on` `a_grace_on` | `ultPartyArt(id, r, src)`（`index.html`、`fireUlt` の直前） |
+| 崩落（大技）の雷1本 | `u_ruin_hit`（敵ごと、`delay` で順に） | `fireUlt` の `ruin` |
+| 仲間の大技 | `a_spin` `a_bulwark` `a_rain`（+`a_rain_hit`） `a_field`（置き型） `a_vanish` `a_grace` `a_sanct`（置き型） | `fireAllyArt`。焦土・聖域は `W.arts` の時計（`feelPersistentPixel`） |
+| スキル技 | `s_wave` `s_dash` `s_revive` `s_regen` | `fireWave` / `tapDash`（game-feel） / 不屈の立ち上がり / 治癒の回復 |
+| 効いている間の足元の輪 | `aura_on`（`aura` = sanct / aegis / ward / bloom / grace。強い順に1つ） | `feelDrawAuras`（`drawFeelArtGround` と `drawFeelWeaponArts` の中） |
+
+- 旧い絵（`ultring` / `ultline` / `ultbeam` / `ultflash` / 瞬歩と瞬足の `dashghost`）は `artId` を付けて描かないようにした（記録は残る）。
+- **当たり判定・ダメージ・時刻は一切変えていない。** 崩落（大技）の雷は 0.1秒＋最大0.18秒遅れて落ちる絵だが、ダメージは今まで通り押した瞬間。
+- `feelPixelArt(id, x, y, o)` に足した引数：`o.ent`（その人に付いて動く）、`o.delay`（秒だけ遅らせる。`age` を負から始める）、
+  `o.wide`（業火の幅・マス）、`o.arc`（衝撃波の角度・ラジアン）、`o.kind` `o.elem`。積める数は 40 → 64。
+- 床の照り返し（`lightPool`）を上下につぶした楕円にした（実機で壁の上へ丸くはみ出していた）。
+- 重さの目安（ヘッドレス Chromium・1回あたり）：当たり・弾・足元の輪 約0.04ms、振り 約0.2ms、支える大技 約0.6ms。
+
 ## `PixelArtFx.renderEffect(ctx, p)` の引数
 
 | 名前 | 中身 |
@@ -57,6 +80,12 @@
 | `casterX, casterY` | 崩落の術者の画面座標（足元の魔法陣と空へ抜ける光） |
 | `orbitA` | ダンシングソードの今の角度 |
 | `fall` | アローレインの矢1本の落ち具合 0..1（-1 は落ち始める前＝輪だけ） |
+| `kind` | 通常攻撃の武器（`n_swing`）／弾の種類（`n_shot`） |
+| `elem` | 属性（`n_swing` `n_shot` `n_hit`） |
+| `target` | `n_hit` で `'ally'` なら小さめ |
+| `wide` | 業火の幅（マス） |
+| `arc` | 衝撃波の扇の角度（ラジアン・全幅） |
+| `aura` | 足元の輪の種類（`aura_on`） |
 
 ## 技を足すとき
 `weapon-art-pixel.js` の `DEFS` に1項目足す：`ground(t,o)` と `air(t,o)`（`o.x,o.y` が足元、`o.R` が届く距離（ドット）、
@@ -68,4 +97,5 @@
 - 居合は `def.dist`（3.4マス）の長さで線を引く。壁で止まったときは実際の踏み込みより長く見える。
 - 地走りは当たりが発動と同時（`artStrikeCone`）で、絵の波は0.44秒かけて届く（旧 V30 スプライトも同じ作り）。
 - 連射・アローレインの発動の絵（弓を引く／空へ放つ）は向きだけで描く。1本ずつの矢と着弾は実際の相手・着弾点で描く。
-- 属性（`element`）は武器技の絵に使っていない（技ごとに色が決まっているため）。
+- 属性（`element`）は武器技の絵に使っていない（技ごとに色が決まっているため）。通常攻撃（振り・弾・当たり）は属性で色と形が変わる。
+- 大技の見本シーンの主人公は戦士の絵で代用している（実機は装備した主人公の絵のまま）。聖騎士（聖域）の見本は騎士の絵。

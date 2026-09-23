@@ -56,7 +56,7 @@ function feelImpact(e,src,crit,dt,elem){
   const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
-  FEEL.hits.push({x:e.x,y:e.y,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally'});
+  FEEL.hits.push({x:e.x,y:e.y,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally',seed:(FEEL.hits.length*7)&31});
   if(FEEL.hits.length>32)FEEL.hits.splice(0,FEEL.hits.length-32);
   if(crit)feelKick(FEEL_TUNING.criticalShake,.19);
 }
@@ -101,18 +101,20 @@ function feelWeaponArtAim(ent,id,tx,ty){
   for(let i=FEEL.weaponArts.length-1;i>=0;i--){const f=FEEL.weaponArts[i];if(f.ent===ent&&f.id===id){f.tx=tx;f.ty=ty;return;}}
 }
 /* 本人に付かない単発の演出（連射の1本・矢の着弾・崩落）。 */
+/* 2026-09-23 追加：o.ent を渡すとその人に付いて動く（大技の足元の陣・仲間ひとりずつの印）。
+   o.delay 秒だけ遅らせて出す（崩落の雷を順に落とす・印を順に灯す）。 */
 function feelPixelArt(id,x,y,o={}){
-  if(!PIXEL_ART_FX)return;
-  FEEL.weaponArts.push({id,x,y,angle:o.angle||0,age:0,max:PIXEL_ART_FX.span(id)||1,range:o.range,life:o.life,
-    tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:null,follow:false});
-  if(FEEL.weaponArts.length>40)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-40);
+  if(!PIXEL_ART_FX||!PIXEL_ART_FX.span(id))return;
+  FEEL.weaponArts.push({id,x,y,angle:o.angle||0,age:-(o.delay||0),max:PIXEL_ART_FX.span(id)||1,range:o.range,life:o.life,
+    tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:o.ent||null,follow:!!o.ent,wide:o.wide,arc:o.arc,kind:o.kind,elem:o.elem});
+  if(FEEL.weaponArts.length>64)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-64);
 }
 function feelArtScale(){return clamp(TS/48,.58,1.35);}
 function feelDrawPixelArt(f,layer,camX,camY){
   let x=f.x,y=f.y;
   if(f.follow&&f.ent&&!f.ent.dead){x=f.ent===P?P.x:f.ent.x;y=f.ent===P?P.y:f.ent.y;}
   PIXEL_ART_FX.renderEffect(ctx,{id:f.id,age:f.age,x:x*TS-camX,y:y*TS-camY,angle:f.angle,scale:feelArtScale(),
-    range:f.range,life:f.life,layer,
+    range:f.range,life:f.life,layer,wide:f.wide,arc:f.arc,kind:f.kind,elem:f.elem,
     tx:f.tx!=null?f.tx*TS-camX:undefined,ty:f.ty!=null?f.ty*TS-camY:undefined,
     casterX:f.cx!=null?f.cx*TS-camX:undefined,casterY:f.cy!=null?f.cy*TS-camY:undefined});
 }
@@ -121,7 +123,9 @@ function feelPersistentPixel(f){
   const id=f.def&&f.def.id;
   if(id==='stflame'||id==='stbolt')return{id,age:f.max-f.t,life:f.max,angle:f.a||0,range:f.r};
   if(id==='dgdance')return{id,age:f.max-f.t,life:f.max,orbitA:f.a||0,range:f.r};
-  if(f.kind==='arrow'&&f.artId==='bwrain')return{id:'bwrain_arrow',age:0,fall:f.t>(f.fall||.45)?-1:clamp(1-f.t/(f.fall||.45),0,1)};
+  if(f.kind==='arrow'&&(f.artId==='bwrain'||f.artId==='a_rain'))return{id:'bwrain_arrow',age:0,fall:f.t>(f.fall||.45)?-1:clamp(1-f.t/(f.fall||.45),0,1)};
+  if(f.kind==='field')return{id:'a_field',age:f.max-f.t,life:f.max,range:f.r};
+  if(f.kind==='sanct')return{id:'a_sanct',age:f.max-f.t,life:f.max,range:f.r};
   if(f.kind==='collapse')return{skip:true};
   return null;
 }
@@ -133,8 +137,25 @@ function feelDrawPersistentPixel(layer,camX,camY){
     PIXEL_ART_FX.renderEffect(ctx,{...p,x:sx,y:sy,scale:feelArtScale(),layer});
   }
 }
+/* 効いている間の足元の輪（守護・鉄壁・生気・聖域・恩寵）。一番強い物を1つだけ描く。 */
+function feelAuraKind(){
+  const r=S.run;if(!r)return null;
+  if(r.sanct&&r.sanct.t>0)return'sanct';
+  if(r.aegis&&r.aegis.t>0)return'aegis';
+  if(r.ward&&r.ward.t>0)return'ward';
+  if(r.bloom&&r.bloom.t>0)return'bloom';
+  if(typeof party==='function'&&party().some(a=>!a.dead&&a.graceT>0))return'grace';
+  return null;
+}
+function feelDrawAuras(layer,camX,camY){
+  const kind=feelAuraKind();if(!kind||!S.hero)return;
+  const members=[P,...(typeof livingParty==='function'?livingParty():[])];
+  members.forEach((m,i)=>PIXEL_ART_FX.renderEffect(ctx,{id:'aura_on',age:FEEL.time+i*.3,x:m.x*TS-camX,y:m.y*TS-camY,
+    scale:feelArtScale(),aura:kind,layer}));
+}
 function drawFeelArtGround(camX,camY){
   if(!PIXEL_ART_FX)return;
+  feelDrawAuras('ground',camX,camY);
   for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'ground',camX,camY);
   feelDrawPersistentPixel('ground',camX,camY);
 }
@@ -142,6 +163,7 @@ function drawFeelWeaponArts(camX,camY){
   if(PIXEL_ART_FX){
     for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'air',camX,camY);
     feelDrawPersistentPixel('air',camX,camY);
+    feelDrawAuras('air',camX,camY);
     return;
   }
   if(!WEAPON_ART_FX)return;
@@ -408,6 +430,13 @@ function drawFeelRing(f,camX,camY){
   ctx.restore();
 }
 function drawFeelSwing(f,camX,camY){
+  if(PIXEL_ART_FX){
+    if(f.skill)return;                      // 衝撃波は s_wave が描く
+    const kind=f.weaponKind||feelWeaponKind(f.weaponBase,f.dt);
+    PIXEL_ART_FX.renderEffect(ctx,{id:'n_swing',kind,elem:feelElement(f.dt,f.elem),age:Math.max(0,(f.max||FEEL_ATTACK_SECONDS)-f.life),
+      x:f.x*TS-camX,y:f.y*TS-camY,angle:f.a||0,scale:feelArtScale(),range:f.r||1.4,layer:'all'});
+    return;
+  }
   if(!ALLY_EFFECT_FX)return;
   const kind=f.weaponKind||feelWeaponKind(f.weaponBase,f.dt),cfg=ALLY_EFFECT_FX.weapons[kind];
   if(!cfg)return;
@@ -426,6 +455,12 @@ function feelHitImage(element,target,age,scale){
   im={canvas,anchor};feelHitCache.set(key,im);return im;
 }
 function drawFeelHits(camX,camY){
+  if(PIXEL_ART_FX){
+    const sc=feelArtScale();
+    for(const f of FEEL.hits)PIXEL_ART_FX.renderEffect(ctx,{id:'n_hit',age:f.age,x:f.x*TS-camX,y:f.y*TS-camY-TS*.1,scale:sc,
+      elem:f.element,target:f.target,seed:f.seed||0,layer:'air'});
+    return;
+  }
   if(!ALLY_EFFECT_FX)return;
   const scale=clamp(TS/48,.65,1.5);
   for(const f of FEEL.hits){const im=feelHitImage(f.element,f.target,f.age,scale);
@@ -443,6 +478,12 @@ function feelProjectileImage(kind,element,scale){
   im={canvas,anchorX,anchorY};feelProjectileCache.set(key,im);return im;
 }
 function drawFeelWeaponShot(f,camX,camY){
+  if(PIXEL_ART_FX){
+    const arrow=f.kind==='arrow';
+    PIXEL_ART_FX.renderEffect(ctx,{id:'n_shot',kind:arrow?'arrow':'bolt',elem:feelElement(arrow?'pierce':'arcane',f.elem),age:FEEL.time,
+      x:f.x*TS-camX,y:f.y*TS-camY,angle:Math.atan2(f.vy,f.vx),scale:feelArtScale(),layer:'air'});
+    return;
+  }
   if(!ALLY_EFFECT_FX)return;
   const kind=f.kind==='arrow'?'bow':'magicbolt',a=Math.atan2(f.vy,f.vx),scale=clamp(TS/42,.8,1.5);
   const element=feelElement(kind==='magicbolt'?'arcane':'pierce',f.elem),im=feelProjectileImage(kind,element,scale);
@@ -622,7 +663,8 @@ function tapDash(cx,cy){
   }
   if(Math.hypot(gx-P.x,gy-P.y)<.12) return false;
   P.dirx=dx;P.diry=dy;
-  P.dash={x0:P.x,y0:P.y,x1:gx,y1:gy,t:0,max:.2,col:'#91dfcb'};
+  P.dash={x0:P.x,y0:P.y,x1:gx,y1:gy,t:0,max:.2,col:'#91dfcb',art:'s_dash'};
+  feelPixelArt('s_dash',P.x,P.y,{angle:Math.atan2(dy,dx),range:Math.hypot(gx-P.x,gy-P.y)});
   FEEL.dashCd=.8; feelKick(1.5,.14);
   FEEL.just=FEEL_TUNING.justWindow;FEEL.justUsed=false;
   return true;

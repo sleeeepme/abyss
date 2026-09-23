@@ -4856,7 +4856,8 @@ function fireAllyArt(a, st, id, tgt, def){
   const say = txt => { sayArt(a.x, a.y, def.nm, def.col); log('◈ '+a.name+'『'+def.nm+'』'+(txt||'')); };
   if(id==='spin'){
     const r=2.4;
-    W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:r, life:0.4, maxLife:0.4, col:def.col});
+    W.fx.push({t:'ultring', artId:'a_spin', x:a.x, y:a.y, r:0, max:r, life:0.4, maxLife:0.4, col:def.col});
+    if(typeof feelPixelArt==='function') feelPixelArt('a_spin', a.x, a.y, {range:r, ent:a, angle:Math.atan2(a.diry||0, a.dirx||1)});
     nearEnemies(a.x, a.y, r+1).forEach(e=>{
       if(e.dead || Math.hypot(e.x-a.x, e.y-a.y) > r+e.r) return;
       hitEnemyByAlly(a, st, e, 1.5);
@@ -4866,7 +4867,8 @@ function fireAllyArt(a, st, id, tgt, def){
 
   }else if(id==='bulwark'){
     [S.hero, ...livingParty()].forEach(h=>{ if(h && !h.dead) h.barrier = BULWARK_HITS; });
-    W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:4.2, life:0.55, maxLife:0.55, col:def.col});
+    W.fx.push({t:'ultring', artId:'a_bulwark', x:a.x, y:a.y, r:0, max:4.2, life:0.55, maxLife:0.55, col:def.col});
+    ultPartyArt('a_bulwark', 2.6, a);
     say('全員に盾');
 
   }else if(id==='rain'){
@@ -4876,11 +4878,12 @@ function fireAllyArt(a, st, id, tgt, def){
     const R = Math.max(3.0, st.range);
     for(let i=0;i<RAIN_ARROWS;i++){
       const ang=rnd()*Math.PI*2, rad=Math.sqrt(rnd())*R;   // 面で均等になるよう平方根
-      W.arts.push({kind:'arrow', x:tgt.x+Math.cos(ang)*rad, y:tgt.y+Math.sin(ang)*rad,
+      W.arts.push({kind:'arrow', artId:'a_rain', x:tgt.x+Math.cos(ang)*rad, y:tgt.y+Math.sin(ang)*rad,
                    t:RAIN_FALL + rnd()*RAIN_SPREAD, fall:RAIN_FALL, r:RAIN_HIT_R,
                    dmg:Math.max(1, Math.round(st.atk*RAIN_MULT)), lv:a.lv,
                    src:a, col:def.col, hit:false});
     }
+    if(typeof feelPixelArt==='function') feelPixelArt('a_rain', a.x, a.y, {angle:Math.atan2(tgt.y-a.y, tgt.x-a.x), tx:tgt.x, ty:tgt.y});
     say('25本');
 
   }else if(id==='field'){
@@ -4890,18 +4893,20 @@ function fireAllyArt(a, st, id, tgt, def){
 
   }else if(id==='vanish'){
     a.iframe = VANISH_SEC;
-    W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:1.6, life:0.4, maxLife:0.4, col:def.col});
+    W.fx.push({t:'ultring', artId:'a_vanish', x:a.x, y:a.y, r:0, max:1.6, life:0.4, maxLife:0.4, col:def.col});
+    if(typeof feelPixelArt==='function') feelPixelArt('a_vanish', a.x, a.y, {ent:a, life:VANISH_SEC});
     say();
 
   }else if(id==='grace'){
     a.graceT = GRACE_SEC;
-    W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:4.5, life:0.6, maxLife:0.6, col:def.col});
+    W.fx.push({t:'ultring', artId:'a_grace', x:a.x, y:a.y, r:0, max:4.5, life:0.6, maxLife:0.6, col:def.col});
+    ultPartyArt('a_grace', 2.6, a);
     say();
 
   }else if(id==='sanctuary'){
     if(S.run) S.run.sanct={t:SANCT_SEC, pct:SANCT_PCT};
     W.arts.push({kind:'sanct', x:a.x, y:a.y, r:4.0, t:SANCT_SEC, max:SANCT_SEC, col:def.col});
-    W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:4.0, life:0.6, maxLife:0.6, col:def.col});
+    W.fx.push({t:'ultring', artId:'a_sanct', x:a.x, y:a.y, r:0, max:4.0, life:0.6, maxLife:0.6, col:def.col});
     say('全能力 +'+SANCT_PCT+'%');
 
   }else if(id==='collapse'){
@@ -8712,8 +8717,9 @@ function fireWave(){
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const half = WAVE_ARC/2;
   W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:FEEL_ATTACK_SECONDS, max:FEEL_ATTACK_SECONDS,
-             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st),
+             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st), skill:'wave',
              weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
+  if(typeof feelPixelArt==='function') feelPixelArt('s_wave', P.x, P.y, {angle:ang, range:WAVE_REACH, arc:WAVE_ARC});
   feelKick(3.4, .18);
   nearEnemies(P.x, P.y, WAVE_REACH+1).forEach(e=>{
     if(e.dead) return;
@@ -8961,6 +8967,15 @@ function ultReady(){
 /* 大技の威力に掛かる倍率。遺物「破断」のぶん。
    ここを1箇所にしておかないと、大技を1つ足すたびに掛け忘れが出る。 */
 function ultPowerMul(){ return 1 + relicSum('ultPow')/100; }
+/* 支える大技・仲間の支える技の絵：本人の足元の陣（本人に付いて動く）＋ 仲間ひとりずつの印を順に灯す。
+   id+'_on' が仲間ごとの印。src を省くと主人公が本人。 */
+function ultPartyArt(id, r, src){
+  if(typeof feelPixelArt!=='function') return;
+  const me = src || P;
+  feelPixelArt(id, me.x, me.y, {range:r, ent:me});
+  const others = [P, ...livingParty()].filter(m=>m!==me);
+  others.forEach((m,i)=>feelPixelArt(id+'_on', m.x, m.y, {ent:m, delay:0.1+i*0.05}));
+}
 function fireUlt(){
   const u=ultEquipped();
   if(!ultReady() || !S.hero) return false;
@@ -8980,7 +8995,8 @@ function fireUlt(){
 
   if(u.id==='quake'){
     const r = 3.2 + lv*0.35, mult = 2.6 + lv*0.55;
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:r, life:0.42, maxLife:0.42, col:u.col});
+    W.fx.push({t:'ultring', artId:'u_quake', x:P.x, y:P.y, r:0, max:r, life:0.42, maxLife:0.42, col:u.col});
+    if(typeof feelPixelArt==='function') feelPixelArt('u_quake', P.x, P.y, {range:r, ent:P});
     near(r).forEach(e=>{ hitEnemy(e, st, mult); addStatus(e, 'stagger', S.hero.lv); });
 
   }else if(u.id==='blink'){
@@ -8998,8 +9014,9 @@ function fireUlt(){
     const gx=stop.x, gy=stop.y;
     /* 走っている間の操作は奪う（途中で曲げられると線分の判定と食い違う）。
        update() の頭で P.dash を進めて、終わったら解ける。 */
-    P.dash = {x0:from.x, y0:from.y, x1:gx, y1:gy, t:0, max:BLINK_SEC, col:u.col};
-    W.fx.push({t:'ultline', x:from.x, y:from.y, x2:gx, y2:gy, life:0.45, maxLife:0.45, col:u.col});
+    P.dash = {x0:from.x, y0:from.y, x1:gx, y1:gy, t:0, max:BLINK_SEC, col:u.col, art:'u_blink'};
+    if(typeof feelPixelArt==='function') feelPixelArt('u_blink', from.x, from.y, {angle:Math.atan2(gy-from.y, gx-from.x), range:Math.hypot(gx-from.x, gy-from.y)});
+    W.fx.push({t:'ultline', artId:'u_blink', x:from.x, y:from.y, x2:gx, y2:gy, life:0.45, maxLife:0.45, col:u.col});
     W.enemies.forEach(e=>{
       if(e.dead) return;
       // 線分と敵の距離で判定する
@@ -9012,7 +9029,8 @@ function fireUlt(){
 
   }else if(u.id==='blaze'){
     const len = 6.5, wide = 1.15, mult = 3.4 + lv*0.7;
-    W.fx.push({t:'ultbeam', x:P.x, y:P.y, a:ang, len, wide, life:0.5, maxLife:0.5, col:u.col});
+    W.fx.push({t:'ultbeam', artId:'u_blaze', x:P.x, y:P.y, a:ang, len, wide, life:0.5, maxLife:0.5, col:u.col});
+    if(typeof feelPixelArt==='function') feelPixelArt('u_blaze', P.x, P.y, {angle:ang, range:len, wide});
     W.enemies.forEach(e=>{
       if(e.dead) return;
       const dx=e.x-P.x, dy=e.y-P.y;
@@ -9029,16 +9047,18 @@ function fireUlt(){
     S.run.ward = {t:dur, cut};
     S.run.pst = {};
     livingParty().forEach(a=>{ a.st={}; });
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
+    W.fx.push({t:'ultring', artId:'u_ward', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
+    ultPartyArt('u_ward', 2.6);
 
   }else if(u.id==='aegis'){
     /* 防御そのものを掛け算する。守護（被ダメージを削る）とは別枠なので、
        両方は乗らない——枠が1つしかないので、そもそも同時には持てない。 */
     const dur = 7 + lv*0.9, mul = 1.6 + lv*0.22;
     S.run.aegis = {t:dur, mul};
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.4, life:0.5, maxLife:0.5, col:u.col});
-    livingParty().forEach(a=>W.fx.push({t:'ultring', x:a.x, y:a.y, r:0, max:1.6,
+    W.fx.push({t:'ultring', artId:'u_aegis', x:P.x, y:P.y, r:0, max:2.4, life:0.5, maxLife:0.5, col:u.col});
+    livingParty().forEach(a=>W.fx.push({t:'ultring', artId:'u_aegis', x:a.x, y:a.y, r:0, max:1.6,
                                         life:0.45, maxLife:0.45, col:u.col}));
+    ultPartyArt('u_aegis', 2.4);
 
   }else if(u.id==='rally'){
     const pct = (22 + lv*5) / 100;
@@ -9050,21 +9070,29 @@ function fireUlt(){
       pop(ent.x!==undefined?ent.x:P.x, (ent.y!==undefined?ent.y:P.y)-0.5, amt, '#7fe0c0', '+');
     };
     heal(S.hero); livingParty().forEach(heal);
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.8, life:0.5, maxLife:0.5, col:u.col});
+    W.fx.push({t:'ultring', artId:'u_rally', x:P.x, y:P.y, r:0, max:2.8, life:0.5, maxLife:0.5, col:u.col});
+    ultPartyArt('u_rally', 2.8);
 
   }else if(u.id==='bloom'){
     /* 一定時間の自動回復。号令（その場で戻す）との違いは、
        **戦い続けているあいだ効く**こと。押す位置が変わる。 */
     const dur = 10 + lv*1.5, pct = 2 + lv*0.5;
     S.run.bloom = {t:dur, pct, tick:0};
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
+    W.fx.push({t:'ultring', artId:'u_bloom', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
+    ultPartyArt('u_bloom', 2.6);
 
   }else if(u.id==='ruin'){
     const mult = 2.2 + lv*0.5;
-    W.fx.push({t:'ultflash', life:0.45, maxLife:0.45, col:u.col});
+    const pix = typeof feelPixelArt==='function';
+    W.fx.push({t:'ultflash', artId:pix?'u_ruin':undefined, life:0.45, maxLife:0.45, col:u.col});
+    if(pix) feelPixelArt('u_ruin', P.x, P.y, {ent:P});
+    let nth = 0;
     W.enemies.forEach(e=>{
       if(e.dead) return;
       if(Math.abs(e.x-P.x)>18 || Math.abs(e.y-P.y)>18) return;   // 画面内だけ
+      // 雷は順に落ちる絵だが、ダメージは今まで通りこの瞬間（絵は 0.1秒＋最大 0.18秒 遅れて着く）
+      if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03});
+      nth++;
       hitEnemy(e, st, e.boss ? mult*0.5 : mult);
     });
   }
@@ -9622,6 +9650,7 @@ function tickRelics(dt){
       if(S.hero.hpNow < st2.maxHp){
         S.hero.hpNow = Math.min(st2.maxHp, S.hero.hpNow + amt);
         pop(P.x, P.y-0.5, amt, '#7fe0c0', '+');
+        if(typeof feelPixelArt==='function') feelPixelArt('s_regen', P.x, P.y, {ent:P});
       }
     }
   }
@@ -10974,7 +11003,8 @@ function die(){
     S.hero.hpNow = stats(S.hero).maxHp;
     P.invuln = Math.max(P.invuln||0, 2.2);   // 立ち上がった直後に即死しない
     feelKick(6, .35);
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:2.4, life:0.7, maxLife:0.7, col:'#e5d18c'});
+    W.fx.push({t:'ultring', artId:'s_revive', x:P.x, y:P.y, r:0, max:2.4, life:0.7, maxLife:0.7, col:'#e5d18c'});
+    if(typeof feelPixelArt==='function') feelPixelArt('s_revive', P.x, P.y, {ent:P});
     W.pops.push({x:P.x, y:P.y-0.8, txt:'不屈', c:'#e5d18c', life:1.2, max:1.2});
     log('不屈 — 立ち上がった');
     return;
@@ -12227,7 +12257,7 @@ function update(dt){
     P.dashFx = (P.dashFx||0) - dt;
     if(P.dashFx<=0){
       P.dashFx = 0.03;
-      W.fx.push({t:'dashghost', x:P.x, y:P.y, life:0.28, max:0.28, col:P.dash.col});
+      W.fx.push({t:'dashghost', artId:P.dash.art, x:P.x, y:P.y, life:0.28, max:0.28, col:P.dash.col});
     }
     if(k>=1) P.dash=null;
   }
@@ -18632,8 +18662,8 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260923a"></script>
-<script src="game-feel.js?v=20260923-pixelarts"></script>
+<script src="weapon-art-pixel.js?v=20260923b"></script>
+<script src="game-feel.js?v=20260923-pixelall"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
