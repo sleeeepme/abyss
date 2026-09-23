@@ -74,17 +74,76 @@ function feelUltimate(ent,col='#f7d898'){
   feelKick(FEEL_TUNING.ultimateShake,.3);feelSpray(ent.x,ent.y,col,48,4);
   W.fx.push({t:'feelring',x:ent.x,y:ent.y,col,life:.6,max:.6,r:3});
 }
+/* ---------- 武器技・崩落の演出 ----------
+   2026-09-23: ドット演出（weapon-art-pixel.js / window.PixelArtFx）へ差し替え。
+   PixelArtFx が無いとき（feeltest など単体で開いたとき）は旧 WeaponArtEffectStudy で描く。
+   描き分け：足元に敷く物（魔法陣・ひび・照準）は drawFeelArtGround で敵より下に、
+   刃・炎・雷・岩などは drawFeelWeaponArts で主人公より上に描く。 */
+const PIXEL_ART_FX=window.PixelArtFx;
+// 持続する技は W.arts 側の時計で描く（絵と当たりの時刻を揃えるため、ここでは二重に積まない）
+const FEEL_PERSISTENT_ARTS=['stflame','stbolt','dgdance'];
 function feelWeaponArtStart(ent,def,x,y,angle){
-  if(!WEAPON_ART_FX||!def)return;
+  if(!def||(!PIXEL_ART_FX&&!WEAPON_ART_FX))return;
   const m=feelMotion(ent);m.artId=def.id;m.artAge=0;m.artLife=def.id==='dgmirage'?(def.t||2.6):.48;
-  // Long-lived arts are rendered from W.arts so their picture and hit timing share
-  // one clock. Adding a second transient copy here makes flame/rain visibly double.
-  if(!['stflame','stbolt','dgdance','bwrain'].includes(def.id))
+  if(PIXEL_ART_FX){
+    if(!FEEL_PERSISTENT_ARTS.includes(def.id))
+      FEEL.weaponArts.push({id:def.id,x,y,angle,age:0,max:PIXEL_ART_FX.span(def.id)||1.45,
+        range:def.r||def.len||def.dist||3,life:def.t,ent,
+        // 居合は踏み込む前の位置、ドラグーンは跳んだ位置に残す（着地は狙いの座標で描く）
+        follow:def.k!=='dash'&&def.k!=='dragoon'});
+  }else if(!['stflame','stbolt','dgdance','bwrain'].includes(def.id))
     FEEL.weaponArts.push({id:def.id,x,y,angle,age:0,max:1.45,range:def.r||def.len||def.dist||3,
       element:feelElement(def.dt),ent,follow:def.k!=='dash'});
   if(FEEL.weaponArts.length>24)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-24);
 }
+/* 狙いが決まってから座標を渡す（レイジングアッパー・ドラグーン）。 */
+function feelWeaponArtAim(ent,id,tx,ty){
+  for(let i=FEEL.weaponArts.length-1;i>=0;i--){const f=FEEL.weaponArts[i];if(f.ent===ent&&f.id===id){f.tx=tx;f.ty=ty;return;}}
+}
+/* 本人に付かない単発の演出（連射の1本・矢の着弾・崩落）。 */
+function feelPixelArt(id,x,y,o={}){
+  if(!PIXEL_ART_FX)return;
+  FEEL.weaponArts.push({id,x,y,angle:o.angle||0,age:0,max:PIXEL_ART_FX.span(id)||1,range:o.range,life:o.life,
+    tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:null,follow:false});
+  if(FEEL.weaponArts.length>40)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-40);
+}
+function feelArtScale(){return clamp(TS/48,.58,1.35);}
+function feelDrawPixelArt(f,layer,camX,camY){
+  let x=f.x,y=f.y;
+  if(f.follow&&f.ent&&!f.ent.dead){x=f.ent===P?P.x:f.ent.x;y=f.ent===P?P.y:f.ent.y;}
+  PIXEL_ART_FX.renderEffect(ctx,{id:f.id,age:f.age,x:x*TS-camX,y:y*TS-camY,angle:f.angle,scale:feelArtScale(),
+    range:f.range,life:f.life,layer,
+    tx:f.tx!=null?f.tx*TS-camX:undefined,ty:f.ty!=null?f.ty*TS-camY:undefined,
+    casterX:f.cx!=null?f.cx*TS-camX:undefined,casterY:f.cy!=null?f.cy*TS-camY:undefined});
+}
+/* W.arts の持続技を PixelArtFx の引数へ。age は周期で割らず、発動からの実時間を渡す。 */
+function feelPersistentPixel(f){
+  const id=f.def&&f.def.id;
+  if(id==='stflame'||id==='stbolt')return{id,age:f.max-f.t,life:f.max,angle:f.a||0,range:f.r};
+  if(id==='dgdance')return{id,age:f.max-f.t,life:f.max,orbitA:f.a||0,range:f.r};
+  if(f.kind==='arrow'&&f.artId==='bwrain')return{id:'bwrain_arrow',age:0,fall:f.t>(f.fall||.45)?-1:clamp(1-f.t/(f.fall||.45),0,1)};
+  if(f.kind==='collapse')return{skip:true};
+  return null;
+}
+function feelDrawPersistentPixel(layer,camX,camY){
+  for(const f of (W.arts||[])){
+    const p=feelPersistentPixel(f);if(!p||p.skip)continue;
+    const sx=f.x*TS-camX,sy=f.y*TS-camY;
+    if(sx<-200||sy<-200||sx>innerWidth+200||sy>innerHeight+200)continue;
+    PIXEL_ART_FX.renderEffect(ctx,{...p,x:sx,y:sy,scale:feelArtScale(),layer});
+  }
+}
+function drawFeelArtGround(camX,camY){
+  if(!PIXEL_ART_FX)return;
+  for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'ground',camX,camY);
+  feelDrawPersistentPixel('ground',camX,camY);
+}
 function drawFeelWeaponArts(camX,camY){
+  if(PIXEL_ART_FX){
+    for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'air',camX,camY);
+    feelDrawPersistentPixel('air',camX,camY);
+    return;
+  }
   if(!WEAPON_ART_FX)return;
   const scale=clamp(TS/48,.58,1.35);
   for(const f of FEEL.weaponArts){
@@ -95,6 +154,8 @@ function drawFeelWeaponArts(camX,camY){
   }
 }
 function drawFeelPersistentArt(f,camX,camY){
+  // PixelArtFx があれば、持続技は drawFeelArtGround / drawFeelWeaponArts で描いている
+  if(PIXEL_ART_FX&&feelPersistentPixel(f))return true;
   if(!WEAPON_ART_FX||!f)return false;
   const scale=clamp(TS/48,.58,1.35),id=f.def&&f.def.id;
   if(id==='stflame'||id==='stbolt'||id==='dgdance'){

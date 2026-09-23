@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>武器技のドット演出</title>
+<style>
+  :root{
+    --bg:#131019; --panel:#1c1826; --panel2:#231e30; --line:#332c44; --ink:#ece6f5; --mute:#a59cb8; --dim:#6f6684;
+    --accent:#e0a458; --arcane:#c98adf; --fire:#ff8a4a; --frost:#7fd8ff; --shock:#ffe066;
+    --idle:#4a4360; --charge:#72d9e6; --cast:#e0a458; --recover:#8e62a3;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{background:var(--bg)}
+  body{margin:0;color:var(--ink);font:15px/1.7 "Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;padding-inline:16px}
+  .wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px}
+  .eyebrow{font:12px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.14em;color:var(--accent);margin:0 0 10px}
+  h1{font-size:clamp(26px,4.4vw,38px);line-height:1.25;margin:0 0 10px;text-wrap:balance;letter-spacing:.02em}
+  .lede{color:var(--mute);max-width:64ch;margin:0}
+  .lede code,.note code,.howto code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+  .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+       margin:22px 0 18px;padding:10px 0;background:linear-gradient(var(--bg) 70%,transparent)}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;
+       font:12px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.06em;padding:10px 12px;cursor:pointer}
+  .btn:hover{border-color:#4a4060}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg .btn{border:0;border-radius:0;background:var(--panel)}
+  .seg .btn+.btn{border-left:1px solid var(--line)}
+  .spacer{flex:1}
+  .clock{font:12px/1 "Silkscreen",ui-monospace,monospace;color:var(--dim);font-variant-numeric:tabular-nums}
+  #cards{display:grid;gap:34px}
+  .group{display:grid;gap:18px;scroll-margin-top:80px}
+  .group>h2{margin:0;font:13px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.14em;color:var(--accent);display:flex;align-items:center;gap:12px}
+  .group>h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  .jump{display:flex;flex-wrap:wrap;gap:6px;margin:-6px 0 18px}
+  .jump a{font-size:13px;color:var(--mute);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 12px;background:var(--panel)}
+  .jump a:hover,.jump a:focus-visible{color:var(--ink);border-color:var(--accent);outline:none}
+  .magic{color:#d9b8ff;border-color:#4b3565}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:16px;
+        grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)}
+  @media (max-width:860px){.card{grid-template-columns:1fr}}
+  .card header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+  .card h3{margin:0;font-size:21px;letter-spacing:.03em}
+  .who{color:var(--mute);font-size:13px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+  .chip{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--panel2);font-variant-numeric:tabular-nums}
+  .stage{display:grid;gap:10px;min-width:0}
+  canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:8px;background:#0d0c12}
+  canvas.new{aspect-ratio:160/112}
+  canvas.old{aspect-ratio:320/170}
+  .tl{position:relative;height:26px;border-radius:6px;overflow:hidden;display:flex;background:var(--panel2)}
+  .tl span{display:flex;align-items:center;justify-content:center;font:10px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.06em;color:#0d0c12;overflow:hidden;white-space:nowrap}
+  .tl .IDLE{background:var(--idle);color:var(--mute)} .tl .CHARGE{background:var(--charge)} .tl .CAST{background:var(--cast)} .tl .RECOVER{background:var(--recover);color:#f0dcff}
+  .tl .head{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 0 1px #0d0c12;left:0}
+  .phase{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute)}
+  .phase b{font:12px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.08em;padding:6px 8px;border-radius:6px;background:var(--idle);color:var(--ink);min-width:88px;text-align:center}
+  .side{display:grid;gap:12px;align-content:start;min-width:0}
+  .label{font:11px/1 "Silkscreen",ui-monospace,monospace;letter-spacing:.12em;color:var(--dim);margin:0 0 6px}
+  .note{margin:0;color:var(--ink);font-size:14px}
+  .warn{margin:0;font-size:13px;color:#f3d49c;background:#2a2217;border:1px solid #4a3a22;border-radius:8px;padding:8px 10px}
+  .old-wrap[hidden]{display:none}
+  section.howto{margin-top:34px;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .howto h3{margin:0 0 8px;font-size:17px}
+  .howto div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .howto ol,.howto ul{margin:0;padding-left:1.3em;color:var(--mute);font-size:14px}
+  .howto li{margin:4px 0;overflow-wrap:anywhere}
+  .howto li b{color:var(--ink);font-weight:600}
+  .pal{display:flex;flex-wrap:wrap;gap:3px;margin-top:10px}
+  .pal i{width:16px;height:16px;border-radius:3px;display:block;box-shadow:inset 0 0 0 1px #0004}
+  @media (prefers-reduced-motion:reduce){.tl .head{transition:none}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">ABYSS — WEAPON ARTS / PIXEL STUDY</p>
+  <h1>武器技24種と「崩落」をドットで描き直す</h1>
+  <p class="lede">論理解像度（1マス＝16ドット）で描いて補間なしで拡大、色は固定パレット、フェードはディザ、形は12fpsで段付き——というやり方で、武器技24種と大魔導士の「崩落」を作り直した見本です。魔法系（杖・崩落・癒し打ち・ホーリーシールド）は足元に魔法陣を敷きます。右に今の実機の演出を並べてあります。すべてコードだけで描いていて、画像素材は使っていません。</p>
+
+  <div class="bar" role="toolbar" aria-label="再生の操作">
+    <button class="btn" id="play" type="button" aria-pressed="true">❚❚ 一時停止</button>
+    <button class="btn" id="step" type="button">▶| コマ送り</button>
+    <div class="seg" role="group" aria-label="速さ">
+      <button class="btn" id="spd1" type="button" data-s="1" aria-pressed="true">1×</button>
+      <button class="btn" id="spd2" type="button" data-s="0.5" aria-pressed="false">½×</button>
+      <button class="btn" id="spd4" type="button" data-s="0.25" aria-pressed="false">¼×</button>
+    </div>
+    <button class="btn" id="cmp" type="button" aria-pressed="true">現行と並べる</button>
+    <span class="spacer"></span>
+    <span class="clock" id="clock">t 0.00</span>
+  </div>
+
+  <nav class="jump" id="jump" aria-label="武器ごとに移動"></nav>
+  <div id="cards"></div>
+
+  <section class="howto">
+    <div>
+      <h3>使ったやり方（ポストのプロンプトから）</h3>
+      <ol>
+        <li><b>論理解像度で描いて整数倍に拡大。</b>1マス＝16ドットでキャラ絵と同じ格子。補間なし。</li>
+        <li><b>固定パレットだけ。</b>半透明・グラデーション・ぼかし（<code>filter:blur</code>）は使わない。消えるときは4×4ディザで間引く。</li>
+        <li><b>形とポーズは12fps、ループは60fps。</b>動きは滑らかに計算してから、コマと格子に落とす。</li>
+        <li><b>粒子は番号から位置が決まる。</b>状態を持たないので割り当てゼロ、コマ送りも巻き戻しもそのまま効く。</li>
+        <li><b>IDLE → CHARGE → CAST → RECOVER の段取り。</b>溜めで宝石へ粒が渦を巻き、杖の宝石から1ドットのリムライト。</li>
+        <li><b>着弾で1〜2ドット揺らす。</b>床は照り返しの色に差し替える（パレットスワップ）。</li>
+        <li><b>魔法系は足元に魔法陣。</b>つぶれた二重の輪が回り、縁から文字片が立ちのぼり、発動の瞬間だけ白く光る。</li>
+      </ol>
+      <div class="pal" id="pal" aria-label="エフェクト用パレット"></div>
+    </div>
+    <div>
+      <h3>実機への組み込み（済み）</h3>
+      <ul>
+        <li><code>proto/weapon-art-pixel.js</code>（<code>window.PixelArtFx</code>）を <code>game-feel.js</code> より先に読み込み、武器技の絵はすべてこちらで描いている。</li>
+        <li>足元（魔法陣・ひび・照準）は敵を描く前の <code>drawFeelArtGround</code>、刃・炎・雷・岩は主人公の後の <code>drawFeelWeaponArts</code>。</li>
+        <li>持続技（フレイム・ライトニング・ダンシングソード）は <code>W.arts</code> の時計（周期で割らない実時間）で描く。ダンシングソードの刃は当たり判定と同じ角度 <code>f.a</code>。</li>
+        <li>崩落は <b>発動の0.55秒後に着弾</b>（<code>COLLAPSE_DELAY</code>）。ダメージも着弾に予約した。</li>
+        <li>レイジングアッパー・ドラグーンは狙った相手の座標、連射は1発ごとの相手の座標で描く。</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<!-- 見比べ用に現行の描画モジュールをそのまま読む（シムなし）。新しい演出は weapon-art-pixel.js だけで完結 -->
+<script src="ally-effect-study.js"></script>
+<script src="weapon-art-effect-study.js"></script>
+<script src="weapon-art-pixel.js"></script>
+<script>
+(() => {
+  'use strict';
+  const S = window.PixelArtFx, OLD = window.WeaponArtEffectStudy;
+  const NOTES = {
+    collapse: ['着弾点から半径3マス・ATK×2.6・17秒ごと', '杖から空へ光を抜き、着弾範囲そのままの魔法陣 → 影 → 岩が落ちる → 衝撃波・ひび・破片。どこに何が落ちるかを先に見せる。', '現行：紫の輪が0.5秒広がるだけ'],
+    stflame: ['前方70°・3.6マス・2.5秒', '先の尖った炎の粒が 白→黄→橙→赤→煙 と色段を下りながら扇に広がる。足元に炎の魔法陣。', '現行：V44スプライト＋ぼかし'],
+    sticicle: ['直線5.5マス・0.2秒刻みで3回', '氷の槍が通った順に床から結晶が生え、砕けて落ちる。3本目は太く、先で砕けて1ドット揺れる。', '現行：ぼかした三角を3回'],
+    stbolt: ['周囲3.2マス・3秒・0.4秒ごと', '最初の一本が杖に落ち、範囲の破線が回り出す。落ちる前2コマの予兆、敵から敵へ走る弧。', '現行：ぼかした細い線'],
+    iai: ['前方3.4マス踏み込み', '走った線がまず細い光、次に太り、ちぎれて横へ弾ける。抜けた先に三日月。', '現行：通常の剣軌跡を1.18倍'],
+    swspin: ['周囲2.7マス', '一周する三日月。外の縁が白、内へ行くほど青い尾。床を擦る土煙の輪。', '現行：通常斬撃で一周'],
+    swmulti: ['前方2マス×3回', '角度を変えた三日月を3回、3回目は大きく。', '現行：通常の剣軌跡を3度'],
+    gtspin: ['周囲3.2マス×2回', '太い輪を2度。床を擦って小石が跳ね、1ドット揺れる。', '現行：通常斬撃の円を2度'],
+    gtquake: ['扇5マス', '振り下ろしから、岩の刺が前線に並んで扇に走り、通り過ぎると崩れて沈む。', '現行：V30スプライト'],
+    gtupper: ['単体2.6マス・強ノックバック', '下から斬り上げ、狙った相手の足元から光の柱。相手が打ち上がる。', '現行：V18スプライト'],
+    dgslash: ['前方1.7マス×3回', '細い斬り跡が交差する3回と、交差点の光。', '現行：通常の短剣軌跡を3度'],
+    dgdance: ['6秒・半径1.9マス', '当たり判定と同じ角度で回る一本の刃と、遅れて付いてくる2つの影。', '現行：刃3本（判定は1本）'],
+    dgmirage: ['2.6秒無敵', '左右に交互に出る残像と、体の周りを回る鏡のかけら。', '現行：半透明＋残像2枚'],
+    axtoma: ['直線6マス・貫通', '回る斧（8方向の絵）が回転の跡を残して貫く。', '現行：斧軌跡を小さく巻く'],
+    axspin: ['周囲3マス', '木の色が混じった重い輪と、木くず・床のひび。', '現行：斧軌跡で一周'],
+    axspiral: ['直線5マス×3回', '小さな斧を3つ、上下にずらして投げる。当たりで木の火花。', '現行：小さな回転を3度'],
+    spswing: ['周囲2.9マス×2回', '細い穂先の弧と柄の線で、槍で払っているのが分かる形に。', '現行：細い円軌道を2度'],
+    splance: ['直線7マス・貫通', '一瞬で伸びる針と、根元から広がる音の輪。', '現行：刺突を1.28倍'],
+    spdragoon: ['1秒後に範囲6.5マスの敵へ', '光の柱で跳び、着地点に縮む照準と落ちる影、空から一直線に降りる。', '現行：上下に刺突'],
+    bwrain: ['狙った辺りへ6〜10本', '空へ5本放ち、着地点に輪を出してから矢が降る。刺さった矢と土煙。', '現行：矢形を上から落とす'],
+    bwrapid: ['近くの敵へ5回', '1本ずつ、そのとき狙った相手へ飛ぶ。', '現行：同じ向きに5本'],
+    bwburst: ['直線7.5マス・炎', '燃える矢が通った道に火の粒と焦げが残る。', '現行：白芯＋橙の残光'],
+    mcdouble: ['前方2マス×2回', '振り下ろして左右の床を2度打つ。金の火花・床のひび・土煙。', '現行：戦鎚衝撃を2度'],
+    mcheal: ['打って周囲4マスの味方を9%回復', '緑の魔法陣。打った所から癒しの輪が広がり、味方の上に十字が立ちのぼる。', '現行：淡い緑の粒'],
+    mcshield: ['1回だけ攻撃を無効化', '金の魔法陣と、体を包む殻。消えたあと頭の上に小さな盾が残る。', '現行：盾形を短く']
+  };
+  const $ = id => document.getElementById(id);
+  const root = $('cards'), jump = $('jump');
+  const cards = [];
+  S.groups.forEach(([gid, gname]) => {
+    const keys = S.keys.filter(k => S.defs[k].group === gid); if (!keys.length) return;
+    const sec = document.createElement('section'); sec.className = 'group'; sec.id = 'g-' + gid;
+    sec.innerHTML = `<h2>${gname}</h2>`;
+    root.appendChild(sec);
+    const a = document.createElement('a'); a.href = '#g-' + gid; a.textContent = gname; jump.appendChild(a);
+    keys.forEach(key => {
+      const d = S.defs[key], n = NOTES[key] || ['', '', ''], tl = S.timeline(key), magic = !!S.magic[key];
+      const el = document.createElement('article');
+      el.className = 'card';
+      el.innerHTML =
+        `<header><h3>${d.label}</h3><span class="who">${d.who}</span><span class="chips"><span class="chip">${n[0]}</span>${magic ? '<span class="chip magic">魔法陣</span>' : ''}</span></header>
+         <div class="stage">
+           <canvas class="new" width="480" height="336" aria-label="${d.label}の新しい演出"></canvas>
+           <div class="tl" aria-hidden="true">${tl.phases.map(p => `<span class="${p[0]}" style="flex:${(p[2] - p[1]).toFixed(3)}">${(p[2] - p[1]) / tl.loop > 0.14 ? p[0] : ''}</span>`).join('')}<i class="head"></i></div>
+           <div class="phase"><b>IDLE</b><span>ループ ${tl.loop.toFixed(2)} 秒</span></div>
+         </div>
+         <div class="side">
+           <div class="old-wrap"><p class="label">NOW — いまの実機</p><canvas class="old" width="320" height="170" aria-label="${d.label}の現行の演出"></canvas><p class="who" style="margin:6px 0 0">${n[2]}</p></div>
+           <div><p class="label">WHAT CHANGED</p><p class="note">${n[1]}</p></div>
+         </div>`;
+      sec.appendChild(el);
+      const cv = el.querySelector('canvas.new'), old = el.querySelector('canvas.old');
+      cards.push({ key, tl, el, ctx: cv.getContext('2d'), octx: old.getContext('2d'),
+                   head: el.querySelector('.head'), phase: el.querySelector('.phase b'), oldWrap: el.querySelector('.old-wrap'), visible: !('IntersectionObserver' in window), lastPhase: '' });
+    });
+  });
+  // パレット見本
+  const pal = $('pal');
+  Object.entries(S.palette).forEach(([k, v]) => { const i = document.createElement('i'); i.style.background = v; i.title = k + ' ' + v; pal.appendChild(i); });
+
+  // 画面外は描かない
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => es.forEach(e => { const c = cards.find(c => c.el === e.target); if (c) c.visible = e.isIntersecting; }), { rootMargin: '120px' });
+    cards.forEach(c => io.observe(c.el));
+  }
+
+  // 現行の崩落（ゲームの ultring と同じ描き方を縮尺 TS=24 で）
+  function drawOldCollapse(ctx, t) {
+    const w = ctx.canvas.width, h = ctx.canvas.height, TS = 24;
+    ctx.fillStyle = '#22352c'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#26392e';
+    for (let y = 0; y < h; y += 12) for (let x = (y / 12 % 2) * 12; x < w; x += 24) ctx.fillRect(x + 1, y + 1, 22, 10);
+    const lt = t % 1.4, life = 0.5;
+    if (lt < life) {
+      const k = lt / life, rr = 3 * TS * k;
+      ctx.save(); ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = '#c98adf'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(w * 0.62, h * 0.52, rr, 0, 7); ctx.stroke();
+      ctx.globalAlpha = (1 - k) * 0.22; ctx.fillStyle = '#c98adf'; ctx.beginPath(); ctx.arc(w * 0.62, h * 0.52, rr, 0, 7); ctx.fill(); ctx.restore();
+    }
+  }
+  function drawOld(c, t) {
+    if (c.key === 'collapse') return drawOldCollapse(c.octx, t);
+    if (!OLD) { c.octx.fillStyle = '#1c1826'; c.octx.fillRect(0, 0, 320, 170); return; }
+    try { OLD.scene(c.octx, c.key, t % (OLD.duration || 1.4)); } catch (e) {}
+  }
+
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const st = { time: 0, playing: !reduce, speed: 1, compare: true };
+  function setPlaying(p) { st.playing = p; $('play').setAttribute('aria-pressed', String(p)); $('play').textContent = p ? '❚❚ 一時停止' : '▶ 再生'; }
+  setPlaying(st.playing);
+  $('play').addEventListener('click', () => setPlaying(!st.playing));
+  $('step').addEventListener('click', () => { setPlaying(false); st.time += 1 / 12; draw(true); });
+  ['spd1', 'spd2', 'spd4'].forEach(id => $(id).addEventListener('click', e => {
+    st.speed = +e.currentTarget.dataset.s;
+    ['spd1', 'spd2', 'spd4'].forEach(j => $(j).setAttribute('aria-pressed', String(j === id)));
+  }));
+  $('cmp').addEventListener('click', () => {
+    st.compare = !st.compare; $('cmp').setAttribute('aria-pressed', String(st.compare));
+    cards.forEach(c => { c.oldWrap.hidden = !st.compare; });
+  });
+  const PCOL = { IDLE: 'var(--idle)', CHARGE: 'var(--charge)', CAST: 'var(--cast)', RECOVER: 'var(--recover)' };
+  function draw(all) {
+    $('clock').textContent = 't ' + st.time.toFixed(2);
+    for (const c of cards) {
+      if (!all && !c.visible) continue;
+      S.scene(c.ctx, c.key, st.time);
+      if (st.compare) drawOld(c, st.time);
+      const lt = ((st.time % c.tl.loop) + c.tl.loop) % c.tl.loop;
+      c.head.style.left = (lt / c.tl.loop * 100).toFixed(2) + '%';
+      const ph = S.phaseAt(c.key, lt);
+      if (ph !== c.lastPhase) { c.lastPhase = ph; c.phase.textContent = ph; c.phase.style.background = PCOL[ph]; c.phase.style.color = ph === 'IDLE' || ph === 'RECOVER' ? '#ece6f5' : '#0d0c12'; }
+    }
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (st.playing) { st.time += dt * st.speed; draw(false); }
+    requestAnimationFrame(frame);
+  }
+  // 止まった状態でも見える絵を1枚（崩落の着弾直前）
+  st.time = reduce ? 1.2 : 0;
+  draw(true);
+  if (window.claude && window.claude.hot) {
+    window.claude.hot.snapshot && window.claude.hot.snapshot(() => ({ time: st.time, speed: st.speed, playing: st.playing, compare: st.compare }));
+    const boot = d => { if (d && typeof d.time === 'number') { st.time = d.time; st.speed = d.speed || 1; setPlaying(d.playing !== false); if (d.compare === false) $('cmp').click(); } draw(true); };
+    window.claude.hot.ready ? window.claude.hot.ready(boot) : boot(window.claude.hot.data || {});
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -246,12 +246,20 @@ R.collapse = await stage('archmage', (a,e,def)=>{
   const mk=(dx,dy)=>{ const c=Object.assign({}, e, {x:e.x+dx, y:e.y+dy, hp:999999, dead:false});
     W.enemies.push(c); return c; };
   const c1=mk(0,0), c2=mk(1.4,0.6), far=mk(9,0);
-  stepSim(0.2);
-  return {c1:999999-c1.hp, c2:999999-c2.hp, far:999999-far.hp,
+  /* 岩が落ちきるまで COLLAPSE_DELAY（0.55秒）ある。その前に減っていたら、
+     絵では何も落ちていないのに敵が削れていることになる。 */
+  /* 通常攻撃（炸裂の飛び火を含む）は止めて、崩落だけを測る。
+     時間を伸ばしたぶん、止めないと遠くの的まで通常攻撃が届いて sparesFar が揺れる。 */
+  const quiet={each:()=>{ a.atkCd=99; }};
+  stepSim(0.2, quiet);
+  const early=999999-c1.hp, pending=(W.arts||[]).some(f=>f.kind==='collapse' && !f.hit);
+  stepSim(COLLAPSE_DELAY, quiet);
+  return {c1:999999-c1.hp, c2:999999-c2.hp, far:999999-far.hp, early, pending,
           hitsCluster: c1.hp<999999 && c2.hp<999999,
           sparesFar: far.hp===999999,
           hitsHard: (999999-c1.hp) > 0,
-          ok: c1.hp<999999 && c2.hp<999999 && far.hp===999999};
+          waitsForImpact: early===0 && pending,
+          ok: c1.hp<999999 && c2.hp<999999 && far.hp===999999 && early===0 && pending};
 });
 
 // 2-j. リキャストがあり、撃ちっぱなしにならない
