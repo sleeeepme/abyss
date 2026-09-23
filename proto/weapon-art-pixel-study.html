@@ -77,8 +77,8 @@
 <body>
 <div class="wrap">
   <p class="eyebrow">ABYSS — PIXEL EFFECTS STUDY</p>
-  <h1>武器技・大技・スキル・通常攻撃をドットで描き直す</h1>
-  <p class="lede">論理解像度（1マス＝16ドット）で描いて補間なしで拡大、色は固定パレット、フェードはディザ、形は12fpsで段付き——というやり方で、武器技24種と大魔導士の「崩落」、主人公の大技8種、仲間の Lv.50 の大技、スキル技、通常攻撃（武器7系統×属性5種）を作り直した見本です。魔法系と支える技は足元に魔法陣を敷きます。右に今の実機の演出を並べてあります。すべてコードだけで描いていて、画像素材は使っていません。</p>
+  <h1>武器技・大技・スキル・通常攻撃・ボスの技をドットで描き直す</h1>
+  <p class="lede">論理解像度（1マス＝16ドット）で描いて補間なしで拡大、色は固定パレット、フェードはディザ、形は12fpsで段付き——というやり方で、武器技24種と大魔導士の「崩落」、主人公の大技8種、仲間の Lv.50 の大技、スキル技、通常攻撃（武器7系統×属性5種）、5F・10F のボスの技を作り直した見本です。ボスの赤い予兆は本編の形（＝当たり判定）のまま残し、溜めの間と放った後だけを描き足しています。魔法系と支える技は足元に魔法陣を敷きます。右に今の実機の演出を並べてあります。すべてコードだけで描いていて、画像素材は使っていません。</p>
 
   <div class="bar" role="toolbar" aria-label="再生の操作">
     <button class="btn" id="play" type="button" aria-pressed="true">❚❚ 一時停止</button>
@@ -186,6 +186,16 @@
     s_dash: ['短い踏み込み', '足元の輪と速度線、通った道に粒。', '現行：丸い残像'],
     s_revive: ['倒れても一度だけ', '空から白い光の柱が落ち、金の魔法陣の上で立ち上がる。羽が舞う。', '現行：金の輪'],
     s_regen: ['10秒ごとに少し回復', '回復した瞬間だけ、足元の輪と小さな十字。', '現行：数字だけ'],
+    bs_toad_slam: ['円・半径2.7＋体', '溜めの間、灰が喉へ吸い込まれて床が震える。跳んで叩きつけると、灰の輪・放射のひび・噴き上がる灰の柱・燃えさし。煙は網掛けで薄く（主人公が隠れない）。', '現行：打撃色の輪が広がるだけ'],
+    bs_toad_cleave: ['正面の扇・75°', '舌で薙ぐ。舌の先と灰の三日月が同じ速さで扇をなぞり、縁に土煙、床に擦った跡。', '現行：扇を塗って白い縁'],
+    bs_toad_pillars: ['半径1.7の円×4', '飲み込んだ灰の塊を吐き出す。溜めの終わりに4つの塊が弧を描いて飛び、影が濃くなって、着弾で灰が噴く。', '現行：赤い円が4つ爆ぜる'],
+    bs_toad_jab: ['通常攻撃', '届く所まで舌を突き出して引っ込める。', '現行：絵なし（当たりの火花だけ）'],
+    bs_vera_beam: ['帯・長さ12・幅0.62', '弓を引く間に光で矢が組み上がる。放つと、白い芯から外へ網掛けで薄れる光の帯が一瞬で走り、帯に直交する輪と羽根がはがれる。', '現行：色の帯が0.4秒'],
+    bs_vera_burst: ['全方位・9〜14本', '弓を空へ鳴らし、形の無い矢を全方位へ撒く。1本ずつが矢羽の付いた光の矢。', '現行：色の丸い弾'],
+    bs_vera_shot: ['通常攻撃', '光の矢を1本。', '現行：色の丸い弾'],
+    bs_vera2_beam: ['帯・長さ12・幅0.62', '石の槍。礫が集まって槍になり、放つと砂利を落としながら走り、道に砂けむり。', '現行：色の帯'],
+    bs_vera2_wave: ['広がる輪・半径9まで', '跳ねながら転がる礫の輪。**円のまま**（当たり判定と同じ）。内側に砂けむり。', '現行：色の太い輪'],
+    bs_vera2_rocks: ['半径1.7の円×4', '空から石が落ちて砕ける。溜めの終わりに影が濃くなり、落ちる石に光の筋。', '現行：赤い円が4つ爆ぜる'],
     aura: ['効いている間', '守護・鉄壁・生気・聖域・恩寵が続くあいだ、全員の足元に回る破線の輪。一番強い物を1つだけ。', '現行：なし']
   };
   /* 現行の見比べ（新しく足した分）。実機の ultring / ultbeam / ultline / 通常攻撃をそのまま小さく描く */
@@ -221,6 +231,15 @@
     } else if (c.key === 's_wave') {
       const k = Math.min(1, lt / 0.48); ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = '#dbe6f2'; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(60, h / 2, 3.4 * TS * (0.4 + 0.6 * k), -0.75, 0.75); ctx.stroke();
+    } else if (c.key.indexOf('bs_') === 0) {                         // ボスの現行：輪・扇・帯・丸い弾
+      const col = c.key.indexOf('toad') > 0 ? '#d8c0a0' : '#c8d8e8', k = Math.min(1, lt / 0.4), cx = w / 2, cy = h / 2;
+      ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+      if (/slam|pillars|rocks/.test(c.key)) { ctx.beginPath(); ctx.arc(cx, cy, 60 * (0.85 + 0.2 * k), 0, 7); ctx.stroke(); }
+      else if (/cleave/.test(c.key)) { ctx.beginPath(); ctx.moveTo(40, cy); ctx.arc(40, cy, 100, -1.3, 1.3); ctx.closePath(); ctx.globalAlpha *= 0.4; ctx.fill(); }
+      else if (/beam/.test(c.key)) { ctx.fillRect(20, cy - 10, 290, 20); }
+      else if (/wave/.test(c.key)) { ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(cx, cy, 20 + 140 * k, 0, 7); ctx.stroke(); }
+      else if (/burst|shot/.test(c.key)) { ctx.globalAlpha = 0.8; for (let i = 0; i < (c.key.indexOf('shot') > 0 ? 1 : 9); i++) { const a = i / 9 * 6.28, d = 20 + 120 * k; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 4, 0, 7); ctx.fill(); } }
+      else { ctx.fillStyle = '#a59cb8'; ctx.font = '13px sans-serif'; ctx.fillText('（絵なし）', 12, 24); }
     } else { ctx.fillStyle = '#a59cb8'; ctx.font = '13px sans-serif'; ctx.fillText('（絵なし）', 12, 24); }
     ctx.restore();
   }

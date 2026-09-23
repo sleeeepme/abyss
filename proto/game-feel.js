@@ -56,7 +56,9 @@ function feelImpact(e,src,crit,dt,elem){
   const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
   feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
-  FEEL.hits.push({x:e.x,y:e.y,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally',seed:(FEEL.hits.length*7)&31});
+  /* 当たりの絵は**当たった相手に付けて動かす。** 座標だけ控えると、ノックバック（knockBack は最大2.6マス
+     その場で動かす）や走っている敵では、絵だけが元の場所に残って「敵と違う所に出る」ように見えた。 */
+  FEEL.hits.push({x:e.x,y:e.y,ent:e,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally',seed:(FEEL.hits.length*7)&31});
   if(FEEL.hits.length>32)FEEL.hits.splice(0,FEEL.hits.length-32);
   if(crit)feelKick(FEEL_TUNING.criticalShake,.19);
 }
@@ -153,9 +155,43 @@ function feelDrawAuras(layer,camX,camY){
   members.forEach((m,i)=>PIXEL_ART_FX.renderEffect(ctx,{id:'aura_on',age:FEEL.time+i*.3,x:m.x*TS-camX,y:m.y*TS-camY,
     scale:feelArtScale(),aura:kind,layer}));
 }
+/* ---------- ボスの攻撃（5F 灰の大蛙・10F ヴェラ）----------
+   予兆（赤い円・扇・帯）は本編の drawBossCast がそのまま描く（当たり判定と同じ形）。
+   ここで足すのは「溜めている間の本体まわり」と、放った後の絵（resolveBossMove が積む）。
+   ヴェラは第一形態（e.form2 がまだある）が空引き＝光の矢、第二形態が礫。 */
+function feelBossArt(e){
+  if(!PIXEL_ART_FX||!e||!e.boss)return null;
+  if(e.uniqueBoss===5)return{pre:'bt',kind:'ash'};
+  if(e.uniqueBoss===10)return{pre:'bv',kind:e.form2?'ghost':'stone'};
+  return null;
+}
+function feelDrawBossCasts(layer,camX,camY){
+  const sc=feelArtScale();
+  for(const e of (W.enemies||[])){
+    if(e.dead||!e.cast)continue;
+    const B=feelBossArt(e);if(!B)continue;
+    const age=e.cast.max-e.cast.t,life=e.cast.max,sx=e.x*TS-camX,sy=e.y*TS-camY;
+    PIXEL_ART_FX.renderEffect(ctx,{id:B.pre+'_charge',age,life,x:sx,y:sy,angle:e.cast.dir||0,kind:B.kind,scale:sc,layer});
+    if(e.cast.id==='pillars')(e.cast.spots||[]).forEach((sp,i)=>PIXEL_ART_FX.renderEffect(ctx,{
+      id:B.pre==='bt'?'bt_spit':'bv_rock',age:age+i*.03,life:life+i*.03,x:sp.x*TS-camX,y:sp.y*TS-camY,
+      casterX:sx,casterY:sy,kind:B.kind,scale:sc,layer}));
+  }
+}
+/* 形を持つ弾・輪（ヴェラの矢と礫の波動）。W.fx の記録はそのまま、絵だけ差し替える */
+function feelDrawBossFx(layer,camX,camY){
+  const sc=feelArtScale();
+  for(const f of (W.fx||[])){
+    if(f.artId==='bv_arrow'&&f.t==='bolt'&&layer==='air')
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bv_arrow',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,angle:Math.atan2(f.vy,f.vx),kind:f.artKind,scale:sc,layer});
+    else if(f.artId==='bv_wave'&&f.t==='wave')
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bv_wave',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,range:f.r,life:f.max,kind:f.artKind,scale:sc,layer});
+  }
+}
 function drawFeelArtGround(camX,camY){
   if(!PIXEL_ART_FX)return;
   feelDrawAuras('ground',camX,camY);
+  feelDrawBossCasts('ground',camX,camY);
+  feelDrawBossFx('ground',camX,camY);
   for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'ground',camX,camY);
   feelDrawPersistentPixel('ground',camX,camY);
 }
@@ -164,6 +200,8 @@ function drawFeelWeaponArts(camX,camY){
     for(const f of FEEL.weaponArts)feelDrawPixelArt(f,'air',camX,camY);
     feelDrawPersistentPixel('air',camX,camY);
     feelDrawAuras('air',camX,camY);
+    feelDrawBossCasts('air',camX,camY);
+    feelDrawBossFx('air',camX,camY);
     return;
   }
   if(!WEAPON_ART_FX)return;
@@ -457,8 +495,14 @@ function feelHitImage(element,target,age,scale){
 function drawFeelHits(camX,camY){
   if(PIXEL_ART_FX){
     const sc=feelArtScale();
-    for(const f of FEEL.hits)PIXEL_ART_FX.renderEffect(ctx,{id:'n_hit',age:f.age,x:f.x*TS-camX,y:f.y*TS-camY-TS*.1,scale:sc,
+    for(const f of FEEL.hits){
+      const e=f.ent;
+      if(e&&!e.dead&&Number.isFinite(e.x)&&Number.isFinite(e.y)){   // 倒れたら最後の場所に残す
+        const off=finiteXY(feelEntityOffset(e));f.x=e.x+off.x/TS;f.y=e.y+off.y/TS;   // 反動は画面px
+      }
+      PIXEL_ART_FX.renderEffect(ctx,{id:'n_hit',age:f.age,x:f.x*TS-camX,y:f.y*TS-camY-TS*.1,scale:sc,
       elem:f.element,target:f.target,seed:f.seed||0,layer:'air'});
+    }
     return;
   }
   if(!ALLY_EFFECT_FX)return;

@@ -9091,7 +9091,7 @@ function fireUlt(){
       if(e.dead) return;
       if(Math.abs(e.x-P.x)>18 || Math.abs(e.y-P.y)>18) return;   // 画面内だけ
       // 裂天：雷は順に落ちる絵だが、ダメージは今まで通りこの瞬間（絵は 0.1秒＋最大 0.18秒 遅れて着く）
-      if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03});
+      if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03, ent:e});
       nth++;
       hitEnemy(e, st, e.boss ? mult*0.5 : mult);
     });
@@ -10427,13 +10427,16 @@ function enemyUpdate(e,dt){
       if(e.trait==='burst'){
         zakoBurst(e);
       }else if(d < a.range+0.6+(e.boss?e.r*0.8:0) || a.range>3){
+        const BA = e.boss && typeof feelBossArt==='function' ? feelBossArt(e) : null;
         if(a.range>3){ // 遠距離: 弾
           W.fx.push({t:'bolt',x:e.x,y:e.y,vx:dx/d*7.5,vy:dy/d*7.5,life:1.6,
-                     dmg:e.atkV, lv:e.lv, dt:e.dt});
-        }else if(tg.ent){
-          hitAlly(tg.ent, e);
+                     dmg:e.atkV, lv:e.lv, dt:e.dt,
+                     artId:BA&&BA.pre==='bv'?'bv_arrow':undefined, artKind:BA&&BA.kind});
         }else{
-          hitPlayer(e);
+          // 灰の大蛙の通常攻撃は舌。届く所まで伸ばして引っ込める（当たりは下の通り）
+          if(BA && BA.pre==='bt') feelPixelArt('bt_jab', e.x, e.y, {angle:Math.atan2(dy,dx), range:d, kind:BA.kind});
+          if(tg.ent) hitAlly(tg.ent, e);
+          else hitPlayer(e);
         }
       }
       // 癖「退く」。振り終わりに離れる＝追う側が一度立ち止まらされる。
@@ -10746,17 +10749,23 @@ function finalBossTick(e, dt){
 function resolveBossMove(e){
   const m = BOSS_MOVES[e.cast.id];
   const dir = e.cast.dir;
+  /* 5F・10F のボスはドットの絵（weapon-art-pixel.js）。当たり判定は下の通りで変えない。
+     BA が null のボス（まだ絵の無いボス）は今までの輪・扇・帯のまま。 */
+  const BA = (typeof feelBossArt==='function') ? feelBossArt(e) : null;
+  const art = (id, x, y, o) => { if(BA) feelPixelArt(id, x, y, Object.assign({kind:BA.kind}, o||{})); };
   if(e.cast.id==='slam'){
     const R = m.rad + e.r;
-    W.fx.push({t:'shock',x:e.x,y:e.y,r:R,life:0.34,max:0.34,col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    W.fx.push({t:'shock',artId:BA&&BA.pre==='bt'?'bt_slam':undefined,x:e.x,y:e.y,r:R,life:0.34,max:0.34,col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    if(BA && BA.pre==='bt') art('bt_slam', e.x, e.y, {range:R});
     aoeTargets().forEach(t=>{
       if(Math.hypot(t.x-e.x, t.y-e.y) - t.r < R) aoeHit(e, t, m.mult);
     });
 
   }else if(e.cast.id==='cleave'){
     const R = m.rad + e.r, half = m.arc*Math.PI/180;
-    W.fx.push({t:'cleave',x:e.x,y:e.y,a:dir,r:R,arc:half,life:0.30,max:0.30,
+    W.fx.push({t:'cleave',artId:BA&&BA.pre==='bt'?'bt_cleave':undefined,x:e.x,y:e.y,a:dir,r:R,arc:half,life:0.30,max:0.30,
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    if(BA && BA.pre==='bt') art('bt_cleave', e.x, e.y, {angle:dir, range:R, arc:half});
     aoeTargets().forEach(t=>{
       const dx=t.x-e.x, dy=t.y-e.y, d=Math.hypot(dx,dy);
       if(d - t.r > R) return;
@@ -10769,14 +10778,17 @@ function resolveBossMove(e){
     for(let i=0;i<n;i++){
       const ang=i/n*Math.PI*2 + rnd()*0.25;
       W.fx.push({t:'bolt',x:e.x,y:e.y,vx:Math.cos(ang)*5.6,vy:Math.sin(ang)*5.6,
-                 life:2.2, dmg:e.atkV*m.mult, lv:e.lv, dt:e.dt});
+                 life:2.2, dmg:e.atkV*m.mult, lv:e.lv, dt:e.dt,
+                 artId:BA&&BA.pre==='bv'?'bv_arrow':undefined, artKind:BA&&BA.kind});
     }
+    if(BA && BA.pre==='bv') art('bv_release', e.x, e.y);
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.4,max:0.4});
 
   }else if(e.cast.id==='wave'){
     // 広がる輪。外へ逃げると必ず追いつかれるので、
     // 「ボスに近づいて内側に入る」が正解になる。逃げ一択を崩すための技。
     W.fx.push({t:'wave',x:e.x,y:e.y,r:e.r*0.9,max:m.rad,speed:5.2,
+               artId:BA&&BA.pre==='bv'?'bv_wave':undefined, artKind:BA&&BA.kind,
                dmg:e.atkV*m.mult, src:e, hit:[],
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80', life:99});
 
@@ -10786,8 +10798,10 @@ function resolveBossMove(e){
        線の当たり判定は「始点から len までの帯」で、予兆の絵とまったく同じ。 */
     const len=m.len, wide=m.wide;
     const cx=Math.cos(dir), cy=Math.sin(dir);
-    W.fx.push({t:'ultbeam', x:e.x, y:e.y, a:dir, len, wide, life:0.42, maxLife:0.42,
+    const beamArt = BA && BA.pre==='bv' && e.cast.id==='beam';
+    W.fx.push({t:'ultbeam', artId:beamArt?'bv_beam':undefined, x:e.x, y:e.y, a:dir, len, wide, life:0.42, maxLife:0.42,
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+    if(beamArt) art('bv_beam', e.x, e.y, {angle:dir, range:len, wide});
     aoeTargets().forEach(t=>{
       const dx=t.x-e.x, dy=t.y-e.y;
       const along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
@@ -10810,8 +10824,10 @@ function resolveBossMove(e){
     /* 離れた数ヶ所が同時に爆ぜる。足元ではなく**逃げ先**を潰す技なので、
        中心はキャスト開始時に決めて、予兆でその場所を見せてある。 */
     (e.cast.spots||[]).forEach(sp=>{
-      W.fx.push({t:'shock',x:sp.x,y:sp.y,r:m.rad,life:0.34,max:0.34,
+      const pid = BA ? (BA.pre==='bt' ? 'bt_pillar' : 'bv_rockhit') : null;
+      W.fx.push({t:'shock',artId:pid||undefined,x:sp.x,y:sp.y,r:m.rad,life:0.34,max:0.34,
                  col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
+      if(pid) art(pid, sp.x, sp.y, {range:m.rad});
       aoeTargets().forEach(t=>{
         if(Math.hypot(t.x-sp.x, t.y-sp.y) - t.r < m.rad) aoeHit(e, t, m.mult);
       });
@@ -18662,8 +18678,8 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260923c"></script>
-<script src="game-feel.js?v=20260923-pixelall"></script>
+<script src="weapon-art-pixel.js?v=20260924a"></script>
+<script src="game-feel.js?v=20260924-boss"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

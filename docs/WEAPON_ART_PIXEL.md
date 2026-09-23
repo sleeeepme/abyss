@@ -74,6 +74,33 @@
 - **改名**（表示名だけ。`id` は据え置き）：震撼→地脈断、瞬歩→縮地、業火→灼髄、崩落→裂天、号令→回帰、生気→命脈。
   仲間の大技（大魔導士 Lv.50）の「崩落」はそのまま。`wartest` の「震撼！」を「地脈断！」に。
 
+## 2026-09-24 ボスの攻撃（5F 灰の大蛙・10F ヴェラ）
+ユーザー依頼「5Fと10Fのボスの攻撃エフェクトも作って」。見本ページに「ボスの攻撃」の組（10場面）を足した。
+ソースは Claude 側の作業場の `src/80_boss.js`（結合後は `weapon-art-pixel.js` の「ボスの攻撃」節）。
+
+**予兆（赤い円・扇・帯）は本編の `drawBossCast` がそのまま描く。** 当たり判定と同じ形なので触っていない。
+足したのは「溜めている間の本体まわり」と「放った後」だけで、円は床の遠近でつぶさず**円のまま**描く（予兆と重なる）。
+主人公が隠れないよう、煙は網掛けを薄め（`dust()` の `alpha`）にしてある。
+
+| ボス | 技 | id | 積む場所 |
+|---|---|---|---|
+| 灰の大蛙 | 溜め（全技） | `bt_charge`（灰が喉へ吸い込まれ、床が震える） | `game-feel.js` `feelDrawBossCasts`（`e.cast` の間） |
+| | 叩きつけ | `bt_slam`（灰の輪・ひび・灰の柱・燃えさし） | `resolveBossMove` の `slam` |
+| | 薙ぎ払い | `bt_cleave`（舌で薙ぐ＋灰の三日月） | 〃 `cleave` |
+| | 落石（激昂） | 溜め中 `bt_spit`（吐き出した灰の塊が弧を描いて飛ぶ）→ 着弾 `bt_pillar` | `feelDrawBossCasts` ／ `resolveBossMove` の `pillars` |
+| | 通常攻撃 | `bt_jab`（舌を突き出す） | 敵の通常攻撃（`e.tele` が尽きた所） |
+| ヴェラ | 溜め（全技） | `bv_charge`（弓を引き、光で矢が組み上がる／礫が集まって石の槍） | `feelDrawBossCasts` |
+| | 貫き | `bv_beam`（光の帯／石の槍と砂利） | `resolveBossMove` の `beam` |
+| | 散弾 | `bv_release` ＋ 弾1本ずつ `bv_arrow`（光の矢／礫） | 〃 `burst`（`bolt` に `artId:'bv_arrow'`） |
+| | 波動（第二形態） | `bv_wave`（跳ねながら転がる礫の輪。半径は `f.r` そのまま） | 〃 `wave`（`wave` に `artId:'bv_wave'`）→ `feelDrawBossFx` |
+| | 落石（第二形態の激昂） | 溜め中 `bv_rock`（空から石）→ 着弾 `bv_rockhit` | `feelDrawBossCasts` ／ `pillars` |
+| | 通常攻撃（第一形態の矢） | `bv_arrow` | 敵の通常攻撃の `bolt` |
+
+- ヴェラの形態は `feelBossArt(e)` が見る：`e.form2` がまだある＝第一形態（空引き・`kind:'ghost'`）、無い＝第二形態（礫・`kind:'stone'`）。
+- 他のボスは今まで通り（`feelBossArt` が null を返す）。ボスを足すときは `feelBossArt` に1行と、`resolveBossMove` の各技の `BA.pre` の分岐を足す。
+- 当たり判定・ダメージ・溜めの秒数は変えていない。旧い輪・扇・帯・丸い弾は `artId` で描かないだけ。
+- 見本の本体：灰の大蛙は本編の 32px 絵（`great-ash-frog` v4）をそのまま。ヴェラは絵がまだ無いので狩人の型を青白く／石色に塗り替えた仮。
+
 ## `PixelArtFx.renderEffect(ctx, p)` の引数
 
 | 名前 | 中身 |

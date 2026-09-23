@@ -44,7 +44,11 @@
     ho0: '#fff6d0', ho1: '#e8d9a0', ho2: '#c0a050', ho3: '#7a6030',                   // 聖（戦鎚）
     du0: '#8b8672', du1: '#5f5b4c', du2: '#3d3a30',                                   // 土煙
     ag0: '#e0f0ff', ag1: '#8fc7ff', ag2: '#4a7fc0', ag3: '#26406a',                   // 鉄壁の青
-    lf0: '#f0ffd0', lf1: '#c8e880', lf2: '#8ab848', lf3: '#4a6a28', lf4: '#ffc8e0'    // 生気の若葉（＋花）
+    lf0: '#f0ffd0', lf1: '#c8e880', lf2: '#8ab848', lf3: '#4a6a28', lf4: '#ffc8e0',   // 命脈の若葉（＋花）
+    as0: '#eee1c1', as1: '#daccae', as2: '#9799a5', as3: '#717586', as4: '#565a6c', as5: '#2b2f3d',   // 灰の大蛙（絵と同じ灰）
+    tg0: '#f0b0a8', tg1: '#c86a6e', tg2: '#7a3440',                                   // 蛙の舌
+    vg0: '#f4fbff', vg1: '#c8e6f5', vg2: '#8fbcd8', vg3: '#557fa0', vg4: '#2f4660',   // ヴェラの空引き（形の無い矢）
+    wr0: '#ff5a46', wr1: '#8a2a22'                                                    // 見本の予兆（実機は別に描く）
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -65,7 +69,9 @@
     wood: [P.wd0, P.wd1, P.wd2],
     bow: [P.W, P.bw0, P.bw1, P.bw2],
     aegis: [P.W, P.ag0, P.ag1, P.ag2, P.ag3],
-    leaf: [P.W, P.lf0, P.lf1, P.lf2, P.lf3]
+    leaf: [P.W, P.lf0, P.lf1, P.lf2, P.lf3],
+    ash: [P.as0, P.as1, P.as2, P.as3, P.as4, P.as5],
+    ghost: [P.W, P.vg0, P.vg1, P.vg2, P.vg3, P.vg4]
   };
   const rampAt = (r, f) => r[f <= 0 ? 0 : f >= 1 ? r.length - 1 : Math.floor(f * r.length)];
 
@@ -239,6 +245,25 @@
       pal: { a: '#1f2843', b: '#454a68', c: '#cd8e38', d: '#f2e8d0', e: '#f2c14e', f: '#e6c593', g: '#3a405c', h: '#e8d6ba', i: '#7fe0c0' },
       staff: (x, y) => (x === 13 && y >= 3 && y <= 13) || ((x === 12 || x === 14) && y === 4),
       gem: [13, 4], outline: 'a'
+    },
+    frog: {
+      map: ['................................', '................................', '................................', '................................', '................................', '................................', '................................', '..............aaa...............', '.............abcca..aa..........', '...........aaaddccaadda.........', '.........aabeffdcdffdda.aaa.....', '.........accgaafddfbddaaaaga....', '........afcccgaadfbdfahhhhaca...', '......aafdddddaadaaadahihhafa...', '......aaaddeeabbbaadfahihhaffa..', '.....adbbadffaabafddcahhhhacffa.', '....addddbebbfaabfbbccaaaacccda.', '....afddfaefffgbbbfccbfddddbbda.', '....afbffaaaaggjbbfgaaaaaaaaaa..', '...abbbbfaaeggjggbggggggggggg...', '..afdbbbbaeebccgggggjjjjjjjj....', '.afdfccddaeebbbccccjjjjjjjj.....', '.adddcbddaeegbddccggggggggda....', '.affbbdffaffgdccdcaaaaaaafdda...', '.adbbfffafffdbbccfcddggafffda...', '..agbffffaeaddddffdbbga.abbbka..', '..adgdffcba.addaffddbgga.abbaca.', '...aafffaca..aaaadggdgdda.aa.a..', '.....aaa.aa......aaggdddja......', '...................aaaaaa.......', '................................', '................................'],
+      pal: { a: '#1f2843', b: '#717586', c: '#9799a5', d: '#565a6c', e: '#2b2f3d', f: '#3f4352', g: '#b2a58b', h: '#e2c252', i: '#151018', j: '#daccae', k: '#eee1c1' },
+      staff: () => false, gem: [25, 14], outline: 'a'
+    },
+    vera: {                                   // 空引きのヴェラ（見本用。狩人の型を青白く。顔はまだある）
+      map: ['................', '................', '...a..bccb......', '..ad.bceeeb.....', '..bdbceeeeb..f..', '..bdbcghihi.fj..',
+            '...dbcgiiib.fj..', '...bdbbbbbbbkj..', '....bleelbclkj..', '....bleellbfij..', '.....bldlbccfj..', '.....bdbbbdbfj..',
+            '.....bdb.bdb.f..', '.....bb..bb.....', '................', '................'],
+      pal: { a: '#dff4ff', b: '#1e222d', c: '#557fa0', d: '#3c4a5a', e: '#a8c8dc', f: '#c8e6f5', g: '#c8a882', h: '#18202a', i: '#d8bc98', j: '#8fbcd8', k: '#ffffff', l: '#6a7e90' },
+      staff: () => false, gem: [12, 8], outline: 'b'
+    },
+    vera2: {                                  // 礫の狩人、ヴェラ（石の魔物。見本用）
+      map: ['................', '................', '...a..bccb......', '..ad.bceeeb.....', '..bdbceeeeb..f..', '..bdbcghghg.fj..',
+            '...dbcggggb.fj..', '...bdbbbbbbbkj..', '....bleelbclkj..', '....bleellbfij..', '.....bldlbccfj..', '.....bdbbbdbfj..',
+            '.....bdb.bdb.f..', '.....bb..bb.....', '................', '................'],
+      pal: { a: '#c8e6f5', b: '#15121b', c: '#5d5566', d: '#3b3544', e: '#8a7f8f', f: '#8a7f8f', g: '#5d5566', h: '#c8e6f5', i: '#3b3544', j: '#221e29', k: '#dff4ff', l: '#3b3544' },
+      staff: () => false, gem: [12, 8], outline: 'b'
     },
     moss: {
       map: ['................', '................', '......aaaa......', '.....abbbba.....', '.....acbbcba....', '....abcdccca....',
@@ -437,21 +462,23 @@
       px(x + Math.cos(a) * sp * bb, y + Math.sin(a) * sp * bb * 0.7 + 40 * bb * bb, rampAt(ramp, bb / 0.32));
     }
   }
+  const DUST_COLS = [P.du0, P.du1, P.du2];
   /* 土煙：ふくらみながら網掛け（4×4ディザ）で薄れて消える。塗りつぶしの丸にしない */
-  function dust(x, y, b, n = 6, seed = 0, spread = 10, life = 0.5) {
+  function dust(x, y, b, n = 6, seed = 0, spread = 10, life = 0.5, cols = null, big = 1, alpha = 1) {
+    const C = cols || DUST_COLS;
     if (b < 0 || b > life) return;
     const p = q12(b) / life;
     for (let i = 0; i < n; i++) {
       const h1 = hash(i, seed + 411), h2 = hash(i, seed + 412), h3 = hash(i, seed + 413);
       const a = h1 * TAU, d = spread * easeOut(Math.min(1, p * 1.4)) * (0.5 + h2 * 0.6);
-      const r = (1.3 + h3 * 1.4) * (1 + p * 1.4);
-      const lv = (p < 0.2 ? 0.8 : 0.8 * (1 - (p - 0.2) / 0.8)) * (0.8 + 0.2 * h2);
+      const r = (1.3 + h3 * 1.4) * (1 + p * 1.4) * big;
+      const lv = (p < 0.2 ? 0.8 : 0.8 * (1 - (p - 0.2) / 0.8)) * (0.8 + 0.2 * h2) * alpha;
       if (lv <= 0.03) continue;
       const xx = x + Math.cos(a) * d, yy = y + Math.sin(a) * d * 0.5 - p * 6 - h3 * 2;
-      disc(xx + 1, yy + 1, r, P.du2, lv * 0.55);                          // 下の影
-      disc(xx, yy, r, P.du1, lv);                                         // 本体
-      disc(xx + (h1 - 0.5) * r, yy - r * 0.6, r * 0.6, P.du1, lv * 0.9);   // こぶ
-      disc(xx - r * 0.35, yy - r * 0.4, r * 0.45, P.du0, lv * 0.7);        // 上の明るい所
+      disc(xx + 1, yy + 1, r, C[2], lv * 0.55);                           // 下の影
+      disc(xx, yy, r, C[1], lv);                                          // 本体
+      disc(xx + (h1 - 0.5) * r, yy - r * 0.6, r * 0.6, C[1], lv * 0.9);    // こぶ
+      disc(xx - r * 0.35, yy - r * 0.4, r * 0.45, C[0], lv * 0.7);         // 上の明るい所
     }
   }
   /* 地面のひび（放射）。glow は光っている時間 */
@@ -1884,6 +1911,317 @@
   }
 
   /* ============================================================
+     ボスの攻撃（5F 灰の大蛙 ／ 10F 空引きのヴェラ・礫の狩人ヴェラ）
+     **予兆（赤い円・扇・帯）は本編がそのまま描く。** ここで描くのは
+     「溜めている間の本体まわり」と「当たった瞬間」だけで、形は当たり判定と同じ
+     （円は円のまま。床の遠近でつぶさない）。
+     o.x,o.y はボスの中心（本編の e.x,e.y と同じ所）。
+     ============================================================ */
+  const ASH_DUST = [P.as1, P.as3, P.as4];
+  const STONE_DUST = [P.st0, P.st1, P.st2];
+
+  /* 中心基準で絵を描く（ボスは中心が座標。16px の見本キャラは足元基準なので別にする） */
+  function drawSprite(key, cx, cy, st = {}) {
+    const s = SPR[key], H = s.map.length, Wd = s.map[0].length, face = st.face || 1;
+    const left = Math.round(cx - Wd / 2), top = Math.round(cy - H / 2 - (st.z || 0) + (st.dy || 0)), lv = st.ghost || 1;
+    const sq = st.squash || 0;                                        // 叩きつけた瞬間に横へつぶす
+    for (const [x, y, c] of s.body.concat(s.stf)) {
+      const fx = face > 0 ? x : Wd - 1 - x, yy = sq ? Math.round(H - 1 - (H - 1 - y) * (1 - sq * 0.25)) : y;
+      const xx = sq ? Math.round(Wd / 2 + (fx - Wd / 2) * (1 + sq * 0.15)) : fx;
+      px(left + xx, top + yy, st.flash ? P.W : c, lv);
+    }
+  }
+  const embers = (x, y, b, seed, n, spreadX, spreadY) => {
+    for (let i = 0; i < n; i++) {
+      const bb = b - hash(i, seed) * 0.2; if (bb < 0 || bb > 0.6) continue;
+      const ex = x + (hash(i, seed + 1) - 0.5) * spreadX + Math.sin(bb * 9 + i) * 2, ey = y + (hash(i, seed + 2) - 0.5) * spreadY - bb * 36;
+      px(ex, ey, ((Math.floor(bb * 12) + i) & 1) ? P.fi2 : P.fi3, 1 - bb / 0.6);
+    }
+  };
+
+  /* ---------- 灰の大蛙：溜め（喉がふくらむ間、灰が吸い込まれ、床が震える） ---------- */
+  function btChargeGround(t, o) {
+    if (t < 0) return;
+    for (let k = 0; k < 8; k++) {
+      const b = t - k * 0.16; if (b < 0 || b > 0.4) continue;
+      const a = hash(k, 801) * TAU, r = 14 + hash(k, 802) * 12;
+      dust(o.x + Math.cos(a) * r, o.y + 6 + Math.sin(a) * r * 0.5, b, 2, 803 + k, 5, 0.4, ASH_DUST);
+    }
+  }
+  function btChargeAir(t, o) {
+    if (t < 0) return;
+    const life = o.life || 0.8, p = clamp(t / life), fr = Math.floor(t * 12);
+    for (let i = 0; i < 18; i++) {
+      const ph = (t * 1.5 + hash(i, 811)) % 1, r = (38 - 32 * ph) * (0.8 + 0.3 * hash(i, 812)), a = hash(i, 813) * TAU + ph * 1.4;
+      const x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r * 0.75, lv = (ph < 0.2 ? ph / 0.2 : 1) * (0.45 + 0.55 * p);
+      px(x, y, ph > 0.7 ? P.as0 : P.as2, lv); if (i % 3 === 0) px(x + 1, y, P.as3, lv);
+    }
+    if (p > 0.7 && (fr & 1)) ring(o.x, o.y, 8 + (1 - p) * 30, P.as1, 0.7);
+  }
+
+  /* ---------- 灰の大蛙：叩きつけ（円。灰の輪・ひび・噴き上がる灰の柱・燃えさし） ---------- */
+  function ashBurstGround(t, o, R, seed, big) {
+    if (t < 0 || t > 1.2) return;
+    if (t < 0.32) {
+      const r = R * easeOut(clamp(t / 0.1)), lv = 1 - t / 0.32;
+      ring(o.x, o.y, r, t < 0.06 ? P.W : P.as0, lv); ring(o.x, o.y, r - 1, P.as2, 0.8 * lv); ring(o.x, o.y, r - 3, P.as3, 0.5 * lv);
+    }
+    if (t < 0.9) disc(o.x, o.y, R * 0.5, P.as5, 0.35 * (1 - t / 0.9));                   // 焦げ
+    cracks(o.x, o.y, t, big > 1 ? 10 : 6, R * 0.7, seed, 0.1, 1.0, P.as0, P.as4);
+    const n = big > 1 ? 14 : 7;                                                         // 主人公が隠れないよう、煙は薄め
+    for (let i = 0; i < n; i++) {
+      const a = i * TAU / n + hash(i, seed + 1) * 0.3, rr = R * (0.72 + 0.28 * hash(i, seed + 2));
+      dust(o.x + Math.cos(a) * rr, o.y + Math.sin(a) * rr, t - 0.03 - hash(i, seed + 3) * 0.08, 2, seed + 10 + i, 8 * big, 0.8, ASH_DUST, 1.0 + 0.3 * big, 0.6);
+    }
+  }
+  function ashBurstAir(t, o, R, seed, big) {
+    if (t < 0 || t > 1.0) return;
+    if (t < 0.08) { plus(o.x, o.y, P.W, 3 + 3 * big); disc(o.x, o.y, 2 + big, P.as0); }
+    for (let k = 0; k < 4 + 4 * big; k++) {                                            // 噴き上がる灰の柱
+      const b = t - k * 0.03; if (b < 0 || b > 0.7) continue;
+      const f = b / 0.7, y = o.y - 3 - k * 5 - f * 12, r = (2.5 + k * 0.4) * (1 + f) * (0.7 + 0.3 * big);
+      disc(o.x + (hash(k, seed + 4) - 0.5) * 6, y, r, k < 2 ? P.as2 : P.as3, 0.6 * (1 - f));
+      disc(o.x + (hash(k, seed + 4) - 0.5) * 6 - r * 0.3, y - r * 0.4, r * 0.5, P.as1, 0.45 * (1 - f));
+    }
+    for (let i = 0; i < 8 + 6 * big; i++) {                                             // 飛ぶ小石
+      const b = t - 0.02; if (b < 0 || b > 0.5) continue;
+      const a = hash(i, seed + 5) * TAU, sp = (40 + hash(i, seed + 6) * 50) * (0.6 + 0.4 * big);
+      px(o.x + Math.cos(a) * sp * b, o.y + Math.sin(a) * sp * b * 0.7 - 60 * b + 170 * b * b, (i & 1) ? P.as2 : P.as4);
+    }
+    embers(o.x, o.y, t - 0.05, seed + 7, 6 + 5 * big, R * 1.3, R * 0.8);
+  }
+  const btSlamGround = (t, o) => ashBurstGround(t, o, o.R, 820, 2);
+  const btSlamAir = (t, o) => ashBurstAir(t, o, o.R, 840, 2);
+
+  /* ---------- 灰の大蛙：薙ぎ払い（扇。舌で薙ぎ、灰の三日月と土煙） ---------- */
+  function tongue(x0, y0, a, L, lv = 1) {
+    const ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
+    for (let s = 5; s < L; s++) {
+      const x = x0 + ca * s, y = y0 + sa * s;
+      px(x, y, P.tg0, lv); px(x + nx, y + ny, P.tg1, lv); px(x - nx, y - ny, P.tg1, lv);
+      if (s % 3 === 0) { px(x + nx * 2, y + ny * 2, P.tg2, lv); px(x - nx * 2, y - ny * 2, P.tg2, lv); }
+    }
+    disc(x0 + ca * L, y0 + sa * L, 2.5, P.tg1, lv); disc(x0 + ca * L - 1, y0 + sa * L - 1, 1.2, P.tg0, lv);
+  }
+  function btCleaveGround(t, o) {
+    const R = o.R, h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h;
+    for (let k = 0; k < 12; k++) {
+      const a = a0 + (a1 - a0) * k / 11, b = t - 0.12 * k / 11;
+      dust(o.x + Math.cos(a) * R * 0.88, o.y + Math.sin(a) * R * 0.88, b, 2, 860 + k, 6, 0.7, ASH_DUST, 1.1, 0.65);
+    }
+    for (let k = 0; k < 5; k++) {                                                       // 床を擦った跡
+      const a = a0 + (a1 - a0) * (k + 0.5) / 5, b = t - 0.12 * (k + 0.5) / 5; if (b < 0 || b > 0.8) continue;
+      const lv = b < 0.3 ? 0.8 : 0.8 * (1 - (b - 0.3) / 0.5);
+      for (let s = R * 0.35; s < R * 0.85; s += 2) px(o.x + Math.cos(a) * s, o.y + Math.sin(a) * s, P.as4, lv);
+    }
+  }
+  function btCleaveAir(t, o) {
+    const R = o.R, h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h;
+    slash(o.x, o.y, R * 0.9, a0, a1, 9, 1, [P.as0, P.as2, P.as4], t, 0.14, 850);
+    if (t >= 0 && t < 0.2) {
+      const a = a0 + (a1 - a0) * easeOut(clamp(t / 0.063)), L = R * 0.9 * (t < 0.14 ? 1 : 1 - (t - 0.14) / 0.06);   // 斬り跡（slash）の先端と同じ速さ
+      tongue(o.x, o.y - 2, a, L);
+    }
+    embers(o.x + Math.cos(o.ang) * R * 0.6, o.y + Math.sin(o.ang) * R * 0.6, t - 0.08, 870, 6, R, R * 0.6);
+  }
+
+  /* ---------- 灰の大蛙：落石（＝飲み込んだ灰の塊を吐き出す。溜めの終わりに弧を描いて落ちる） ---------- */
+  function btSpitGround(t, o) {                                                         // 着弾点の影
+    const L = o.life || 1, f = clamp((t - (L - 0.5)) / 0.5);
+    if (f > 0) disc(o.x, o.y, 2 + f * 6, P.as5, 0.25 + 0.45 * f);
+  }
+  function btSpitAir(t, o) {
+    const L = o.life || 1, f = (t - (L - 0.5)) / 0.5; if (f < 0 || f > 1 || o.cx == null) return;
+    const pos = g => { const x = o.cx + (o.x - o.cx) * g, y = o.cy - 6 + (o.y + 6 - o.cy) * g - 55 * 4 * g * (1 - g); return [x, y]; };
+    for (let k = 3; k >= 1; k--) { const g = f - k * 0.05; if (g < 0) continue; const [x, y] = pos(g); disc(x, y, 2.5 - k * 0.4, P.as3, 0.8 - k * 0.2); }
+    const [x, y] = pos(f);
+    disc(x, y, 3.5, P.as4); disc(x - 1, y - 1, 2, P.as2); px(x - 1, y - 2, P.as0); px(x + 1, y + 1, (Math.floor(t * 12) & 1) ? P.fi2 : P.fi3);
+  }
+  const btPillarGround = (t, o) => ashBurstGround(t, o, o.R, 880, 1);
+  const btPillarAir = (t, o) => ashBurstAir(t, o, o.R, 890, 1);
+
+  /* ---------- 灰の大蛙：通常攻撃（舌を突き出す） ---------- */
+  function btJabAir(t, o) {
+    if (t < 0 || t > 0.24) return;
+    const L = Math.max(10, o.R) * (t < 0.06 ? easeOut(t / 0.06) : t < 0.1 ? 1 : 1 - (t - 0.1) / 0.14);
+    tongue(o.x, o.y - 2, o.ang, L);
+    if (t >= 0.05 && t < 0.12) plus(o.x + Math.cos(o.ang) * o.R, o.y - 2 + Math.sin(o.ang) * o.R, P.W, 2);
+  }
+  function btJabGround(t, o) { dust(o.x + Math.cos(o.ang) * o.R, o.y + 4 + Math.sin(o.ang) * o.R, t - 0.06, 3, 895, 6, 0.4, ASH_DUST); }
+
+  /* ================= ヴェラ ================= */
+  const isStone = o => o.kind === 'stone';
+  /* 溜め（貫き）：弓を引く。形の無い矢が光で組み上がる／石の槍に礫が集まる */
+  function bvChargeGround(t, o) {
+    if (t < 0) return;
+    const fr = Math.floor(t * 12);
+    ellRing(o.x, o.y + 8, 9, 3, isStone(o) ? P.st1 : ((fr & 1) ? P.vg2 : P.vg3), 0.7, 10, q12(t) * 2);
+  }
+  function bvChargeAir(t, o) {
+    if (t < 0) return;
+    const life = o.life || 0.7, p = clamp(t / life), [ux, uy] = dirv(o), nx = -uy, ny = ux, fr = Math.floor(t * 12);
+    const bx = o.x + ux * 8, by = o.y - 2 + uy * 8, stone = isStone(o);
+    for (let k = -6; k <= 6; k++) {                                                    // 弓
+      const bend = (1 - (k / 6) * (k / 6)) * 3;
+      px(bx + nx * k + ux * bend, by + ny * k + uy * bend, stone ? P.st0 : P.vg2);
+    }
+    const nock = 2 + 6 * easeOut(p), kx = bx - ux * nock, ky = by - uy * nock;
+    line(bx + nx * 6, by + ny * 6, kx, ky, stone ? P.st1 : P.vg1); line(bx - nx * 6, by - ny * 6, kx, ky, stone ? P.st1 : P.vg1);
+    const len = 4 + 12 * p;                                                             // 組み上がる矢
+    for (let s = 0; s < len; s++) px(kx + ux * s, ky + uy * s, stone ? (s > len - 3 ? P.st0 : P.st1) : (s > len - 3 ? P.W : P.vg0), stone ? 1 : 0.6 + 0.4 * p);
+    for (let i = 0; i < 14; i++) {                                                     // 集まる光／礫
+      const ph = (t * 1.8 + hash(i, 901)) % 1, r = 26 * (1 - ph), a = hash(i, 902) * TAU + ph;
+      const x = kx + Math.cos(a) * r, y = ky + Math.sin(a) * r * 0.8, lv = (ph < 0.25 ? ph / 0.25 : 1) * (0.4 + 0.6 * p);
+      if (stone) { px(x, y, P.st1, lv); px(x + 1, y, P.st2, lv); px(x, y - 1, P.st0, lv); } else px(x, y, ph > 0.6 ? P.W : P.vg1, lv);
+    }
+    if (p > 0.78 && (fr & 1)) plus(kx + ux * len, ky + uy * len, P.W, 2);
+  }
+
+  /* 貫き：12マスの帯を一瞬で走る（空引き＝光の矢／礫＝石の槍と砂利） */
+  function bvBeamGround(t, o) {
+    const [ux, uy] = dirv(o), L = o.R, stone = isStone(o);
+    for (let s = 12; s < L; s += 12) {
+      const b = t - 0.1 * (s / L);
+      dust(o.x + ux * s, o.y + uy * s + 4, b, stone ? 3 : 2, 910 + s, stone ? 8 : 5, 0.6, stone ? STONE_DUST : null, stone ? 1.3 : 0.9);
+    }
+  }
+  function bvBeamAir(t, o) {
+    if (t < 0 || t > 0.8) return;
+    const [ux, uy] = dirv(o), nx = -uy, ny = ux, L = o.R, Wd = Math.max(4, o.wide || 10), stone = isStone(o), hs = L * easeOut(clamp(t / 0.1));
+    const ox = o.x + ux * 6, oy = o.y - 2 + uy * 6;
+    const core = stone ? P.st0 : P.W, c1 = stone ? P.st1 : P.vg0, c2 = stone ? P.st2 : P.vg1, edge = stone ? P.vg2 : P.vg2;
+    for (let s = 0; s <= hs; s++) {
+      const as = t - 0.1 * (s / L); if (as > 0.5) continue;
+      const lv = as < 0.12 ? 1 : 1 - (as - 0.12) / 0.38, x = ox + ux * s, y = oy + uy * s;
+      const cw = as < 0.06 ? 2 : 1, bw = Math.round(Wd * (as < 0.1 ? 1 : 0.55));
+      px(x, y, core, lv);
+      for (let k = 1; k <= bw; k++) {                                                   // 白い芯から外へ、色も網掛けも薄く
+        const f = k / bw, c = k <= cw ? c1 : k === bw ? edge : f < 0.45 ? c2 : stone ? P.st2 : P.vg2;
+        const l2 = k <= cw ? lv : lv * (k === bw ? 0.9 : 0.85 - 0.55 * f);
+        if (k === bw && (s + Math.floor(t * 24)) % 3) continue;
+        px(x + nx * k, y + ny * k, c, l2); px(x - nx * k, y - ny * k, c, l2);
+      }
+    }
+    if (t < 0.12) {                                                                     // 矢じり
+      const hx = ox + ux * hs, hy = oy + uy * hs;
+      for (let j = 0; j < 7; j++) { const w = Math.round((7 - j) * 0.7); for (let k = -w; k <= w; k++) px(hx - ux * j + nx * k, hy - uy * j + ny * k, j < 2 ? P.W : stone ? P.st0 : P.vg0); }
+      plus(hx, hy, P.W, 2);
+    }
+    for (let q = 1; q <= 3; q++) {                                                     // 帯に直交する衝撃の輪
+      const f = q / 4, b = t - 0.1 * f; if (b < 0 || b > 0.3) continue;
+      const cx = ox + ux * L * f, cy = oy + uy * L * f, ra = 2 + b * 16, rb = Wd + 2 + b * 50, lv = 1 - b / 0.3;
+      for (let i = 0; i < 40; i++) {
+        const a = i * TAU / 40, u = Math.cos(a) * ra, v = Math.sin(a) * rb;
+        px(cx + ux * u + nx * v, cy + uy * u + ny * v, b < 0.08 ? P.W : c2, lv);
+      }
+    }
+    for (let i = 0; i < 20; i++) {                                                     // はがれる羽根／砂利
+      const s = L * hash(i, 921), b = t - 0.1 * (s / L); if (b < 0 || b > 0.45) continue;
+      const side = hash(i, 922) < 0.5 ? -1 : 1, off = 3 + b * (stone ? 20 : 40);
+      const x = ox + ux * (s - b * 30) + nx * off * side, y = oy + uy * (s - b * 30) + ny * off * side + (stone ? 90 * b * b : 0);
+      px(x, y, stone ? ((i & 1) ? P.st1 : P.st2) : ((i & 1) ? P.vg1 : P.vg0), 1 - b / 0.45);
+      if (stone && (i % 3 === 0)) px(x + 1, y, P.st0, 1 - b / 0.45);
+    }
+    if (t < 0.12) { plus(ox, oy, P.W, 5); ring(ox, oy, 3 + t * 80, c2, 1 - t / 0.12); }   // 放った瞬間
+    const b = t - 0.1;                                                                  // 帯の終わり
+    if (b >= 0) { const ex = ox + ux * L, ey = oy + uy * L; spark(ex, ey, b, stone ? RAMP.stone : RAMP.ghost, 930, 12, 1.3); if (b < 0.2) ring(ex, ey, 3 + b * 60, c2, 1 - b / 0.2); }
+  }
+
+  /* 散弾：弓を空へ鳴らし、全方位へ形の無い矢（礫）を撒く。1本ずつは bv_arrow */
+  function bvReleaseAir(t, o) {
+    if (t < 0 || t > 0.4) return;
+    const stone = isStone(o), n = 14, lv = 1 - t / 0.4;
+    if (t < 0.08) { plus(o.x, o.y - 2, P.W, 5); disc(o.x, o.y - 2, 2, stone ? P.st0 : P.vg0); }
+    for (let i = 0; i < n; i++) {
+      const a = i * TAU / n, r0 = 6 + t * 30, r1 = r0 + 8;
+      line(o.x + Math.cos(a) * r0, o.y - 2 + Math.sin(a) * r0, o.x + Math.cos(a) * r1, o.y - 2 + Math.sin(a) * r1, (i & 1) ? (stone ? P.st0 : P.vg1) : P.W, lv);
+    }
+    ring(o.x, o.y - 2, 4 + t * 70, stone ? P.st1 : P.vg2, lv);
+  }
+  function bvReleaseGround(t, o) { if (isStone(o)) dust(o.x, o.y + 6, t, 6, 940, 14, 0.5, STONE_DUST, 1.2); }
+  function bvArrowAir(t, o) {
+    const a = o.ang, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, x = o.x, y = o.y, fr = Math.floor(t * 24);
+    if (isStone(o)) {                                                                   // 礫：回る石くずと砂の尾
+      for (let k = 1; k <= 4; k++) px(x - ux * k * 3 + ((fr + k) & 1 ? nx : -nx), y - uy * k * 3, P.st2, 1 - k / 5);
+      disc(x, y, 1.6, P.st1); px(x + ((fr & 1) ? 1 : -1), y - 1, P.st0); px(x - 1, y + 1, P.st3); px(x + ux * 2, y + uy * 2, P.vg1);
+      return;
+    }
+    for (let s = 0; s < 10; s++) px(x - ux * s, y - uy * s, s < 4 ? P.W : P.vg1, s < 7 ? 1 : 0.6);
+    px(x + ux, y + uy, P.W); px(x + nx, y + ny, P.vg0); px(x - nx, y - ny, P.vg0);          // 矢じり
+    for (let k = 1; k <= 2; k++) { px(x - ux * (9 + k) + nx * k, y - uy * (9 + k) + ny * k, P.vg2); px(x - ux * (9 + k) - nx * k, y - uy * (9 + k) - ny * k, P.vg2); }
+    for (let k = 1; k <= 3; k++) px(x - ux * (12 + k * 3), y - uy * (12 + k * 3), P.vg2, 0.8 - k * 0.2);   // 残像
+  }
+
+  /* 波動（礫の狩人）：石くずの輪が外へ広がる。**円のまま**（当たり判定と同じ） */
+  function bvWaveGround(t, o) {
+    const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3)), fr = Math.floor(t * 12);
+    if (R <= 0 || fade <= 0) return;
+    ring(o.x, o.y, R, P.st1, 0.9 * fade); ring(o.x, o.y, R - 2, P.st2, 0.6 * fade); ring(o.x, o.y, R - 5, P.st3, 0.35 * fade);
+    const n = Math.max(8, Math.floor(TAU * R / 8));
+    for (let i = 0; i < n; i++) {                                                     // 輪の内側に残る砂けむり
+      if ((i + fr) % 3) continue;
+      const a = i * TAU / n + hash(i, 951) * 0.2, r = R - 4 - hash(i, 952) * 5;
+      disc(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 1.5 + hash(i, 953), P.st1, 0.45 * fade);
+    }
+  }
+  function bvWaveAir(t, o) {
+    const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3));
+    if (R <= 0 || fade <= 0) return;
+    const n = Math.max(8, Math.floor(TAU * R / 7));
+    for (let i = 0; i < n; i++) {                                                     // 跳ねながら転がる礫
+      const a = i * TAU / n + hash(i, 961) * 0.25, hop = Math.abs(Math.sin(t * 14 + i * 1.7)) * 3;
+      const x = o.x + Math.cos(a) * R, y = o.y + Math.sin(a) * R - hop;
+      px(x, y, P.st1, fade); px(x + 1, y, P.st2, fade); px(x, y - 1, P.st0, fade); if (i % 2 === 0) px(x + 1, y - 1, P.vg1, fade * 0.8);
+    }
+  }
+
+  /* 落石（礫の狩人・激昂）：空から石が落ちる（溜めの終わり）→ 砕ける */
+  function bvRockGround(t, o) { const L = o.life || 1, f = clamp((t - (L - 0.45)) / 0.45); if (f > 0) disc(o.x, o.y, 2 + f * 7, P.st3, 0.25 + 0.45 * f); }
+  function bvRockAir(t, o) {
+    const L = o.life || 1, f = (t - (L - 0.45)) / 0.45; if (f < 0 || f > 1) return;
+    const y = o.y - (1 - f * f) * 95;
+    for (let k = 1; k <= 4; k++) px(o.x + (k & 1 ? 2 : -2), y - 6 - k * 5, P.vg2, 0.8 - k * 0.15);
+    disc(o.x, y, 4, P.st2); disc(o.x - 1, y - 1, 2.5, P.st1); px(o.x - 2, y - 3, P.st0); px(o.x + 3, y - 1, P.vg1);
+  }
+  function bvRockHitGround(t, o) {
+    if (t < 0 || t > 1.1) return;
+    const R = o.R;
+    if (t < 0.3) { const r = R * easeOut(clamp(t / 0.08)), lv = 1 - t / 0.3; ring(o.x, o.y, r, t < 0.06 ? P.W : P.st0, lv); ring(o.x, o.y, r - 2, P.st2, 0.6 * lv); }
+    if (t < 1.0) disc(o.x, o.y, R * 0.35, P.st3, 0.4 * (1 - t));
+    cracks(o.x, o.y, t, 7, R * 0.8, 970, 0.1, 1.0, P.vg1, P.st2);
+    for (let i = 0; i < 10; i++) { const a = i * TAU / 10 + hash(i, 971) * 0.3, rr = R * (0.6 + 0.3 * hash(i, 972)); dust(o.x + Math.cos(a) * rr, o.y + Math.sin(a) * rr, t - 0.03, 2, 973 + i, 7, 0.75, STONE_DUST, 1.1, 0.6); }
+  }
+  function bvRockHitAir(t, o) {
+    if (t < 0 || t > 0.7) return;
+    if (t < 0.08) { plus(o.x, o.y, P.W, 5); disc(o.x, o.y, 3, P.st0); }
+    for (let i = 0; i < 12; i++) {                                                     // 砕けて跳ぶ礫
+      const b = t - 0.01; if (b > 0.55) continue;
+      const a = hash(i, 981) * TAU, sp = 35 + hash(i, 982) * 45, x = o.x + Math.cos(a) * sp * b, y = o.y + Math.sin(a) * sp * b * 0.7 - 70 * b + 200 * b * b;
+      px(x, y, P.st1); px(x + 1, y, (i & 1) ? P.st2 : P.st0); if (i % 3 === 0) px(x, y - 1, P.vg1);
+    }
+  }
+
+  /* ---------- 見本シーン用：予兆（本編の赤い図形の代わりにドットで） ---------- */
+  function teleFill(test, x0, y0, x1, y1, p) {
+    for (let y = Math.floor(y0); y <= y1; y++) for (let x = Math.floor(x0); x <= x1; x++) {
+      const k = test(x, y); if (!k) continue;
+      if (k === 2) px(x, y, P.wr0, 0.6 + 0.4 * p); else px(x, y, P.wr1, k > 1 ? 0.45 + 0.3 * p : 0.18 + 0.3 * p);
+    }
+  }
+  function teleCircle(cx, cy, R, p) {
+    teleFill((x, y) => { const d = Math.hypot(x - cx, y - cy); return d > R ? 0 : d > R - 1.2 || Math.abs(d - R * p) < 0.7 ? 2 : 1; }, cx - R, cy - R, cx + R, cy + R, p);
+  }
+  function teleFan(cx, cy, R, a, h, p) {
+    teleFill((x, y) => { const d = Math.hypot(x - cx, y - cy), da = Math.abs(norm(Math.atan2(y - cy, x - cx) - a + Math.PI) - Math.PI); if (d > R || da > h) return 0;
+      return d > R - 1.2 || da > h - 1.2 / Math.max(d, 1) || Math.abs(d - R * p) < 0.7 ? 2 : 1; }, cx - R, cy - R, cx + R, cy + R, p);
+  }
+  function teleBand(cx, cy, a, L, Wd, p) {
+    const ux = Math.cos(a), uy = Math.sin(a);
+    teleFill((x, y) => { const s = (x - cx) * ux + (y - cy) * uy, w = Math.abs(-(x - cx) * uy + (y - cy) * ux); if (s < 0 || s > L || w > Wd) return 0;
+      return w > Wd - 1.2 || s > L - 1.2 ? 2 : s < L * p ? 1.5 : 1; }, cx - L - Wd, cy - L - Wd, cx + L + Wd, cy + L + Wd, p);
+  }
+
+  /* ============================================================
      技の一覧（見本シーンの配置・段取り・当たりの時刻）
      ============================================================ */
   const T16 = v => Math.round(v * TILE);
@@ -1946,6 +2284,18 @@
   function uSupport(label, id, ramp, rimCol, ground, air, who, group = 'ult', caster = 'warrior') {
     return { group, label, who: (group === 'ult' ? '大技・' : '') + who, caster, ramp, rimCol, castAt: 0.5, span: 1.4, loop: 2.4, charge: 0.35, recover: [0.6, 1.0], pose: caster === 'priest' ? 'high' : 'melee', swings: [0],
       cx: 80, cy: 62, ang: 0, R: T16(2.6), enemies: [], allies: [['hunter', 46, 78], ['mage', 116, 80]], hits: () => [], ground, air };
+  }
+
+  /* ボスの見本：本体は中心基準で大きく描き、狙われる側（主人公）を置く。t<0 が溜め（予兆） */
+  function bossScene(d) {
+    return Object.assign({ group: 'boss', boss: true, castAt: d.charge + 0.15, span: 1, recover: [0.6, 1.0], ang: 0, enemies: [], hits: () => [] }, d);
+  }
+  function burstTele(o, p) {                                   // 散弾の予兆（本編と同じ放射の線）
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8; line(o.x + Math.cos(a) * 12, o.y + Math.sin(a) * 12, o.x + Math.cos(a) * (12 + 35 * p), o.y + Math.sin(a) * (12 + 35 * p), P.wr0, 0.5 + 0.5 * p); }
+    bvChargeAir(p * 0.5, { ...o, life: 0.5 });
+  }
+  function burstArrows(t, o, n) {
+    for (let i = 0; i < n; i++) { const a = i / n * TAU + hash(i, 999) * 0.25, d = 10 + t * 90; if (d > 110) continue; bvArrowAir(t, { x: o.x + Math.cos(a) * d, y: o.y - 2 + Math.sin(a) * d, ang: a, kind: o.kind }); }
   }
   const DEFS = {
     /* ---- 大魔導士 ---- */
@@ -2204,7 +2554,62 @@
       air: (t, o) => { const ts = t + 0.1; auraAir(ts, { x: o.x, y: o.y, aura: 'ward' }); ['aegis', 'bloom', 'sanct', 'grace'].forEach((k, i) => o.allies && o.allies[i] && auraAir(ts + i * 0.2, { x: o.allies[i][0], y: o.allies[i][1], aura: k })); }
     },
 
+
+    /* ==== ボス（5F 灰の大蛙・10F ヴェラ） ==== */
+    bs_toad_slam: bossScene({ label: '叩きつけ', who: '灰の大蛙（5F）・通常技', caster: 'frog', cx: 80, cy: 56, R: T16(3.55), charge: 0.85, loop: 2.5,
+      allies: [['warrior', 118, 90]], pose: t => t < 0 && t > -0.25 ? { z: Math.round(8 * easeOut((t + 0.25) / 0.25)) } : t >= 0 && t < 0.12 ? { squash: 1, flash: t < 0.04 } : {},
+      ground(t, o) { if (t < 0) { teleCircle(o.x, o.y, o.R, clamp((t + this.charge) / this.charge)); btChargeGround(t + this.charge, o); } else btSlamGround(t, o); },
+      air(t, o) { if (t < 0) btChargeAir(t + this.charge, { ...o, life: this.charge }); else btSlamAir(t, o); } }),
+    bs_toad_cleave: bossScene({ label: '薙ぎ払い', who: '灰の大蛙（5F）・通常技', caster: 'frog', cx: 38, cy: 58, R: T16(4.45), arc: 75 * Math.PI / 180, charge: 0.62, loop: 2.1,
+      allies: [['warrior', 100, 74]], pose: t => t >= 0 && t < 0.1 ? { squash: 0.6 } : {},
+      ground(t, o) { if (t < 0) { teleFan(o.x, o.y, o.R, o.ang, o.arc, clamp((t + this.charge) / this.charge)); btChargeGround(t + this.charge, o); } else btCleaveGround(t, o); },
+      air(t, o) { if (t < 0) btChargeAir(t + this.charge, { ...o, life: this.charge }); else btCleaveAir(t, o); } }),
+    bs_toad_pillars: bossScene({ label: '落石（吐き出す灰）', who: '灰の大蛙（5F）・激昂で開く', caster: 'frog', cx: 28, cy: 58, R: T16(1.7), charge: 1.05, loop: 2.8,
+      spots: [[96, 44], [124, 76], [84, 90], [132, 36]], allies: [['warrior', 100, 70]], pose: t => t < 0 && t > -0.5 ? { squash: 0.3 * Math.sin((t + 0.5) * 30) } : {},
+      ground(t, o) { const L = this.charge; this.spots.forEach(([x, y], i) => { if (t < 0) { teleCircle(x, y, o.R, clamp((t + L) / L)); btSpitGround(t + L, { x, y, life: L }); } else btPillarGround(t, { x, y, R: o.R }); }); if (t < 0) btChargeGround(t + L, o); },
+      air(t, o) { const L = this.charge; if (t < 0) btChargeAir(t + L, { ...o, life: L }); this.spots.forEach(([x, y], i) => { if (t < 0) btSpitAir(t + L + i * 0.03, { x, y, life: L + i * 0.03, cx: o.x + 10, cy: o.y }); else btPillarAir(t, { x, y, R: o.R }); }); } }),
+    bs_toad_jab: bossScene({ label: '舌（通常攻撃）', who: '灰の大蛙（5F）', caster: 'frog', cx: 46, cy: 58, R: 42, charge: 0.4, loop: 1.4,
+      allies: [['warrior', 90, 66]],
+      ground(t, o) { if (t >= 0) btJabGround(t, o); }, air(t, o) { if (t >= 0) btJabAir(t, o); } }),
+    bs_vera_beam: bossScene({ label: '貫き', who: '空引きのヴェラ（10F・第一形態）', caster: 'vera', kind: 'ghost', cx: 18, cy: 64, R: T16(12), wide: T16(0.62), charge: 0.72, loop: 2.2,
+      allies: [['warrior', 104, 70]],
+      ground(t, o) { if (t < 0) { teleBand(o.x, o.y, o.ang, o.R, o.wide, clamp((t + this.charge) / this.charge)); bvChargeGround(t + this.charge, o); } else bvBeamGround(t, o); },
+      air(t, o) { if (t < 0) bvChargeAir(t + this.charge, { ...o, life: this.charge }); else bvBeamAir(t, o); } }),
+    bs_vera_burst: bossScene({ label: '散弾', who: '空引きのヴェラ（10F）・形の無い矢を撒く', caster: 'vera', kind: 'ghost', cx: 80, cy: 60, R: T16(1), charge: 0.5, loop: 1.9,
+      allies: [['warrior', 124, 86]],
+      ground(t, o) { if (t < 0) bvChargeGround(t + this.charge, o); else bvReleaseGround(t, o); },
+      air(t, o) { if (t < 0) { burstTele(o, clamp((t + this.charge) / this.charge)); return; } bvReleaseAir(t, o); burstArrows(t, o, 14); } }),
+    bs_vera_shot: bossScene({ label: '矢（通常攻撃）', who: '空引きのヴェラ（10F・第一形態）', caster: 'vera', kind: 'ghost', cx: 22, cy: 64, R: T16(1), charge: 0.62, loop: 1.6,
+      allies: [['warrior', 132, 66]],
+      ground(t, o) { if (t < 0) bvChargeGround(t + this.charge, o); },
+      air(t, o) { if (t < 0) { bvChargeAir(t + this.charge, { ...o, life: this.charge }); return; } const f = t * 120; if (f < 104) bvArrowAir(t, { x: o.x + 8 + f, y: o.y - 4, ang: 0, kind: o.kind }); else hitAir(t - 0.87, { x: 132, y: 58, elem: 'frost' }); } }),
+    bs_vera2_beam: bossScene({ label: '貫き（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）', caster: 'vera2', kind: 'stone', cx: 18, cy: 64, R: T16(12), wide: T16(0.62), charge: 0.72, loop: 2.2, big: 2,
+      allies: [['warrior', 104, 70]],
+      ground(t, o) { if (t < 0) { teleBand(o.x, o.y, o.ang, o.R, o.wide, clamp((t + this.charge) / this.charge)); bvChargeGround(t + this.charge, o); } else bvBeamGround(t, o); },
+      air(t, o) { if (t < 0) bvChargeAir(t + this.charge, { ...o, life: this.charge }); else bvBeamAir(t, o); } }),
+    bs_vera2_wave: bossScene({ label: '波動（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）', caster: 'vera2', kind: 'stone', cx: 80, cy: 58, R: T16(4.05), charge: 0.95, loop: 3.0, big: 2,
+      allies: [['warrior', 112, 88]],
+      ground(t, o) { if (t < 0) { teleCircle(o.x, o.y, o.R, clamp((t + this.charge) / this.charge)); return; } const r = 18 + 83 * t; if (r < 144) bvWaveGround(t, { ...o, R: r, life: 9 }); },
+      air(t, o) { if (t < 0) return; const r = 18 + 83 * t; if (t < 0.3) bvReleaseAir(t, o); if (r < 144) bvWaveAir(t, { ...o, R: r, life: 9 }); } }),
+    bs_vera2_rocks: bossScene({ label: '落石（礫）', who: '礫の狩人、ヴェラ（10F）・激昂で開く', caster: 'vera2', kind: 'stone', cx: 28, cy: 60, R: T16(1.7), charge: 1.05, loop: 2.8, big: 2,
+      spots: [[96, 44], [124, 76], [84, 90], [132, 36]], allies: [['warrior', 100, 70]],
+      ground(t, o) { const L = this.charge; this.spots.forEach(([x, y]) => { if (t < 0) { teleCircle(x, y, o.R, clamp((t + L) / L)); bvRockGround(t + L, { x, y, life: L }); } else bvRockHitGround(t, { x, y, R: o.R }); }); },
+      air(t, o) { const L = this.charge; this.spots.forEach(([x, y], i) => { if (t < 0) bvRockAir(t + L + i * 0.04, { x, y, life: L + i * 0.04 }); else bvRockHitAir(t, { x, y, R: o.R }); }); } }),
     /* ---- 実機だけで使う部品（見本シーンなし） ---- */
+
+    bt_charge: { aux: true, span: 5, ext: 44, pad: 8, sky: 20, ground: btChargeGround, air: btChargeAir },
+    bt_slam: { aux: true, span: 1.2, pad: 20, sky: 60, ground: btSlamGround, air: btSlamAir },
+    bt_cleave: { aux: true, span: 0.8, pad: 16, sky: 30, ground: btCleaveGround, air: btCleaveAir },
+    bt_spit: { aux: true, span: 5, pad: 12, sky: 80, ground: btSpitGround, air: btSpitAir },
+    bt_pillar: { aux: true, span: 1.2, pad: 20, sky: 50, ground: btPillarGround, air: btPillarAir },
+    bt_jab: { aux: true, span: 0.4, pad: 12, sky: 14, ground: btJabGround, air: btJabAir },
+    bv_charge: { aux: true, span: 5, ext: 40, pad: 8, sky: 16, ground: bvChargeGround, air: bvChargeAir },
+    bv_beam: { aux: true, span: 0.8, pad: 24, sky: 20, ground: bvBeamGround, air: bvBeamAir },
+    bv_release: { aux: true, span: 0.5, ext: 40, pad: 8, sky: 16, ground: bvReleaseGround, air: bvReleaseAir },
+    bv_arrow: { aux: true, span: 1e9, ext: 24, pad: 4, sky: 4, ground() {}, air: bvArrowAir },
+    bv_wave: { aux: true, span: 1e9, pad: 10, sky: 10, ground: bvWaveGround, air: bvWaveAir },
+    bv_rock: { aux: true, span: 5, ext: 20, pad: 8, sky: 110, ground: bvRockGround, air: bvRockAir },
+    bv_rockhit: { aux: true, span: 1.1, pad: 16, sky: 40, ground: bvRockHitGround, air: bvRockHitAir },
     n_swing: { aux: true, span: 0.3, ext: 44, pad: 8, ground: swingGround, air: swingAir },
     n_hit: { aux: true, span: 0.5, ext: 12, pad: 8, ground() {}, air: hitAir },
     n_shot: { aux: true, span: 1e9, ext: 12, pad: 6, ground() {}, air: shotAirN },
@@ -2221,7 +2626,7 @@
     a_rain_hit: { aux: true, span: 0.5, ground() {}, air: (t, o) => rainHit(o.x, o.y, t) },
     bwrain_arrow: { aux: true, span: 1, ground: (t, o) => rainRing(o.x, o.y, o.fall != null ? o.fall : t), air: (t, o) => rainArrow(o.x, o.y, o.fall != null ? o.fall : t) }
   };
-  const GROUPS = [['archmage', '大魔導士'], ['staff', '杖'], ['sword', '剣'], ['great', '大剣'], ['dagger', '短剣'], ['axe', '斧'], ['spear', '槍'], ['bow', '弓'], ['mace', '戦鎚'], ['normal', '通常攻撃'], ['ult', '大技'], ['ally', '仲間の大技'], ['skill', 'スキル技']];
+  const GROUPS = [['archmage', '大魔導士'], ['staff', '杖'], ['sword', '剣'], ['great', '大剣'], ['dagger', '短剣'], ['axe', '斧'], ['spear', '槍'], ['bow', '弓'], ['mace', '戦鎚'], ['normal', '通常攻撃'], ['ult', '大技'], ['ally', '仲間の大技'], ['skill', 'スキル技'], ['boss', 'ボスの攻撃（5F・10F）']];
 
   function timeline(key) {
     const d = DEFS[key];
@@ -2332,7 +2737,8 @@
     drawSceneFloor();
     const shx = shake ? ((fr & 1) ? shake : -shake) : 0, shy = shake && fr % 3 === 0 ? shake : 0;
     const o0 = d._o || {};
-    const pose = poseFor(d, ts, Object.assign(o0, { x: d.cx, y: d.cy, R: d.R, ang: d.ang || 0, tx: o0.tx, ty: o0.ty }));
+    const pose = d.boss ? { bob: 0, lift: 0, fwd: 0, sway: 0, rim: 0, dx: 0, dy: 0, z: 0, face: 1 }
+                        : poseFor(d, ts, Object.assign(o0, { x: d.cx, y: d.cy, R: d.R, ang: d.ang || 0, tx: o0.tx, ty: o0.ty }));
     const s = SPR[d.caster], face = pose.face || 1;
     const gx = Math.round(d.cx + pose.dx) - 8 + (face > 0 ? s.gem[0] : 15 - s.gem[0]) + pose.fwd, gy = Math.round(d.cy + pose.dy) - 13 - Math.round(pose.z) + s.gem[1] - pose.lift + pose.bob;
     const o = sceneO(key, d, gx, gy);
@@ -2340,7 +2746,8 @@
     // キャラと敵を足元の y で並べて描く
     const actors = d.enemies.map((e, i) => [e[1], () => drawEnemy(e[0], e[1], enemyState(d, i, e, t, o))]);
     (d.allies || []).forEach(([k, ax, ay]) => actors.push([ay, () => drawCaster(k, ax, ay, { bob: Math.floor(ts * 4) & 1, lift: 0, fwd: 0, sway: 0, rim: 0, rimCol: P.W, face: 1 })]));
-    actors.push([d.cy + pose.dy, () => {
+    if (d.boss) actors.push([d.cy + SPR[d.caster].map.length / 2 - 2, () => drawSprite(d.caster, d.cx, d.cy, (d.pose && d.pose(t)) || {})]);
+    else actors.push([d.cy + pose.dy, () => {
       if (d.pose === 'mirage' && t >= 0 && t < d.life) {                   // 左右にずれた残像
         const side = (Math.floor(t * 12) & 1) ? 1 : -1;                  // 左右に交互に一枚ずつ
         drawCaster(d.caster, d.cx + side * 6, d.cy, { ...pose, ghost: 0.5 });
@@ -2349,7 +2756,7 @@
     }]);
     actors.sort((a, b) => a[0] - b[0]).forEach(a => a[1]());
     if (MAGIC[key]) chargeFx(ts - (d.castAt - d.charge), d.charge + 0.05, gx, gy, RAMP[d.ramp || 'arcane']);
-    else if (t < 0 && t > -d.charge && (fr & 1)) { plus(gx, gy, P.W, 2); px(gx, gy, P.ac0); }     // 刃のきらめき
+    else if (!d.boss && t < 0 && t > -d.charge && (fr & 1)) { plus(gx, gy, P.W, 2); px(gx, gy, P.ac0); }     // 刃のきらめき
     d.air(t, o);
     blit(ctx, SCENE_BUF, shx, shy, ctx.canvas.width, ctx.canvas.height, true);
   }
@@ -2405,6 +2812,7 @@
                        wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0 });
     if (p.arc != null) o.arc = p.arc;
     if (p.tx != null) { const [a, b] = toBuf(p.tx, p.ty, ox, oy); o.tx = a; o.ty = b; }
+    if (p.casterX != null && id !== 'collapse') { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; }
     if (id === 'collapse') { o.gx = null; if (p.casterX != null) { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; o.gx = a + 5; o.gy = b - 12; } }
     if (id === 'stbolt') o.gx = null;
     const layer = p.layer || 'all';
