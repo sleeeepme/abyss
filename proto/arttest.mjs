@@ -470,4 +470,20 @@ R.enemyLabels = await pg.evaluate(()=>{
   return {near:near.length, shown:shown.length, ok: shown.length<=1};
 });
 
+// 6. 当たりの絵は当たった相手に付いて動く（ノックバックで絵だけ元の場所に残らない）
+R.hitFollows = await pg.evaluate(()=>{
+  TH.run(1,{seed:77}); TH.floor(3); TH.immortal();
+  S.hero.equip.weapon = buildItem(BASES.find(x=>x.id==='great'), RARITY[0], 5); S.hero.equip.weapon.aff=[];
+  const e0=W.enemies[0]; W.enemies.forEach(x=>x.dead=true);
+  const e=Object.assign({}, e0, {x:P.x+1.5, y:P.y, hp:1e7, maxHp:1e7, dead:false, boss:false});
+  W.enemies=[e]; P.dirx=1; P.diry=0;
+  const x0=e.x;
+  fireArt(WEAPON_ARTS.great[2], S.hero);          // レイジングアッパー（強ノックバック）
+  stepSim(0.05);
+  const h=FEEL.hits.find(h=>h.ent===e);
+  drawFeelHits(0,0);
+  const knocked=e.x-x0, gap=h?Math.abs(h.x-e.x):99;
+  return {knocked:+knocked.toFixed(2), gap:+gap.toFixed(2), ok: !!h && knocked>1 && gap<0.2};
+});
+
 await done(b, errs, R);
