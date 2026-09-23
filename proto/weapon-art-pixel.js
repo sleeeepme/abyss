@@ -48,7 +48,8 @@
     as0: '#eee1c1', as1: '#daccae', as2: '#9799a5', as3: '#717586', as4: '#565a6c', as5: '#2b2f3d',   // 灰の大蛙（絵と同じ灰）
     tg0: '#f0b0a8', tg1: '#c86a6e', tg2: '#7a3440',                                   // 蛙の舌
     vg0: '#f4fbff', vg1: '#c8e6f5', vg2: '#8fbcd8', vg3: '#557fa0', vg4: '#2f4660',   // ヴェラの空引き（形の無い矢）
-    wr0: '#ff5a46', wr1: '#8a2a22'                                                    // 見本の予兆（実機は別に描く）
+    wr0: '#ff5a46', wr1: '#8a2a22',                                                   // 見本の予兆（実機は別に描く）
+    rk0: '#8c8c8e', rk1: '#79797c', rk2: '#5c5c61', rk3: '#3c3d45', rk4: '#23272f', rk5: '#0b0c10'   // 礫の岩（マット：光らせない）
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -1918,7 +1919,7 @@
      o.x,o.y はボスの中心（本編の e.x,e.y と同じ所）。
      ============================================================ */
   const ASH_DUST = [P.as1, P.as3, P.as4];
-  const STONE_DUST = [P.st0, P.st1, P.st2];
+  const STONE_DUST = [P.rk0, P.rk2, P.rk3];
 
   /* 中心基準で絵を描く（ボスは中心が座標。16px の見本キャラは足元基準なので別にする） */
   function drawSprite(key, cx, cy, st = {}) {
@@ -2147,7 +2148,7 @@
   function bvArrowAir(t, o) {
     const a = o.ang, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, x = o.x, y = o.y, fr = Math.floor(t * 24);
     if (isStone(o)) {                                                                   // 礫：回りながら飛ぶ岩と砂の尾
-      for (let k = 1; k <= 3; k++) px(x - ux * (3 + k * 3), y - uy * (3 + k * 3) + k, P.st2, 0.7 - k * 0.18);
+      for (let k = 1; k <= 3; k++) px(x - ux * (3 + k * 3), y - uy * (3 + k * 3) + k, P.rk3, 0.7 - k * 0.18);
       rockBullet(x, y, a, 11, 3, fr >> 1, 1, 0.9);
       return;
     }
@@ -2157,44 +2158,61 @@
     for (let k = 1; k <= 3; k++) px(x - ux * (12 + k * 3), y - uy * (12 + k * 3), P.vg2, 0.8 - k * 0.2);   // 残像
   }
 
-  /* 波動（礫の狩人）：輪の先で岩の棘が床から突き出し、通り過ぎると崩れて石くずが跳ねる。**円のまま**（当たり判定と同じ） */
+  /* 波動（礫の狩人）：輪が通った所から、地面を割って大きな岩の棘が突き出す。
+     棘は床の決まった場所に生えて（輪と一緒に動かない）、少し残ってから崩れて沈む。
+     当たり判定は輪（円のまま）。棘は輪の少し内側＝もう通った所にだけ立つので、見た目が判定より外へ出ない。 */
+  const SPIKE_STEP = 16;                                                            // 棘の列の間隔（ドット）
+  function waveSpikes(o, R, fn) {
+    const out = [];
+    for (let rs = SPIKE_STEP; rs <= R; rs += SPIKE_STEP) {
+      const dr = R - rs; if (dr > 34) continue;                                     // 通ってから 34 ドットぶんで消える
+      const n = Math.max(4, Math.floor(TAU * rs / 22)), off = hash(rs, 1181) * TAU;
+      for (let i = 0; i < n; i++) {
+        if (hash(i + rs, 1186) < 0.3) continue;                                        // 抜けがある方が岩らしい
+        const a = off + i * TAU / n + (hash(i + rs, 1182) - 0.5) * 0.25, r = rs - hash(i + rs, 1183) * 4;
+        out.push([o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, dr, rs * 31 + i]);
+      }
+    }
+    out.sort((p, q) => p[1] - q[1]).forEach(fn);
+  }
+  function spikeHeight(dr, seed) {                                                   // 突き出す → 残る → 崩れて沈む
+    const H = 16 + hash(seed, 1184) * 14;
+    return dr < 3 ? H * easeOut(dr / 3) : dr < 18 ? H : H * (1 - (dr - 18) / 16);
+  }
   function bvWaveGround(t, o) {
     const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3));
     if (R <= 0 || fade <= 0) return;
-    ring(o.x, o.y, R + 1, P.st3, 0.7 * fade);                                            // 割れていく床の線
-    const n = Math.max(10, Math.floor(TAU * R / 6));
-    for (let i = 0; i < n; i++) {                                                       // 通り過ぎた跡の瓦礫
-      const a = i * TAU / n + hash(i, 951) * 0.2, r = R - 5 - hash(i, 952) * 7;
-      if (r <= 2) continue;
-      const x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r;
-      px(x, y, P.st2, 0.8 * fade); if (i & 1) px(x + 1, y, P.st3, 0.8 * fade);
-      if (i % 4 === 0) disc(x, y - 1, 1.5, P.st1, 0.35 * fade);
-    }
+    ring(o.x, o.y, R + 1, P.rk4, 0.8 * fade); ring(o.x, o.y, R + 2, P.rk3, 0.4 * fade);      // 割れていく床の線
+    waveSpikes(o, R, ([x, y, dr, seed]) => {                                          // 棘の根元の割れ目と土煙
+      if (dr < 20) { line(x - 5, y + 1, x + 5, y + 2, P.rk5, 0.6 * fade); px(x - 3, y + 3, P.rk4, 0.6 * fade); px(x + 4, y - 1, P.rk4, 0.6 * fade); }
+      if (dr > 16) dust(x, y, (dr - 16) / 60, 2, seed, 6, 0.4, STONE_DUST, 1, 0.6 * fade);
+    });
+    /* 棘は床の層に描く：キャラ（主人公・ボス）は必ず棘より手前に出る＝主人公が岩に隠れない */
+    waveSpikes(o, R, ([x, y, dr, seed]) => {
+      const h = spikeHeight(dr, seed) * (0.6 + 0.4 * fade);
+      bigSpike(x, y, h, 3 + Math.round(h * (0.2 + 0.12 * hash(seed, 1187))), seed, 1);
+    });
   }
   function bvWaveAir(t, o) {
     const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3));
     if (R <= 0 || fade <= 0) return;
-    const n = Math.max(10, Math.floor(TAU * R / 7)), fr = Math.floor(t * 12);
-    for (let i = 0; i < n; i++) {
-      const a = i * TAU / n + hash(i, 961) * 0.2, x = Math.round(o.x + Math.cos(a) * R), y = Math.round(o.y + Math.sin(a) * R);
-      const h = (4 + hash(i, 962) * 6) * fade * (((fr + i) % 4) === 0 ? 0.7 : 1);         // 輪の先の岩の棘
-      rockSpike(x, y, h, 2);
-      if (i % 3 === 0) px(x, y - h - 1, P.vg1, fade);
-      const b = (t * 3 + hash(i, 963)) % 1, bx = o.x + Math.cos(a) * (R - 3 - b * 6), by = o.y + Math.sin(a) * (R - 3 - b * 6) - 10 * b + 18 * b * b;   // 跳ねる石くず
-      if (i % 2 === 0) { px(bx, by, P.st1, fade); px(bx + 1, by, P.st2, fade); }
-    }
+    waveSpikes(o, R, ([x, y, dr, seed]) => {
+      const h = spikeHeight(dr, seed) * (0.6 + 0.4 * fade);
+      if (dr < 3) for (let k = 0; k < 3; k++) px(x + (hash(seed + k, 1185) - 0.5) * 12, y - 2 - dr * 4 - k * 2, P.rk2);   // 突き出る瞬間の石くず
+      if (dr > 18 && dr < 30) for (let k = 0; k < 3; k++) { const b = (dr - 18) / 12; rock(x + (k - 1) * 4 + (k - 1) * b * 8, y - h * 0.6 - 10 * b + 30 * b * b, 1.5, k + seed, 1); }   // 崩れる
+    });
   }
 
   /* 落石（礫の狩人・激昂）：ヴェラが床から岩を引き剥がして投げる。弧を描いて落ち、砕ける */
   function bvRockGround(t, o) {
     const L = o.life || 1, f = clamp((t - (L - 0.55)) / 0.55);
-    if (f > 0) { disc(o.x, o.y, 2 + f * 8, P.st3, 0.25 + 0.45 * f); if (f > 0.7) ring(o.x, o.y, 10 - f * 4, P.st2, 0.6); }
+    if (f > 0) { disc(o.x, o.y, 2 + f * 8, P.rk4, 0.25 + 0.45 * f); if (f > 0.7) ring(o.x, o.y, 10 - f * 4, P.rk3, 0.6); }
   }
   function bvRockAir(t, o) {
     const L = o.life || 1, f = (t - (L - 0.55)) / 0.55; if (f < 0 || f > 1) return;
     const sx = o.cx != null ? o.cx : o.x - 60, sy = o.cy != null ? o.cy : o.y;
     const pos = g => [sx + (o.x - sx) * g, sy - 10 + (o.y + 4 - sy + 10) * g - 70 * 4 * g * (1 - g)];
-    for (let k = 1; k <= 3; k++) { const g = f - k * 0.06; if (g < 0) continue; const [x, y] = pos(g); px(x, y, P.st2, 0.8 - k * 0.2); px(x + 1, y + 1, P.st3, 0.6 - k * 0.15); }
+    for (let k = 1; k <= 3; k++) { const g = f - k * 0.06; if (g < 0) continue; const [x, y] = pos(g); px(x, y, P.rk3, 0.8 - k * 0.2); px(x + 1, y + 1, P.rk4, 0.6 - k * 0.15); }
     const [x, y] = pos(f);
     const [xa, ya] = pos(Math.max(0, f - 0.04)), [xb, yb] = pos(Math.min(1, f + 0.04));
     rockBullet(x, y, Math.atan2(yb - ya, xb - xa), 15, 4.5, Math.floor(t * 12), 1, 1);   // 弧の向きに先を向ける
@@ -2202,9 +2220,9 @@
   function bvRockHitGround(t, o) {
     if (t < 0 || t > 1.2) return;
     const R = o.R;
-    if (t < 0.3) { const r = R * easeOut(clamp(t / 0.08)), lv = 1 - t / 0.3; ring(o.x, o.y, r, t < 0.06 ? P.W : P.st0, lv); ring(o.x, o.y, r - 2, P.st2, 0.6 * lv); }
-    if (t < 1.1) disc(o.x, o.y, R * 0.4, P.st3, 0.45 * (1 - t / 1.1));               // くぼみ
-    cracks(o.x, o.y, t, 8, R * 0.85, 970, 0.1, 1.1, P.vg1, P.st2);
+    if (t < 0.3) { const r = R * easeOut(clamp(t / 0.08)), lv = 1 - t / 0.3; ring(o.x, o.y, r, t < 0.06 ? P.rk0 : P.rk1, lv); ring(o.x, o.y, r - 2, P.rk3, 0.6 * lv); }
+    if (t < 1.1) disc(o.x, o.y, R * 0.4, P.rk4, 0.45 * (1 - t / 1.1));               // くぼみ
+    cracks(o.x, o.y, t, 8, R * 0.85, 970, 0.1, 1.1, P.rk3, P.rk3);
     for (let i = 0; i < 7; i++) {                                                     // 残る岩のかけら
       const a = hash(i, 974) * TAU, r = R * (0.3 + 0.5 * hash(i, 975)), b = t - 0.05; if (b < 0) continue;
       const lv = b < 0.7 ? 1 : 1 - (b - 0.7) / 0.4; if (lv <= 0) continue;
@@ -2214,7 +2232,7 @@
   }
   function bvRockHitAir(t, o) {
     if (t < 0 || t > 0.8) return;
-    if (t < 0.08) { plus(o.x, o.y, P.W, 6); disc(o.x, o.y, 3, P.st0); }
+    if (t < 0.08) { plus(o.x, o.y, P.rk0, 6); disc(o.x, o.y, 3, P.rk1); }
     for (let i = 0; i < 10; i++) {                                                     // 砕けて跳ぶ岩
       const b = t - 0.01; if (b > 0.65) continue;
       const a = hash(i, 981) * TAU, sp = 30 + hash(i, 982) * 45, x = o.x + Math.cos(a) * sp * b, y = o.y + Math.sin(a) * sp * b * 0.7 - 80 * b + 220 * b * b;
@@ -2223,49 +2241,82 @@
   }
 
   /* ================= 礫の狩人（第二形態）：岩を投げる ================= */
-  /* 岩ひとつ。光は左上から固定、輪郭だけが回る（転がって見える）。rim＝ヴェラの青白い縁取り */
-  function rock(cx, cy, r, rot, lv = 1, rim = 0.8) {
-    if (r < 0.8) { px(cx, cy, P.st1, lv); return; }
-    const ri = Math.ceil(r) + 1, lx = -0.6, ly = -0.8;
+  /* ---------- 礫の岩（マット）----------
+     面を平らに塗り分ける：明るい面 rk1・中 rk2・暗 rk3、面の境目の割れ目 rk4、輪郭 rk5。
+     白や青白い照り返しは入れない（添付の参考のような、光らない石の質感）。
+     光は左上から固定。 */
+  const LX = -0.6, LY = -0.8;
+  const faceTone = (nx, ny, bias = 0) => { const l = nx * LX + ny * LY + bias; return l > 0.3 ? P.rk1 : l > -0.25 ? P.rk2 : P.rk3; };
+  /* 岩の塊：扇形の面（5〜7枚）＋上の平らな面。rot で面の割り方が変わる＝転がって見える */
+  function rock(cx, cy, r, rot, lv = 1) {
+    if (r < 0.8) { px(cx, cy, P.rk2, lv); return; }
     cx = Math.round(cx); cy = Math.round(cy);
+    const ri = Math.ceil(r) + 1, n = 5 + (rot & 1), seed = 1101 + (rot & 7);
+    const cut = k => (k + 0.3 * (hash(k, seed) - 0.5)) / n * TAU;                   // 面の境目の角度
     for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
-      const d = Math.hypot(dx, dy), a = Math.atan2(dy, dx), bucket = Math.floor(((a / TAU + 1) * 6 + rot * 0.5)) % 6;
-      const rr = r * (0.78 + 0.22 * hash(bucket, 991 + (rot & 3)));                     // ごつごつした輪郭（6面）
+      const d = Math.hypot(dx, dy); let a = Math.atan2(dy, dx); if (a < 0) a += TAU;
+      let k = 0; while (k < n - 1 && a > cut(k + 1)) k++;
+      const rr = r * (0.8 + 0.2 * hash(k, seed + 50));
       if (d > rr) continue;
-      const sh = d < 0.5 ? 0.3 : (dx * lx + dy * ly) / d * (d / rr);
-      let c = sh > 0.45 ? P.st0 : sh > 0.05 ? P.st1 : sh > -0.45 ? P.st2 : P.st3;
-      if (d > rr - 1) c = sh > 0.3 && rim ? P.vg1 : P.st4;
-      if (((dx + dy + rot) & 7) === 0 && d < rr - 1.5) c = P.st3;                       // 割れ目
-      px(cx + dx, cy + dy, c, c === P.vg1 ? lv * rim : lv);
+      const mid = (cut(k) + cut(k + 1)) / 2, top = Math.hypot(dx + r * 0.25, dy + r * 0.3) < r * 0.42;
+      let c = top ? P.rk1 : faceTone(Math.cos(mid), Math.sin(mid), (hash(k, seed + 9) - 0.5) * 0.3);
+      if (!top && Math.abs(a - cut(k)) * d < 0.7 && (dx > -1 || dy > -1)) c = P.rk4;   // 面の境目（影側だけ）
+      if (d > rr - 1) c = r < 2.6 ? P.rk3 : P.rk5;                                    // 小さいかけらは輪郭を弱く（黒い点にしない）
+      px(cx + dx, cy + dy, c, lv);
     }
   }
-  /* 岩の弾丸：後ろは丸く、先は尖る。向き ang に沿って伸びた岩。
-     芯に稜線（明るい筋）、先端に光、輪郭はごつごつ。spin は稜線の位置を回して「きりもみ」に見せる */
-  function rockBullet(cx, cy, ang, len, wid, spin = 0, lv = 1, rim = 0.8) {
+  /* 岩の弾丸：後ろは丸く先が尖る。長さ方向に数枚の面、左右（光の側・影の側）で塗り分け。先も光らせない */
+  function rockBullet(cx, cy, ang, len, wid, spin = 0, lv = 1) {
     const ux = Math.cos(ang), uy = Math.sin(ang), tail = len * 0.35, tip = len - tail, ext = Math.ceil(len) + 2;
     cx = Math.round(cx); cy = Math.round(cy);
-    const ridge = Math.sin(spin * 1.3) * wid * 0.35;                                  // 回ると稜線が上下に動く
+    const sideLit = s => faceTone(-uy * s, ux * s);                                    // 側面の向きで明暗
+    const split = Math.sin(spin * 1.3) * wid * 0.3;                                    // 面の境目（回ると動く）
     for (let dy = -ext; dy <= ext; dy++) for (let dx = -ext; dx <= ext; dx++) {
       const u = dx * ux + dy * uy, v = -dx * uy + dy * ux;
       if (u < -tail || u > tip) continue;
-      const seg = Math.floor((u + tail) / 2.5);
+      const seg = Math.floor((u + tail) / 4);
       let w = u < 0 ? wid * Math.sqrt(Math.max(0, 1 - (u / tail) * (u / tail))) : wid * Math.pow(1 - u / tip, 0.85);
-      w *= 0.84 + 0.16 * hash(seg + (v > 0 ? 7 : 0), 1101 + (spin & 3));             // ごつごつ
+      w *= 0.86 + 0.14 * hash(seg + (v > 0 ? 7 : 0), 1151 + (spin & 3));
       if (Math.abs(v) > w) continue;
-      const edge = Math.abs(v) > w - 1, lit = (-dx * 0.6 - dy * 0.8) / Math.max(1, Math.hypot(dx, dy));
-      let c = Math.abs(v - ridge) < 0.8 ? P.st0 : lit > 0.35 ? P.st1 : lit > -0.35 ? P.st2 : P.st3;
-      if (edge) c = lit > 0.2 && rim ? P.vg1 : P.st4;
-      if (u > tip - 2.5) c = u > tip - 1.2 ? P.W : P.vg0;                             // 尖った先の光
-      if (((seg * 3 + Math.round(v) + spin) % 7) === 0 && !edge && u < tip - 3) c = P.st3;   // 割れ目
-      px(cx + dx, cy + dy, c, c === P.vg1 ? lv * rim : lv);
+      const side = v < split ? -1 : 1, hv = hash(seg * 2 + (side > 0 ? 1 : 0), 1160 + (spin & 3));
+      let c = sideLit(side);                                                            // 面ごとに一段ずらす（参考の岩の面のむら）
+      if (hv > 0.62) c = c === P.rk1 ? P.rk2 : c === P.rk2 ? P.rk3 : P.rk3;
+      else if (hv < 0.18 && c === P.rk3) c = P.rk2;
+      if (Math.abs(u - (seg * 4 - tail) - (v + wid) * 0.6) < 0.6 && hash(seg, 1162) > 0.45 && Math.abs(v) < w - 1) c = P.rk4;   // 斜めの割れ目
+      if (Math.abs(v - split) < 0.6 && side > 0 && hash(seg, 1161) > 0.35) c = P.rk4;   // 稜の割れ目（暗い線）
+      if (Math.abs(v) > w - 1) c = wid < 3 ? P.rk3 : P.rk5;                           // 細い弾は輪郭を弱く
+      px(cx + dx, cy + dy, c, lv);
     }
+  }
+  /* 大きな岩の棘（波動）：ごつごつした段のある岩の柱。少し傾き、先は平らに欠けていることもある。
+     左が光の面、中ほどに中間の面、右が影の面。段ごとに面の境目がずれ、斜めの割れ目が入る。根元に影 */
+  function bigSpike(x, y, h, w, seed, lv = 1) {
+    x = Math.round(x); y = Math.round(y); h = Math.round(h); if (h < 2) return;
+    for (let dx = -w - 2; dx <= w + 3; dx++) px(x + dx, y + 1, P.rk5, 0.4 * lv);       // 根元の影
+    const lean = (hash(seed, 1171) - 0.5) * 0.5, flat = hash(seed, 1172) < 0.4 ? 1 : 0;
+    for (let k = 0; k < h; k++) {
+      const f = k / h, blk = Math.floor(k / 3);
+      const jl = Math.round((hash(blk, seed + 1) - 0.5) * 2), jr = Math.round((hash(blk, seed + 2) - 0.5) * 2);   // 段ごとのでこぼこ
+      const hw = Math.max(flat, w * Math.pow(1 - f, 0.8) + (k < 2 ? 1 : 0));
+      const cx = x + Math.round(lean * k), L = cx - Math.round(hw) + jl, Rr = cx + Math.round(hw) + jr;
+      const sL = cx - Math.round(hw * (0.1 + 0.3 * hash(blk, seed + 3))), sR = cx + Math.round(hw * (0.35 + 0.3 * hash(blk, seed + 4)));
+      for (let xx = L; xx <= Rr; xx++) {
+        let c = xx < sL ? P.rk1 : xx < sR ? P.rk2 : P.rk3;
+        if (c === P.rk1 && hash(blk * 7 + xx, seed + 5) > 0.82) c = P.rk2;              // 面のむら
+        if ((xx - cx) === Math.round((k % 9) * 0.5) - 2 && hash(blk, seed + 6) > 0.5 && xx > L && xx < Rr) c = P.rk4;   // 斜めの割れ目
+        if (xx === L || xx === Rr) c = P.rk5;
+        px(xx, y - k, c, lv);
+      }
+    }
+    const tx = x + Math.round(lean * h);
+    for (let dx = -flat; dx <= flat; dx++) px(tx + dx, y - h, P.rk5, lv);
   }
   /* 溜め：床から岩が浮き上がって周りを回り、前に構えた大岩へ寄り集まる */
   function rockChargeGround(t, o) {
     for (let k = 0; k < 6; k++) {                                                     // 岩が抜けた床の穴と土煙
       const b = t - k * 0.1; if (b < 0) continue;
       const a = hash(k, 1001) * TAU, r = 12 + hash(k, 1002) * 10, x = o.x + Math.cos(a) * r, y = o.y + 6 + Math.sin(a) * r * 0.5;
-      disc(x, y, 2, P.st4, 0.6); dust(x, y, b, 2, 1003 + k, 4, 0.4, STONE_DUST, 0.8, 0.6);
+      disc(x, y, 2, P.rk5, 0.6); dust(x, y, b, 2, 1003 + k, 4, 0.4, STONE_DUST, 0.8, 0.6);
     }
   }
   function rockChargeAir(t, o) {
@@ -2282,7 +2333,7 @@
     }
     const g = clamp((p - 0.45) / 0.55);
     if (g > 0) rockBullet(hx, hy, o.ang, 6 + 18 * g, 1.5 + 5.5 * g, Math.floor(t * 6), 1, 1);
-    if (p > 0.8 && (Math.floor(t * 12) & 1)) plus(hx - 3, hy - 4, P.vg0, 1);
+    if (p > 0.8 && (Math.floor(t * 12) & 1)) plus(hx - 3, hy - 4, P.rk1, 1);
   }
   /* 貫き：大岩を投げる。回りながら帯をまっすぐ飛び、道の床を削り、小岩が後を追い、終わりで砕ける */
   const BOULDER_T = 0.2;
@@ -2291,7 +2342,7 @@
     for (let s = 10; s < L; s += 3) {                                                 // 削れた床（帯の中だけ）
       const b = t - BOULDER_T * (s / L); if (b < 0 || b > 1.0) continue;
       const lv = b < 0.5 ? 0.8 : 0.8 * (1 - (b - 0.5) / 0.5), j = (hash(s, 1011) - 0.5) * Wd * 0.6;
-      px(o.x + ux * s + nx * j, o.y + 4 + uy * s + ny * j, P.st3, lv); px(o.x + ux * s + nx * (j + 1), o.y + 4 + uy * s + ny * (j + 1), P.st4, lv * 0.7);
+      px(o.x + ux * s + nx * j, o.y + 4 + uy * s + ny * j, P.rk4, lv); px(o.x + ux * s + nx * (j + 1), o.y + 4 + uy * s + ny * (j + 1), P.rk5, lv * 0.7);
     }
     for (let s = 14; s < L; s += 14) dust(o.x + ux * s, o.y + 6 + uy * s, t - BOULDER_T * (s / L), 3, 1012 + s, 7, 0.6, STONE_DUST, 1.2, 0.55);
     const b = t - BOULDER_T;                                                          // 終わりで砕けた跡
@@ -2301,12 +2352,12 @@
     if (t < 0 || t > 1.0) return;
     const [ux, uy] = dirv(o), nx = -uy, ny = ux, L = o.R, Wd = Math.max(4, o.wide || 10), f = clamp(t / BOULDER_T);
     const x0 = o.x + ux * 10, y0 = o.y - 6 + uy * 10;
-    if (t < 0.1) { plus(x0, y0, P.W, 4); ring(x0, y0, 4 + t * 90, P.st1, 1 - t / 0.1); }
+    if (t < 0.1) ring(x0, y0, 4 + t * 90, P.rk3, 1 - t / 0.1);                           // 放った瞬間（光らせない）
     if (f < 1) {
       const d = L * f, x = x0 + ux * d, y = y0 + uy * d + 6 * f;                      // 大岩（少し沈みながら飛ぶ）
       for (let k = 1; k <= 5; k++) {                                                  // 速さの筋
         const bx = x - ux * k * 5, by = y - uy * k * 5;
-        px(bx + nx * 5, by + ny * 5, P.st2, 0.8 - k * 0.14); px(bx - nx * 5, by - ny * 5, P.st2, 0.8 - k * 0.14); px(bx, by + 6, P.vg2, 0.6 - k * 0.1);
+        px(bx + nx * 5, by + ny * 5, P.rk3, 0.8 - k * 0.14); px(bx - nx * 5, by - ny * 5, P.rk3, 0.8 - k * 0.14); px(bx, by + 6, P.rk3, 0.6 - k * 0.1);
       }
       rockBullet(x, y, o.ang, 26, 8, Math.floor(t * 30), 1, 1);
     }
@@ -2321,13 +2372,13 @@
   /* 散弾：足元の岩盤を砕いて全方位へ投げる。1個ずつは bv_arrow（kind:'stone'）の岩 */
   function rockBurstGround(t, o) {
     if (t < 0 || t > 0.9) return;
-    if (t < 0.25) { const r = 6 + t * 80, lv = 1 - t / 0.25; ring(o.x, o.y + 4, r, P.st1, lv); }
-    cracks(o.x, o.y + 4, t, 8, 14, 1031, 0.08, 0.9, P.vg1, P.st2);
+    if (t < 0.25) { const r = 6 + t * 80, lv = 1 - t / 0.25; ring(o.x, o.y + 4, r, P.rk2, lv); }
+    cracks(o.x, o.y + 4, t, 8, 14, 1031, 0.08, 0.9, P.rk3, P.rk3);
     dust(o.x, o.y + 6, t, 7, 1032, 16, 0.6, STONE_DUST, 1.2, 0.6);
   }
   function rockBurstAir(t, o) {
     if (t < 0 || t > 0.5) return;
-    if (t < 0.08) { plus(o.x, o.y, P.W, 5); disc(o.x, o.y, 3, P.st0); }
+    if (t < 0.08) { plus(o.x, o.y, P.rk0, 5); disc(o.x, o.y, 3, P.rk1); }
     for (let i = 0; i < 10; i++) {                                                    // 割れて舞う岩片
       const a = hash(i, 1033) * TAU, sp = 20 + hash(i, 1034) * 30;
       rock(o.x + Math.cos(a) * sp * t, o.y + Math.sin(a) * sp * t * 0.7 - 50 * t + 150 * t * t, 1.2 + hash(i, 1035), i + Math.floor(t * 12), 1 - t / 0.5, 0);
