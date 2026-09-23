@@ -1428,8 +1428,8 @@
   <div class="card" style="text-align:left;line-height:1.9">
     <b>10階ごとの大ボス</b>を倒すたびに、大技を1つ覚えます（全5種）。<br>
     セットできるのは<b>1つだけ</b>。探索中は画面右下の丸ボタンで発動します。<br>
-    <span style="font-size:12px">震撼（周囲を殴る）/ 瞬歩（跳んで無敵）/ 業火（前方へ炎）/
-      守護（全員の被ダメージ減）/ 崩落（画面内すべて）</span><br><br>
+    <span style="font-size:12px">地脈断（周囲を殴る）/ 縮地（走り抜けて無敵）/ 灼髄（前方へ火柱）/
+      守護（全員の被ダメージ減）/ 裂天（画面内すべて）</span><br><br>
     技レベルは<b style="color:#8fd8ff">SP</b>で上げられます（街 → 能力強化）。
     威力が上がり、<b>リキャストも短くなります</b>。<br>
     <span style="font-size:12px">操作は移動だけ、という原則の唯一の例外です。だから枠は1つ、
@@ -2829,7 +2829,7 @@ const WAVE_CD    = 6;      // リキャスト（秒）
 const WAVE_MUL   = 4.0;    // 武器攻撃力に対する倍率
 const WAVE_REACH = 3.4;    // 前方への届き（マス）
 const WAVE_ARC   = 1.5;    // 扇の広さ（ラジアン。約86度）
-const BLOOM_EVERY = 2;     // 大技「生気」が体を戻す間隔（秒）
+const BLOOM_EVERY = 2;     // 大技「命脈」が体を戻す間隔（秒）
 
 /* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
 /* 対価はSP（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
@@ -4320,19 +4320,19 @@ function curseBonus(){
    解放は大ボス（10階ごと）を1体倒すごとに1つ。アカウント単位で恒久。
    技レベルはSPで上げる——能力強化がカンストしたあとのSPの行き先でもある。 */
 const ULTS=[
-  {id:'quake', nm:'震撼', icon:'✹', col:'#d6b34a', cd:26,
+  {id:'quake', nm:'地脈断', icon:'✹', col:'#d6b34a', cd:26,
    desc:lv=>`周囲 ${(3.2+lv*0.35).toFixed(1)} マスに ATK×${(2.6+lv*0.55).toFixed(1)} の打撃。全員よろめく`,
    at:1},
-  {id:'blink', nm:'瞬歩', icon:'➤', col:'#7fc8e0', cd:24,
+  {id:'blink', nm:'縮地', icon:'➤', col:'#7fc8e0', cd:24,
    desc:lv=>`進行方向へ跳び、通過した敵に ATK×${(1.8+lv*0.4).toFixed(1)}。${(2.0+lv*0.12).toFixed(1)}秒 無敵`,
    at:2},
-  {id:'blaze', nm:'業火', icon:'✦', col:'#e0705a', cd:30,
+  {id:'blaze', nm:'灼髄', icon:'✦', col:'#e0705a', cd:30,
    desc:lv=>`前方へ炎の柱。ATK×${(3.4+lv*0.7).toFixed(1)} と火傷を与える`,
    at:3},
   {id:'ward',  nm:'守護', icon:'✜', col:'#7fe0c0', cd:34,
    desc:lv=>`${(6+lv*0.8).toFixed(0)}秒 パーティ全員の被ダメージ -${Math.min(70,30+lv*5)}%。状態異常を消す`,
    at:4},
-  {id:'ruin',  nm:'崩落', icon:'✧', col:'#c98adf', cd:40,
+  {id:'ruin',  nm:'裂天', icon:'✧', col:'#c98adf', cd:40,
    desc:lv=>`画面内の全ての敵に ATK×${(2.2+lv*0.5).toFixed(1)}。ボスには半減`,
    at:5},
 
@@ -4347,10 +4347,10 @@ const ULTS=[
   {id:'aegis', nm:'鉄壁', icon:'▣', col:'#8fc7ff', cd:28,
    desc:lv=>`${(7+lv*0.9).toFixed(0)}秒 パーティ全員の防御力 ×${(1.6+lv*0.22).toFixed(1)}`,
    at:1},
-  {id:'rally', nm:'号令', icon:'✚', col:'#7fe0c0', cd:32,
+  {id:'rally', nm:'回帰', icon:'✚', col:'#7fe0c0', cd:32,
    desc:lv=>`パーティ全員のHPを最大値の ${(22+lv*5)}% 回復`,
    at:2},
-  {id:'bloom', nm:'生気', icon:'❦', col:'#a9d86a', cd:30,
+  {id:'bloom', nm:'命脈', icon:'❦', col:'#a9d86a', cd:30,
    desc:lv=>`${(10+lv*1.5).toFixed(0)}秒 パーティ全員が2秒ごとに最大HPの ${(2+lv*0.5).toFixed(1)}% 回復`,
    at:3},
 ];
@@ -4433,7 +4433,7 @@ const ART_FLASH_ALLY   = 1.8;
 const ART_ALLY_CD_MUL  = 1.35;   // 仲間は自動発動なので、手で切るより少し遅く回す
 
 /* 技の形（k）と数値。
-   **威力は「大技 Lv.1（震撼＝ATK×3.15）を超えない」を上限に置いてある。**
+   **威力は「大技 Lv.1（地脈断＝ATK×3.15）を超えない」を上限に置いてある。**
    段が上がると増えるのは主に届き方と付随効果で、倍率そのものではない——
    倍率で伸ばすと lv3 が出るまで武器技そのものが弱い、という時間が長くなる。 */
 const WEAPON_ARTS={
@@ -7854,7 +7854,7 @@ function enterFloor(depth){
   // 同じ深さの階に入り直したとき、別の間取りの経路を使い回してしまう。
   _intrKey = '';
   P.invuln = 0; S.run.ward = null;    // 無敵と守護は階層をまたがない
-  S.run.aegis = null; S.run.bloom = null;   // 鉄壁・生気も同じく持ち越さない
+  S.run.aegis = null; S.run.bloom = null;   // 鉄壁・命脈も同じく持ち越さない
   P.fallAnim = null; P.fallBlink = 0; // 落下演出も同様（跨ぐと違う階で消え続ける）
   S.run.hinted = false;
 
@@ -8958,7 +8958,7 @@ function firePlayerArt(){
 
 /* ---------- 大技の発動 ----------
    どれも「押した瞬間にその場で完結する」。狙いを付ける操作は要らない。
-   向きが要る技（瞬歩・業火）は、直前の移動方向をそのまま使う。 */
+   向きが要る技（縮地・灼髄）は、直前の移動方向をそのまま使う。 */
 function ultReady(){
   if(hasCurse('silence')) return false;         // 呪い「静寂」
   const u=ultEquipped();
@@ -9000,7 +9000,7 @@ function fireUlt(){
     near(r).forEach(e=>{ hitEnemy(e, st, mult); addStatus(e, 'stagger', S.hero.lv); });
 
   }else if(u.id==='blink'){
-    /* ---------- 瞬歩は「跳ぶ」のをやめた ----------
+    /* ---------- 縮地（旧 瞬歩）は「跳ぶ」のをやめた ----------
        1フレームで座標を移していたので、**画面上では消えて現れるだけ**。
        何が起きたのか読めず、そのうえ通り道の敵を巻き込んだ手応えも無かった。
 
@@ -9074,7 +9074,7 @@ function fireUlt(){
     ultPartyArt('u_rally', 2.8);
 
   }else if(u.id==='bloom'){
-    /* 一定時間の自動回復。号令（その場で戻す）との違いは、
+    /* 一定時間の自動回復。回帰（その場で戻す）との違いは、
        **戦い続けているあいだ効く**こと。押す位置が変わる。 */
     const dur = 10 + lv*1.5, pct = 2 + lv*0.5;
     S.run.bloom = {t:dur, pct, tick:0};
@@ -9090,7 +9090,7 @@ function fireUlt(){
     W.enemies.forEach(e=>{
       if(e.dead) return;
       if(Math.abs(e.x-P.x)>18 || Math.abs(e.y-P.y)>18) return;   // 画面内だけ
-      // 雷は順に落ちる絵だが、ダメージは今まで通りこの瞬間（絵は 0.1秒＋最大 0.18秒 遅れて着く）
+      // 裂天：雷は順に落ちる絵だが、ダメージは今まで通りこの瞬間（絵は 0.1秒＋最大 0.18秒 遅れて着く）
       if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03});
       nth++;
       hitEnemy(e, st, e.boss ? mult*0.5 : mult);
@@ -9702,7 +9702,7 @@ function snapWaterFrame(){
 const LIQUID_LIVE_R = 6;
 const UPG_REGEN_EVERY = 10;   // 治癒の間隔（秒）
 const UPG_REGEN_PCT   = 3;    // 1段あたり、最大HPの何％戻すか
-const BLINK_SEC = 0.28;      // 瞬歩が走り抜けるのにかける秒数
+const BLINK_SEC = 0.28;      // 縮地が走り抜けるのにかける秒数
 
 /* ---------- 鞘無し（周回刃）の毎フレーム処理 ----------
    弾を撃たない。刃そのものが当たる。だから W.fx を1つも使わず、
@@ -12243,7 +12243,7 @@ function update(dt){
   if(S.hero.hpNow<=0){ die(); return; }
   const pChill = hasStatus({st:S.run.pst},'chill') ? (1-CHILL_SLOW) : 1;
 
-  /* ---------- 瞬歩の走り ----------
+  /* ---------- 縮地の走り ----------
      ここで座標を進める。**入力より先に処理して、走っている間は操作を捨てる**——
      途中で曲がれると、既に取ってある線分の判定と当たった場所が食い違う。
      `ease` は出だしを速く、着地でゆるめる（跳んだのではなく走ったと読める形）。 */
@@ -12286,7 +12286,7 @@ function update(dt){
   if(S.run.ward){ S.run.ward.t -= dt; if(S.run.ward.t<=0) S.run.ward=null; }
   // 大技「鉄壁」。防御を掛け算する（stats の def が見る）
   if(S.run.aegis){ S.run.aegis.t -= dt; if(S.run.aegis.t<=0) S.run.aegis=null; }
-  /* 大技「生気」。2秒ごとに、主人公と仲間の体を戻す。
+  /* 大技「命脈」。2秒ごとに、主人公と仲間の体を戻す。
      毎フレーム少しずつ戻す形にすると数字が読めないので、刻んで出す。 */
   if(S.run.bloom){
     const bl=S.run.bloom;
@@ -13673,7 +13673,7 @@ function draw(){
       ctx.stroke();
       ctx.restore();
     }
-    if(f.t==='ultring'){       // 震撼・守護：広がる輪
+    if(f.t==='ultring'){       // 地脈断・守護：広がる輪
       /* life は「減らしてから、同じフレームで描いて、最後に捨てる」順で回るので、
          描く瞬間だけ負になっていることがある。そのまま半径にすると
          arc() が負の半径で例外を投げ、**ループごと止まる**（実際に踏んだ）。
@@ -13688,7 +13688,7 @@ function draw(){
       ctx.beginPath(); ctx.arc(f.x*TS-camX, f.y*TS-camY, rr*TS, 0, 7); ctx.fill();
       ctx.restore();
     }
-    if(f.t==='ultline'){       // 瞬歩：通った跡
+    if(f.t==='ultline'){       // 縮地：通った跡
       const k=f.life/f.maxLife;
       ctx.save();
       ctx.globalAlpha=k*0.85; ctx.strokeStyle=f.col;
@@ -13699,14 +13699,14 @@ function draw(){
       ctx.stroke();
       ctx.restore();
     }
-    if(f.t==='dashghost'){     // 瞬歩：走っている間の残像
+    if(f.t==='dashghost'){     // 縮地：走っている間の残像
       const k=f.life/f.max;
       ctx.save();
       ctx.globalAlpha=k*0.55; ctx.fillStyle=f.col;
       ctx.beginPath(); ctx.arc(f.x*TS-camX, f.y*TS-camY, TS*0.30*k+TS*0.10, 0, 7); ctx.fill();
       ctx.restore();
     }
-    if(f.t==='ultbeam'){       // 業火：前方への柱
+    if(f.t==='ultbeam'){       // 灼髄：前方への柱
       const k=f.life/f.maxLife;
       ctx.save();
       ctx.translate(f.x*TS-camX, f.y*TS-camY); ctx.rotate(f.a);
@@ -18662,7 +18662,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260923b"></script>
+<script src="weapon-art-pixel.js?v=20260923c"></script>
 <script src="game-feel.js?v=20260923-pixelall"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------

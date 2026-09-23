@@ -137,7 +137,7 @@ function feelDrawPersistentPixel(layer,camX,camY){
     PIXEL_ART_FX.renderEffect(ctx,{...p,x:sx,y:sy,scale:feelArtScale(),layer});
   }
 }
-/* 効いている間の足元の輪（守護・鉄壁・生気・聖域・恩寵）。一番強い物を1つだけ描く。 */
+/* 効いている間の足元の輪（守護・鉄壁・命脈・聖域・恩寵）。一番強い物を1つだけ描く。 */
 function feelAuraKind(){
   const r=S.run;if(!r)return null;
   if(r.sanct&&r.sanct.t>0)return'sanct';

@@ -56,8 +56,8 @@
     {id:"a-staff-3", cat:"arts", group:"杖", name:"ライトニング", meta:"lv3 ／ field・雷 ／ 魔法陣", desc:"周囲に3秒の雷", status:"done", preview:{type:"art", key:"stbolt"}},
 
     // ---- 大技：確認できている名称のみ（未実装） ----
-    {id:"u-shinkan", cat:"ult", group:"", name:"震撼 Lv.1", meta:"大技（ULT） ／ 実測ATK倍率 約2.70", desc:"武器技システム比較時のベンチマーク名として言及のみ。演出未設計。", status:"todo"},
-    {id:"u-gokuka",  cat:"ult", group:"", name:"業火 Lv.1", meta:"大技（ULT） ／ 実測ATK倍率 約6.93", desc:"武器技システム比較時のベンチマーク名として言及のみ。演出未設計。", status:"todo"},
+    {id:"u-shinkan", cat:"ult", group:"", name:"地脈断 Lv.1", meta:"大技（ULT） ／ 実測ATK倍率 約2.70", desc:"武器技システム比較時のベンチマーク名として言及のみ。演出未設計。", status:"todo"},
+    {id:"u-gokuka",  cat:"ult", group:"", name:"灼髄 Lv.1", meta:"大技（ULT） ／ 実測ATK倍率 約6.93", desc:"武器技システム比較時のベンチマーク名として言及のみ。演出未設計。", status:"todo"},
     {id:"u-collapse-ally", cat:"ult", group:"", name:"崩落（大魔導士 Lv.50）", meta:"仲間の大技 ／ 着弾点から半径3マス・0.55秒後に着弾", desc:"魔法陣→影→岩が落ちる→衝撃波。足元にも魔法陣。", status:"done", preview:{type:"art", key:"collapse"}},
 
     // ---- スキル技：リキャスト技・キーストーン ----

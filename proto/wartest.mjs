@@ -300,7 +300,7 @@ R.saysName = await pg.evaluate(()=>{
   // 大技
   TH.dummy('sword'); S.greatKills=9; S.ult='quake'; P.ultCd=0; W.pops.length=0;
   fireUlt();
-  out.ult = txts().includes('震撼！');
+  out.ult = txts().includes('地脈断！');
   // 衝撃波
   TH.dummy('sword'); S.upg={wave:1}; P.waveCd=0; W.pops.length=0;
   fireWave();

@@ -50,19 +50,29 @@
 | 通常攻撃の振り | `n_swing`（`kind` = swordaxe / greatsword / dagger / hammer / spear、`elem` で色） | `game-feel.js` `drawFeelSwing`（`f.skill` のある振り＝衝撃波は描かない） |
 | 弾 | `n_shot`（`kind` = arrow / bolt） | `drawFeelWeaponShot` |
 | 当たり | `n_hit`（`elem` = neutral / fire / shock / frost / arcane、`target:'ally'` で小さく） | `drawFeelHits`（`FEEL.hits` はそのまま） |
-| 大技8種 | `u_quake` `u_blink` `u_blaze` `u_ward` `u_aegis` `u_rally` `u_bloom` `u_ruin` | `index.html` `fireUlt` |
+| 大技8種 | `u_quake`（地脈断） `u_blink`（縮地） `u_blaze`（灼髄） `u_ward` `u_aegis` `u_rally`（回帰） `u_bloom`（命脈） `u_ruin`（裂天） | `index.html` `fireUlt` |
 | 支える大技の仲間ごとの印 | `u_ward_on` `u_aegis_on` `u_rally_on` `u_bloom_on` `a_bulwark_on` `a_grace_on` | `ultPartyArt(id, r, src)`（`index.html`、`fireUlt` の直前） |
-| 崩落（大技）の雷1本 | `u_ruin_hit`（敵ごと、`delay` で順に） | `fireUlt` の `ruin` |
+| 裂天の雷1本 | `u_ruin_hit`（敵ごと、`delay` で順に） | `fireUlt` の `ruin` |
 | 仲間の大技 | `a_spin` `a_bulwark` `a_rain`（+`a_rain_hit`） `a_field`（置き型） `a_vanish` `a_grace` `a_sanct`（置き型） | `fireAllyArt`。焦土・聖域は `W.arts` の時計（`feelPersistentPixel`） |
 | スキル技 | `s_wave` `s_dash` `s_revive` `s_regen` | `fireWave` / `tapDash`（game-feel） / 不屈の立ち上がり / 治癒の回復 |
 | 効いている間の足元の輪 | `aura_on`（`aura` = sanct / aegis / ward / bloom / grace。強い順に1つ） | `feelDrawAuras`（`drawFeelArtGround` と `drawFeelWeaponArts` の中） |
 
 - 旧い絵（`ultring` / `ultline` / `ultbeam` / `ultflash` / 瞬歩と瞬足の `dashghost`）は `artId` を付けて描かないようにした（記録は残る）。
-- **当たり判定・ダメージ・時刻は一切変えていない。** 崩落（大技）の雷は 0.1秒＋最大0.18秒遅れて落ちる絵だが、ダメージは今まで通り押した瞬間。
+- **当たり判定・ダメージ・時刻は一切変えていない。** 裂天の雷は 0.1秒＋最大0.18秒遅れて落ちる絵だが、ダメージは今まで通り押した瞬間。
 - `feelPixelArt(id, x, y, o)` に足した引数：`o.ent`（その人に付いて動く）、`o.delay`（秒だけ遅らせる。`age` を負から始める）、
-  `o.wide`（業火の幅・マス）、`o.arc`（衝撃波の角度・ラジアン）、`o.kind` `o.elem`。積める数は 40 → 64。
+  `o.wide`（灼髄の幅・マス）、`o.arc`（衝撃波の角度・ラジアン）、`o.kind` `o.elem`。積める数は 40 → 64。
 - 床の照り返し（`lightPool`）を上下につぶした楕円にした（実機で壁の上へ丸くはみ出していた）。
 - 重さの目安（ヘッドレス Chromium・1回あたり）：当たり・弾・足元の輪 約0.04ms、振り 約0.2ms、支える大技 約0.6ms。
+
+## 2026-09-23（3回目）土煙を網掛けに・大技3つを派手に・大技の改名
+- **土煙**（`dust()`、全技共通）：塗りつぶしの丸が縮む形をやめ、ふくらみながら 4×4 ディザで薄れる煙にした（影・本体・こぶ・上の明るい所）。
+- **縮地**（`u_blink`）：踏み切りの閃光、太い光の帯（白い芯＋水色の縁）、通り道に遅れて弾ける X の斬り跡4つ、
+  抜けた先の破裂（輪・放射線・床のひび）、走った床に残る霜の筋。
+- **灼髄**（`u_blaze`）：陣を大きく、前へ順に噴き上がる火柱6本（最後が一番高い）、根元の溶けたひびと焦げ、帯の縁の熾火、高く舞う火の粉。span 1.2→1.6。
+- **裂天**（`u_ruin` / `u_ruin_hit`）：本人から天へ太い柱、空が横にぎざぎざに裂ける、敵ごとに太い雷（白い芯＋紫2段＋枝）と
+  小さな魔法陣・網掛けで薄れる残光の柱・跳ね上がる石くず。
+- **改名**（表示名だけ。`id` は据え置き）：震撼→地脈断、瞬歩→縮地、業火→灼髄、崩落→裂天、号令→回帰、生気→命脈。
+  仲間の大技（大魔導士 Lv.50）の「崩落」はそのまま。`wartest` の「震撼！」を「地脈断！」に。
 
 ## `PixelArtFx.renderEffect(ctx, p)` の引数
 
@@ -83,7 +93,7 @@
 | `kind` | 通常攻撃の武器（`n_swing`）／弾の種類（`n_shot`） |
 | `elem` | 属性（`n_swing` `n_shot` `n_hit`） |
 | `target` | `n_hit` で `'ally'` なら小さめ |
-| `wide` | 業火の幅（マス） |
+| `wide` | 灼髄の幅（マス） |
 | `arc` | 衝撃波の扇の角度（ラジアン・全幅） |
 | `aura` | 足元の輪の種類（`aura_on`） |
 

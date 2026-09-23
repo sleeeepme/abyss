@@ -437,15 +437,21 @@
       px(x + Math.cos(a) * sp * bb, y + Math.sin(a) * sp * bb * 0.7 + 40 * bb * bb, rampAt(ramp, bb / 0.32));
     }
   }
-  /* 土煙（縮んで消える） */
+  /* 土煙：ふくらみながら網掛け（4×4ディザ）で薄れて消える。塗りつぶしの丸にしない */
   function dust(x, y, b, n = 6, seed = 0, spread = 10, life = 0.5) {
     if (b < 0 || b > life) return;
+    const p = q12(b) / life;
     for (let i = 0; i < n; i++) {
-      const a = hash(i, seed + 411) * TAU, p = q12(b) / life, d = spread * easeOut(Math.min(1, p * 1.6)) * (0.5 + hash(i, seed + 412) * 0.6);
-      const r = Math.round((1.5 + hash(i, seed + 413) * 1.5) * (1 - p));
-      const xx = x + Math.cos(a) * d, yy = y + Math.sin(a) * d * 0.5 - p * 5;
-      if (r <= 0) continue;
-      disc(xx + 1, yy + 1, r - 1, P.du2); disc(xx, yy, r, P.du1); px(xx - 1, yy - r + 1, P.du0);
+      const h1 = hash(i, seed + 411), h2 = hash(i, seed + 412), h3 = hash(i, seed + 413);
+      const a = h1 * TAU, d = spread * easeOut(Math.min(1, p * 1.4)) * (0.5 + h2 * 0.6);
+      const r = (1.3 + h3 * 1.4) * (1 + p * 1.4);
+      const lv = (p < 0.2 ? 0.8 : 0.8 * (1 - (p - 0.2) / 0.8)) * (0.8 + 0.2 * h2);
+      if (lv <= 0.03) continue;
+      const xx = x + Math.cos(a) * d, yy = y + Math.sin(a) * d * 0.5 - p * 6 - h3 * 2;
+      disc(xx + 1, yy + 1, r, P.du2, lv * 0.55);                          // 下の影
+      disc(xx, yy, r, P.du1, lv);                                         // 本体
+      disc(xx + (h1 - 0.5) * r, yy - r * 0.6, r * 0.6, P.du1, lv * 0.9);   // こぶ
+      disc(xx - r * 0.35, yy - r * 0.4, r * 0.45, P.du0, lv * 0.7);        // 上の明るい所
     }
   }
   /* 地面のひび（放射）。glow は光っている時間 */
@@ -1510,54 +1516,101 @@
     }
   }
 
-  /* ---------- 大技：瞬歩（走り抜けた線が光る） ---------- */
+  /* ---------- 大技：縮地（走り抜けた線が光り、遅れて斬り跡が弾ける） ---------- */
   const BLINK_T = 0.28;
   function uBlinkGround(t, o) {
-    const [ux, uy] = dirv(o), L = o.R;
-    dust(o.x, o.y, t, 6, 621, 8, 0.4); dust(o.x + ux * L, o.y + uy * L, t - BLINK_T, 5, 622, 8, 0.4);
-    if (t >= 0 && t < 0.6) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.55, 0.4 * (1 - t / 0.6), 'frost');
+    const [ux, uy] = dirv(o), L = o.R, ex = o.x + ux * L, ey = o.y + uy * L;
+    dust(o.x, o.y, t, 8, 621, 10, 0.5); dust(ex, ey, t - BLINK_T, 8, 622, 12, 0.55);
+    groundRing(o.x, o.y, t, 18, 0.25, RAMP.frost, 0.45);
+    groundRing(ex, ey, t - BLINK_T, 26, 0.3, RAMP.frost, 0.45);
+    cracks(ex, ey, t - BLINK_T, 6, 9, 624, 0.1, 0.7, P.W, P.fr2);
+    for (let s = 4; s < L; s += 2) {                                       // 走った床に残る霜の筋
+      const b = t - BLINK_T * (1 - Math.sqrt(Math.max(0, 1 - s / L))); if (b < 0 || b > 0.7) continue;
+      px(o.x + ux * s, o.y + uy * s + 1, b < 0.15 ? P.fr0 : P.fr2, b < 0.35 ? 0.9 : 0.9 * (1 - (b - 0.35) / 0.35));
+    }
+    if (t >= 0 && t < 0.8) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.6, 0.6 * (1 - t / 0.8), 'frost');
   }
   function uBlinkAir(t, o) {
-    if (t < 0 || t > 0.8) return;
+    if (t < 0 || t > 0.95) return;
     const [ux, uy] = dirv(o), [bx, by] = body(o), L = o.R, nx = -uy, ny = ux, d = L * easeOut(clamp(t / BLINK_T));
-    for (let s = 0; s <= d; s++) {
-      const as = t - BLINK_T * (1 - Math.sqrt(Math.max(0, 1 - s / L))); if (as > 0.45) continue;
-      const x = bx + ux * s, y = by + uy * s, lv = as < 0.15 ? 1 : 1 - (as - 0.15) / 0.3;
-      px(x, y, as < 0.08 ? P.W : as < 0.2 ? P.fr1 : P.fl1, lv);
-      if (as < 0.18) { px(x + nx, y + ny, P.cy1, lv); px(x - nx, y - ny, P.fr2, lv); }
-      if (as < 0.1 && (s % 4) === 0) { px(x + nx * 2, y + ny * 2, P.fr0); px(x - nx * 2, y - ny * 2, P.fr0); }
+    if (t < 0.08) { plus(bx, by, P.W, 6); ring(bx, by, 3 + t * 90, P.cy0, 1 - t / 0.08); }   // 踏み切りの閃光
+    for (let s = 0; s <= d; s++) {                                         // 太い光の帯（白い芯＋水色の縁）
+      const as = t - BLINK_T * (1 - Math.sqrt(Math.max(0, 1 - s / L))); if (as > 0.55) continue;
+      const x = bx + ux * s, y = by + uy * s, lv = as < 0.18 ? 1 : 1 - (as - 0.18) / 0.37, w = as < 0.06 ? 3 : as < 0.16 ? 2 : 1;
+      px(x, y, as < 0.1 ? P.W : as < 0.24 ? P.cy0 : P.fr1, lv);
+      for (let k = 1; k <= w; k++) { const c = k === w ? P.fr2 : P.cy1; px(x + nx * k, y + ny * k, c, lv); px(x - nx * k, y - ny * k, c, lv); }
+      if (as < 0.12 && (s % 5) === 0) { px(x + nx * (w + 2), y + ny * (w + 2), P.W); px(x - nx * (w + 2), y - ny * (w + 2), P.W); }
     }
-    speedLines(bx, by, bx + ux * L, by + uy * L, t, BLINK_T + 0.1, 5, 623, [P.W, P.cy0, P.fr1]);
-    const b = t - BLINK_T;
-    if (b >= 0 && b < 0.3) { const ex = bx + ux * L, ey = by + uy * L; ellRing(ex, ey + 6, 3 + b * 50, 1 + b * 22, b < 0.1 ? P.W : P.cy1, 1 - b / 0.3); if (b < 0.08) plus(ex, ey, P.W, 3); }
+    speedLines(bx, by, bx + ux * L, by + uy * L, t, BLINK_T + 0.15, 9, 623, [P.W, P.cy0, P.fr1]);
+    for (let k = 0; k < 4; k++) {                                          // 通り道に遅れて弾ける斬り跡（X）
+      const s = L * (0.2 + k * 0.2), b = t - BLINK_T * (s / L) - 0.08; if (b < 0 || b > 0.3) continue;
+      const cx = bx + ux * s, cy = by + uy * s, ang = Math.atan2(uy, ux);
+      slash(cx, cy, 9, ang + 2.4, ang + 0.7, 3, 0.8, [P.W, P.cy0, P.fr2], b, 0.16, 625 + k);
+      slash(cx, cy, 9, ang - 2.4, ang - 0.7, 3, 0.8, [P.W, P.cy0, P.fr2], b - 0.04, 0.16, 629 + k);
+      if (b < 0.06) plus(cx, cy, P.W, 3);
+      spark(cx, cy, b, RAMP.frost, 630 + k, 6, 1);
+    }
+    const b = t - BLINK_T;                                                 // 抜けた先の破裂
+    if (b >= 0 && b < 0.45) {
+      const ex = bx + ux * L, ey = by + uy * L;
+      if (b < 0.1) { plus(ex, ey, P.W, 7); disc(ex, ey, 3 - b * 20, P.W); }
+      ring(ex, ey, 4 + b * 70, b < 0.12 ? P.W : P.cy1, 1 - b / 0.45);
+      ellRing(ex, ey + 6, 5 + b * 90, 2 + b * 36, b < 0.1 ? P.W : P.fr1, 1 - b / 0.45);
+      spark(ex, ey, b, RAMP.frost, 634, 12, 1.4);
+      for (let i = 0; i < 8; i++) { const a2 = i * TAU / 8, r = 6 + b * 60; if (b < 0.25) line(ex + Math.cos(a2) * r * 0.5, ey + Math.sin(a2) * r * 0.35, ex + Math.cos(a2) * r, ey + Math.sin(a2) * r * 0.7, i & 1 ? P.cy0 : P.W, 1 - b / 0.25); }
+    }
   }
 
-  /* ---------- 大技：業火（前方へ炎の柱） ---------- */
+  /* ---------- 大技：灼髄（足元の陣から、前へ順に火柱が噴き上がる） ---------- */
+  const BLAZE_COLS = 6;
   function uBlazeGround(t, o) {
-    magicCircle(o.x, o.y + 1, t, 0.7, 'fire', 1.3, o.charge || 0);
-    const [ux, uy] = dirv(o), L = o.R;
-    if (t >= 0 && t < 1.0) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.5, 0.6 * (1 - t), 'fire');
-    for (let s = 8; s < L; s += 3) {
-      const b = t - 0.25 * (s / L); if (b < 0 || b > 0.9) continue;
-      const j = (hash(s, 631) * 2 - 1) * o.wide * 0.8;
-      px(o.x + ux * s - uy * j, o.y + uy * s + ux * j, b < 0.3 ? P.fi3 : P.fi5, b < 0.5 ? 1 : 1 - (b - 0.5) / 0.4);
+    magicCircle(o.x, o.y + 1, t, 0.8, 'fire', 1.7, o.charge || 0);
+    const [ux, uy] = dirv(o), L = o.R, W = o.wide || 18;
+    if (t >= 0 && t < 1.4) lightPool(o.x + ux * L * 0.5, o.y + uy * L * 0.5, L * 0.6, 0.8 * (1 - t / 1.4), 'fire');
+    for (let k = 0; k < BLAZE_COLS; k++) {                                // 火柱の根元：溶けた床のひびと焦げ
+      const s = L * (k + 1) / (BLAZE_COLS + 0.5), b = t - 0.06 - k * 0.06, x = o.x + ux * s, y = o.y + uy * s;
+      cracks(x, y, b, 6, W * 0.5, 640 + k, 0.2, 1.3, P.fi1, P.fi4);
+      groundRing(x, y, b, W * 0.7, 0.25, RAMP.fire, 0.45);
+      if (b > 0.1 && b < 1.4) ellRing(x, y, W * 0.45, W * 0.2, P.fi5, 0.7 * (1 - (b - 0.1) / 1.3));
     }
+    for (let s = 8; s < L; s += 2) {                                      // 帯の縁の熾火
+      const b = t - 0.3 * (s / L); if (b < 0 || b > 1.3) continue;
+      for (const sg of [-1, 1]) {
+        const j = sg * W * (0.55 + hash(s, 631 + sg) * 0.4);
+        px(o.x + ux * s - uy * j, o.y + uy * s + ux * j, b < 0.4 ? P.fi3 : P.fi5, b < 0.7 ? 1 : 1 - (b - 0.7) / 0.6);
+      }
+    }
+  }
+  function flameColumn(x, y, b, H, fr, seed) {                            // 1本の火柱：下から伸びて、上から崩れる
+    if (b < 0 || b > 0.9) return;
+    const grow = easeOut(clamp(b / 0.1)), top = H * grow, fall = b > 0.45 ? (b - 0.45) / 0.45 : 0;
+    for (let h = 0; h < top; h += 3) {
+      const f = h / H, ci = Math.min(5, Math.floor(f * 3 + fall * 3 + (b < 0.08 ? 0 : 1)));
+      if (f < fall * 0.9 && fall > 0) continue;                           // 崩れた所から消える
+      const wob = ((fr + Math.floor(h / 3)) % 3) - 1;
+      flamePuff(x + wob + Math.sin(h * 0.5 + seed) * 1.5, y - h, f < 0.3 ? 3 : f < 0.7 ? 2 : 1, ci, wob);
+    }
+    if (b < 0.12) { disc(x, y - 2, 4 - b * 20, P.W); plus(x, y - top, P.fi0, 3); }
   }
   function uBlazeAir(t, o) {
     if (t < 0) return;
-    const [ux, uy] = dirv(o), [bx, by] = body(o), L = o.R, fr = Math.floor(t * 12);
-    if (t < 0.12) { disc(bx + ux * 6, by + uy * 6, 3 - t * 16, P.fi0); plus(bx + ux * 6, by + uy * 6, P.fi1, 3); }
-    for (let s = 6; s < L; s += 5) {
-      const b = t - 0.25 * (s / L); if (b < 0 || b > 0.6) continue;
-      for (let lane = 0; lane < 2; lane++) {
-        const j = (hash(s * 3 + lane, 632) * 2 - 1) * o.wide * 0.7, f = b / 0.6, ci = Math.min(5, 1 + Math.floor(f * 5));
-        flamePuff(bx + ux * s - uy * j, by + uy * s + ux * j - b * 16, f < 0.35 ? 2 : 1, ci, (fr + s + lane) % 3 - 1);
+    const [ux, uy] = dirv(o), [bx, by] = body(o), L = o.R, W = o.wide || 18, fr = Math.floor(t * 12);
+    if (t < 0.14) { disc(bx + ux * 6, by + uy * 6, 4 - t * 20, P.W); plus(bx + ux * 6, by + uy * 6, P.fi1, 5); }
+    for (let s = 6; s < L; s += 4) {                                      // 地を這う炎の帯
+      const b = t - 0.3 * (s / L); if (b < 0 || b > 0.6) continue;
+      for (let lane = 0; lane < 3; lane++) {
+        const j = (hash(s * 3 + lane, 632) * 2 - 1) * W * 0.6, f = b / 0.6, ci = Math.min(5, 1 + Math.floor(f * 5));
+        flamePuff(bx + ux * s - uy * j, by + 4 + uy * s + ux * j - b * 10, f < 0.35 ? 2 : 1, ci, (fr + s + lane) % 3 - 1);
       }
-      if (b < 0.12) { px(bx + ux * s, by + uy * s, P.W); px(bx + ux * (s + 2), by + uy * (s + 2), P.fi0); }
     }
-    for (let i = 0; i < 10; i++) {                                     // 舞い上がる火の粉
-      const t0 = hash(i, 633) * 0.6, a = t - t0; if (a < 0 || a > 0.6) continue;
-      const s = L * hash(i, 634); px(bx + ux * s + (hash(i, 635) - 0.5) * o.wide, by + uy * s - a * 30, rampAt(RAMP.fire, a / 0.6));
+    for (let k = 0; k < BLAZE_COLS; k++) {                                // 前へ順に噴き上がる火柱
+      const s = L * (k + 1) / (BLAZE_COLS + 0.5), b = t - 0.06 - k * 0.06;
+      flameColumn(o.x + ux * s, o.y + uy * s, b, 26 + (k & 1) * 8 + (k === BLAZE_COLS - 1 ? 10 : 0), fr, k);
+    }
+    for (let i = 0; i < 28; i++) {                                        // 高く舞う火の粉
+      const t0 = 0.05 + hash(i, 633) * 0.7, a = t - t0; if (a < 0 || a > 0.8) continue;
+      const s = L * hash(i, 634), sx = o.x + ux * s + (hash(i, 635) - 0.5) * W * 1.4;
+      px(sx + Math.sin(a * 9 + i) * 2, o.y + uy * s - 6 - a * 55, rampAt(RAMP.fire, a / 0.8));
     }
   }
 
@@ -1626,29 +1679,64 @@
     bloomOn(t, o); onEach(o, t, bloomOn);
   }
 
-  /* ---------- 大技：崩落（画面内の敵それぞれへ紫の雷） ---------- */
+  /* ---------- 大技：裂天（空が裂け、画面内の敵それぞれへ紫の雷） ---------- */
   function uRuinGround(t, o) {
-    magicCircle(o.x, o.y + 1, t, 0.6, 'arcane', 1.6, o.charge || 0);
-    if (t >= 0 && t < 0.25) ellRing(o.x, o.y, 20 + t * 200, (20 + t * 200) * 0.5, t < 0.08 ? P.ar0 : P.ar2, 0.6 * (1 - t / 0.25));
+    magicCircle(o.x, o.y + 1, t, 0.8, 'arcane', 1.9, o.charge || 0);
+    for (let k = 0; k < 2; k++) { const b = t - k * 0.1; if (b >= 0 && b < 0.4) ellRing(o.x, o.y, 20 + b * 320, (20 + b * 320) * 0.5, b < 0.08 ? P.W : k ? P.ar2 : P.ar0, 0.8 * (1 - b / 0.4)); }
+    if (t >= 0 && t < 0.6) lightPool(o.x, o.y, 44, t < 0.12 ? 1 : 0.5 * (1 - t / 0.6), 'arcane');
     (o.targets || []).forEach(([x, y], i) => ruinHitGround(t - 0.1 - i * 0.05, { x, y }));
   }
+  function skyRift(cx, top, t) {                                          // 空の裂け目（横にぎざぎざに開いて閉じる）
+    if (t < 0 || t > 0.7) return;
+    const open = t < 0.12 ? t / 0.12 : t < 0.45 ? 1 : 1 - (t - 0.45) / 0.25, half = 70 * easeOut(clamp(t / 0.15));
+    let py = top + 6;
+    for (let x = -half; x <= half; x += 3) {
+      const y = top + 6 + (hash(Math.round(x / 3) + 50, 655) - 0.5) * 6, g = Math.max(0, open * (3 - Math.abs(x) / half * 3));
+      line(cx + x - 3, py, cx + x, y, P.W, open);
+      for (let k = 1; k <= g; k++) { px(cx + x, y - k, P.ar0, open); px(cx + x, y + k, k > 1 ? P.ar2 : P.ar1, open); }
+      py = y;
+    }
+  }
   function uRuinAir(t, o) {
-    const [bx, by] = body(o);
-    if (t >= 0 && t < 0.14) { const top = o.skyY != null ? o.skyY : 0; line(bx, by - 8, bx, top, P.W); line(bx - 1, by - 8, bx - 1, top, P.ar1, 0.8); line(bx + 1, by - 8, bx + 1, top, P.ar1, 0.8); plus(bx, by - 8, P.W, 3); }
+    const [bx, by] = body(o), top = o.skyY != null ? o.skyY : 0;
+    if (t >= 0 && t < 0.3) {                                              // 本人から天へ抜ける太い柱
+      const w = t < 0.08 ? 3 : t < 0.18 ? 2 : 1, lv = t < 0.18 ? 1 : 1 - (t - 0.18) / 0.12;
+      for (let dx = -w - 1; dx <= w + 1; dx++) line(bx + dx, by - 6, bx + dx, top, Math.abs(dx) <= w - 1 ? P.W : Math.abs(dx) === w ? P.ar0 : P.ar2, lv);
+      if (t < 0.1) { plus(bx, by - 8, P.W, 6); disc(bx, by - 8, 3, P.ar0); }
+    }
+    skyRift(bx, top, t - 0.04);
+    for (let i = 0; i < 16; i++) {                                        // 裂け目から降る光の粒
+      const b = t - 0.08 - hash(i, 656) * 0.4; if (b < 0 || b > 0.5) continue;
+      px(bx + (hash(i, 657) - 0.5) * 120, top + 8 + b * 140, b < 0.2 ? P.W : P.ar1, 1 - b / 0.5);
+    }
     (o.targets || []).forEach(([x, y], i) => ruinHitAir(t - 0.1 - i * 0.05, { x, y, skyY: o.skyY }));
   }
   function ruinHitGround(t, o) {
-    if (t < 0 || t > 0.8) return;
-    groundRing(o.x, o.y, t, 16, 0.3, RAMP.arcane, 0.5);
-    cracks(o.x, o.y, t, 5, 8, 651, 0.1, 0.8, P.ar0, P.ar2);
-    if (t < 0.2) lightPool(o.x, o.y, 16, t < 0.08 ? 0.9 : 0.4, 'arcane');
+    if (t < 0 || t > 1.0) return;
+    magicCircle(o.x, o.y + 1, t + 0.3, 0.35, 'arcane', 0.8, 0.3);
+    groundRing(o.x, o.y, t, 22, 0.32, RAMP.arcane, 0.5);
+    cracks(o.x, o.y, t, 7, 11, 651, 0.14, 1.0, P.ar0, P.ar2);
+    if (t < 0.3) lightPool(o.x, o.y, 22, t < 0.08 ? 1 : 0.5, 'arcane');
   }
   function ruinHitAir(t, o) {
-    if (t < 0 || t > 0.5) return;
-    const top = o.skyY != null ? o.skyY : o.y - 80, x = o.x, y = o.y - 6;
-    if (t < 0.12) boltPath(x, y, top, Math.round(x * 13 + y), Math.floor(t * 24) & 1, (a, c, d, e) => { line(a, c, d, e, t < 0.05 ? P.W : P.ar0); line(a + 1, c, d + 1, e, P.ar1); });
-    spark(x, y, t, RAMP.arcane, 652, 8, 1.1);
-    if (t < 0.3) ring(x, y, 2 + t * 30, rampAt(RAMP.arcane, t / 0.3), 1 - t / 0.3);
+    if (t < 0 || t > 0.6) return;
+    const top = o.skyY != null ? o.skyY : o.y - 80, x = o.x, y = o.y - 6, fr = Math.floor(t * 24) & 1, seed = Math.round(x * 13 + y);
+    if (t < 0.16) {                                                       // 太い雷（白い芯＋紫の縁2段）と枝
+      const core = t < 0.06 ? P.W : P.ar0;
+      boltPath(x, y, top, seed, fr, (a, c, d, e) => { line(a - 2, c, d - 2, e, P.ar3); line(a + 2, c, d + 2, e, P.ar3); line(a - 1, c, d - 1, e, P.ar1); line(a + 1, c, d + 1, e, P.ar1); line(a, c, d, e, core); });
+      boltPath(x + 8 - fr * 16, y - 20, top + 30, seed + 7, fr, (a, c, d, e) => line(a, c, d, e, P.ar1, 0.8));
+    } else if (t < 0.4) {                                                 // 残光の柱（網掛けで薄れる）
+      const lv = 0.7 * (1 - (t - 0.16) / 0.24);
+      for (let k = y; k > top; k--) { px(x, k, P.ar1, lv); px(x - 1, k, P.ar2, lv * 0.6); px(x + 1, k, P.ar2, lv * 0.6); }
+    }
+    if (t < 0.1) { plus(x, y, P.W, 6); disc(x, y, 3 - t * 20, P.W); }
+    spark(x, y, t, RAMP.arcane, 652, 12, 1.4);
+    if (t < 0.35) { ring(x, y, 3 + t * 50, rampAt(RAMP.arcane, t / 0.35), 1 - t / 0.35); ring(x, y, 2 + t * 28, P.W, 0.6 * (1 - t / 0.35)); }
+    for (let i = 0; i < 6; i++) {                                         // 跳ね上がる石くず
+      const b = t - 0.02; if (b < 0 || b > 0.5) continue;
+      const a = hash(i, 658) * Math.PI + Math.PI, sp = 30 + hash(i, 659) * 30;
+      px(x + Math.cos(a) * sp * b, o.y - 2 + Math.sin(a) * sp * b + 120 * b * b, i & 1 ? P.st1 : P.ar2);
+    }
   }
 
   /* ============ 仲間の大技（Lv.50） ============ */
@@ -2032,27 +2120,27 @@
 
     /* ==== 大技（主人公） ==== */
     u_quake: {
-      group: 'ult', label: '震撼', who: '大技・周囲を叩き割る', caster: 'warrior', castAt: 0.4, span: 1.0, loop: 2.2, charge: 0.3, recover: [0.4, 0.7], pose: 'melee', swings: [0], shake: [[0.02, 2], [0.2, 1]],
+      group: 'ult', label: '地脈断', who: '大技・周囲の地脈を断ち割る', caster: 'warrior', castAt: 0.4, span: 1.0, loop: 2.2, charge: 0.3, recover: [0.4, 0.7], pose: 'melee', swings: [0], shake: [[0.02, 2], [0.2, 1]],
       cx: 80, cy: 64, ang: 0, R: T16(3.9), enemies: [[40, 56], [124, 60], [100, 86], [60, 84]],
       hits: (o, e) => { const d = Math.hypot(e[0] - o.x, (e[1] - o.y) / 0.5); return d <= o.R + 8 ? [{ t: 0.36 * (1 - Math.sqrt(Math.max(0, 1 - Math.min(1, d / o.R)))), k: 3, z: 5, zt: 0.3 }] : []; },
       ground: uQuakeGround, air: uQuakeAir
     },
     u_blink: {
-      group: 'ult', label: '瞬歩', who: '大技・走り抜けて斬る', caster: 'warrior', castAt: 0.35, span: 0.9, loop: 2.0, charge: 0.2, recover: [0.4, 0.8], pose: 'blink', dashT: BLINK_T,
+      group: 'ult', label: '縮地', who: '大技・走り抜けて斬る', caster: 'warrior', castAt: 0.35, span: 1.0, loop: 2.0, charge: 0.2, recover: [0.4, 0.8], pose: 'blink', dashT: BLINK_T,
       cx: 26, cy: 70, ang: 0, R: T16(4.5), enemies: [[62, 66], [84, 74]],
       hits: H.line([0], BLINK_T, false, 10, 2), ground: uBlinkGround, air: uBlinkAir
     },
     u_blaze: {
-      group: 'ult', label: '業火', who: '大技・前方へ炎の柱', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.2, loop: 2.4, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
+      group: 'ult', label: '灼髄', who: '大技・前へ火柱が噴き上がる', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.6, loop: 2.8, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
       cx: 14, cy: 70, ang: 0, R: T16(6.5), wide: T16(1.15), enemies: [[60, 64], [92, 76], [116, 66]],
       hits: H.line([0], 0.25, true, 20, 1.5), ground: uBlazeGround, air: uBlazeAir
     },
     u_ward: uSupport('守護', 'ward', 'heal', P.hl1, uWardGround, uWardAir, '6秒〜・被ダメージを削り、状態異常を消す'),
     u_aegis: uSupport('鉄壁', 'aegis', 'aegis', P.ag1, uAegisGround, uAegisAir, '防御を掛け算する'),
-    u_rally: uSupport('号令', 'rally', 'heal', P.hl1, uRallyGround, uRallyAir, '全員をその場で回復'),
-    u_bloom: uSupport('生気', 'bloom', 'leaf', P.lf1, uBloomGround, uBloomAir, 'しばらく自動回復'),
+    u_rally: uSupport('回帰', 'rally', 'heal', P.hl1, uRallyGround, uRallyAir, '全員をその場で回復'),
+    u_bloom: uSupport('命脈', 'bloom', 'leaf', P.lf1, uBloomGround, uBloomAir, 'しばらく自動回復'),
     u_ruin: {
-      group: 'ult', label: '崩落', who: '大技・画面内の敵すべてへ紫の雷', caster: 'warrior', ramp: 'arcane', rimCol: P.ar1, castAt: 0.55, span: 1.0, loop: 2.4, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'arcane',
+      group: 'ult', label: '裂天', who: '大技・空を裂き、画面内の敵すべてへ紫の雷', caster: 'warrior', ramp: 'arcane', rimCol: P.ar1, castAt: 0.55, span: 1.1, loop: 2.6, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'arcane',
       cx: 30, cy: 76, ang: 0, R: T16(1.6), enemies: [[74, 40], [110, 58], [132, 84], [86, 96], [124, 30]],
       hits: (o, e, i) => [{ t: 0.1 + i * 0.05, k: 2 }], ground: uRuinGround, air: uRuinAir
     },
@@ -2126,7 +2214,7 @@
     u_bloom_on: { aux: true, span: 1.0, ext: 16, pad: 8, sky: 24, ground() {}, air: bloomOn },
     a_bulwark_on: { aux: true, span: 1.3, ext: 16, pad: 8, sky: 28, ground() {}, air: bulwarkOn },
     a_grace_on: { aux: true, span: 0.9, ext: 16, pad: 8, sky: 24, ground() {}, air: graceOn },
-    u_ruin_hit: { aux: true, span: 0.8, ext: 20, pad: 10, sky: 110, ground: ruinHitGround, air: ruinHitAir },
+    u_ruin_hit: { aux: true, span: 1.0, ext: 24, pad: 10, sky: 110, ground: ruinHitGround, air: ruinHitAir },
     aura_on: { aux: true, span: 1e9, ext: 14, pad: 6, sky: 16, ground: auraGround, air: auraAir },
     bwshot: { aux: true, span: 0.45, ground() {}, air: bwshotAir },
     bwrain_hit: { aux: true, span: 0.5, ground() {}, air: (t, o) => rainHit(o.x, o.y, t) },
@@ -2292,8 +2380,8 @@
      fall      … アローレインの矢1本の落ち具合 0..1
      ============================================================ */
   const GAME_O = {};
-  const SKY = { stbolt: 72, collapse: 130, spdragoon: 90, gtupper: 60, bwrain: 60, a_rain: 60, u_ruin: 130, s_revive: 110, u_rally: 40, u_bloom: 40,
-                u_ward: 24, u_aegis: 24, a_bulwark: 32, a_grace: 24, a_sanct: 34, a_field: 24, u_quake: 24, u_blaze: 30 };
+  const SKY = { stbolt: 72, collapse: 130, spdragoon: 90, gtupper: 60, bwrain: 60, a_rain: 60, u_ruin: 140, s_revive: 110, u_rally: 40, u_bloom: 40,
+                u_ward: 24, u_aegis: 24, a_bulwark: 32, a_grace: 24, a_sanct: 34, a_field: 24, u_quake: 24, u_blaze: 64 };
   function span(id) { const d = DEFS[id]; return d ? d.span : 0; }
   function renderEffect(ctx, p) {
     const id = p.id, d = DEFS[id], age = p.age || 0;
