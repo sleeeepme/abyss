@@ -2054,11 +2054,13 @@
   /* 溜め（貫き）：弓を引く。形の無い矢が光で組み上がる／石の槍に礫が集まる */
   function bvChargeGround(t, o) {
     if (t < 0) return;
+    if (isStone(o)) return rockChargeGround(t, o);
     const fr = Math.floor(t * 12);
     ellRing(o.x, o.y + 8, 9, 3, isStone(o) ? P.st1 : ((fr & 1) ? P.vg2 : P.vg3), 0.7, 10, q12(t) * 2);
   }
   function bvChargeAir(t, o) {
     if (t < 0) return;
+    if (isStone(o)) return rockChargeAir(t, o);
     const life = o.life || 0.7, p = clamp(t / life), [ux, uy] = dirv(o), nx = -uy, ny = ux, fr = Math.floor(t * 12);
     const bx = o.x + ux * 8, by = o.y - 2 + uy * 8, stone = isStone(o);
     for (let k = -6; k <= 6; k++) {                                                    // 弓
@@ -2079,6 +2081,7 @@
 
   /* 貫き：12マスの帯を一瞬で走る（空引き＝光の矢／礫＝石の槍と砂利） */
   function bvBeamGround(t, o) {
+    if (isStone(o)) return boulderGround(t, o);
     const [ux, uy] = dirv(o), L = o.R, stone = isStone(o);
     for (let s = 12; s < L; s += 12) {
       const b = t - 0.1 * (s / L);
@@ -2086,6 +2089,7 @@
     }
   }
   function bvBeamAir(t, o) {
+    if (isStone(o)) return boulderAir(t, o);
     if (t < 0 || t > 0.8) return;
     const [ux, uy] = dirv(o), nx = -uy, ny = ux, L = o.R, Wd = Math.max(4, o.wide || 10), stone = isStone(o), hs = L * easeOut(clamp(t / 0.1));
     const ox = o.x + ux * 6, oy = o.y - 2 + uy * 6;
@@ -2129,6 +2133,7 @@
 
   /* 散弾：弓を空へ鳴らし、全方位へ形の無い矢（礫）を撒く。1本ずつは bv_arrow */
   function bvReleaseAir(t, o) {
+    if (isStone(o)) return rockBurstAir(t, o);
     if (t < 0 || t > 0.4) return;
     const stone = isStone(o), n = 14, lv = 1 - t / 0.4;
     if (t < 0.08) { plus(o.x, o.y - 2, P.W, 5); disc(o.x, o.y - 2, 2, stone ? P.st0 : P.vg0); }
@@ -2138,12 +2143,12 @@
     }
     ring(o.x, o.y - 2, 4 + t * 70, stone ? P.st1 : P.vg2, lv);
   }
-  function bvReleaseGround(t, o) { if (isStone(o)) dust(o.x, o.y + 6, t, 6, 940, 14, 0.5, STONE_DUST, 1.2); }
+  function bvReleaseGround(t, o) { if (isStone(o)) rockBurstGround(t, o); }
   function bvArrowAir(t, o) {
     const a = o.ang, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux, x = o.x, y = o.y, fr = Math.floor(t * 24);
-    if (isStone(o)) {                                                                   // 礫：回る石くずと砂の尾
-      for (let k = 1; k <= 4; k++) px(x - ux * k * 3 + ((fr + k) & 1 ? nx : -nx), y - uy * k * 3, P.st2, 1 - k / 5);
-      disc(x, y, 1.6, P.st1); px(x + ((fr & 1) ? 1 : -1), y - 1, P.st0); px(x - 1, y + 1, P.st3); px(x + ux * 2, y + uy * 2, P.vg1);
+    if (isStone(o)) {                                                                   // 礫：回りながら飛ぶ岩と砂の尾
+      for (let k = 1; k <= 3; k++) px(x - ux * (3 + k * 3), y - uy * (3 + k * 3) + k, P.st2, 0.7 - k * 0.18);
+      rock(x, y, 3, fr >> 1, 1, 0.9);
       return;
     }
     for (let s = 0; s < 10; s++) px(x - ux * s, y - uy * s, s < 4 ? P.W : P.vg1, s < 7 ? 1 : 0.6);
@@ -2152,52 +2157,157 @@
     for (let k = 1; k <= 3; k++) px(x - ux * (12 + k * 3), y - uy * (12 + k * 3), P.vg2, 0.8 - k * 0.2);   // 残像
   }
 
-  /* 波動（礫の狩人）：石くずの輪が外へ広がる。**円のまま**（当たり判定と同じ） */
+  /* 波動（礫の狩人）：輪の先で岩の棘が床から突き出し、通り過ぎると崩れて石くずが跳ねる。**円のまま**（当たり判定と同じ） */
   function bvWaveGround(t, o) {
-    const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3)), fr = Math.floor(t * 12);
+    const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3));
     if (R <= 0 || fade <= 0) return;
-    ring(o.x, o.y, R, P.st1, 0.9 * fade); ring(o.x, o.y, R - 2, P.st2, 0.6 * fade); ring(o.x, o.y, R - 5, P.st3, 0.35 * fade);
-    const n = Math.max(8, Math.floor(TAU * R / 8));
-    for (let i = 0; i < n; i++) {                                                     // 輪の内側に残る砂けむり
-      if ((i + fr) % 3) continue;
-      const a = i * TAU / n + hash(i, 951) * 0.2, r = R - 4 - hash(i, 952) * 5;
-      disc(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 1.5 + hash(i, 953), P.st1, 0.45 * fade);
+    ring(o.x, o.y, R + 1, P.st3, 0.7 * fade);                                            // 割れていく床の線
+    const n = Math.max(10, Math.floor(TAU * R / 6));
+    for (let i = 0; i < n; i++) {                                                       // 通り過ぎた跡の瓦礫
+      const a = i * TAU / n + hash(i, 951) * 0.2, r = R - 5 - hash(i, 952) * 7;
+      if (r <= 2) continue;
+      const x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r;
+      px(x, y, P.st2, 0.8 * fade); if (i & 1) px(x + 1, y, P.st3, 0.8 * fade);
+      if (i % 4 === 0) disc(x, y - 1, 1.5, P.st1, 0.35 * fade);
     }
   }
   function bvWaveAir(t, o) {
     const R = o.R, maxR = (o.life || 9) * TILE, fade = clamp(1 - Math.pow(R / maxR, 3));
     if (R <= 0 || fade <= 0) return;
-    const n = Math.max(8, Math.floor(TAU * R / 7));
-    for (let i = 0; i < n; i++) {                                                     // 跳ねながら転がる礫
-      const a = i * TAU / n + hash(i, 961) * 0.25, hop = Math.abs(Math.sin(t * 14 + i * 1.7)) * 3;
-      const x = o.x + Math.cos(a) * R, y = o.y + Math.sin(a) * R - hop;
-      px(x, y, P.st1, fade); px(x + 1, y, P.st2, fade); px(x, y - 1, P.st0, fade); if (i % 2 === 0) px(x + 1, y - 1, P.vg1, fade * 0.8);
+    const n = Math.max(10, Math.floor(TAU * R / 7)), fr = Math.floor(t * 12);
+    for (let i = 0; i < n; i++) {
+      const a = i * TAU / n + hash(i, 961) * 0.2, x = Math.round(o.x + Math.cos(a) * R), y = Math.round(o.y + Math.sin(a) * R);
+      const h = (4 + hash(i, 962) * 6) * fade * (((fr + i) % 4) === 0 ? 0.7 : 1);         // 輪の先の岩の棘
+      rockSpike(x, y, h, 2);
+      if (i % 3 === 0) px(x, y - h - 1, P.vg1, fade);
+      const b = (t * 3 + hash(i, 963)) % 1, bx = o.x + Math.cos(a) * (R - 3 - b * 6), by = o.y + Math.sin(a) * (R - 3 - b * 6) - 10 * b + 18 * b * b;   // 跳ねる石くず
+      if (i % 2 === 0) { px(bx, by, P.st1, fade); px(bx + 1, by, P.st2, fade); }
     }
   }
 
-  /* 落石（礫の狩人・激昂）：空から石が落ちる（溜めの終わり）→ 砕ける */
-  function bvRockGround(t, o) { const L = o.life || 1, f = clamp((t - (L - 0.45)) / 0.45); if (f > 0) disc(o.x, o.y, 2 + f * 7, P.st3, 0.25 + 0.45 * f); }
+  /* 落石（礫の狩人・激昂）：ヴェラが床から岩を引き剥がして投げる。弧を描いて落ち、砕ける */
+  function bvRockGround(t, o) {
+    const L = o.life || 1, f = clamp((t - (L - 0.55)) / 0.55);
+    if (f > 0) { disc(o.x, o.y, 2 + f * 8, P.st3, 0.25 + 0.45 * f); if (f > 0.7) ring(o.x, o.y, 10 - f * 4, P.st2, 0.6); }
+  }
   function bvRockAir(t, o) {
-    const L = o.life || 1, f = (t - (L - 0.45)) / 0.45; if (f < 0 || f > 1) return;
-    const y = o.y - (1 - f * f) * 95;
-    for (let k = 1; k <= 4; k++) px(o.x + (k & 1 ? 2 : -2), y - 6 - k * 5, P.vg2, 0.8 - k * 0.15);
-    disc(o.x, y, 4, P.st2); disc(o.x - 1, y - 1, 2.5, P.st1); px(o.x - 2, y - 3, P.st0); px(o.x + 3, y - 1, P.vg1);
+    const L = o.life || 1, f = (t - (L - 0.55)) / 0.55; if (f < 0 || f > 1) return;
+    const sx = o.cx != null ? o.cx : o.x - 60, sy = o.cy != null ? o.cy : o.y;
+    const pos = g => [sx + (o.x - sx) * g, sy - 10 + (o.y + 4 - sy + 10) * g - 70 * 4 * g * (1 - g)];
+    for (let k = 1; k <= 3; k++) { const g = f - k * 0.06; if (g < 0) continue; const [x, y] = pos(g); px(x, y, P.st2, 0.8 - k * 0.2); px(x + 1, y + 1, P.st3, 0.6 - k * 0.15); }
+    const [x, y] = pos(f);
+    rock(x, y, 5 + 2 * Math.sin(Math.PI * f), Math.floor(t * 10), 1, 1);
   }
   function bvRockHitGround(t, o) {
-    if (t < 0 || t > 1.1) return;
+    if (t < 0 || t > 1.2) return;
     const R = o.R;
     if (t < 0.3) { const r = R * easeOut(clamp(t / 0.08)), lv = 1 - t / 0.3; ring(o.x, o.y, r, t < 0.06 ? P.W : P.st0, lv); ring(o.x, o.y, r - 2, P.st2, 0.6 * lv); }
-    if (t < 1.0) disc(o.x, o.y, R * 0.35, P.st3, 0.4 * (1 - t));
-    cracks(o.x, o.y, t, 7, R * 0.8, 970, 0.1, 1.0, P.vg1, P.st2);
-    for (let i = 0; i < 10; i++) { const a = i * TAU / 10 + hash(i, 971) * 0.3, rr = R * (0.6 + 0.3 * hash(i, 972)); dust(o.x + Math.cos(a) * rr, o.y + Math.sin(a) * rr, t - 0.03, 2, 973 + i, 7, 0.75, STONE_DUST, 1.1, 0.6); }
+    if (t < 1.1) disc(o.x, o.y, R * 0.4, P.st3, 0.45 * (1 - t / 1.1));               // くぼみ
+    cracks(o.x, o.y, t, 8, R * 0.85, 970, 0.1, 1.1, P.vg1, P.st2);
+    for (let i = 0; i < 7; i++) {                                                     // 残る岩のかけら
+      const a = hash(i, 974) * TAU, r = R * (0.3 + 0.5 * hash(i, 975)), b = t - 0.05; if (b < 0) continue;
+      const lv = b < 0.7 ? 1 : 1 - (b - 0.7) / 0.4; if (lv <= 0) continue;
+      rock(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 1.6 + hash(i, 976) * 1.4, i, lv, 0);
+    }
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + hash(i, 971) * 0.3, rr = R * (0.6 + 0.3 * hash(i, 972)); dust(o.x + Math.cos(a) * rr, o.y + Math.sin(a) * rr, t - 0.03, 2, 973 + i, 7, 0.7, STONE_DUST, 1.1, 0.55); }
   }
   function bvRockHitAir(t, o) {
-    if (t < 0 || t > 0.7) return;
+    if (t < 0 || t > 0.8) return;
+    if (t < 0.08) { plus(o.x, o.y, P.W, 6); disc(o.x, o.y, 3, P.st0); }
+    for (let i = 0; i < 10; i++) {                                                     // 砕けて跳ぶ岩
+      const b = t - 0.01; if (b > 0.65) continue;
+      const a = hash(i, 981) * TAU, sp = 30 + hash(i, 982) * 45, x = o.x + Math.cos(a) * sp * b, y = o.y + Math.sin(a) * sp * b * 0.7 - 80 * b + 220 * b * b;
+      rock(x, y, 1.2 + hash(i, 983) * 1.8, Math.floor(t * 12) + i, 1, 0);
+    }
+  }
+
+  /* ================= 礫の狩人（第二形態）：岩を投げる ================= */
+  /* 岩ひとつ。光は左上から固定、輪郭だけが回る（転がって見える）。rim＝ヴェラの青白い縁取り */
+  function rock(cx, cy, r, rot, lv = 1, rim = 0.8) {
+    if (r < 0.8) { px(cx, cy, P.st1, lv); return; }
+    const ri = Math.ceil(r) + 1, lx = -0.6, ly = -0.8;
+    cx = Math.round(cx); cy = Math.round(cy);
+    for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
+      const d = Math.hypot(dx, dy), a = Math.atan2(dy, dx), bucket = Math.floor(((a / TAU + 1) * 6 + rot * 0.5)) % 6;
+      const rr = r * (0.78 + 0.22 * hash(bucket, 991 + (rot & 3)));                     // ごつごつした輪郭（6面）
+      if (d > rr) continue;
+      const sh = d < 0.5 ? 0.3 : (dx * lx + dy * ly) / d * (d / rr);
+      let c = sh > 0.45 ? P.st0 : sh > 0.05 ? P.st1 : sh > -0.45 ? P.st2 : P.st3;
+      if (d > rr - 1) c = sh > 0.3 && rim ? P.vg1 : P.st4;
+      if (((dx + dy + rot) & 7) === 0 && d < rr - 1.5) c = P.st3;                       // 割れ目
+      px(cx + dx, cy + dy, c, c === P.vg1 ? lv * rim : lv);
+    }
+  }
+  /* 溜め：床から岩が浮き上がって周りを回り、前に構えた大岩へ寄り集まる */
+  function rockChargeGround(t, o) {
+    for (let k = 0; k < 6; k++) {                                                     // 岩が抜けた床の穴と土煙
+      const b = t - k * 0.1; if (b < 0) continue;
+      const a = hash(k, 1001) * TAU, r = 12 + hash(k, 1002) * 10, x = o.x + Math.cos(a) * r, y = o.y + 6 + Math.sin(a) * r * 0.5;
+      disc(x, y, 2, P.st4, 0.6); dust(x, y, b, 2, 1003 + k, 4, 0.4, STONE_DUST, 0.8, 0.6);
+    }
+  }
+  function rockChargeAir(t, o) {
+    const life = o.life || 0.7, p = clamp(t / life), [ux, uy] = dirv(o);
+    const hx = o.x + ux * 10, hy = o.y - 6 + uy * 10;                                    // 構えた大岩の位置
+    for (let k = 0; k < 6; k++) {
+      const b = t - k * 0.1; if (b < 0) continue;
+      const a0 = hash(k, 1001) * TAU, r0 = 12 + hash(k, 1002) * 10;
+      const sx = o.x + Math.cos(a0) * r0, sy = o.y + 6 + Math.sin(a0) * r0 * 0.5;
+      const rise = clamp(b / 0.25), orbit = a0 + b * 5, gather = clamp((p - 0.55) / 0.45);
+      let x = sx + Math.cos(orbit) * 3 * rise, y = sy - 14 * easeOut(rise);
+      x += (hx - x) * gather; y += (hy - y) * gather;
+      if (gather < 1) rock(x, y, 1.6 + hash(k, 1004) * 1.2, Math.floor(t * 8) + k, 1, 0.6);
+    }
+    rock(hx, hy, 1.5 + 6.5 * clamp((p - 0.45) / 0.55), Math.floor(t * 6), 1, 1);
+    if (p > 0.8 && (Math.floor(t * 12) & 1)) plus(hx - 3, hy - 4, P.vg0, 1);
+  }
+  /* 貫き：大岩を投げる。回りながら帯をまっすぐ飛び、道の床を削り、小岩が後を追い、終わりで砕ける */
+  const BOULDER_T = 0.2;
+  function boulderGround(t, o) {
+    const [ux, uy] = dirv(o), nx = -uy, ny = ux, L = o.R, Wd = Math.max(4, o.wide || 10);
+    for (let s = 10; s < L; s += 3) {                                                 // 削れた床（帯の中だけ）
+      const b = t - BOULDER_T * (s / L); if (b < 0 || b > 1.0) continue;
+      const lv = b < 0.5 ? 0.8 : 0.8 * (1 - (b - 0.5) / 0.5), j = (hash(s, 1011) - 0.5) * Wd * 0.6;
+      px(o.x + ux * s + nx * j, o.y + 4 + uy * s + ny * j, P.st3, lv); px(o.x + ux * s + nx * (j + 1), o.y + 4 + uy * s + ny * (j + 1), P.st4, lv * 0.7);
+    }
+    for (let s = 14; s < L; s += 14) dust(o.x + ux * s, o.y + 6 + uy * s, t - BOULDER_T * (s / L), 3, 1012 + s, 7, 0.6, STONE_DUST, 1.2, 0.55);
+    const b = t - BOULDER_T;                                                          // 終わりで砕けた跡
+    if (b >= 0) bvRockHitGround(b, { x: o.x + ux * L, y: o.y + uy * L, R: Wd + 6 });
+  }
+  function boulderAir(t, o) {
+    if (t < 0 || t > 1.0) return;
+    const [ux, uy] = dirv(o), nx = -uy, ny = ux, L = o.R, Wd = Math.max(4, o.wide || 10), f = clamp(t / BOULDER_T);
+    const x0 = o.x + ux * 10, y0 = o.y - 6 + uy * 10;
+    if (t < 0.1) { plus(x0, y0, P.W, 4); ring(x0, y0, 4 + t * 90, P.st1, 1 - t / 0.1); }
+    if (f < 1) {
+      const d = L * f, x = x0 + ux * d, y = y0 + uy * d + 6 * f;                      // 大岩（少し沈みながら飛ぶ）
+      for (let k = 1; k <= 5; k++) {                                                  // 速さの筋
+        const bx = x - ux * k * 5, by = y - uy * k * 5;
+        px(bx + nx * 5, by + ny * 5, P.st2, 0.8 - k * 0.14); px(bx - nx * 5, by - ny * 5, P.st2, 0.8 - k * 0.14); px(bx, by + 6, P.vg2, 0.6 - k * 0.1);
+      }
+      rock(x, y, 9, Math.floor(t * 30), 1, 1);
+    }
+    for (let i = 0; i < 6; i++) {                                                     // 後を追う小岩（帯の幅の中）
+      const g = clamp((t - 0.03 - i * 0.02) / BOULDER_T); if (g <= 0 || g >= 1) continue;
+      const j = (hash(i, 1021) - 0.5) * Wd * 1.4, d = L * g;
+      rock(x0 + ux * d + nx * j, y0 + uy * d + ny * j + 6 * g, 1.8 + hash(i, 1022) * 1.2, Math.floor(t * 24) + i, 1, 0.5);
+    }
+    const b = t - BOULDER_T;
+    if (b >= 0) bvRockHitAir(b, { x: x0 + ux * L, y: y0 + uy * L + 6 });
+  }
+  /* 散弾：足元の岩盤を砕いて全方位へ投げる。1個ずつは bv_arrow（kind:'stone'）の岩 */
+  function rockBurstGround(t, o) {
+    if (t < 0 || t > 0.9) return;
+    if (t < 0.25) { const r = 6 + t * 80, lv = 1 - t / 0.25; ring(o.x, o.y + 4, r, P.st1, lv); }
+    cracks(o.x, o.y + 4, t, 8, 14, 1031, 0.08, 0.9, P.vg1, P.st2);
+    dust(o.x, o.y + 6, t, 7, 1032, 16, 0.6, STONE_DUST, 1.2, 0.6);
+  }
+  function rockBurstAir(t, o) {
+    if (t < 0 || t > 0.5) return;
     if (t < 0.08) { plus(o.x, o.y, P.W, 5); disc(o.x, o.y, 3, P.st0); }
-    for (let i = 0; i < 12; i++) {                                                     // 砕けて跳ぶ礫
-      const b = t - 0.01; if (b > 0.55) continue;
-      const a = hash(i, 981) * TAU, sp = 35 + hash(i, 982) * 45, x = o.x + Math.cos(a) * sp * b, y = o.y + Math.sin(a) * sp * b * 0.7 - 70 * b + 200 * b * b;
-      px(x, y, P.st1); px(x + 1, y, (i & 1) ? P.st2 : P.st0); if (i % 3 === 0) px(x, y - 1, P.vg1);
+    for (let i = 0; i < 10; i++) {                                                    // 割れて舞う岩片
+      const a = hash(i, 1033) * TAU, sp = 20 + hash(i, 1034) * 30;
+      rock(o.x + Math.cos(a) * sp * t, o.y + Math.sin(a) * sp * t * 0.7 - 50 * t + 150 * t * t, 1.2 + hash(i, 1035), i + Math.floor(t * 12), 1 - t / 0.5, 0);
     }
   }
 
@@ -2583,18 +2693,22 @@
       allies: [['warrior', 132, 66]],
       ground(t, o) { if (t < 0) bvChargeGround(t + this.charge, o); },
       air(t, o) { if (t < 0) { bvChargeAir(t + this.charge, { ...o, life: this.charge }); return; } const f = t * 120; if (f < 104) bvArrowAir(t, { x: o.x + 8 + f, y: o.y - 4, ang: 0, kind: o.kind }); else hitAir(t - 0.87, { x: 132, y: 58, elem: 'frost' }); } }),
-    bs_vera2_beam: bossScene({ label: '貫き（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）', caster: 'vera2', kind: 'stone', cx: 18, cy: 64, R: T16(12), wide: T16(0.62), charge: 0.72, loop: 2.2, big: 2,
+    bs_vera2_beam: bossScene({ label: '貫き（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）・大岩を投げる', caster: 'vera2', kind: 'stone', cx: 18, cy: 64, R: T16(12), wide: T16(0.62), charge: 0.72, loop: 2.2, big: 2,
       allies: [['warrior', 104, 70]],
       ground(t, o) { if (t < 0) { teleBand(o.x, o.y, o.ang, o.R, o.wide, clamp((t + this.charge) / this.charge)); bvChargeGround(t + this.charge, o); } else bvBeamGround(t, o); },
       air(t, o) { if (t < 0) bvChargeAir(t + this.charge, { ...o, life: this.charge }); else bvBeamAir(t, o); } }),
+    bs_vera2_burst: bossScene({ label: '散弾（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）・岩盤を砕いて投げる', caster: 'vera2', kind: 'stone', cx: 80, cy: 60, R: T16(1), charge: 0.5, loop: 2.0,
+      allies: [['warrior', 124, 86]],
+      ground(t, o) { if (t < 0) bvChargeGround(t + this.charge, o); else bvReleaseGround(t, o); },
+      air(t, o) { if (t < 0) { burstTele(o, clamp((t + this.charge) / this.charge)); return; } bvReleaseAir(t, o); burstArrows(t, o, 14); } }),
     bs_vera2_wave: bossScene({ label: '波動（礫）', who: '礫の狩人、ヴェラ（10F・第二形態）', caster: 'vera2', kind: 'stone', cx: 80, cy: 58, R: T16(4.05), charge: 0.95, loop: 3.0, big: 2,
       allies: [['warrior', 112, 88]],
       ground(t, o) { if (t < 0) { teleCircle(o.x, o.y, o.R, clamp((t + this.charge) / this.charge)); return; } const r = 18 + 83 * t; if (r < 144) bvWaveGround(t, { ...o, R: r, life: 9 }); },
       air(t, o) { if (t < 0) return; const r = 18 + 83 * t; if (t < 0.3) bvReleaseAir(t, o); if (r < 144) bvWaveAir(t, { ...o, R: r, life: 9 }); } }),
-    bs_vera2_rocks: bossScene({ label: '落石（礫）', who: '礫の狩人、ヴェラ（10F）・激昂で開く', caster: 'vera2', kind: 'stone', cx: 28, cy: 60, R: T16(1.7), charge: 1.05, loop: 2.8, big: 2,
+    bs_vera2_rocks: bossScene({ label: '落石（礫）', who: '礫の狩人、ヴェラ（10F）・激昂で開く・岩を投げ込む', caster: 'vera2', kind: 'stone', cx: 28, cy: 60, R: T16(1.7), charge: 1.05, loop: 2.8, big: 2,
       spots: [[96, 44], [124, 76], [84, 90], [132, 36]], allies: [['warrior', 100, 70]],
-      ground(t, o) { const L = this.charge; this.spots.forEach(([x, y]) => { if (t < 0) { teleCircle(x, y, o.R, clamp((t + L) / L)); bvRockGround(t + L, { x, y, life: L }); } else bvRockHitGround(t, { x, y, R: o.R }); }); },
-      air(t, o) { const L = this.charge; this.spots.forEach(([x, y], i) => { if (t < 0) bvRockAir(t + L + i * 0.04, { x, y, life: L + i * 0.04 }); else bvRockHitAir(t, { x, y, R: o.R }); }); } }),
+      ground(t, o) { const L = this.charge; if (t < 0) rockChargeGround(t + L, o); this.spots.forEach(([x, y]) => { if (t < 0) { teleCircle(x, y, o.R, clamp((t + L) / L)); bvRockGround(t + L, { x, y, life: L }); } else bvRockHitGround(t, { x, y, R: o.R }); }); },
+      air(t, o) { const L = this.charge; if (t < 0) rockChargeAir(t + L, { ...o, life: L }); this.spots.forEach(([x, y], i) => { if (t < 0) bvRockAir(t + L + i * 0.04, { x, y, life: L + i * 0.04, cx: o.x + 8, cy: o.y - 4 }); else bvRockHitAir(t, { x, y, R: o.R }); }); } }),
     /* ---- 実機だけで使う部品（見本シーンなし） ---- */
 
     bt_charge: { aux: true, span: 5, ext: 44, pad: 8, sky: 20, ground: btChargeGround, air: btChargeAir },
@@ -2604,11 +2718,11 @@
     bt_pillar: { aux: true, span: 1.2, pad: 20, sky: 50, ground: btPillarGround, air: btPillarAir },
     bt_jab: { aux: true, span: 0.4, pad: 12, sky: 14, ground: btJabGround, air: btJabAir },
     bv_charge: { aux: true, span: 5, ext: 40, pad: 8, sky: 16, ground: bvChargeGround, air: bvChargeAir },
-    bv_beam: { aux: true, span: 0.8, pad: 24, sky: 20, ground: bvBeamGround, air: bvBeamAir },
+    bv_beam: { aux: true, span: 1.4, pad: 24, sky: 20, ground: bvBeamGround, air: bvBeamAir },
     bv_release: { aux: true, span: 0.5, ext: 40, pad: 8, sky: 16, ground: bvReleaseGround, air: bvReleaseAir },
     bv_arrow: { aux: true, span: 1e9, ext: 24, pad: 4, sky: 4, ground() {}, air: bvArrowAir },
     bv_wave: { aux: true, span: 1e9, pad: 10, sky: 10, ground: bvWaveGround, air: bvWaveAir },
-    bv_rock: { aux: true, span: 5, ext: 20, pad: 8, sky: 110, ground: bvRockGround, air: bvRockAir },
+    bv_rock: { aux: true, span: 5, ext: 20, pad: 10, sky: 90, ground: bvRockGround, air: bvRockAir },
     bv_rockhit: { aux: true, span: 1.1, pad: 16, sky: 40, ground: bvRockHitGround, air: bvRockHitAir },
     n_swing: { aux: true, span: 0.3, ext: 44, pad: 8, ground: swingGround, air: swingAir },
     n_hit: { aux: true, span: 0.5, ext: 12, pad: 8, ground() {}, air: hitAir },
