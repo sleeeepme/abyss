@@ -2246,7 +2246,15 @@
      白や青白い照り返しは入れない（添付の参考のような、光らない石の質感）。
      光は左上から固定。 */
   const LX = -0.6, LY = -0.8;
-  const faceTone = (nx, ny, bias = 0) => { const l = nx * LX + ny * LY + bias; return l > 0.3 ? P.rk1 : l > -0.25 ? P.rk2 : P.rk3; };
+  /* 輪郭線は引かない。明るさ5段（rk0〜rk4）の「段」で形を出す：
+     面の向き（平らな面ごとの明暗）＋ 縁に向かう陰影（光の側の縁は一段明るく、影の側の縁は一段〜二段暗く）
+     ＋ 下側の接地の暗がり。こうすると線が無くても輪郭が立ち、立体に見える。 */
+  const TONE = [P.rk0, P.rk1, P.rk2, P.rk3, P.rk4];
+  const toneAt = i => TONE[i < 0 ? 0 : i > 4 ? 4 : i];
+  const faceIdx = (nx, ny, bias = 0) => { const l = nx * LX + ny * LY + bias; return l > 0.3 ? 1 : l > -0.25 ? 2 : 3; };
+  const faceTone = (nx, ny, bias = 0) => TONE[faceIdx(nx, ny, bias)];
+  /* 縁の陰影：e は中心0→縁1、s は光への向き（-1..1） */
+  const rimShade = (e, s) => e < 0.55 ? 0 : s > 0.5 ? -1 : s < -0.7 ? 2 : s < -0.3 ? 1 : 0;
   /* 岩の塊：扇形の面（5〜7枚）＋上の平らな面。rot で面の割り方が変わる＝転がって見える */
   function rock(cx, cy, r, rot, lv = 1) {
     if (r < 0.8) { px(cx, cy, P.rk2, lv); return; }
@@ -2259,9 +2267,12 @@
       const rr = r * (0.8 + 0.2 * hash(k, seed + 50));
       if (d > rr) continue;
       const mid = (cut(k) + cut(k + 1)) / 2, top = Math.hypot(dx + r * 0.25, dy + r * 0.3) < r * 0.42;
-      let c = top ? P.rk1 : faceTone(Math.cos(mid), Math.sin(mid), (hash(k, seed + 9) - 0.5) * 0.3);
-      if (!top && Math.abs(a - cut(k)) * d < 0.7 && (dx > -1 || dy > -1)) c = P.rk4;   // 面の境目（影側だけ）
-      if (d > rr - 1) c = r < 2.6 ? P.rk3 : P.rk5;                                    // 小さいかけらは輪郭を弱く（黒い点にしない）
+      const e = d / rr, sl = d < 0.5 ? 1 : (dx * LX + dy * LY) / d;
+      let i = top ? (sl > 0.6 && e > 0.25 ? 0 : 1) : faceIdx(Math.cos(mid), Math.sin(mid), (hash(k, seed + 9) - 0.5) * 0.3);
+      i += rimShade(e, sl);                                                            // 縁の陰影
+      if (dy > rr * 0.5) i += 1;                                                       // 下側の暗がり
+      let c = toneAt(i);
+      if (!top && r > 2.5 && Math.abs(a - cut(k)) * d < 0.7 && (dx > -1 || dy > -1) && e < 0.85) c = P.rk4;   // 面の境目（影側だけ）
       px(cx + dx, cy + dy, c, lv);
     }
   }
@@ -2269,8 +2280,8 @@
   function rockBullet(cx, cy, ang, len, wid, spin = 0, lv = 1) {
     const ux = Math.cos(ang), uy = Math.sin(ang), tail = len * 0.35, tip = len - tail, ext = Math.ceil(len) + 2;
     cx = Math.round(cx); cy = Math.round(cy);
-    const sideLit = s => faceTone(-uy * s, ux * s);                                    // 側面の向きで明暗
     const split = Math.sin(spin * 1.3) * wid * 0.3;                                    // 面の境目（回ると動く）
+    const sideL = s => (-uy * s) * LX + (ux * s) * LY;                                  // 側面の光への向き
     for (let dy = -ext; dy <= ext; dy++) for (let dx = -ext; dx <= ext; dx++) {
       const u = dx * ux + dy * uy, v = -dx * uy + dy * ux;
       if (u < -tail || u > tip) continue;
@@ -2278,21 +2289,24 @@
       let w = u < 0 ? wid * Math.sqrt(Math.max(0, 1 - (u / tail) * (u / tail))) : wid * Math.pow(1 - u / tip, 0.85);
       w *= 0.86 + 0.14 * hash(seg + (v > 0 ? 7 : 0), 1151 + (spin & 3));
       if (Math.abs(v) > w) continue;
-      const side = v < split ? -1 : 1, hv = hash(seg * 2 + (side > 0 ? 1 : 0), 1160 + (spin & 3));
-      let c = sideLit(side);                                                            // 面ごとに一段ずらす（参考の岩の面のむら）
-      if (hv > 0.62) c = c === P.rk1 ? P.rk2 : c === P.rk2 ? P.rk3 : P.rk3;
-      else if (hv < 0.18 && c === P.rk3) c = P.rk2;
-      if (Math.abs(u - (seg * 4 - tail) - (v + wid) * 0.6) < 0.6 && hash(seg, 1162) > 0.45 && Math.abs(v) < w - 1) c = P.rk4;   // 斜めの割れ目
-      if (Math.abs(v - split) < 0.6 && side > 0 && hash(seg, 1161) > 0.35) c = P.rk4;   // 稜の割れ目（暗い線）
-      if (Math.abs(v) > w - 1) c = wid < 3 ? P.rk3 : P.rk5;                           // 細い弾は輪郭を弱く
+      const side = v < split ? -1 : 1, hv = hash(seg * 2 + (side > 0 ? 1 : 0), 1160 + (spin & 3)), sl = sideL(side);
+      let i = faceIdx(-uy * side, ux * side);
+      if (hv > 0.62) i += 1; else if (hv < 0.18 && i === 3) i -= 1;                   // 面ごとのむら
+      const e = Math.abs(v) / Math.max(1, w);
+      if (sl < 0 && e > 0.35) i += 1;                                                  // 影の側はしっかり暗く
+      i += rimShade(e, sl);                                                            // 縁の陰影
+      if (u < -tail * 0.55 && sl < 0) i += 1;                                           // 丸い尻の影
+      let c = toneAt(i);
+      if (Math.abs(u - (seg * 4 - tail) - (v + wid) * 0.6) < 0.6 && hash(seg, 1162) > 0.8 && e < 0.7 && wid >= 3) c = P.rk3;   // 斜めの割れ目（ひとつ二つ）
+      if (Math.abs(v - split) < 0.6 && side > 0 && wid >= 3) c = toneAt(i + 1);        // 稜（面の折れ目）は一段暗く
       px(cx + dx, cy + dy, c, lv);
     }
   }
   /* 大きな岩の棘（波動）：ごつごつした段のある岩の柱。少し傾き、先は平らに欠けていることもある。
-     左が光の面、中ほどに中間の面、右が影の面。段ごとに面の境目がずれ、斜めの割れ目が入る。根元に影 */
+     左が光の面、中ほどに中間の面、右が影の面。光の側の縁は一段明るく、影の側の縁は暗く。根元は接地の暗がり */
   function bigSpike(x, y, h, w, seed, lv = 1) {
     x = Math.round(x); y = Math.round(y); h = Math.round(h); if (h < 2) return;
-    for (let dx = -w - 2; dx <= w + 3; dx++) px(x + dx, y + 1, P.rk5, 0.4 * lv);       // 根元の影
+    for (let dx = -w - 2; dx <= w + 3; dx++) px(x + dx, y + 1, P.rk5, 0.35 * lv);      // 床に落ちる影
     const lean = (hash(seed, 1171) - 0.5) * 0.5, flat = hash(seed, 1172) < 0.4 ? 1 : 0;
     for (let k = 0; k < h; k++) {
       const f = k / h, blk = Math.floor(k / 3);
@@ -2300,16 +2314,20 @@
       const hw = Math.max(flat, w * Math.pow(1 - f, 0.8) + (k < 2 ? 1 : 0));
       const cx = x + Math.round(lean * k), L = cx - Math.round(hw) + jl, Rr = cx + Math.round(hw) + jr;
       const sL = cx - Math.round(hw * (0.1 + 0.3 * hash(blk, seed + 3))), sR = cx + Math.round(hw * (0.35 + 0.3 * hash(blk, seed + 4)));
+      const ledge = (k % 3) === 2 && hash(blk, seed + 7) > 0.45;                      // 段の上の面（明るい棚）
       for (let xx = L; xx <= Rr; xx++) {
-        let c = xx < sL ? P.rk1 : xx < sR ? P.rk2 : P.rk3;
-        if (c === P.rk1 && hash(blk * 7 + xx, seed + 5) > 0.82) c = P.rk2;              // 面のむら
+        let i = xx < sL ? 1 : xx < sR ? 2 : 3;
+        if (i === 1 && hash(blk * 7 + xx, seed + 5) > 0.82) i = 2;                      // 面のむら
+        if (xx === L && Rr - L > 2) i -= 1;                                            // 光の側の縁
+        if (xx >= Rr - 1 && Rr - L > 2) i += xx === Rr ? 2 : 1;                         // 影の側の縁
+        if (ledge && xx < sR) i -= 1;
+        if (k < 2) i += 1;                                                             // 接地の暗がり
+        if (f > 0.85) i -= 1;                                                          // 先は少し明るい
+        let c = toneAt(i);
         if ((xx - cx) === Math.round((k % 9) * 0.5) - 2 && hash(blk, seed + 6) > 0.5 && xx > L && xx < Rr) c = P.rk4;   // 斜めの割れ目
-        if (xx === L || xx === Rr) c = P.rk5;
         px(xx, y - k, c, lv);
       }
     }
-    const tx = x + Math.round(lean * h);
-    for (let dx = -flat; dx <= flat; dx++) px(tx + dx, y - h, P.rk5, lv);
   }
   /* 溜め：床から岩が浮き上がって周りを回り、前に構えた大岩へ寄り集まる */
   function rockChargeGround(t, o) {
