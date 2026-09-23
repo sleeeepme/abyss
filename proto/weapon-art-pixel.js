@@ -2152,14 +2152,11 @@
   /* 散弾：弓を空へ鳴らし、全方位へ形の無い矢（礫）を撒く。1本ずつは bv_arrow */
   function bvReleaseAir(t, o) {
     if (isStone(o)) return rockBurstAir(t, o);
-    if (t < 0 || t > 0.4) return;
-    const stone = isStone(o), n = 14, lv = 1 - t / 0.4;
-    if (t < 0.08) { plus(o.x, o.y - 2, P.W, 5); disc(o.x, o.y - 2, 2, stone ? P.st0 : P.vg0); }
-    for (let i = 0; i < n; i++) {
-      const a = i * TAU / n, r0 = 6 + t * 30, r1 = r0 + 8;
-      line(o.x + Math.cos(a) * r0, o.y - 2 + Math.sin(a) * r0, o.x + Math.cos(a) * r1, o.y - 2 + Math.sin(a) * r1, (i & 1) ? (stone ? P.st0 : P.vg1) : P.W, lv);
-    }
-    ring(o.x, o.y - 2, 4 + t * 70, stone ? P.st1 : P.vg2, lv);
+    if (t < 0 || t > 0.22) return;
+    /* 弦が鳴る一瞬の光だけ。矢そのもの（向き・本数）は bv_arrow が1本ずつ描くので、ここで放射の線は引かない
+       （以前は14本の線を固定の向きに引いていて、実際の矢の向き・本数とずれて崩れて見えた） */
+    if (t < 0.1) { plus(o.x, o.y - 2, P.W, 6 - t * 30); disc(o.x, o.y - 2, 3 - t * 15, P.vg0); }
+    ring(o.x, o.y - 2, 5 + t * 90, t < 0.1 ? P.W : P.vg1, 1);
   }
   function bvReleaseGround(t, o) { if (isStone(o)) rockBurstGround(t, o); }
   function bvArrowAir(t, o) {
@@ -2169,10 +2166,12 @@
       rockBullet(x, y, a, 11, 3, fr >> 1, 1, 0.9);
       return;
     }
-    for (let s = 0; s < 10; s++) px(x - ux * s, y - uy * s, s < 4 ? P.W : P.vg1, s < 7 ? 1 : 0.6);
-    px(x + ux, y + uy, P.W); px(x + nx, y + ny, P.vg0); px(x - nx, y - ny, P.vg0);          // 矢じり
-    for (let k = 1; k <= 2; k++) { px(x - ux * (9 + k) + nx * k, y - uy * (9 + k) + ny * k, P.vg2); px(x - ux * (9 + k) - nx * k, y - uy * (9 + k) - ny * k, P.vg2); }
-    for (let k = 1; k <= 3; k++) px(x - ux * (12 + k * 3), y - uy * (12 + k * 3), P.vg2, 0.8 - k * 0.2);   // 残像
+    /* 光の矢：矢じり（くの字）・白い軸・羽根。網掛けにすると斜めで点線にちぎれて見えるので、全部塗り切る */
+    const P2 = (d, s, c) => px(Math.round(x + ux * d + nx * s), Math.round(y + uy * d + ny * s), c);
+    for (let s = 0; s < 11; s++) P2(-s, 0, s < 5 ? P.W : P.vg1);                            // 軸
+    P2(1, 0, P.W); P2(0, 1, P.vg0); P2(0, -1, P.vg0); P2(-1, 2, P.vg1); P2(-1, -2, P.vg1);   // 矢じり
+    for (let k = 1; k <= 2; k++) { P2(-9 - k, k, P.vg2); P2(-9 - k, -k, P.vg2); }             // 羽根
+    if (fr & 1) P2(-14, 0, P.vg2);                                                        // ちらつく残り光（1点だけ）
   }
 
   /* 波動（礫の狩人）：輪が通った所から、地面を割って大きな岩の棘が突き出す。
@@ -2187,6 +2186,8 @@
       for (let i = 0; i < n; i++) {
         if (hash(i + rs, 1186) < 0.3) continue;                                        // 抜けがある方が岩らしい
         const a = off + i * TAU / n + (hash(i + rs, 1182) - 0.5) * 0.25, r = rs - hash(i + rs, 1183) * 4;
+        const sx = o.x + Math.cos(a) * r, sy = o.y + Math.sin(a) * r;
+        if (o.floor && !(o.floor(sx, sy) && o.floor(sx, sy - 12))) continue;             // 壁・奈落の上には生やさない
         out.push([o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, dr, rs * 31 + i]);
       }
     }
@@ -2200,7 +2201,7 @@
     if (R <= 0 || fade <= 0) return;
     ring(o.x, o.y, R + 1, P.rk4, 0.8 * fade); ring(o.x, o.y, R + 2, P.rk3, 0.4 * fade);      // 割れていく床の線
     waveSpikes(o, R, ([x, y, dr, seed]) => {                                          // 棘の根元の割れ目と土煙
-      if (dr < 20) { line(x - 5, y + 1, x + 5, y + 2, P.rk5, 0.6 * fade); px(x - 3, y + 3, P.rk4, 0.6 * fade); px(x + 4, y - 1, P.rk4, 0.6 * fade); }
+      if (dr < 20 && fade > 0.3) { line(x - 4, y + 1, x + 4, y + 2, P.rk4, 1); px(x - 3, y + 3, P.rk4, 1); px(x + 4, y - 1, P.rk4, 1); }   // 割れ目（網掛けにすると点線に見えるので塗り切る）
       if (dr > 16) dust(x, y, (dr - 16) / 60, 2, seed, 6, 0.4, STONE_DUST, 1, 0.6 * fade);
     });
     /* 棘は床の層に描く：キャラ（主人公・ボス）は必ず棘より手前に出る＝主人公が岩に隠れない */
@@ -2288,7 +2289,7 @@
     if (frac <= 0.05) return;
     const H = 16 + hash(seed, 1184) * 14, cls = H < 21 ? 0 : H < 27 ? 3 : 6;
     const spr = ROCK_SPR.spike[cls + (seed % 3)], hw = Math.round(spr[0].length / 2);
-    for (let dx = -hw - 1; dx <= hw + 2; dx++) px(x + dx, y + 1, P.rk5, 0.35 * lv);    // 床に落ちる影
+    for (let dx = -hw + 1; dx <= hw; dx++) px(x + dx, y + 1, P.rk4, lv);               // 床に落ちる影（根元の幅だけ・塗り切る）
     drawRockSpr(spr, x, y, lv, true, Math.max(1, Math.round(spr.length * Math.min(1, frac))));
   }
   /* 溜め：床から岩が浮き上がって周りを回り、前に構えた大岩へ寄り集まる */
@@ -2352,16 +2353,19 @@
   /* 散弾：足元の岩盤を砕いて全方位へ投げる。1個ずつは bv_arrow（kind:'stone'）の岩 */
   function rockBurstGround(t, o) {
     if (t < 0 || t > 0.9) return;
-    if (t < 0.25) { const r = 6 + t * 80, lv = 1 - t / 0.25; ring(o.x, o.y + 4, r, P.rk2, lv); }
+    if (t < 0.18) ring(o.x, o.y + 4, 6 + t * 90, P.rk2, 1);
     cracks(o.x, o.y + 4, t, 8, 14, 1031, 0.08, 0.9, P.rk3, P.rk3);
-    dust(o.x, o.y + 6, t, 7, 1032, 16, 0.6, STONE_DUST, 1.2, 0.6);
+    dust(o.x, o.y + 6, t, 5, 1032, 12, 0.45, [P.rk0, P.rk1, P.rk2], 1, 0.45);          // 薄く・明るめ（暗い網掛けが四角く残らない）
   }
   function rockBurstAir(t, o) {
-    if (t < 0 || t > 0.5) return;
+    if (t < 0 || t > 0.42) return;
     if (t < 0.08) { plus(o.x, o.y, P.rk0, 5); disc(o.x, o.y, 3, P.rk1); }
-    for (let i = 0; i < 10; i++) {                                                    // 割れて舞う岩片
-      const a = hash(i, 1033) * TAU, sp = 20 + hash(i, 1034) * 30;
-      rock(o.x + Math.cos(a) * sp * t, o.y + Math.sin(a) * sp * t * 0.7 - 50 * t + 150 * t * t, 1.2 + hash(i, 1035), i + Math.floor(t * 12), 1 - t / 0.5, 0);
+    /* 割れて舞う岩片。薄くして消すと網掛けが四角い点の格子に見えるので、薄めずに小さくなって落ちて消える */
+    for (let i = 0; i < 10; i++) {
+      const a = hash(i, 1033) * TAU, sp = 20 + hash(i, 1034) * 30, end = 0.26 + hash(i, 1036) * 0.16;
+      if (t > end) continue;
+      const sz = (1.2 + hash(i, 1035)) * (1 - 0.6 * t / end);
+      rock(o.x + Math.cos(a) * sp * t, o.y + Math.sin(a) * sp * t * 0.7 - 50 * t + 150 * t * t, sz, i + Math.floor(t * 12), 1);
     }
   }
 
@@ -2773,9 +2777,9 @@
     bt_jab: { aux: true, span: 0.4, pad: 12, sky: 14, ground: btJabGround, air: btJabAir },
     bv_charge: { aux: true, span: 5, ext: 40, pad: 8, sky: 16, ground: bvChargeGround, air: bvChargeAir },
     bv_beam: { aux: true, span: 1.4, pad: 24, sky: 20, ground: bvBeamGround, air: bvBeamAir },
-    bv_release: { aux: true, span: 0.5, ext: 40, pad: 8, sky: 16, ground: bvReleaseGround, air: bvReleaseAir },
+    bv_release: { aux: true, span: 0.9, ext: 56, pad: 12, sky: 16, ground: bvReleaseGround, air: bvReleaseAir },
     bv_arrow: { aux: true, span: 1e9, ext: 24, pad: 4, sky: 4, ground() {}, air: bvArrowAir },
-    bv_wave: { aux: true, span: 1e9, pad: 10, sky: 10, ground: bvWaveGround, air: bvWaveAir },
+    bv_wave: { aux: true, span: 1e9, pad: 14, sky: 36, ground: bvWaveGround, air: bvWaveAir },
     bv_rock: { aux: true, span: 5, ext: 20, pad: 10, sky: 90, ground: bvRockGround, air: bvRockAir },
     bv_rockhit: { aux: true, span: 1.1, pad: 16, sky: 40, ground: bvRockHitGround, air: bvRockHitAir },
     n_swing: { aux: true, span: 0.3, ext: 44, pad: 8, ground: swingGround, air: swingAir },
@@ -2979,6 +2983,7 @@
                        arrows: false, shots: false, kind: p.kind || d.kind, elem: p.elem || d.elem, target: p.target, aura: p.aura, ring: p.ring || 0,
                        wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0 });
     if (p.arc != null) o.arc = p.arc;
+    if (p.isFloor) o.floor = (bx, by) => p.isFloor(p.x + (bx - ox) * k, p.y + (by - oy) * k);   // 床かどうか（画面座標で聞く）
     if (p.tx != null) { const [a, b] = toBuf(p.tx, p.ty, ox, oy); o.tx = a; o.ty = b; }
     if (p.casterX != null && id !== 'collapse') { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; }
     if (id === 'collapse') { o.gx = null; if (p.casterX != null) { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; o.gx = a + 5; o.gy = b - 12; } }

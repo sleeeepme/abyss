@@ -184,7 +184,8 @@ function feelDrawBossFx(layer,camX,camY){
     if(f.artId==='bv_arrow'&&f.t==='bolt'&&layer==='air')
       PIXEL_ART_FX.renderEffect(ctx,{id:'bv_arrow',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,angle:Math.atan2(f.vy,f.vx),kind:f.artKind,scale:sc,layer});
     else if(f.artId==='bv_wave'&&f.t==='wave')
-      PIXEL_ART_FX.renderEffect(ctx,{id:'bv_wave',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,range:f.r,life:f.max,kind:f.artKind,scale:sc,layer});
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bv_wave',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,range:f.r,life:f.max,kind:f.artKind,scale:sc,layer,
+        isFloor:(sx,sy)=>!solid((sx+camX)/TS,(sy+camY)/TS)});   // 棘は床の上にだけ生やす
   }
 }
 function drawFeelArtGround(camX,camY){
