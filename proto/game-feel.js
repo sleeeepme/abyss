@@ -189,6 +189,7 @@ function feelDrawBossFx(layer,camX,camY){
   }
 }
 function drawFeelArtGround(camX,camY){
+  drawFeelMist(camX,camY);   // 部屋の隅の地霧（床の層・キャラより下）
   if(!PIXEL_ART_FX)return;
   feelDrawAuras('ground',camX,camY);
   feelDrawBossCasts('ground',camX,camY);
@@ -976,6 +977,111 @@ function drawFeelDarkness(){
   if(!feelLanternOn()||!feelLantern.bw)return;
   const L=feelLantern;ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.drawImage(L.dark,0,0,L.bw*L.q,L.bh*L.q);ctx.restore();
+}
+
+
+/* ---------- 部屋の隅の地霧・漂う埃・虫 ----------
+   ユーザー指定：マップに舞う粒を「大気中の埃や虫」に、部屋の隅には地霧のような薄いもや。霧は「なめらか」の案（網掛けにしない）。
+   - 地霧：床1マスごとに四方の壁の近さを数え、直交する二方が近い所（角）だけ濃くする。壁沿いは薄く、通路と部屋の真ん中はほぼ0。
+     それを1ドット（TS/16）ごとに補間し、横に長くゆっくり流れる雲の模様を掛ける。濃さは0.04刻み（網は掛けない）。
+     床の層（キャラより下・ランタンの暗がりより下）に描くので、暗がりの網で自然に暗くなる。
+     計算は3フレームに1回、画面より少し広い範囲を床に貼り付けた座標で作っておき、その間はずらして貼るだけ。
+   - 埃：1ドットの粒。床と一緒に動く（画面に貼り付かない）。ランタンの明かりの中の粒だけが光を拾って白く、ときどき瞬く。
+   - 虫：部屋ごとに霧の一番濃い角に羽虫の群れ（6匹、ちらちら動く）。主人公の明かりの縁を回る蛾が1匹。
+   ?ambient=old で旧い粒（層ごとの四角い粒）に戻せる。 */
+const FEEL_AMBIENT=window.FEEL_AMBIENT={on:new URLSearchParams(location.search).get('ambient')!=='old',
+  mistMax:.38, motes:70, stats:{ms:0}};
+const FEEL_MIST_COL={stone:[176,190,214],sump:[150,200,210],root:[190,205,160],ruin:[210,196,168],furnace:[200,150,120],pale:[220,220,235]};
+const FEEL_AIR_COL={stone:'#dfe6f2',sump:'#cfeef5',root:'#e6f0c8',ruin:'#f0e4c8',furnace:'#ffd9a8',pale:'#ffffff'};
+function feelAmbHash(x,y,s){let h=(x*374761393+y*668265263+s*1442695041)|0;h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296;}
+function feelVNoise(x,y,s){
+  const xi=Math.floor(x),yi=Math.floor(y);let fx=x-xi,fy=y-yi;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
+  const a=feelAmbHash(xi,yi,s),b=feelAmbHash(xi+1,yi,s),c=feelAmbHash(xi,yi+1,s),d=feelAmbHash(xi+1,yi+1,s);
+  return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;
+}
+const feelMist={fl:null,F:null,W:0,H:0,cv:document.createElement('canvas'),bw:0,bh:0,ax:0,ay:0,frame:0,img:null,u32:null,swarms:[]};
+feelMist.cx=feelMist.cv.getContext('2d');
+function feelMistField(f){
+  const Wd=f.W,Hd=f.H,g=f.g,wall=(x,y)=>x<0||y<0||x>=Wd||y>=Hd||g[y][x]===T.WALL;
+  const reach=(x,y,dx,dy)=>{for(let k=1;k<=3;k++)if(wall(x+dx*k,y+dy*k))return clamp(1-(k-1)/1.7,0,1);return 0;};
+  const raw=new Float32Array(Wd*Hd),F=new Float32Array(Wd*Hd);
+  for(let y=0;y<Hd;y++)for(let x=0;x<Wd;x++){if(wall(x,y))continue;
+    const n=reach(x,y,0,-1),so=reach(x,y,0,1),e=reach(x,y,1,0),w=reach(x,y,-1,0);
+    raw[y*Wd+x]=Math.max(Math.max(Math.min(n,w),Math.min(n,e),Math.min(so,w),Math.min(so,e)),.22*Math.max(n,so,e,w));}
+  for(let y=0;y<Hd;y++)for(let x=0;x<Wd;x++){
+    let m=0,sum=0,cnt=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(wall(xx,yy))continue;const v=raw[yy*Wd+xx];if(v>m)m=v;sum+=v;cnt++;}
+    F[y*Wd+x]=wall(x,y)?m*.9:(cnt?sum/cnt:0);}
+  // 羽虫：部屋ごとに一番濃い角（6割の部屋だけ）
+  const sw=[];
+  for(const r of (f.rooms||[])){let best=null,bv=.4;
+    for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++){const v=F[y*Wd+x];if(!wall(x,y)&&v>bv){bv=v;best={x:x+.5,y:y+.5};}}
+    if(best&&feelAmbHash(best.x|0,best.y|0,31)<.6)sw.push(best);}
+  Object.assign(feelMist,{fl:f,F,W:Wd,H:Hd,swarms:sw});
+}
+function feelMistAt(wx,wy){
+  const M=feelMist,x=wx-.5,y=wy-.5,xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi;
+  const g=(xx,yy)=>(xx<0||yy<0||xx>=M.W||yy>=M.H)?0:M.F[yy*M.W+xx];
+  const a=g(xi,yi),b=g(xi+1,yi),c=g(xi,yi+1),d=g(xi+1,yi+1);
+  return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;
+}
+function drawFeelMist(camX,camY){
+  const f=W.fl;if(!FEEL_AMBIENT.on||!f)return;
+  const M=feelMist,t0=performance.now();if(M.fl!==f)feelMistField(f);
+  const q=TS/FEEL_REFERENCE_TILE,PAD=8,bw=Math.ceil(innerWidth/q)+PAD*2+2,bh=Math.ceil(innerHeight/q)+PAD*2+2;
+  const cax=Math.floor(camX/q),cay=Math.floor(camY/q);
+  const stale=M.bw!==bw||M.bh!==bh||M.q!==q||Math.abs(cax-PAD-M.ax)>PAD-1||Math.abs(cay-PAD-M.ay)>PAD-1||(M.frame++%3)===0||M.drawnFl!==f;
+  if(stale){
+    if(M.bw!==bw||M.bh!==bh){M.cv.width=bw;M.cv.height=bh;M.bw=bw;M.bh=bh;M.img=M.cx.createImageData(bw,bh);M.u32=new Uint32Array(M.img.data.buffer);}
+    M.q=q;M.ax=cax-PAD;M.ay=cay-PAD;M.drawnFl=f;
+    const u=M.u32;u.fill(0);
+    const Z=f.zone||ZONES[0],col=FEEL_MIST_COL[Z.id]||FEEL_MIST_COL.stone,rgb=col[2]<<16|col[1]<<8|col[0];
+    const t=FEEL.time,A=FEEL_AMBIENT.mistMax,k=q/TS,seen=W.seen;
+    for(let j=0;j<bh;j++){const wy=(M.ay+j+.5)*k,ty=Math.floor(wy);if(ty<0||ty>=f.H)continue;const grow=f.g[ty],srow=seen[ty];
+      for(let i=0;i<bw;i++){const wx=(M.ax+i+.5)*k,tx=Math.floor(wx);
+        if(tx<0||tx>=f.W||grow[tx]===T.WALL||!(srow&&srow[tx]))continue;
+        const base=feelMistAt(wx,wy);if(base<=.02)continue;
+        const n=.65*feelVNoise(wx*.38+t*.10,wy*.95+t*.02,7)+.35*feelVNoise(wx*1.1-t*.16,wy*2.2,9);
+        const a=Math.round(clamp(base*1.3-.18+(n-.5)*1.1,0,1)*A/.04)*.04;if(a<=0)continue;
+        u[j*bw+i]=((Math.round(a*255)&255)<<24|rgb)>>>0;}}
+    M.cx.putImageData(M.img,0,0);
+  }
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(M.cv,M.ax*q-camX,M.ay*q-camY,M.bw*q,M.bh*q);ctx.restore();
+  FEEL_AMBIENT.stats.ms=performance.now()-t0;
+}
+const feelMotes=[];
+function drawFeelAir(Z,dt){
+  if(!FEEL_AMBIENT.on||!W.fl)return false;
+  const f=W.fl,q=TS/FEEL_REFERENCE_TILE,t=FEEL.time,camX=P.x*TS-innerWidth/2,camY=P.y*TS-innerHeight/2;
+  if(feelMist.fl!==f)feelMistField(f);
+  if(feelMotes.length!==FEEL_AMBIENT.motes){feelMotes.length=0;for(let i=0;i<FEEL_AMBIENT.motes;i++)
+    feelMotes.push({x:feelAmbHash(i,1,41),y:feelAmbHash(i,2,41),p:feelAmbHash(i,3,41)*6.28,s:.5+feelAmbHash(i,4,41),big:feelAmbHash(i,5,41)<.12});}
+  const col=FEEL_AIR_COL[Z.id]||FEEL_AIR_COL.stone,Wd=innerWidth+40,Hd=innerHeight+40;
+  const reach=5.5*((typeof FEEL_LANTERN!=='undefined'&&FEEL_LANTERN.on)?FEEL_LANTERN.wide:1);
+  const hx=P.x*TS-camX,hy=P.y*TS-camY,lightAt=(x,y)=>clamp(1-Math.hypot(x-hx,(y-hy)*1.1)/TS/reach,0,1);
+  const px=(x,y,c,a)=>{if(a<=0)return;ctx.globalAlpha=Math.min(1,a);ctx.fillStyle=c;ctx.fillRect(Math.round(x/q)*q,Math.round(y/q)*q,Math.ceil(q),Math.ceil(q));};
+  ctx.save();
+  for(const m of feelMotes){   // 埃（床と一緒に動く）
+    const wx=m.x*Wd+t*TS*.10*m.s+Math.sin(t*.7+m.p)*TS*.25,wy=m.y*Hd+Math.sin(t*.5+m.p*2)*TS*.18+t*TS*.03*m.s;
+    const sx=((wx-camX)%Wd+Wd)%Wd-20,sy=((wy-camY)%Hd+Hd)%Hd-20;
+    const L=lightAt(sx,sy),tw=.5+.5*Math.sin(t*(1.3+m.s)+m.p*5),a=.10+.75*L*(.45+.55*tw);
+    px(sx,sy,L>.35?col:'#8a93a6',a);if(m.big)px(sx+q,sy,col,a*.6);
+    if(L>.55&&tw>.97){px(sx-q,sy,col,a*.5);px(sx+q,sy,col,a*.5);px(sx,sy-q,col,a*.5);px(sx,sy+q,col,a*.5);}
+  }
+  for(const s of feelMist.swarms){   // 羽虫の群れ
+    if(!tileSeen(s.x,s.y))continue;
+    const cx=s.x*TS-camX,cy=s.y*TS-camY-TS*.35;if(cx<-TS||cy<-TS||cx>innerWidth+TS||cy>innerHeight+TS)continue;
+    for(let i=0;i<6;i++){
+      const a1=1.7+feelAmbHash(i,1,s.x|0)*1.6,a2=2.3+feelAmbHash(i,2,s.y|0)*1.9,p=feelAmbHash(i,3,1)*6.28,fr=Math.floor(t*14);
+      const x=cx+Math.sin(t*a1+p)*TS*.32+(feelAmbHash(i,fr,5)-.5)*q*2,y=cy+Math.sin(t*a2+p*1.3)*TS*.22+(feelAmbHash(i,fr,6)-.5)*q*2;
+      const L=lightAt(x,y);px(x,y,L>.25?'#ece6cc':'#9aa2b4',.55+.45*L);}
+  }
+  {const r=TS*(1.25+.2*Math.sin(t*1.9)),a=t*1.1+.6;   // 蛾：明かりの縁を回る
+    const x=hx+Math.cos(a)*r+Math.sin(t*7.3)*q*2,y=hy-TS*.5+Math.sin(a)*r*.6+Math.sin(t*5.1)*q*2,open=Math.floor(t*18)%2===0,c='#efe3c0';
+    px(x,y,c,.95);px(x,y+q,'#b9ad8e',.9);
+    if(open){px(x-q,y,c,.85);px(x+q,y,c,.85);px(x-2*q,y-q,c,.7);px(x+2*q,y-q,c,.7);}else{px(x-q,y-q,c,.8);px(x+q,y-q,c,.8);}}
+  ctx.restore();
+  return true;
 }
 
 /* 接地影は光源方向へ回さない。長い影は drawPlayerLight の照明遮蔽で作り、
