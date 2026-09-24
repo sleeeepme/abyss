@@ -416,7 +416,7 @@ function drawFeelHubTiltShift(canvas,target){
   target.restore();
 }
 const feelVignetteCanvas=feelTiltSurface(1,1);
-function drawFeelVignette(){paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);}
+function drawFeelVignette(){if(feelLanternOn())return;paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);}
 function paintFeelVignette(target,w,h,canvas){
   if(!FEEL_POST.vignetteEnabled)return;
   const t=FEEL_TUNING;
@@ -849,7 +849,7 @@ function feelCutActorLight(c,caster,sourceX,sourceY,rangePx,q=1){
   c.drawImage(shadow.canvas,-shadow.ax,-shadow.ay);
   c.restore();
 }
-function drawPlayerLight(camX,camY){
+function drawPlayerLightSmooth(camX,camY){
   const px=P.x*TS-camX,py=P.y*TS-camY;
   /* HOLLOWFLUX と同じ役割分担にする。
      - 低解像度ライトバッファを1枚だけ作る
@@ -874,6 +874,108 @@ function drawPlayerLight(camX,camY){
     feelCutActorLight(c,caster,px,py,rangeTiles*TS,q);
   ctx.save();ctx.globalCompositeOperation='lighter';ctx.imageSmoothingEnabled=false;
   ctx.drawImage(feelLightCanvas,0,0,innerWidth/q,innerHeight/q,0,0,innerWidth,innerHeight);ctx.restore();
+}
+
+
+/* ---------- ランタンの光と暗がり（ドットの網） ----------
+   参考：ユーザーが送ってくれた録画（ランタンの周りを数段の明るさに切り、段の境だけ 4×4 の網でつなぐ）。
+   - 光の強さを主人公からの距離で決め、5段に切る。段の中はべた、段の境だけ網（Bayer 4×4）。網の1点＝絵の1ドット（TS/16）。
+   - 光は壁で止まる（feelLightRay の128本）。向いている側へ少し長く、キャラの背後には影（feelLightCasters）。
+   - 暗がりは画面の外周も含めてここで決める（旧いなめらかなビネットは使わない）。
+   - キャラの周りは暗がりを抜く：主人公は広く完全に、仲間と敵は少し狭く弱く（ユーザー指定）。
+   - 暗がりは UI より下：本編はキャラまで描いた所で drawFeelDarkness を呼び、そのあと名前・HP帯・予兆を描く。
+   - 床のマス単位の明暗（lightR）は止め、明暗はこの網だけで出す。層の lightR は光の届く距離の倍率に使う。
+   ?lantern=old で旧い光（なめらか）に戻せる。 */
+const FEEL_LANTERN=window.FEEL_LANTERN={
+  on:new URLSearchParams(location.search).get('lantern')!=='old',
+  darkScale:.72,          // 暗がり全体の濃さ（ユーザー指定で薄め）
+  wide:1.3,               // 暗がりの掛からない中央の広さ（ユーザー指定で3割広く）
+  dark:[.94,.74,.52,.30,.10,0],        // 段ごとの暗がり（0＝一番暗い）
+  light:[0,0,.03,.08,.15,.24],         // 段ごとのランタンの色（足し色）
+  col:[116,198,164], darkCol:[2,5,9],
+  guard:{hero:[1.35,1], ally:[.95,.86], enemy:[.62,.78]},   // [半径（マス）, 強さ]。敵は +0.25 マス、ボスは体の大きさ
+  stats:{ms:0}
+};
+function feelLanternOn(){return FEEL_LANTERN.on&&!!(W&&W.fl);}
+const FEEL_BAYER4=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16);
+const feelLantern={light:document.createElement('canvas'),dark:document.createElement('canvas'),bw:0,bh:0,q:1,
+  li:null,di:null,l32:null,d32:null,guard:null,node:null,rays:new Float32Array(129)};
+feelLantern.lc=feelLantern.light.getContext('2d');feelLantern.dc=feelLantern.dark.getContext('2d');
+function feelLanternResize(bw,bh){
+  const L=feelLantern;if(L.bw===bw&&L.bh===bh)return;
+  L.bw=bw;L.bh=bh;L.light.width=L.dark.width=bw;L.light.height=L.dark.height=bh;
+  L.li=L.lc.createImageData(bw,bh);L.di=L.dc.createImageData(bw,bh);
+  L.l32=new Uint32Array(L.li.data.buffer);L.d32=new Uint32Array(L.di.data.buffer);
+  L.guard=new Float32Array(bw*bh);
+  L.gw=Math.ceil(bw/4)+2;L.gh=Math.ceil(bh/4)+2;L.node=new Float32Array(L.gw*L.gh);
+}
+function feelRGBA(c,a){return ((Math.round(a*255)&255)<<24|c[2]<<16|c[1]<<8|c[0])>>>0;}
+function drawPlayerLight(camX,camY){
+  if(!feelLanternOn())return drawPlayerLightSmooth(camX,camY);
+  const t0=performance.now(),L=feelLantern,C=FEEL_LANTERN,iw=innerWidth,ih=innerHeight;
+  const q=Math.max(1,TS/FEEL_REFERENCE_TILE),bw=Math.ceil(iw/q)+1,bh=Math.ceil(ih/q)+1;L.q=q;
+  feelLanternResize(bw,bh);
+  const px=P.x*TS-camX,py=P.y*TS-camY,Z=(W.fl.zone||ZONES[0]);
+  const reach=C.wide*clamp((Z.lightR||14)/14,.8,3);
+  const flick=FEEL_REDUCED.matches?1:1+.035*Math.sin(FEEL.time*8.3)+.02*Math.sin(FEEL.time*21.7);
+  const fa=Math.atan2(FEEL.lightY,FEEL.lightX),fcx=Math.cos(fa),fcy=Math.sin(fa);
+  const rays=L.rays;
+  for(let i=0;i<=128;i++){const p=feelLightRay(i/128*Math.PI*2,14);rays[i]=Math.hypot(p.x-P.x,p.y-P.y);}
+  const casters=feelLightCasters(camX,camY,9*TS);
+  // 光の強さは4ドットおきの格子で計算し、間は直線でつなぐ（網は1ドットごと）
+  const gw=L.gw,gh=L.gh,node=L.node,cell=4*q;
+  for(let gy=0;gy<gh;gy++){const sy=gy*cell,dy=(sy-py)/TS,ny=(sy/ih-.5)*2;
+    for(let gx=0;gx<gw;gx++){const sx=gx*cell,dx=(sx-px)/TS,d=Math.hypot(dx,dy);
+      let a=Math.atan2(dy,dx);if(a<0)a+=Math.PI*2;
+      const f=a/(Math.PI*2)*128,i0=Math.floor(f),rd=rays[i0]+(rays[i0+1]-rays[i0])*(f-i0);
+      const cone=d<.01?1:feelSmoothstep(-.2,.9,(dx*fcx+dy*fcy)/d);
+      const nx=(sx/iw-.5)*2,vig=feelSmoothstep(.5*C.wide,1.4+.5*(C.wide-1),Math.hypot(nx,ny*.9));
+      let v=clamp(1-(d/reach-1.6)/(8.4*flick*(.8+.3*cone)),0,1)*(1-vig*.85);
+      if(d>rd+.45)v*=.35;                                   // 壁の向こう
+      // キャラの背後の影（光は主人公から出ている）
+      if(v>0&&casters.length){const ax=sx-px,ay=sy-py;
+        for(const c of casters){const cx=c.x-px,cy=c.y-py,cl=Math.hypot(cx,cy)||1,ux=cx/cl,uy=cy/cl;
+          const behind=(ax*ux+ay*uy-cl)/q;if(behind<=c.radius/q*.08||behind>FEEL_SHADOW_MAX_BEHIND)continue;
+          const across=Math.abs(ax*uy-ay*ux)/q,r=c.radius/q,pen=r*(.9+Math.min(behind/44,.62));
+          const sh=(1-feelSmoothstep(pen*.43,pen,across))*(1-feelSmoothstep(FEEL_SHADOW_FADE_START,FEEL_SHADOW_MAX_BEHIND,behind))*(c.strength??.56)*.8;
+          v*=1-sh;}}
+      node[gy*gw+gx]=v;}}
+  // キャラの周りは暗がりを抜く
+  const guard=L.guard;guard.fill(0);
+  const stamp=(e,rT,str,lift=0)=>{
+    if(!e||e.dead)return;const m=finiteXY(feelEntityOffset(e));
+    const cx=e.x*TS-camX+m.x,cy=e.y*TS-camY+m.y-lift-TS*.18,R=rT*TS;
+    const i0=Math.max(0,Math.floor((cx-R)/q)),i1=Math.min(bw-1,Math.ceil((cx+R)/q));
+    const j0=Math.max(0,Math.floor((cy-R)/q)),j1=Math.min(bh-1,Math.ceil((cy+R)/q));
+    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+      const dd=Math.hypot((i+.5)*q-cx,((j+.5)*q-cy)*1.1)/R,g=str*(1-feelSmoothstep(.55,1,dd)),k=j*bw+i;
+      if(g>guard[k])guard[k]=g;}
+  };
+  stamp(P,C.guard.hero[0],C.guard.hero[1]);
+  for(const a of (S.hero.party||[]))if(!a.dead&&!a.fallen)stamp(a,C.guard.ally[0],C.guard.ally[1]);
+  if(W.npc)stamp(W.npc,C.guard.ally[0],C.guard.ally[1]);
+  for(const e of W.enemies)if(tileSeen(e.x,e.y))stamp(e,(e.boss?e.r*1.25:C.guard.enemy[0])+.25,C.guard.enemy[1],typeof hopLift==='function'?hopLift(e):0);
+  // 1ドットずつ段に切って網を掛ける
+  const LC=C.light.map(a=>a>0?feelRGBA(C.col,a):0),DC=C.dark.map(a=>a>0?feelRGBA(C.darkCol,a*C.darkScale):0);
+  const DOT=feelRGBA(C.darkCol,Math.max(0,C.dark[0]-.22)*C.darkScale);   // 闇の中の薄い点の格子
+  const l32=L.l32,d32=L.d32;
+  for(let j=0;j<bh;j++){const gy=Math.floor(j/4),fy=(j-gy*4)/4,row=j*bw,br=(j&3)*4;
+    for(let i=0;i<bw;i++){const gx=i>>2,fx=(i&3)/4,n=gy*gw+gx;
+      const v=(node[n]*(1-fx)+node[n+1]*fx)*(1-fy)+(node[n+gw]*(1-fx)+node[n+gw+1]*fx)*fy;
+      const b=FEEL_BAYER4[br+(i&3)],k=row+i;
+      const lv=Math.min(5,Math.floor(v*5+b));l32[k]=LC[lv];
+      const g=guard[k],vd=g>v?g:v,ld=Math.min(5,Math.floor(vd*5+b));
+      d32[k]=(ld===0&&!(i&1)&&!(j&1))?DOT:DC[ld];}}
+  L.lc.putImageData(L.li,0,0);L.dc.putImageData(L.di,0,0);
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(L.light,0,0,bw*q,bh*q);ctx.restore();
+  C.stats.ms=performance.now()-t0;
+}
+/* 暗がり。本編がキャラまで描いた所で呼ぶ（このあとに名前・HP帯・予兆を描くので、UIは暗がりの上に出る） */
+function drawFeelDarkness(){
+  if(!feelLanternOn()||!feelLantern.bw)return;
+  const L=feelLantern;ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  ctx.drawImage(L.dark,0,0,L.bw*L.q,L.bh*L.q);ctx.restore();
 }
 
 /* 接地影は光源方向へ回さない。長い影は drawPlayerLight の照明遮蔽で作り、

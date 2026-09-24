@@ -12778,6 +12778,7 @@ function resize(){
 addEventListener('resize',resize);
 
 function draw(){
+  _uiQ=null;
   _drawStage='画面消し';
   ctx.fillStyle='#0d0f14'; ctx.fillRect(0,0,innerWidth,innerHeight);
   if(S.screen!=='game'||!W.fl||!S.hero||!S.run) return;
@@ -12804,6 +12805,7 @@ function draw(){
   const blinded   = sightMul<1;
   const lightR    = Z.lightR;
   const litFloor  = 0.34;
+  const lanternNet = typeof feelLanternOn==='function' && feelLanternOn();
   const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
   const x0=Math.max(0,Math.floor(camX/TS)-1), x1=Math.min(f.W-1,Math.ceil((camX+innerWidth)/TS));
   const y0=Math.max(0,Math.floor(camY/TS)-1), y1=Math.min(f.H-1,Math.ceil((camY+innerHeight)/TS));
@@ -12817,6 +12819,7 @@ function draw(){
       ? (dist<=BLIND_CLEAR ? 1
          : dist>=BLIND_DARK ? 0
          : 1 - (dist-BLIND_CLEAR)/(BLIND_DARK-BLIND_CLEAR))
+      : lanternNet ? 1                        // ランタンの網（game-feel.js）が明暗を出すので、床はマス単位で暗くしない
       : clamp(1.3-dist/lightR, litFloor, 1);
     const sx=x*TS-camX, sy=y*TS-camY;
     if(t===T.WALL){ ctx.fillStyle=shade(Z.wall,lit*dim); }
@@ -13040,6 +13043,9 @@ function draw(){
 
   // 武器技の足元（魔法陣・ひび・照準）。キャラより下に敷くので、敵を描く前に出す
   if(typeof drawFeelArtGround==='function') drawFeelArtGround(camX,camY);
+  /* ここから主人公までを描くあいだ、名前・HP帯・予兆は控えておき、暗がり（ランタンの網）を重ねたあとに描く。
+     暗がりの下に UI を沈めない（ユーザー指定）。 */
+  _uiQ = lanternNet ? [] : null;
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
   _drawStage='敵';
   W.enemies.forEach(e=>{
@@ -13092,12 +13098,14 @@ function draw(){
     drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?Math.max(0,e.fade/0.3):1);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
-    if(e.boss && e.cast) drawBossCast(e, sx, sy, R);
+    if(e.boss && e.cast) uiLater(()=>drawBossCast(e, sx, sy, R));
     // 予兆リング（攻撃が来る合図）
     if(e.tele>0){
       const p=1-e.tele/e.arch.tele;
-      ctx.strokeStyle='rgba(255,110,80,'+(0.4+p*0.55)+')'; ctx.lineWidth=2+p*3;
-      ctx.beginPath(); ctx.arc(sx,sy,TS*(0.5+p*0.4),0,7); ctx.stroke();
+      uiLater(()=>{
+        ctx.strokeStyle='rgba(255,110,80,'+(0.4+p*0.55)+')'; ctx.lineWidth=2+p*3;
+        ctx.beginPath(); ctx.arc(sx,sy,TS*(0.5+p*0.4),0,7); ctx.stroke();
+      });
     }
     /* 絵があるならそちらを出す。**無ければ今までの図形のまま。**
        絵は層ごとに1体ずつ増えていくので、
@@ -13193,8 +13201,11 @@ function draw(){
          既に削れている本体だけが帯を出していると、殴る前に本体が割れる。
          本体のHPは上の #bossbar に出ているので、情報としては失われない。 */
       if(e.hp<e.maxHp && !disg){
-        ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
-        ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy-R-9,R*2*(e.hp/e.maxHp),3.5);
+        const hpf=e.hp/e.maxHp;
+        uiLater(()=>{
+          ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
+          ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy-R-9,R*2*hpf,3.5);
+        });
       }
       /* 名前と、そのすぐ下に Lv。
          画面上部の情報パネルを畳んだので、相手の強さはここで読ませる。
@@ -13383,7 +13394,7 @@ function draw(){
       ctx.beginPath(); ctx.arc(sx,sy,TS*0.14,0,7); ctx.fill();
       ctx.restore();
     });
-    if(h.barrier>0){                          // 重騎士の守護陣
+    if(h.barrier>0) uiLater(()=>{             // 重騎士の守護陣
       const sx=hx*TS-camX, sy=hy*TS-camY;
       ctx.save();
       ctx.globalAlpha=0.45+0.2*Math.sin(performance.now()/180);
@@ -13394,7 +13405,7 @@ function draw(){
       ctx.textAlign='center';
       ctx.fillText(String(h.barrier), sx, sy-TS*0.78);
       ctx.restore();
-    }
+    });
     if(h!==S.hero && (h.iframe||0)>0){        // 盗賊の幻影
       const sx=hx*TS-camX, sy=hy*TS-camY;
       ctx.save();
@@ -13881,6 +13892,12 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   drawPlayerLight(camX,camY);
+  // 暗がり（ランタンの網）を重ねてから、控えておいた名前・HP帯・予兆を描く
+  if(_uiQ){
+    if(typeof drawFeelDarkness==='function') drawFeelDarkness();
+    const uq=_uiQ; _uiQ=null;
+    for(const f of uq){ ctx.save(); try{ f(); }catch(err){ console.error(err); } ctx.restore(); }
+  }
   if(!heroBlinkOff) drawFeelFlash(P,px+heroBob.x,py+heroBob.y,TS*heroScale);
   /* 主人公の頭上に「自分」とは書かない。画面の中央にいて、
      ジョイスティックで動いているのが自分——それ以上の説明は要らない。 */
@@ -14047,7 +14064,14 @@ function drawBanner(){
   ctx.textBaseline='alphabetic';
 }
 /* 小さな文字を暗い背景の上でも読ませるため、黒フチをつけて描く */
+/* 暗がり（ランタンの網）より上に出す物。draw() が主人公まで描くあいだは控えておき、暗がりのあとにまとめて描く */
+let _uiQ=null;
+function uiLater(fn){
+  if(!_uiQ) return fn();
+  const a=ctx.globalAlpha; _uiQ.push(()=>{ ctx.globalAlpha=a; fn(); });
+}
 function label(text,x,y,color,scale){
+  if(_uiQ){ const a=ctx.globalAlpha; _uiQ.push(()=>{ ctx.globalAlpha=a; label(text,x,y,color,scale); }); return; }
   const s=Math.max(9, TS*0.36*(scale||1));
   ctx.font='bold '+s+'px '+FONT;
   ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -18679,7 +18703,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20260924b"></script>
-<script src="game-feel.js?v=20260924-boss2"></script>
+<script src="game-feel.js?v=20260924-lantern"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
