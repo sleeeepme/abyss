@@ -1078,37 +1078,36 @@ function drawFeelMist(camX,camY){
   FEEL_AMBIENT.stats.ms=performance.now()-t0;
 }
 const feelMotes=[];
-/* 蛾の出入り。ユーザー指定：「常についてくるとナビキャラに見えたり意図を感じる」ので、稀に現れるくらい。
-   待つ（最初は25〜50秒、以後45〜110秒）→ 画面の外から主人公へ寄る（2.2秒）→ 明かりの縁を回る（4〜7秒）→ 外へ去る（2秒）。
-   位置は主人公からのずれ（マス）で返す。いない間は null。 */
-const FEEL_MOTH=window.FEEL_MOTH={first:[25,50],every:[45,110],inT:2.2,orbit:[4,7],outT:2};
-const feelMoth=window.feelMoth={state:'wait',t:0,wait:null,a0:0,dir:1,orbitT:0,outA:0,from:null};
+/* 蛾の出入り。ユーザー指定：「常についてくるとナビキャラに見えたり意図を感じる」ので稀に現れるくらい。
+   「画面端から飛んでくると目立つ」ので、主人公の近くでふっと現れて（フェードイン）、明かりの縁を回り、近くでふっと消える（フェードアウト）。
+   待つ（最初は25〜50秒、以後45〜110秒）→ 近くに現れる（1.2秒）→ 回る（4〜7秒）→ 消える（1.2秒）。
+   位置は主人公からのずれ（マス）と不透明度 a を返す。いない間は null。 */
+const FEEL_MOTH=window.FEEL_MOTH={first:[25,50],every:[45,110],inT:1.2,orbit:[4,7],outT:1.2};
+const feelMoth=window.feelMoth={state:'wait',t:0,wait:null,a0:0,dir:1,orbitT:0,outA:0};
 function feelMothStep(dt){
   const M=feelMoth,C=FEEL_MOTH,rnd=(a,b)=>a+Math.random()*(b-a);
   if(M.wait==null)M.wait=rnd(C.first[0],C.first[1]);
   M.t+=dt;
-  const far=Math.max(innerWidth,innerHeight)/TS*.62+1.5;           // 画面の外（マス）
-  const orbitPos=(a,tt)=>{const r=1.25+.2*Math.sin(tt*1.9);return {x:Math.cos(a)*r+Math.sin(tt*7.3)*.12,y:Math.sin(a)*r*.6+Math.sin(tt*5.1)*.12};};
+  const orbitPos=(a,tt,rMul=1)=>{const r=(1.25+.2*Math.sin(tt*1.9))*rMul;return {x:Math.cos(a)*r+Math.sin(tt*7.3)*.12,y:Math.sin(a)*r*.6+Math.sin(tt*5.1)*.12};};
   if(M.state==='wait'){
     if(M.t<M.wait)return null;
     M.state='in';M.t=0;M.a0=Math.random()*Math.PI*2;M.dir=Math.random()<.5?-1:1;M.orbitT=rnd(C.orbit[0],C.orbit[1]);
-    M.from={x:Math.cos(M.a0)*far,y:Math.sin(M.a0)*far};
   }
-  if(M.state==='in'){
-    const k=Math.min(1,M.t/C.inT),e=1-(1-k)*(1-k),o=orbitPos(M.a0,0),wob=Math.sin(M.t*6)*.35*(1-k);
+  if(M.state==='in'){                       // 少し外側（1.5倍の半径）から回りながら寄せ、薄い所から濃くする
+    const k=Math.min(1,M.t/C.inT),e=k*k*(3-2*k),a=M.a0+M.dir*(M.t-C.inT)*1.1;
+    const p=orbitPos(a,M.t-C.inT,1.5-.5*e);p.a=e;
     if(k>=1){M.state='orbit';M.t=0;}
-    return {x:M.from.x+(o.x-M.from.x)*e-Math.sin(M.a0)*wob,y:M.from.y+(o.y-M.from.y)*e+Math.cos(M.a0)*wob};
+    return p;
   }
   if(M.state==='orbit'){
-    const a=M.a0+M.dir*M.t*1.1;
-    if(M.t>=M.orbitT){M.state='out';M.t=0;M.outA=a;M.from=orbitPos(a,M.orbitT);}
-    return orbitPos(a,M.t);
+    const a=M.a0+M.dir*M.t*1.1,p=orbitPos(a,M.t);p.a=1;
+    if(M.t>=M.orbitT){M.state='out';M.orbitT=M.t;M.t=0;M.outA=a;}
+    return p;
   }
-  if(M.state==='out'){
-    const k=Math.min(1,M.t/C.outT),e=k*k,wob=Math.sin(M.t*6)*.35*k;
+  if(M.state==='out'){                      // 回りながら少し外へ離れつつ薄くなって消える
+    const k=Math.min(1,M.t/C.outT),e=k*k*(3-2*k),a=M.outA+M.dir*M.t*1.1;
     if(k>=1){M.state='wait';M.t=0;M.wait=rnd(C.every[0],C.every[1]);return null;}
-    const ex=Math.cos(M.outA+M.dir*.8)*far,ey=Math.sin(M.outA+M.dir*.8)*far;
-    return {x:M.from.x+(ex-M.from.x)*e+wob,y:M.from.y+(ey-M.from.y)*e};
+    const p=orbitPos(a,M.orbitT+M.t,1+.5*e);p.a=1-e;return p;
   }
   return null;
 }
@@ -1138,11 +1137,11 @@ function drawFeelAir(Z,dt){
       const x=cx+Math.sin(t*a1+p)*TS*.32+(feelAmbHash(i,fr,5)-.5)*q*2,y=cy+Math.sin(t*a2+p*1.3)*TS*.22+(feelAmbHash(i,fr,6)-.5)*q*2;
       const L=lightAt(x,y);px(x,y,L>.25?'#ece6cc':'#9aa2b4',.55+.45*L);}
   }
-  // 蛾：常にはいない。ときどき暗がりから飛んできて、明かりの縁を何周かして、また暗がりへ去る
+  // 蛾：常にはいない。ときどき主人公の近くにふっと現れ、明かりの縁を何周かして、ふっと消える
   const mp=feelMothStep(dt||0);
-  if(mp){const x=hx+mp.x*TS,y=hy-TS*.5+mp.y*TS,open=Math.floor(t*18)%2===0,c='#efe3c0';
-    px(x,y,c,.95);px(x,y+q,'#b9ad8e',.9);
-    if(open){px(x-q,y,c,.85);px(x+q,y,c,.85);px(x-2*q,y-q,c,.7);px(x+2*q,y-q,c,.7);}else{px(x-q,y-q,c,.8);px(x+q,y-q,c,.8);}}
+  if(mp){const x=hx+mp.x*TS,y=hy-TS*.5+mp.y*TS,open=Math.floor(t*18)%2===0,c='#efe3c0',A=mp.a==null?1:mp.a;
+    px(x,y,c,.95*A);px(x,y+q,'#b9ad8e',.9*A);
+    if(open){px(x-q,y,c,.85*A);px(x+q,y,c,.85*A);px(x-2*q,y-q,c,.7*A);px(x+2*q,y-q,c,.7*A);}else{px(x-q,y-q,c,.8*A);px(x+q,y-q,c,.8*A);}}
   ctx.restore();
   return true;
 }
