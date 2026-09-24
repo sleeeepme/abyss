@@ -10434,7 +10434,10 @@ function enemyUpdate(e,dt){
                      artId:BA&&BA.pre==='bv'?'bv_arrow':undefined, artKind:BA&&BA.kind});
         }else{
           // 灰の大蛙の通常攻撃は舌。届く所まで伸ばして引っ込める（当たりは下の通り）
-          if(BA && BA.pre==='bt') feelPixelArt('bt_jab', e.x, e.y, {angle:Math.atan2(dy,dx), range:d, kind:BA.kind});
+          if(BA && BA.pre==='bt'){
+            const mo = typeof feelBossMouth==='function' ? feelBossMouth(e, Math.atan2(dy,dx)) : {x:e.x, y:e.y};
+            feelPixelArt('bt_jab', mo.x, mo.y, {angle:Math.atan2(tg.y-mo.y, tg.x-mo.x), range:Math.hypot(tg.x-mo.x, tg.y-mo.y), kind:BA.kind});
+          }
           if(tg.ent) hitAlly(tg.ent, e);
           else hitPlayer(e);
         }
@@ -10756,7 +10759,10 @@ function resolveBossMove(e){
   if(e.cast.id==='slam'){
     const R = m.rad + e.r;
     W.fx.push({t:'shock',artId:BA&&BA.pre==='bt'?'bt_slam':undefined,x:e.x,y:e.y,r:R,life:0.34,max:0.34,col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
-    if(BA && BA.pre==='bt') art('bt_slam', e.x, e.y, {range:R});
+    if(BA && BA.pre==='bt'){
+      art('bt_slam', e.x, e.y, {range:R, wide:e.r});              // wide＝体の半径（マス）。絵は体の縁から外に出す
+      if(typeof feelKick==='function') feelKick(3.2, 0.22);       // 叩きつけの重さは画面の揺れで
+    }
     aoeTargets().forEach(t=>{
       if(Math.hypot(t.x-e.x, t.y-e.y) - t.r < R) aoeHit(e, t, m.mult);
     });
@@ -10765,7 +10771,10 @@ function resolveBossMove(e){
     const R = m.rad + e.r, half = m.arc*Math.PI/180;
     W.fx.push({t:'cleave',artId:BA&&BA.pre==='bt'?'bt_cleave':undefined,x:e.x,y:e.y,a:dir,r:R,arc:half,life:0.30,max:0.30,
                col:DTYPE[e.dt]?DTYPE[e.dt].col:'#ff8a80'});
-    if(BA && BA.pre==='bt') art('bt_cleave', e.x, e.y, {angle:dir, range:R, arc:half});
+    if(BA && BA.pre==='bt'){                                       // 舌は口から（口の位置は絵の向きから）
+      const mo = typeof feelBossMouth==='function' ? feelBossMouth(e, dir) : {x:e.x, y:e.y};
+      art('bt_cleave', mo.x, mo.y, {angle:dir, range:R, arc:half});
+    }
     aoeTargets().forEach(t=>{
       const dx=t.x-e.x, dy=t.y-e.y, d=Math.hypot(dx,dy);
       if(d - t.r > R) return;
@@ -18705,8 +18714,8 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260924b"></script>
-<script src="game-feel.js?v=20260924-moth2"></script>
+<script src="weapon-art-pixel.js?v=20260924c"></script>
+<script src="game-feel.js?v=20260924-toad"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

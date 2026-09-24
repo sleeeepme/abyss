@@ -165,6 +165,12 @@ function feelBossArt(e){
   if(e.uniqueBoss===10)return{pre:'bv',kind:e.form2?'ghost':'stone'};
   return null;
 }
+/* 灰の大蛙の口の位置（マス）。絵（great-ash-frog、32×32、右向き）の口は中心から右へ 0.30、下へ 0.14（絵の大きさ比）。
+   絵の大きさは本編と同じ e.r×2.25 マス。向きは絵の向き（_artFace）、まだ描かれていなければ攻撃の向き。 */
+function feelBossMouth(e,dir){
+  const face=e._artFace||(Math.cos(dir||0)<0?-1:1),size=(e.r||1)*2.25;
+  return {x:e.x+face*.30*size,y:e.y+.14*size};
+}
 function feelDrawBossCasts(layer,camX,camY){
   const sc=feelArtScale();
   for(const e of (W.enemies||[])){

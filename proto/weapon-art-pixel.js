@@ -2008,39 +2008,110 @@
     }
     embers(o.x, o.y, t - 0.05, seed + 7, 6 + 5 * big, R * 1.3, R * 0.8);
   }
-  const btSlamGround = (t, o) => ashBurstGround(t, o, o.R, 820, 2);
-  const btSlamAir = (t, o) => ashBurstAir(t, o, o.R, 840, 2);
-
-  /* ---------- 灰の大蛙：薙ぎ払い（扇。舌で薙ぎ、灰の三日月と土煙） ---------- */
-  function tongue(x0, y0, a, L, lv = 1) {
-    const ca = Math.cos(a), sa = Math.sin(a), nx = -sa, ny = ca;
-    for (let s = 5; s < L; s++) {
-      const x = x0 + ca * s, y = y0 + sa * s;
-      px(x, y, P.tg0, lv); px(x + nx, y + ny, P.tg1, lv); px(x - nx, y - ny, P.tg1, lv);
-      if (s % 3 === 0) { px(x + nx * 2, y + ny * 2, P.tg2, lv); px(x - nx * 2, y - ny * 2, P.tg2, lv); }
+  /* 叩きつけ（2026-09-24 作り直し：実機で「上手く出ていない」＝体の下の灰の柱やひびが大蛙の絵に隠れ、残るのは薄い網の煙だけだった）
+     体の縁から外だけで見せる：①体の縁から太い衝撃の輪が一気に広がる（網を掛けずに塗り切る）②体の縁から外へ太いひび
+     ③輪に押し出されて床を這う灰の壁 ④飛び散る石くず ⑤体の上に一瞬の閃光。o.wide＝体の半径（ドット） */
+  function btSlamGround(t, o) {
+    if (t < 0 || t > 1.2) return;
+    const R = o.R, B = Math.max(10, Math.min(R * 0.6, o.wide || 16));
+    if (t < 0.26) {                                                                    // ① 衝撃の輪（つぶれた楕円・3段の太さ）
+      const f = easeOut(clamp(t / 0.2)), r = B + (R - B) * f;
+      const w = t < 0.18 ? 3 : 1;
+      for (let k = 0; k < w; k++) ellRing(o.x, o.y + 2, r - k, (r - k) * 0.62, k === 0 ? P.as0 : k === 1 ? P.as1 : P.as3, 1);
+      if (t < 0.12) ellRing(o.x, o.y + 2, r * 0.8, r * 0.8 * 0.62, P.as2, 1);
     }
-    disc(x0 + ca * L, y0 + sa * L, 2.5, P.tg1, lv); disc(x0 + ca * L - 1, y0 + sa * L - 1, 1.2, P.tg0, lv);
+    const lv = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.5;                                      // ② 体の縁から外への太いひび
+    if (lv > 0) for (let i = 0; i < 11; i++) {
+      const a = (i + hash(i, 821) * 0.6) * TAU / 11, L = (R - B) * (0.45 + 0.4 * hash(i, 822)) * easeOut(clamp(t / 0.08));
+      let lx = o.x + Math.cos(a) * B, ly = o.y + 2 + Math.sin(a) * B * 0.62;
+      for (let sgm = 1; sgm <= 3; sgm++) {
+        const f = sgm / 3, jx = (hash(i * 7 + sgm, 823) - 0.5) * 4;
+        const nx = o.x + Math.cos(a) * (B + L * f) - Math.sin(a) * jx, ny = o.y + 2 + (Math.sin(a) * (B + L * f) + Math.cos(a) * jx) * 0.62;
+        line(lx, ly, nx, ny, P.as5, 1); line(lx + 1, ly, nx + 1, ny, t < 0.12 ? P.as1 : P.as4, 1);
+        if (Math.floor(lv * 4 + 0.5) < sgm) break;                                     // 消えるときは網ではなく、先から短くなる
+        lx = nx; ly = ny;
+      }
+    }
+    for (let i = 0; i < 10; i++) {                                                     // ③ 床を這う灰の壁（輪のすぐ内側で膨らむ）
+      const a = i * TAU / 10 + hash(i, 824) * 0.3, b = t - 0.03;
+      if (b < 0 || b > 0.55) continue;
+      const f = easeOut(clamp(b / 0.3)), r = B + (R - B) * 0.8 * f;
+      dust(o.x + Math.cos(a) * r, o.y + 4 + Math.sin(a) * r * 0.62, b, 2, 830 + i, 4, 0.55, ASH_DUST, 1.2, 0.9);
+    }
+  }
+  function btSlamAir(t, o) {
+    if (t < 0 || t > 1.0) return;
+    const R = o.R, B = Math.max(10, Math.min(R * 0.6, o.wide || 16));
+    if (t < 0.04) {                                                                      // ⑤ 閃光（1コマ。体を隠さないよう小さく、光の筋で）
+      disc(o.x, o.y + B * 0.3, B * 0.35, P.as0, 1);
+      for (let i = 0; i < 8; i++) { const a = i * TAU / 8 + 0.2; line(o.x + Math.cos(a) * B * 0.5, o.y + B * 0.3 + Math.sin(a) * B * 0.35, o.x + Math.cos(a) * B * 1.1, o.y + B * 0.3 + Math.sin(a) * B * 0.75, P.as0, 1); }
+    } else if (t < 0.09) ellRing(o.x, o.y + 2, B * 1.05, B * 0.65, P.as0, 1);
+    for (let i = 0; i < 18; i++) {                                                     // ④ 石くず：体の縁から外へ弧を描いて飛ぶ
+      const b = t - 0.02 - hash(i, 841) * 0.04; if (b < 0 || b > 0.55) continue;
+      const a = hash(i, 842) * TAU, sp = (R - B) * (1.2 + hash(i, 843)) , d = B + sp * b;
+      const x = o.x + Math.cos(a) * d, y = o.y + Math.sin(a) * d * 0.62 - 70 * b + 190 * b * b;
+      const big = i % 3 === 0;
+      px(x, y, big ? P.as2 : P.as3); if (big) { px(x + 1, y, P.as3); px(x, y + 1, P.as4); }
+    }
+    for (let k = 0; k < 6; k++) {                                                      // 体の上から噴き上がる灰（体の絵の上に出す）
+      const b = t - 0.04 - k * 0.03; if (b < 0 || b > 0.6) continue;
+      const f = b / 0.6, y = o.y - B * 0.7 - k * 4 - f * 14, r = (3 + k * 0.5) * (1 + f);
+      disc(o.x + (hash(k, 844) - 0.5) * B * 0.8, y, r, k < 2 ? P.as1 : P.as2, 0.75 * (1 - f));
+    }
+    embers(o.x, o.y, t - 0.05, 847, 10, R * 1.2, R * 0.7);
+  }
+
+  /* ---------- 灰の大蛙：薙ぎ払い（2026-09-24 作り直し：「舌で薙いでいるように見えない」）
+     原点＝口（本編が口の位置を渡す）。舌を伸ばす → 扇の端から端まで振る（先がしなって遅れる）→ 引っ込める。
+     振った跡はピンクの帯（舌の色）で残り、すぐ消える。床には灰の土煙と擦り跡。 */
+  function tongueCurve(x0, y0, a, L, bend, lv = 1) {
+    if (L < 2) return;
+    const pts = []; let x = x0, y = y0;
+    for (let s = 0; s <= L; s++) { const f = s / L, g = a + bend * f * f; x += Math.cos(g); y += Math.sin(g); pts.push([x, y, g, f]); }
+    for (const [x, y, g, f] of pts) { const w = f < 0.15 ? 2.6 : 2.2, nx = -Math.sin(g), ny = Math.cos(g); px(x + nx * w, y + ny * w, P.tg2, lv); px(x - nx * w, y - ny * w, P.tg2, lv); }
+    for (const [x, y, g] of pts) { const nx = -Math.sin(g), ny = Math.cos(g); px(x, y, P.tg1, lv); px(x + nx, y + ny, P.tg1, lv); px(x - nx, y - ny, P.tg1, lv); px(x - nx * 1.5, y - ny * 1.5, P.tg1, lv); }
+    for (let k = 0; k < pts.length; k += 2) { const [x, y, g] = pts[k], nx = -Math.sin(g), ny = Math.cos(g); px(x + nx * 0.7, y + ny * 0.7, P.tg0, lv); }   // つや
+    const [tx, ty] = pts[pts.length - 1];
+    disc(tx, ty, 3.6, P.tg2, lv); disc(tx, ty, 2.7, P.tg1, lv); px(tx - 1, ty - 1, P.tg0, lv); px(tx, ty - 1, P.tg0, lv);   // 先の膨らみ
+  }
+  const TONGUE_EXT = 0.07, TONGUE_SWEEP = 0.2, TONGUE_BACK = 0.1;
+  function tongueState(t, o) {
+    const h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h, Lm = Math.max(14, o.R * 0.92);
+    if (t < 0) return null;
+    if (t < TONGUE_EXT) return { a: a0, L: Lm * easeOut(t / TONGUE_EXT), bend: 0, sw: 0 };
+    const t2 = t - TONGUE_EXT;
+    if (t2 < TONGUE_SWEEP) { const u = t2 / TONGUE_SWEEP, e = u * u * (3 - 2 * u); return { a: a0 + (a1 - a0) * e, L: Lm, bend: -(a1 - a0) * 0.45 * Math.sin(Math.PI * u), sw: e }; }
+    const t3 = t2 - TONGUE_SWEEP;
+    if (t3 < TONGUE_BACK) return { a: a1, L: Lm * (1 - t3 / TONGUE_BACK), bend: -(a1 - a0) * 0.1 * (1 - t3 / TONGUE_BACK), sw: 1 };
+    return { a: a1, L: 0, bend: 0, sw: 1, gone: t3 - TONGUE_BACK };
   }
   function btCleaveGround(t, o) {
-    const R = o.R, h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h;
-    for (let k = 0; k < 12; k++) {
-      const a = a0 + (a1 - a0) * k / 11, b = t - 0.12 * k / 11;
-      dust(o.x + Math.cos(a) * R * 0.88, o.y + Math.sin(a) * R * 0.88, b, 2, 860 + k, 6, 0.7, ASH_DUST, 1.1, 0.65);
-    }
-    for (let k = 0; k < 5; k++) {                                                       // 床を擦った跡
-      const a = a0 + (a1 - a0) * (k + 0.5) / 5, b = t - 0.12 * (k + 0.5) / 5; if (b < 0 || b > 0.8) continue;
-      const lv = b < 0.3 ? 0.8 : 0.8 * (1 - (b - 0.3) / 0.5);
-      for (let s = R * 0.35; s < R * 0.85; s += 2) px(o.x + Math.cos(a) * s, o.y + Math.sin(a) * s, P.as4, lv);
+    const S = tongueState(t, o); if (!S) return;
+    const h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h, R = Math.max(14, o.R * 0.92);
+    for (let k = 0; k < 10; k++) {                                                      // 舌の先が通った所から土煙と擦り跡
+      const f = (k + 0.5) / 10; if (S.sw < f) break;
+      const a = a0 + (a1 - a0) * f, b = t - TONGUE_EXT - TONGUE_SWEEP * f;
+      dust(o.x + Math.cos(a) * R, o.y + 4 + Math.sin(a) * R, b, 2, 860 + k, 5, 0.6, ASH_DUST, 1.2, 0.8);
+      if (b < 0.5) for (let s = R * 0.6; s < R; s += 1.5) px(o.x + Math.cos(a) * s, o.y + 3 + Math.sin(a) * s, P.as4, 1);
     }
   }
   function btCleaveAir(t, o) {
-    const R = o.R, h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h;
-    slash(o.x, o.y, R * 0.9, a0, a1, 9, 1, [P.as0, P.as2, P.as4], t, 0.14, 850);
-    if (t >= 0 && t < 0.2) {
-      const a = a0 + (a1 - a0) * easeOut(clamp(t / 0.063)), L = R * 0.9 * (t < 0.14 ? 1 : 1 - (t - 0.14) / 0.06);   // 斬り跡（slash）の先端と同じ速さ
-      tongue(o.x, o.y - 2, a, L);
+    const S = tongueState(t, o); if (!S) return;
+    const h = o.arc || 1.3, a0 = o.ang - h, a1 = o.ang + h, R = Math.max(14, o.R * 0.92), span = a1 - a0;
+    const fade = S.gone != null ? 1 - S.gone / 0.14 : 1;                                // ピンクの振り跡（舌の先の帯）
+    if (S.sw > 0 && fade > 0) {
+      const cur = a0 + span * S.sw, n = Math.ceil(Math.abs(cur - a0) * R / 1.2);
+      for (let k = 0; k <= n; k++) {
+        const a = a0 + (cur - a0) * k / Math.max(1, n), behind = Math.abs(cur - a) / Math.abs(span);
+        const len = (1 - behind / 0.6) * 0.2 * fade; if (len <= 0.015) continue;         // 新しい所ほど太く、古い所ほど細い（網で薄めない）
+        for (let s = R * (1 - len); s <= R + 1; s += 1) px(o.x + Math.cos(a) * s, o.y + Math.sin(a) * s, s > R - 1.5 ? P.tg0 : behind < 0.2 ? P.tg1 : P.tg2, 1);
+      }
     }
-    embers(o.x + Math.cos(o.ang) * R * 0.6, o.y + Math.sin(o.ang) * R * 0.6, t - 0.08, 870, 6, R, R * 0.6);
+    if (S.L > 0) tongueCurve(o.x, o.y, S.a, S.L, S.bend, 1);
+    if (S.sw > 0.05 && S.sw < 1 && S.L > 0) {                                          // 先に当たる灰の粒
+      const cur = a0 + span * S.sw; plus(o.x + Math.cos(cur) * R, o.y + Math.sin(cur) * R, P.as0, 1);
+    }
+    embers(o.x + Math.cos(o.ang) * R * 0.6, o.y + Math.sin(o.ang) * R * 0.6, t - 0.12, 870, 5, R, R * 0.6);
   }
 
   /* ---------- 灰の大蛙：落石（＝飲み込んだ灰の塊を吐き出す。溜めの終わりに弧を描いて落ちる） ---------- */
@@ -2062,8 +2133,8 @@
   function btJabAir(t, o) {
     if (t < 0 || t > 0.24) return;
     const L = Math.max(10, o.R) * (t < 0.06 ? easeOut(t / 0.06) : t < 0.1 ? 1 : 1 - (t - 0.1) / 0.14);
-    tongue(o.x, o.y - 2, o.ang, L);
-    if (t >= 0.05 && t < 0.12) plus(o.x + Math.cos(o.ang) * o.R, o.y - 2 + Math.sin(o.ang) * o.R, P.W, 2);
+    tongueCurve(o.x, o.y, o.ang, L, 0);                                                // 口から（本編が口の位置を渡す）
+    if (t >= 0.05 && t < 0.12) plus(o.x + Math.cos(o.ang) * o.R, o.y + Math.sin(o.ang) * o.R, P.W, 2);
   }
   function btJabGround(t, o) { dust(o.x + Math.cos(o.ang) * o.R, o.y + 4 + Math.sin(o.ang) * o.R, t - 0.06, 3, 895, 6, 0.4, ASH_DUST); }
 
