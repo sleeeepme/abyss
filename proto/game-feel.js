@@ -417,7 +417,28 @@ function drawFeelHubTiltShift(canvas,target){
   target.restore();
 }
 const feelVignetteCanvas=feelTiltSurface(1,1);
-function drawFeelVignette(){if(feelLanternOn())return;paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);}
+function drawFeelVignette(){if(feelLanternOn())return;paintFeelVignette(ctx,innerWidth,innerHeight,feelVignetteCanvas);drawFeelCornerNet();}
+/* 画面の四隅だけに、ドットの網（4×4）で少しだけ暗がりを足す（ユーザー指定：網のビネットは画面がごちゃつくので、四隅に少しだけ）。
+   画面に貼り付いた模様なので、画面の大きさが変わらない限り1枚焼いて貼るだけ。?corner=off で消せる。 */
+const FEEL_CORNER=window.FEEL_CORNER={on:new URLSearchParams(location.search).get('corner')!=='off',size:.42,max:.6,levels:3};
+const feelCornerCanvas=document.createElement('canvas');
+function drawFeelCornerNet(){
+  const C=FEEL_CORNER;if(!C.on)return;
+  const w=innerWidth,h=innerHeight,q=Math.max(1,TS/16),bw=Math.ceil(w/q)+1,bh=Math.ceil(h/q)+1,cv=feelCornerCanvas;
+  const key=[bw,bh,q,C.size,C.max,C.levels].join(':');
+  if(cv.feelKey!==key){
+    cv.feelKey=key;cv.width=bw;cv.height=bh;
+    const c=cv.getContext('2d'),im=c.createImageData(bw,bh),u=new Uint32Array(im.data.buffer),R=Math.min(w,h)*C.size,L=C.levels;
+    const bayer=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+    for(let j=0;j<bh;j++){const sy=(j+.5)*q,dy=Math.min(sy,h-sy);
+      for(let i=0;i<bw;i++){const sx=(i+.5)*q,dx=Math.min(sx,w-sx);
+        const d=Math.hypot(dx,dy)/R;if(d>=1)continue;
+        const v=(1-d)*(1-d),lv=Math.min(L,Math.floor(v*L+(bayer[(j&3)*4+(i&3)]+.5)/16));if(lv<=0)continue;
+        u[j*bw+i]=((Math.round(C.max*lv/L*255)&255)<<24|9<<16|5<<8|2)>>>0;}}
+    c.putImageData(im,0,0);
+  }
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(cv,0,0,bw*q,bh*q);ctx.restore();
+}
 function paintFeelVignette(target,w,h,canvas){
   if(!FEEL_POST.vignetteEnabled)return;
   const t=FEEL_TUNING;
@@ -886,9 +907,9 @@ function drawPlayerLightSmooth(camX,camY){
    - キャラの周りは暗がりを抜く：主人公は広く完全に、仲間と敵は少し狭く弱く（ユーザー指定）。
    - 暗がりは UI より下：本編はキャラまで描いた所で drawFeelDarkness を呼び、そのあと名前・HP帯・予兆を描く。
    - 床のマス単位の明暗（lightR）は止め、明暗はこの網だけで出す。層の lightR は光の届く距離の倍率に使う。
-   ?lantern=old で旧い光（なめらか）に戻せる。 */
+   既定は旧い光（なめらか）＋旧いビネット＋四隅だけの網（drawFeelCornerNet）。?lantern=net でこの網に切り替わる。 */
 const FEEL_LANTERN=window.FEEL_LANTERN={
-  on:new URLSearchParams(location.search).get('lantern')!=='old',
+  on:new URLSearchParams(location.search).get('lantern')==='net',   // ユーザー判断で既定は旧い光に戻した（画面がごちゃつく）。?lantern=net で網
   darkScale:.72,          // 暗がり全体の濃さ（ユーザー指定で薄め）
   wide:1.3,               // 暗がりの掛からない中央の広さ（ユーザー指定で3割広く）
   dark:[.94,.74,.52,.30,.10,0],        // 段ごとの暗がり（0＝一番暗い）

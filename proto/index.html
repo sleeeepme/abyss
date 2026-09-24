@@ -13043,9 +13043,9 @@ function draw(){
 
   // 武器技の足元（魔法陣・ひび・照準）。キャラより下に敷くので、敵を描く前に出す
   if(typeof drawFeelArtGround==='function') drawFeelArtGround(camX,camY);
-  /* ここから主人公までを描くあいだ、名前・HP帯・予兆は控えておき、暗がり（ランタンの網）を重ねたあとに描く。
-     暗がりの下に UI を沈めない（ユーザー指定）。 */
-  _uiQ = lanternNet ? [] : null;
+  /* ここから主人公までを描くあいだ、名前・HP帯・予兆は控えておき、ビネット（と、ランタンの網の暗がり）の
+     あとに描く。ビネットの下に UI を沈めない（ユーザー指定）。ティルトシフトのぼかしにも掛からない。 */
+  _uiQ = [];
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
   _drawStage='敵';
   W.enemies.forEach(e=>{
@@ -13892,12 +13892,8 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   drawPlayerLight(camX,camY);
-  // 暗がり（ランタンの網）を重ねてから、控えておいた名前・HP帯・予兆を描く
-  if(_uiQ){
-    if(typeof drawFeelDarkness==='function') drawFeelDarkness();
-    const uq=_uiQ; _uiQ=null;
-    for(const f of uq){ ctx.save(); try{ f(); }catch(err){ console.error(err); } ctx.restore(); }
-  }
+  // ランタンの網（?lantern=net のときだけ）の暗がりはキャラまで描いた所で重ねる
+  if(lanternNet && typeof drawFeelDarkness==='function') drawFeelDarkness();
   if(!heroBlinkOff) drawFeelFlash(P,px+heroBob.x,py+heroBob.y,TS*heroScale);
   /* 主人公の頭上に「自分」とは書かない。画面の中央にいて、
      ジョイスティックで動いているのが自分——それ以上の説明は要らない。 */
@@ -13932,6 +13928,11 @@ function draw(){
   ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
   drawFeelTiltShift();
   drawFeelVignette();
+  // 控えておいた名前・HP帯・予兆は、ビネットのあとに描く（描いた時のカメラの揺れ込みの位置で）
+  if(_uiQ){
+    const uq=_uiQ; _uiQ=null;
+    for(const f of uq){ ctx.save(); try{ f(); }catch(err){ console.error(err); } ctx.restore(); }
+  }
   // 被弾フラッシュ
   const hu=W.fx.find(f=>f.t==='hurt');
   if(hu){ ctx.fillStyle='rgba(196,67,63,'+(hu.life*1.2)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
@@ -14064,14 +14065,14 @@ function drawBanner(){
   ctx.textBaseline='alphabetic';
 }
 /* 小さな文字を暗い背景の上でも読ませるため、黒フチをつけて描く */
-/* 暗がり（ランタンの網）より上に出す物。draw() が主人公まで描くあいだは控えておき、暗がりのあとにまとめて描く */
+/* ビネット（と、ランタンの網の暗がり）より上に出す物。draw() が主人公まで描くあいだは控えておき、ビネットのあとにまとめて描く */
 let _uiQ=null;
 function uiLater(fn){
   if(!_uiQ) return fn();
-  const a=ctx.globalAlpha; _uiQ.push(()=>{ ctx.globalAlpha=a; fn(); });
+  const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; fn(); });
 }
 function label(text,x,y,color,scale){
-  if(_uiQ){ const a=ctx.globalAlpha; _uiQ.push(()=>{ ctx.globalAlpha=a; label(text,x,y,color,scale); }); return; }
+  if(_uiQ){ const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; label(text,x,y,color,scale); }); return; }
   const s=Math.max(9, TS*0.36*(scale||1));
   ctx.font='bold '+s+'px '+FONT;
   ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -18705,7 +18706,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20260924b"></script>
-<script src="game-feel.js?v=20260924-mist"></script>
+<script src="game-feel.js?v=20260924-corner"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
