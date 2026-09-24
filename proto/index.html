@@ -384,6 +384,51 @@
   #log:empty{display:none}
   #log div{opacity:.9}
 
+  /* ---------- 資質を得た通知（レベルアップ） ----------
+     ユーザー要望「レベルアップ時に出る資質はまだおどろくので、画面停止せず
+     にログのところにステータスが上がった通知のような感じで少し目立つように
+     出してほしい」。以前は画面を止めてカードを出していたが、戦っている最中に
+     手が止まるのが驚きの正体だったので、止めるのをやめてログの上に積む。
+
+     #log と同じ「数秒で消える」扱いだが、**#log とは別の要素**にしてある。
+     log() は最新の1行で中身を丸ごと書き換えるので、同じ箱に入れると
+     直後の戦闘ログ1行で消えてしまう。少しだけ長く、少しだけ目立たせたい
+     通知なので、居場所を分ける。
+     枠と薄い背景を持たせるのは、流れる戦闘ログと「格が違う」と分かるように。
+     色は得た資質のいちばん高い色（RARCOL）を JS が --pn-col に入れる。 */
+  #potnote{position:absolute;left:50%;
+    bottom:calc(env(safe-area-inset-bottom) + 186px);
+    transform:translateX(-50%);
+    display:none;pointer-events:none;
+    width:max-content;max-width:min(78%,560px);text-align:center;
+    padding:6px 14px;border-radius:10px;
+    border:1px solid var(--pn-col,#8ad7c0);
+    background:rgba(8,10,14,.72);
+    color:#eaf2ef;font-size:13px;line-height:1.5;text-shadow:var(--pxshadow)}
+  #potnote.on{display:block}
+  /* 見出しだけはレア度の色を使わない。Common は灰色に近く、そこが
+     いちばん小さい字なので読みづらくなる。レベルアップの帯（#ffd06a）と
+     同じ色にして「レベルが上がって手に入った物」だと一目で繋げる。 */
+  #potnote .pn-head{font-size:12px;font-weight:700;letter-spacing:.08em;color:#ffd06a}
+  /* 太字は数字だけ（ユーザー要望）。行全体を太くすると「%」が読みづらい。 */
+  #potnote .pn-line{font-size:13px;font-weight:400;margin-top:2px}
+  #potnote .pn-line b{font-weight:700}
+  #potnote .pn-rar{font-size:11px;margin-right:6px}
+  @keyframes potNoteIn{
+    0%{transform:translateX(-50%) translateY(8px) scale(.94);opacity:0}
+    60%{transform:translateX(-50%) translateY(0) scale(1.04);opacity:1}
+    100%{transform:translateX(-50%) translateY(0) scale(1);opacity:1}
+  }
+  @keyframes potNoteGlow{
+    0%{box-shadow:0 0 0 0 var(--pn-col,transparent)}
+    40%{box-shadow:0 0 16px 1px var(--pn-col,transparent)}
+    100%{box-shadow:0 0 0 0 var(--pn-col,transparent)}
+  }
+  /* 連続レベルアップで出し直すとき、remove→reflow→add で再生できるように
+     アニメーションだけ別クラスにしておく。 */
+  #potnote.pot-note-anim{animation:potNoteIn .34s cubic-bezier(.25,.9,.35,1.15),
+                                   potNoteGlow .8s ease-out}
+
   #stick{position:absolute;width:130px;height:130px;border-radius:50%;
     border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);display:none}
   #knob{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.16);
@@ -495,65 +540,6 @@
     position:sticky; bottom:0; z-index:2;
     box-shadow:0 0 0 10px var(--bg), 0 -14px 18px -10px var(--bg)}
   .lost{color:var(--c-relic);font-size:12px;line-height:1.8}
-
-  /* ---------- 潜在カードの演出 ----------
-     ユーザー要望「プレイヤーキャラのレベルアップごとにランダムに1個潜在が
-     手に入るようにしたい。テキストだけだと分かりづらいのでカードが出るような
-     演出を入れたい」への対応。選ぶ操作がある恩寵（m-boon の3択）と違い、
-     こちらは自動で1枚もらえるだけなので、なおさら「今、何かが起きた」が
-     ひと目で伝わる動きが要る。裏返りながら出て、潜在の強さ（色）でふわっと
-     光ってから収まる——恩寵の静かな一覧選びとははっきり違う体験にする。
-     perspective は rotateY を掛ける要素の**親**に置かないと奥行きが出ないので、
-     カード本体ではなくラップ側に持たせる。 */
-  /* m-charpot だけ、他のモーダルより背景を薄くする。
-     他の .modal（恩寵・見送り等）は「別の画面に切り替わった」体で
-     ほぼ不透明に盤面を覆う作りだが、こちらは JS 側で S.screen を
-     'game' のまま動かさず pauseGame(true) するだけにした
-     （報告「急に全画面表示をすると驚く」への対応）。
-     背景まで不透明だと「止まった盤面の上にカードが乗る」がまったく
-     見えず、切り替え方を直した意味が消えるので、ここだけ薄くして
-     止まった瞬間の盤面を透かして見せる。 */
-  #m-charpot{background:rgba(8,10,14,.55)}
-  /* ユーザー要望「レベルアップ時の潜在に敷いてるウインドウを無くす」で、
-     .box に足していたパネル背景（不透明に近い箱）を撤廃。
-     カードと文字が、止まった盤面の上に直接浮くだけの見た目に戻す。 */
-  .pot-card-wrap{perspective:700px}
-  /* カードの背景だけは入れる（ユーザー要望「潜在のカードの背景だけは入れて欲しい」）。
-     窓（.box）を外したぶん、カードの下は止まった盤面が直接透ける。そのままだと
-     カードが「浮いている札」ではなく「文字が乗っているだけ」に見えるので、
-     カード自体は不透明にして、その上に今までの薄い白のツヤを重ねる。
-     影は、止まった盤面から一段手前に浮かせるため。 */
-  .pot-card{
-    border:2px solid var(--line); border-radius:14px;
-    padding:22px 16px; margin:16px 0;
-    background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)), var(--panel);
-    box-shadow:0 6px 20px rgba(0,0,0,.55);
-  }
-  .pot-card .pc-rar{font-size:12px;font-weight:700;letter-spacing:.05em}
-  /* ユーザー要望「%とかが太字にすると読みづらいので、太字は数字だけに適用する
-     ようにしたい」への対応。以前は行全体（「物理ダメージ +12%」の「%」まで）
-     を font-weight:700 にしていた。ここは通常の太さに戻し、数値だけを
-     JS側で <b> に包んで、その <b> だけ太くする。 */
-  .pot-card .pc-name{font-size:21px;font-weight:400;margin-top:8px;line-height:1.4}
-  .pot-card .pc-name b{font-weight:700}
-  @keyframes potCardIn{
-    0%{transform:scale(.5) rotateY(80deg); opacity:0}
-    55%{transform:scale(1.05) rotateY(0deg); opacity:1}
-    100%{transform:scale(1) rotateY(0deg); opacity:1}
-  }
-  @keyframes potCardGlow{
-    0%{box-shadow:0 0 0 0 var(--pot-glow, transparent)}
-    35%{box-shadow:0 0 28px 4px var(--pot-glow, transparent)}
-    100%{box-shadow:0 0 0 0 var(--pot-glow, transparent)}
-  }
-  /* アニメーションだけを別クラスに分け、連続レベルアップ（一度に大量の
-     経験値が入って2回以上上がる）でも remove→reflow→add で毎回再生できる
-     ようにする——.pot-card 自体を差し替えると中身のHTMLごと作り直す
-     羽目になるので、クラスの付け外しだけで済ませる。 */
-  .pot-card.pot-card-anim{
-    animation:potCardIn .45s cubic-bezier(.25,.9,.35,1.15),
-              potCardGlow .7s ease-out;
-  }
 
   /* ---------- 街（ハブ） ----------
      背景はループアニメ（docs/HUB_BACKGROUND_HANDOFF.md）を敷き、
@@ -968,6 +954,7 @@
   <div id="statusbar"></div>
   <div id="targetinfo"></div>
   <div id="log"></div>
+  <div id="potnote"></div>
 <!-- キーボードの操作説明は畳んだ。出荷先はスマホで、
      この行は**盤面の左下を常時1割ほど占有していた**だけだった。
      PC の操作は「操作と記号」（タイトルの？）に残してある。 -->
@@ -1032,15 +1019,6 @@
   <p class="sub" id="boon-sub"></p>
   <div class="grid" id="boon-choices" style="grid-template-columns:repeat(3,1fr)"></div>
   <p class="sub" style="margin-top:14px">効果は<b>このキャラが死ぬまで</b>続きます</p>
-</div></div>
-
-<!-- ============ 資質カード（レベルアップ） ============ -->
-<div class="modal" id="m-charpot"><div class="box">
-  <h1>資質を獲得！</h1>
-  <p class="sub" id="cp-sub"></p>
-  <div class="pot-card-wrap"><div class="pot-card" id="cp-card"></div></div>
-  <p class="sub" style="margin-top:6px">レベルアップのたびに1つ、ずっと効果が続きます</p>
-  <button class="primary" id="cp-ok">閉じる</button>
 </div></div>
 
 <!-- ============ 恩寵の付与先（主人公 / 仲間） ============ -->
@@ -9998,6 +9976,8 @@ function addXp(h, amount, isPlayer){
     log(isPlayer ? ('LEVEL UP! Lv.'+h.lv) : (h.name+' が Lv.'+h.lv+' になった'));
     onLevelUp(h, isPlayer);
   }
+  // 何レベル上がっても通知は1枚。ループを抜けてから、まとめて出す。
+  if(isPlayer) flushCharPotNotice();
 }
 /* ---------- レベルアップの見せ方 ----------
    ログの1行だけだった。ログは他の行にすぐ押し流されるうえ、
@@ -10040,57 +10020,56 @@ function rollCharPotential(h){
   return {t:'pt', id:def.id, stat:def.stat, v, tier};
 }
 /* 一度に複数レベル上がる（大きな経験値を一気に得た）と、この関数が
-   同期的に連続で呼ばれる。カードは1枚ずつ見せたいので、キューに積んで
-   閉じるたびに次を出す（_fallenQueue と同じ考え方）。 */
-let _charPotQueue=[];
+   同期的に連続で呼ばれる。そのぶんを溜めておいて、addXp のループが
+   終わってから**まとめて1枚**の通知にする（1回のレベルアップごとに
+   出し直すと、log() と同じで直前の通知を自分で消してしまう）。 */
+let _charPotPend=[];
 function grantCharPotential(h){
   const pot=rollCharPotential(h);
   h.charPot=h.charPot||[];
   h.charPot.push(pot);
-  _charPotQueue.push({pot, lv:h.lv});
-  if(_charPotQueue.length===1) openCharPotCard();
+  _charPotPend.push(pot);
 }
-function openCharPotCard(){
-  const q=_charPotQueue[0];
-  if(!q || !S.hero) return;
-  // 恩寵の選択画面と同じ理由：他のモーダルが下に隠れて開けなくなる事故を防ぐ
-  document.querySelectorAll('.modal.on').forEach(m=>{ if(m.id!=='m-charpot') m.classList.remove('on'); });
-  /* ---------- 画面ごと切り替えず、止めて重ねる ----------
-     以前は S.screen を 'charpot' に切り替え、HUD ごと隠していた。
-     戦っている最中に前触れなく別画面へ差し替わると、盤面が一瞬で
-     消えて驚く（報告：「急に全画面表示をすると驚く」）。
-     技名変更の窓（openArtRename）と同じ作法に直す：
-     S.screen は 'game' のまま動かさず、pauseGame(true) で
-     **update だけ**止める。draw はそのまま回るので（tick() の
-     `S.screen==='game'` 判定が生きている）、盤面は「今の見た目のまま
-     止まる」——切り替わるのではなく、止まって、その上にカードが乗る。 */
-  pauseGame(true);
-  const {pot, lv} = q;
-  const col=RARCOL[pot.tier];
-  el('cp-sub').textContent = 'Lv.'+lv+' に上がった';
-  const card=el('cp-card');
-  card.style.borderColor=col;
-  card.style.setProperty('--pot-glow', col);
-  // 数字だけ太くする（「%」まで太字だと読みづらい、という指摘への対応）
-  card.innerHTML =
-    `<div class="pc-rar" style="color:${col}">${RARITY[pot.tier].nm}の資質</div>`
-    + `<div class="pc-name">${STATNM[pot.stat].replace('%v','<b>'+pot.v+'</b>')}</div>`;
-  /* クラスの付け外しで強制的に reflow を挟み、連続して同じ強さの潜在が
-     出たときにもアニメーションを毎回頭から再生させる（既に付いている
-     クラスに add し直すだけではブラウザが「変化なし」として再生しない）。 */
-  card.classList.remove('pot-card-anim');
-  void card.offsetWidth;
-  card.classList.add('pot-card-anim');
-  el('m-charpot').classList.add('on');
+/* 出したら数秒で消す。数えるのは #log と同じく update() に渡る dt。 */
+const POTNOTE_SEC=5.0;
+let _potNoteT=0;
+/* 溜まっているぶんを1枚の通知にして、ログの上に出す。
+   **画面は止めない**（ユーザー要望「画面停止せずにログのところに
+   ステータスが上がった通知のような感じで少し目立つように」）。
+
+   止めないので「閉じる」操作も要らない。これは見た目の話だけではない：
+   以前のキュー方式は、閉じる関数を通らずにモーダルが閉じられる
+   （setScreen は全モーダルから .on を外すが、キューには触らない）と
+   先頭が残り続け、以後 length===1 が二度と成立せず**カードが永久に
+   出なくなった**。報告「たまにレベルアップしても出なくなる事があった」の
+   正体がこれで、資質自体は h.charPot に入り続けるので効果だけは効いていた。
+   溜めた物をその場で出し切るこの形なら、詰まりようがない。 */
+function flushCharPotNotice(){
+  if(!_charPotPend.length) return;
+  const pots=_charPotPend; _charPotPend=[];
+  const nd=el('potnote'); if(!nd) return;
+  // 枠と光の色は、まとめたうちで一番高い色に合わせる
+  const top=pots.reduce((a,p)=> p.tier>a.tier ? p : a, pots[0]);
+  nd.style.setProperty('--pn-col', RARCOL[top.tier]);
+  nd.innerHTML =
+    '<div class="pn-head">資質を獲得</div>'
+    + pots.map(p=>
+        '<div class="pn-line">'
+        + '<span class="pn-rar" style="color:'+RARCOL[p.tier]+'">'+RARITY[p.tier].nm+'</span>'
+        + STATNM[p.stat].replace('%v','<b>'+p.v+'</b>')
+        + '</div>').join('');
+  nd.classList.remove('pot-note-anim');
+  void nd.offsetWidth;                 // 連続で出す時にアニメを再生し直すため
+  nd.classList.add('pot-note-anim');
+  nd.classList.add('on');
+  _potNoteT=POTNOTE_SEC;
 }
-function closeCharPotCard(){
-  el('m-charpot').classList.remove('on');
-  _charPotQueue.shift();
-  if(_charPotQueue.length){ openCharPotCard(); return; }
-  // 最後の1枚を閉じたときだけ、止めていた時間を戻す
-  pauseGame(false);
+function tickPotNote(dt){
+  if(_potNoteT<=0) return;
+  if((_potNoteT-=dt)>0) return;
+  const nd=el('potnote');
+  if(nd){ nd.classList.remove('on'); nd.classList.remove('pot-note-anim'); nd.innerHTML=''; }
 }
-bindTap(el('cp-ok'), closeCharPotCard);
 
 /* 精鋭の性質「影の」。こちらの攻撃をたまにすり抜ける。
    当てても通らないことがある相手は、手数で押す戦い方を否定する。 */
@@ -12492,6 +12471,7 @@ function update(dt){
   W.pops.forEach(p=>{ if(p.delay>0) p.delay-=dt; else p.life-=dt; });
   W.pops=W.pops.filter(p=>p.life>0);
   tickLog(dt);
+  tickPotNote(dt);
 
   /* ---------- 壁にめり込んだ物を引き出す ----------
      落とし物は「敵がいた場所 ± 乱数」で置いている。壁際で倒すと

@@ -8,10 +8,13 @@
 //    付いたり付かなかったりはしない）
 //  ・ランダムなのは効果の種類と強さ（色）だけ——装備の潜在と同じ抽選プール
 //  ・実際に stats() へ乗る（表示だけの飾りではない）
-//  ・カードが出る（m-charpot が開き、盤面は画面ごと切り替わらず
-//    pauseGame() で止まったまま見えている——「急に全画面表示をすると
-//    驚く」という報告への対応）
-//  ・一度に複数レベル上がってもカードは1枚ずつ（キューで順番に）
+//  ・ログの上に通知が出る（#potnote）。**画面は止めない**——
+//    「画面停止せずにログのところにステータスが上がった通知のような感じで
+//    少し目立つように出してほしい」という要望への対応で、以前の
+//    「止めてカードを出す」方式から乗り換えた
+//  ・一度に複数レベル上がっても通知は1枚（全部まとめて並べる）
+//  ・出しっぱなしにせず、数秒で自分から消える
+//  ・何度レベルアップを繰り返しても出続ける（詰まらない）
 //  ・仲間（プレイヤーキャラ以外）はレベルアップしても対象外
 import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
@@ -39,80 +42,108 @@ R.allyNotGranted = await pg.evaluate(()=>{
   TH.run(1,{seed:12}); S.hero.party=[];
   const a=TH.ally(1,'warrior',5); a.xp=0; S.hero.party.push(a);
   const need=xpNeed(a.lv);
-  _charPotQueue=[];
-  const queueBefore=_charPotQueue.length;
+  _charPotPend=[]; _potNoteT=0;
+  const nd=document.getElementById('potnote');
+  nd.classList.remove('on'); nd.innerHTML='';
   addXp(a, need, false);
   return {allyLeveled: a.lv===6,
           allyHasNoCharPot: !a.charPot || a.charPot.length===0,
-          queueUnchanged: _charPotQueue.length===queueBefore,
-          modalStaysClosed: !document.getElementById('m-charpot').classList.contains('on'),
+          pendUnchanged: _charPotPend.length===0,
+          noticeStaysHidden: !nd.classList.contains('on'),
           ok: a.lv===6 && (!a.charPot || a.charPot.length===0)
-              && !document.getElementById('m-charpot').classList.contains('on')};
+              && !nd.classList.contains('on')};
 });
 
-/* ============ 3. カードが出る（演出） ============
-   報告「レベルアップ時に急に全画面表示をすると驚く」への対応で、
-   画面を切り替える（S.screen変更）のではなく、止める（pauseGame）方式に
-   変えた。盤面はそのまま見えているのが正しい動作なので、
-   S.screen==='game' のまま変わらないことを確認する。 */
-R.cardShown = await pg.evaluate(()=>{
+/* ============ 3. ログの上に通知が出る（画面は止めない） ============
+   報告「レベルアップ時に出る資質はまだおどろく」への対応で、
+   止めてカードを出す方式をやめ、ログの上の通知に変えた。
+   **止まらない**ことが直したかった点そのものなので、
+   gamePaused() が false のままであることを必ず見る。 */
+R.noticeShown = await pg.evaluate(()=>{
   TH.run(1,{seed:13}); S.hero.party=[];
-  S.hero.charPot=[]; _charPotQueue=[];
+  S.hero.charPot=[]; _charPotPend=[]; _potNoteT=0;
   setScreen('game');
-  document.getElementById('m-charpot').classList.remove('on');
+  const nd=document.getElementById('potnote');
+  nd.classList.remove('on'); nd.innerHTML='';
   const need=xpNeed(S.hero.lv);
   addXp(S.hero, need, true);
   const pot=S.hero.charPot[S.hero.charPot.length-1];
-  const col=RARCOL[pot.tier];
-  const cardHtml=document.getElementById('cp-card').innerHTML;
-  const modalOn=document.getElementById('m-charpot').classList.contains('on');
-  const screenStaysGame=S.screen==='game';
-  const gamePausedNow=gamePaused();
-  const showsRarity=cardHtml.includes(RARITY[pot.tier].nm);
-  const showsBorderColor=document.getElementById('cp-card').style.borderColor.length>0;
-  // 閉じると探索画面に戻る（止めていた時間も動き出す）
-  closeCharPotCard();
-  const closedOk = !document.getElementById('m-charpot').classList.contains('on')
-                   && S.screen==='game' && !gamePaused();
-  return {modalOn, screenStaysGame, gamePausedNow, showsRarity, showsBorderColor, closedOk,
-          ok: modalOn && screenStaysGame && gamePausedNow && showsRarity && showsBorderColor && closedOk};
+  const html=nd.innerHTML;
+  return {
+    noticeOn: nd.classList.contains('on'),
+    screenStaysGame: S.screen==='game',
+    notPaused: !gamePaused(),                       // ← 止めないのが要件
+    noModalOpened: !document.querySelector('.modal.on'),
+    showsRarity: html.includes(RARITY[pot.tier].nm),
+    showsValue: html.includes('<b>'+pot.v+'</b>'),  // 太字は数字だけ
+    colored: nd.style.getPropertyValue('--pn-col').length>0,
+    animPlaying: nd.classList.contains('pot-note-anim'),
+    pendDrained: _charPotPend.length===0,
+    ok: nd.classList.contains('on') && S.screen==='game' && !gamePaused()
+        && !document.querySelector('.modal.on')
+        && html.includes(RARITY[pot.tier].nm) && html.includes('<b>'+pot.v+'</b>')};
 });
 
-/* ============ 4. 一度に複数レベル上がると、カードは1枚ずつキューで出る ============
-   複数枚をまたぐ間、盤面はずっと止まったまま（毎回動き出しては止まり直す、
-   のようなチラつきが起きないか）も合わせて見る。動き出すのは最後の1枚を
-   閉じたときだけのはず。 */
-R.queuedMultiLevel = await pg.evaluate(()=>{
+/* ============ 4. 一度に複数レベル上がっても通知は1枚 ============
+   1レベルごとに出し直すと、log() と同じで直前の通知を自分で消してしまい、
+   最後の1個しか見えない。全部まとめて1枚に並べる。 */
+R.mergedMultiLevel = await pg.evaluate(()=>{
   TH.run(1,{seed:14}); S.hero.party=[];
-  S.hero.lv=3; S.hero.xp=0; S.hero.charPot=[]; _charPotQueue=[];
+  S.hero.lv=3; S.hero.xp=0; S.hero.charPot=[]; _charPotPend=[]; _potNoteT=0;
   setScreen('game');
-  document.getElementById('m-charpot').classList.remove('on');
-  // 3レベルぶんを一気に与える
-  const big = xpNeed(3)+xpNeed(4)+xpNeed(5)+1;
+  const nd=document.getElementById('potnote');
+  nd.classList.remove('on'); nd.innerHTML='';
+  const big = xpNeed(3)+xpNeed(4)+xpNeed(5)+1;      // 3レベルぶん
   addXp(S.hero, big, true);
-  const gained = S.hero.charPot.length;         // 3個ぶん貯まっている
-  const queueLenAfterGrant = _charPotQueue.length;
-  // 1枚目が見えていて、盤面は止まっている
-  const modalOnAfterGrant = document.getElementById('m-charpot').classList.contains('on');
-  const pausedAfterGrant = gamePaused();
-  // 閉じるたびに1つずつ減り、最後の1枚まではまだ止まったまま
-  const seenBeforeEachClose=[];
-  const pausedDuring=[];
-  while(_charPotQueue.length){
-    seenBeforeEachClose.push(_charPotQueue.length);
-    closeCharPotCard();
-    if(_charPotQueue.length) pausedDuring.push(gamePaused());
+  const gained=S.hero.charPot.length;
+  const lines=nd.querySelectorAll('.pn-line').length;
+  // 3個ぶんの値がすべて載っている（1個だけ残って他が消えていない）
+  const allValuesShown=S.hero.charPot.every(p=>nd.innerHTML.includes('<b>'+p.v+'</b>'));
+  return {gained, lines, allValuesShown,
+          notPaused: !gamePaused(),
+          oneNotice: nd.classList.contains('on'),
+          ok: gained===3 && lines===3 && allValuesShown && !gamePaused()};
+});
+
+/* ============ 4b. 数秒で自分から消える ============ */
+R.noticeFades = await pg.evaluate(()=>{
+  TH.run(1,{seed:18}); S.hero.party=[];
+  S.hero.charPot=[]; _charPotPend=[]; _potNoteT=0;
+  setScreen('game');
+  addXp(S.hero, xpNeed(S.hero.lv), true);
+  const nd=document.getElementById('potnote');
+  const onAtFirst=nd.classList.contains('on');
+  tickPotNote(POTNOTE_SEC*0.5);
+  const stillOnHalfway=nd.classList.contains('on');
+  tickPotNote(POTNOTE_SEC);
+  const goneAfter=!nd.classList.contains('on') && nd.innerHTML==='';
+  return {onAtFirst, stillOnHalfway, goneAfter,
+          ok: onAtFirst && stillOnHalfway && goneAfter};
+});
+
+/* ============ 4c. 何度上がっても出続ける（詰まらない） ============
+   報告「たまにレベルアップしても出なくなる事があった」の再発防止。
+   原因は、1枚ずつ見せるためのキューが**閉じる関数を通らずにモーダルが
+   閉じられる**（setScreen は全モーダルから .on を外すが、キューには
+   触らない）と先頭を抱えたまま戻らず、以後まったく出なくなることだった。
+   途中で画面を行き来しても出続けることを、10回ぶん確かめる。 */
+R.neverWedges = await pg.evaluate(()=>{
+  TH.run(1,{seed:19}); S.hero.party=[];
+  S.hero.charPot=[]; _charPotPend=[]; _potNoteT=0;
+  setScreen('game');
+  const nd=document.getElementById('potnote');
+  const shown=[];
+  for(let i=0;i<10;i++){
+    nd.classList.remove('on'); nd.innerHTML='';       // 消えた状態から始める
+    addXp(S.hero, xpNeed(S.hero.lv), true);
+    shown.push(nd.classList.contains('on'));
+    // 途中で街に寄って戻る（ここで詰まっていた）
+    if(i%3===2){ setScreen('town'); setScreen('game'); }
   }
-  const closesNeeded = seenBeforeEachClose.length;
-  const stayedPausedBetweenCards = pausedDuring.every(p=>p===true);
-  // 最後の1枚を閉じたら、画面は切り替わらないまま、止めていた時間だけ動き出す
-  const backToGame = S.screen==='game' && !document.getElementById('m-charpot').classList.contains('on')
-                      && !gamePaused();
-  return {gained, queueLenAfterGrant, modalOnAfterGrant, pausedAfterGrant, closesNeeded,
-          stayedPausedBetweenCards, backToGame,
-          matchesGain: queueLenAfterGrant===gained && closesNeeded===gained,
-          ok: gained===3 && queueLenAfterGrant===3 && modalOnAfterGrant && pausedAfterGrant
-              && closesNeeded===3 && stayedPausedBetweenCards && backToGame};
+  return {shown, shownCount:shown.filter(Boolean).length,
+          potCount:S.hero.charPot.length,
+          leftOver:_charPotPend.length,
+          ok: shown.every(Boolean) && S.hero.charPot.length===10 && _charPotPend.length===0};
 });
 
 /* ============ 5. 実際に stats() へ乗る（表示だけの飾りではない） ============ */
