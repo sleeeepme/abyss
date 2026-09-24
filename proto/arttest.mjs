@@ -486,4 +486,20 @@ R.hitFollows = await pg.evaluate(()=>{
   return {knocked:+knocked.toFixed(2), gap:+gap.toFixed(2), ok: !!h && knocked>1 && gap<0.2};
 });
 
+// 7. 振りの絵と当たりの火花も付いて動く（走りながら殴っても、ノックバックでも置き去りにしない）
+R.swingFollows = await pg.evaluate(()=>{
+  TH.run(1,{seed:77}); TH.floor(3); TH.immortal();
+  const e0=W.enemies[0]; W.enemies.forEach(x=>x.dead=true);
+  const e=Object.assign({}, e0, {x:P.x+1.0, y:P.y, hp:1e7, maxHp:1e7, dead:false, boss:false});
+  W.enemies=[e]; P.dirx=1; P.diry=0;
+  meleeSwing(stats(S.hero), 0, 1);
+  const sw=W.fx.find(f=>f.t==='swing');
+  feelImpact(e,P,false,'slash','neutral');
+  const m=FEEL.motes.filter(p=>p.ent===e);
+  const px0=P.x; P.x+=1.2; e.x+=1.5;                 // 走りながら・ノックバック
+  drawSwing(sw,0,0); updateFeel(1/60);
+  const mgap=m.length?Math.min(...m.map(p=>Math.abs(p.x-e.x))):99;
+  return {swingMoved:+(sw.x-px0).toFixed(2), motes:m.length, mgap:+mgap.toFixed(2), ok: Math.abs(sw.x-P.x)<1e-6 && m.length>0 && mgap<1};
+});
+
 await done(b, errs, R);

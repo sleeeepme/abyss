@@ -55,7 +55,7 @@ function feelImpact(e,src,crit,dt,elem){
   const n=Math.hypot(dx,dy)||1;
   const distance=e.boss?FEEL_TUNING.bossRecoilDistance:FEEL_TUNING.recoilDistance;
   m.recoil=FEEL_TUNING.recoilSeconds;m.recoilX=dx/n*distance;m.recoilY=dy/n*distance;
-  feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2);
+  feelSpray(e.x,e.y,crit?'#fff1ad':'#ddd7be',crit?18:5,crit?2.4:1.2,'spark',e);   // 火花も相手に付いて動く（ノックバックで置き去りにしない）
   /* 当たりの絵は**当たった相手に付けて動かす。** 座標だけ控えると、ノックバック（knockBack は最大2.6マス
      その場で動かす）や走っている敵では、絵だけが元の場所に残って「敵と違う所に出る」ように見えた。 */
   FEEL.hits.push({x:e.x,y:e.y,ent:e,age:0,element:feelElement(dt,elem),target:e.arch?'enemy':'ally',seed:(FEEL.hits.length*7)&31});
@@ -298,11 +298,12 @@ update=function(dt){
     }
   }
 };
-function feelSpray(x,y,col,n,speed=1,kind='spark'){
+function feelSpray(x,y,col,n,speed=1,kind='spark',ent=null){
   for(let i=0;i<n;i++){
     const a=i*2.399+FEEL.time*3,v=speed*(.35+((i*17)%23)/30);
     FEEL.motes.push({x,y,z:.1,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.5,vz:kind==='dust'?.25:1+v*.4,
-      col,kind,life:kind==='dust'?.36:.55,max:kind==='dust'?.36:.55,size:kind==='dust'?.04:.045});
+      col,kind,life:kind==='dust'?.36:.55,max:kind==='dust'?.36:.55,size:kind==='dust'?.04:.045,
+      ent,ex:ent?ent.x:0,ey:ent?ent.y:0});
   }
   if(FEEL.motes.length>420)FEEL.motes.splice(0,FEEL.motes.length-420);
 }
@@ -491,6 +492,9 @@ function drawFeelRing(f,camX,camY){
   ctx.restore();
 }
 function drawFeelSwing(f,camX,camY){
+  /* 振りの絵は振った本人に付けて動かす。振った瞬間の座標のままだと、走りながら殴ったとき
+     斬撃と当たりの火花が後ろに置き去りになり、「当たりの絵が敵と違う所に出る」ように見えた。 */
+  const who=f.ent;if(who&&!who.dead&&Number.isFinite(who.x)&&Number.isFinite(who.y)){f.x=who.x;f.y=who.y;}
   if(PIXEL_ART_FX){
     if(f.skill)return;                      // 衝撃波は s_wave が描く
     const kind=f.weaponKind||feelWeaponKind(f.weaponBase,f.dt);
@@ -521,7 +525,8 @@ function drawFeelHits(camX,camY){
     for(const f of FEEL.hits){
       const e=f.ent;
       if(e&&!e.dead&&Number.isFinite(e.x)&&Number.isFinite(e.y)){   // 倒れたら最後の場所に残す
-        const off=finiteXY(feelEntityOffset(e));f.x=e.x+off.x/TS;f.y=e.y+off.y/TS;   // 反動は画面px
+        const off=finiteXY(feelEntityOffset(e)),lift=(e.arch&&typeof hopLift==='function')?hopLift(e):0;
+        f.x=e.x+off.x/TS;f.y=e.y+(off.y-lift)/TS;   // 反動・跳ねている高さは画面px（絵と同じだけずらす）
       }
       PIXEL_ART_FX.renderEffect(ctx,{id:'n_hit',age:f.age,x:f.x*TS-camX,y:f.y*TS-camY-TS*.1,scale:sc,
       elem:f.element,target:f.target,seed:f.seed||0,layer:'air'});
@@ -600,7 +605,9 @@ function updateFeel(dt){
     p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=dt*1.5;
     p.vx*=Math.exp(-dt*2); return p.life>0;
   });
-  FEEL.motes=FEEL.motes.filter(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=dt*3;return p.life>0;});
+  FEEL.motes=FEEL.motes.filter(p=>{
+    if(p.ent&&!p.ent.dead&&Number.isFinite(p.ent.x)&&Number.isFinite(p.ent.y)){p.x+=p.ent.x-p.ex;p.y+=p.ent.y-p.ey;p.ex=p.ent.x;p.ey=p.ent.y;}
+    p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=dt*3;return p.life>0;});
   FEEL.ripples=FEEL.ripples.filter(r=>{r.age+=dt;return r.age<.85;});
   FEEL.hits=FEEL.hits.filter(f=>{f.age+=dt;return f.age<.48;});
   FEEL.weaponArts=FEEL.weaponArts.filter(f=>{f.age+=dt;return f.age<f.max;});
