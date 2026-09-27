@@ -12804,6 +12804,7 @@ function draw(){
   const camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
   const x0=Math.max(0,Math.floor(camX/TS)-1), x1=Math.min(f.W-1,Math.ceil((camX+innerWidth)/TS));
   const y0=Math.max(0,Math.floor(camY/TS)-1), y1=Math.min(f.H-1,Math.ceil((camY+innerHeight)/TS));
+  if(!(window.CAVE && CAVE.on && CAVE.terrain(f,Z,camX,camY,blinded)))
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
     if(!W.seen[y][x]) continue;
     const t=f.g[y][x];
@@ -12844,7 +12845,7 @@ function draw(){
     }
   }
   // 地形ハザード。床の上、キャラの下に描く。
-  if(W.haz){
+  if(W.haz && !(window.CAVE && CAVE.on)){
     const hz=hazardDef(W.haz.kind);
     const t=performance.now()/1000;
     /* 水面の屈折のために、**この時点の画面を1枚だけ控える。**
@@ -13109,7 +13110,8 @@ function draw(){
     const charKey = CharacterArt.enemyKey(e);
     let spriteDrawn=false;
     ctx.save(); ctx.globalAlpha*=feelBlink(e);
-    if(spr && sprite(spr)){
+    if(window.CAVE && CAVE.on && CAVE.enemy(e,sx,sy,R)){ spriteDrawn=true; }
+    else if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
       spriteDrawn=drawSpriteArt
@@ -18704,6 +18706,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20260924c"></script>
 <script src="game-feel.js?v=20260924-toad"></script>
+<script src="cave-look.js"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

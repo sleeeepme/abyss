@@ -532,6 +532,7 @@ R.blindGradient = await pg.evaluate(()=>{
   for(let y=0;y<W.fl.H;y++) for(let x=0;x<W.fl.W;x++) W.seen[y][x]=1;
   S.run.trial=null; S.run.bossBane=null; S.run.zoneBane=null;
   const air=window.drawAir; window.drawAir=()=>{};   // 漂う塵で1枚が揺れる
+  if(window.CAVE) CAVE.noFlicker=true;                // ランタンの揺らぎで2回の測定がずれる
   const dpr=Math.min(2, devicePixelRatio||1);
   /* 主人公の真横（+X）へ n マスの点を測る。床でなければ壁の色を拾うので、
      同じ点を「暗幕あり／なし」で比べる形にして、地形の差を打ち消す。 */
@@ -547,7 +548,7 @@ R.blindGradient = await pg.evaluate(()=>{
   const open=at.map(lum);
   S.run.trial={bane:'blind', t:30, max:30};
   const dark=at.map(lum);
-  window.drawAir=air;
+  window.drawAir=air; if(window.CAVE) CAVE.noFlicker=false;
   return {at, open:open.map(v=>+v.toFixed(1)), dark:dark.map(v=>+v.toFixed(1)),
           clear:BLIND_CLEAR, black:BLIND_DARK,
           nearIsUntouched: Math.abs(dark[0]-open[0]) < 2,
