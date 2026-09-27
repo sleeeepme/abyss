@@ -248,7 +248,7 @@ killEnemy=function(e,byAlly){
     const screen=S.screen,modals=[...document.querySelectorAll('.modal.on')];
     const pending=screen!=='game'?()=>{setScreen(screen);modals.forEach(n=>n.classList.add('on'));}:null;
     if(pending){modals.forEach(n=>n.classList.remove('on'));setScreen('game');}
-    FEEL.boss={x:e.x,y:e.y,age:0,pending};feelSlow(.32,.2);feelKick(7,.4);
+    FEEL.boss={x:e.x,y:e.y,age:0,pending,screen};feelSlow(.32,.2);feelKick(7,.4);
     feelSpray(e.x,e.y,'#ffe5a0',70,4.5);
     W.fx.push({t:'feelring',x:e.x,y:e.y,col:'#ffe5a0',r:4,life:.85,max:.85});
   }

@@ -1612,8 +1612,9 @@
    ========================================================================== */
 
 /* ---------- RNG ---------- */
-function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
-  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function mulberry32(a){const next=function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+  next.state=()=>a>>>0; return next;}
 let RNG=mulberry32(Date.now()>>>0);
 const rnd=()=>RNG();
 const ri=(a,b)=>Math.floor(RNG()*(b-a+1))+a;      // inclusive
@@ -11474,6 +11475,7 @@ function tapAccepted(e){
   if(now-_lastTap<700) return false;
   return true;
 }
+function savedAction(fn){ return function(e){ fn(e); if(window.ABYSS_SAVE) window.ABYSS_SAVE.afterAction(); }; }
 function bindTap(node, fn){
   if(!node){ console.warn('bindTap: element not found'); return; }
   const run=e=>{
@@ -11481,6 +11483,7 @@ function bindTap(node, fn){
     if(e && e.cancelable) e.preventDefault();
     if(e && e.stopPropagation) e.stopPropagation();
     fn(e);
+    if(window.ABYSS_SAVE) window.ABYSS_SAVE.afterAction();
   };
   node.addEventListener('click', run, false);
   node.addEventListener('touchend', run, {passive:false});
@@ -11505,6 +11508,7 @@ function bindRowTap(node, sel, fn){
     if(e.cancelable) e.preventDefault();
     e.stopPropagation();                 // 下の townTap / bagTap に二重で拾わせない
     fn(t, e);
+    if(window.ABYSS_SAVE) window.ABYSS_SAVE.afterAction();
   };
   node.addEventListener('click', run, false);
   node.addEventListener('touchend', run, {passive:false});
@@ -12116,6 +12120,7 @@ function tick(now){
       }catch(_){}
     }
   }
+  if(window.ABYSS_SAVE) window.ABYSS_SAVE.frame();
   requestAnimationFrame(tick);
 }
 let _canvasDirty=true;
@@ -12141,6 +12146,7 @@ const ART_NAME_DELAY = 0.9;
 let _artNamePend = null;            // {id, t}
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
+  if(window.ABYSS_SAVE && window.ABYSS_SAVE.paused()) return true;
   /* 窓が閉じているのに止まったままになると、盤面が二度と動かない。
      止めている理由（開いている窓）が消えていたら自分で戻す。 */
   if(_paused && !document.querySelector('.modal.on')) _paused=false;
@@ -17096,8 +17102,8 @@ function townTap(e){
   const eqi=Object.values(S.hero.equip).find(i=>i&&i.uid===uid);
   if(eqi){ S.hero.equip[eqi.slot]=null; shelveItem(eqi); redraw(); }
 }
-document.addEventListener('click', townTap, false);
-document.addEventListener('touchend', townTap, {passive:false});
+document.addEventListener('click', savedAction(townTap), false);
+document.addEventListener('touchend', savedAction(townTap), {passive:false});
 
 /* ---------- 倉庫から「誰に着せるか」 ---------- */
 /* 外した物の戻り先。レジェンドは倉庫ではなく専用の棚へ返す
@@ -17635,8 +17641,8 @@ function bagTap(e){
     clampHp(); renderBag();
   }
 }
-document.addEventListener('click', bagTap, false);
-document.addEventListener('touchend', bagTap, {passive:false});
+document.addEventListener('click', savedAction(bagTap), false);
+document.addEventListener('touchend', savedAction(bagTap), {passive:false});
 
 /* ---------- 恩寵の選択 ---------- */
 let _boonPending=null;
@@ -17645,7 +17651,7 @@ const BOON_SRC_LABEL={unique:'ユニーク撃破', mid:'中ボス撃破', great:
 /* 出所ごとの一行。以前は全部「〜を倒した」で組み立てていたので、
    祭壇では「祭壇を倒した」と出ていた。倒していない。 */
 const BOON_SRC_LEAD={altar:'祭壇に捧げた。'};
-function openBoonPick(tier, srcName){
+function openBoonPick(tier, srcName, savedChoices){
   /* 実際に踏んだバグ: 祭壇でHPを捧げても選択画面が出てこなかった。
      .modal は全部同じ z-index なので、**DOM の後ろにある物が上に乗る**。
      m-event は m-boon より後ろにあり、イベントのダイアログを畳まずに
@@ -17655,7 +17661,7 @@ function openBoonPick(tier, srcName){
   document.querySelectorAll('.modal.on').forEach(m=>{
     if(m.id!=='m-boon') m.classList.remove('on');
   });
-  _boonPending = rollBoons(tier, BOON_CHOICES);
+  _boonPending = savedChoices || rollBoons(tier, BOON_CHOICES);
   _boonTier = tier;
   S.screen='boon';
   el('hud').classList.remove('on');
@@ -17692,8 +17698,8 @@ function boonTap(e){
   if(targets.length<=1){ applyBoon(S.hero, b); return; }
   openBoonTarget(b, targets);
 }
-document.addEventListener('click', boonTap, false);
-document.addEventListener('touchend', boonTap, {passive:false});
+document.addEventListener('click', savedAction(boonTap), false);
+document.addEventListener('touchend', savedAction(boonTap), {passive:false});
 
 /* ---------- 回復アイテムの使い先 ----------
    恩寵の付与先とまったく同じ形にしてある。画面が同じなら、
@@ -17741,8 +17747,8 @@ function utTap(e){
   if(_utPrev==='bag'){ S.screen='bag'; el('m-bag').classList.add('on'); renderBag(); }
   else { S.screen='game'; el('hud').classList.add('on'); }
 }
-document.addEventListener('click', utTap, false);
-document.addEventListener('touchend', utTap, {passive:false});
+document.addEventListener('click', savedAction(utTap), false);
+document.addEventListener('touchend', savedAction(utTap), {passive:false});
 
 /* ---------- 恩寵の付与先 ---------- */
 let _btPending=null, _btTargets=[];
@@ -17778,8 +17784,8 @@ function btTap(e){
   el('m-btarget').classList.remove('on');
   applyBoon(h, b);
 }
-document.addEventListener('click', btTap, false);
-document.addEventListener('touchend', btTap, {passive:false});
+document.addEventListener('click', savedAction(btTap), false);
+document.addEventListener('touchend', savedAction(btTap), {passive:false});
 
 function applyBoon(h, b){
   const firstBlade = (b.id==='orbit' && h===S.hero && bladeCount()===0);
@@ -18387,6 +18393,7 @@ bindTap(el('btn-fixall'), ()=>{
   renderShop();
 });
 bindTap(el('dbg-reset'), ()=>{
+  if(window.ABYSS_SAVE && !window.ABYSS_SAVE.clear()) return;
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
   S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
@@ -18532,6 +18539,7 @@ function startAdventure(){
   last=performance.now();
 }
 bindTap(el('t-start'), ()=>{
+  if(window.ABYSS_SAVE && window.ABYSS_SAVE.continue()) return;
   // 既に冒険が始まっているなら名前は聞き直さない（街へ戻るだけ）
   if(S.hero) startAdventure(); else openNameEntry();
 });
@@ -18668,7 +18676,7 @@ bindRowTap(el('m-dbgally'), '[data-addjob]', n=>{
   if(RENDERERS[S.screen]) RENDERERS[S.screen]();
 });
 bindTap(el('dbgally-close'), ()=>{ el('m-dbgally').classList.remove('on'); last=performance.now(); });
-bindTap(el('nm-ok'),   confirmName);
+bindTap(el('nm-ok'), ()=>confirmName());
 bindTap(el('nm-back'), closeNameEntry);
 bindTap(el('nm-roll'), ()=>{ el('nm-input').value = rollAllyName()+rollAllyName().slice(-1); });
 // Enter でも決定できるようにする（PC で遊ぶときのため）
@@ -18743,5 +18751,6 @@ if(typeof tapDash === 'function'){
   };
 }
 </script>
+<script src="save-load.js?v=20260926a"></script>
 </body>
 </html>
