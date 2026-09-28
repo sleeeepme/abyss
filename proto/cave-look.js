@@ -107,10 +107,47 @@ const lookOf=Z=>LOOK[Z&&Z.id]||LOOK.stone;
 const PAT_A=.15;
 /* 画面上下のぼかし（本編は blur 5 / band .40 / fade .30） */
 const CAVE_TILT={strength:6, band:.30, fade:.24, strips:10};   // strength＝端での縮小率（大きいほど強くぼける）
+/* ---------- 画面の端へ向かって暗くなるビネット ----------
+   ユーザー要望「主人公の灯りとは別に、画面端にかけて暗くなるビネットを入れたい。
+   ぼかしの領域あたりが暗くなるようなイメージ」。
+
+   **上下のぼかし帯の中で一緒に塗る。** ビネット用にもう一度画面を走査すると、
+   全画面ぶんの重ね塗りが1枚増える（以前、放射グラデーションのビネットが
+   それで 15fps ぶん食っていた）。ぼかしは既に帯を1本ずつ塗り直しているので、
+   その直後に同じ矩形を黒で伏せれば、走査は増えない。
+
+   そしてここが肝で、**暗くした所はぼかす必要が無くなる。**
+   一番外の帯（帯の終わりから画面の端まで）はぼかし全体の3割を占めるのに、
+   ビネットで6割以上伏せてしまえば、ぼけているかどうかは読めない。
+   そこはぼかさずに伏せるだけにして、浮いた時間を発熱の削減に回す。 */
+const CAVE_VIG={
+  max: 1,          // 画面の**いちばん端**での暗さ（1 で真っ黒）
+  pow: 1.9,        // 立ち上がり方。大きいほど端に寄る（途中はあまり暗くしない）
+  skipBlur: .40,   // これより暗くなる帯はぼかさない（伏せるだけ）
+  steps: 6,        // 一番外の帯の中を何段に分けて濃くするか
+  side: .30,       // 左右の端の暗さ
+  sideW: .14,      // 左右にかける幅（画面幅に対する割合）
+  /* 上下の端の、完全に真っ黒になる帯（画面の高さに対する割合）。
+     **ここは地形を1ドットも計算しない。** 伏せてしまうので計算しても見えない。
+     地形は画面のドット1つずつを回す一番重い所なので、
+     削った帯のぶんがそのまま発熱の削減になる。 */
+  black: .055,
+};
 const TILT_C=document.createElement('canvas'), TILT_X=TILT_C.getContext('2d');
+/* 左右の暗がりは1枚焼いて貼るだけ（横方向は毎フレーム変わらない）。 */
+const SIDE_C=document.createElement('canvas');
+function sideSprite(){
+  if(SIDE_C.width) return SIDE_C;
+  const N=64; SIDE_C.width=N; SIDE_C.height=1;
+  const c=SIDE_C.getContext('2d');
+  const g=c.createLinearGradient(0,0,N,0);
+  for(let i=0;i<=8;i++){ const t=i/8; g.addColorStop(t, 'rgba(0,0,0,'+(CAVE_VIG.side*Math.pow(1-t,1.7)).toFixed(3)+')'); }
+  c.fillStyle=g; c.fillRect(0,0,N,1);
+  return SIDE_C;
+}
 function extraTilt(){
   if(!CAVE.on||S.screen!=='game') return;
-  const W0=cv.width, H0=cv.height, T0_=CAVE_TILT, n=T0_.strips;
+  const W0=cv.width, H0=cv.height, T0_=CAVE_TILT, n=T0_.strips, V=CAVE_VIG;
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; TILT_X.imageSmoothingEnabled=true;
   for(const side of [-1,1]){
     const edge=(.5+side*T0_.band/2)*H0, span=T0_.fade*H0;
@@ -118,16 +155,54 @@ function extraTilt(){
       const s0=k/n, s1=(k+1)/n;
       const y0=side<0? edge-span*s1 : edge+span*s0, y1=side<0? edge-span*s0 : edge+span*s1;
       let a=Math.max(0,Math.min(H0,y0)), b=Math.max(0,Math.min(H0,y1));
-      if(k===n-1){ if(side<0) a=0; else b=H0; }
+      const outer = (k===n-1);
+      if(outer){ if(side<0) a=0; else b=H0; }
       const h=Math.round(b-a); if(h<=0) continue;
-      const f=1+((k+.5)/n)*(T0_.strength-1), sw=Math.max(1,Math.round(W0/f)), sh=Math.max(1,Math.round(h/f)), pad=Math.ceil(f*2);
-      const ya=Math.max(0,Math.round(a)-pad), hb=Math.min(H0,Math.round(a)+h+pad)-ya, shp=Math.max(1,Math.round(hb/f));
-      if(TILT_C.width<sw) TILT_C.width=sw; if(TILT_C.height<shp) TILT_C.height=shp;
-      TILT_X.clearRect(0,0,sw,shp);
-      TILT_X.drawImage(cv,0,ya,W0,hb,0,0,sw,shp);
-      const sy=(Math.round(a)-ya)/hb*shp, shh=h/hb*shp;
-      ctx.drawImage(TILT_C,0,sy,sw,shh,0,Math.round(a),W0,h);
+      const t=(k+.5)/n, dark=V.max*Math.pow(t,V.pow);
+      // 伏せてしまう一番外の帯はぼかさない（ぼけているかどうか読めないので）
+      if(!(outer && dark>=V.skipBlur)){
+        const f=1+t*(T0_.strength-1), sw=Math.max(1,Math.round(W0/f)), pad=Math.ceil(f*2);
+        const ya=Math.max(0,Math.round(a)-pad), hb=Math.min(H0,Math.round(a)+h+pad)-ya, shp=Math.max(1,Math.round(hb/f));
+        if(TILT_C.width<sw) TILT_C.width=sw; if(TILT_C.height<shp) TILT_C.height=shp;
+        TILT_X.clearRect(0,0,sw,shp);
+        TILT_X.drawImage(cv,0,ya,W0,hb,0,0,sw,shp);
+        const sy=(Math.round(a)-ya)/hb*shp, shh=h/hb*shp;
+        ctx.drawImage(TILT_C,0,sy,sw,shh,0,Math.round(a),W0,h);
+      }
+      // 伏せる。一番外の帯は背が高いので、中を何段かに分けて濃くしていく
+      ctx.fillStyle='#000';
+      if(outer && h>8){
+        const m=V.steps;
+        for(let j=0;j<m;j++){
+          const u0=j/m, u1=(j+1)/m;
+          // side<0（上側）は a が画面の上端なので、外へ行くほど j が小さい側になる
+          const p0=side<0? 1-u1 : u0, p1=side<0? 1-u0 : u1;
+          const tt=t+(1-t)*((p0+p1)/2);
+          const yy=Math.round(a+h*Math.min(p0,p1)), hh=Math.max(1,Math.round(h*(u1-u0)));
+          ctx.globalAlpha=Math.min(1, V.max*Math.pow(tt,V.pow));
+          ctx.fillRect(0,yy,W0,hh);
+        }
+        ctx.globalAlpha=1;
+      }else if(dark>.004){
+        ctx.globalAlpha=dark; ctx.fillRect(0,Math.round(a),W0,h);
+      }
+      ctx.globalAlpha=1;
     }
+  }
+  /* 上下のいちばん端は真っ黒で伏せる。地形側がこの帯を計算していないので、
+     ここは**必ず**塗る（塗り残すと、消し色のままの帯が出る）。 */
+  if(V.black>0){
+    const hb2=Math.round(H0*V.black);
+    ctx.globalAlpha=1; ctx.fillStyle='#000';
+    ctx.fillRect(0,0,W0,hb2); ctx.fillRect(0,H0-hb2,W0,hb2);
+  }
+  // 左右の端。焼いたグラデーションを margin のぶんだけ貼る（中央は触らない）
+  if(V.side>0 && V.sideW>0){
+    const sp=sideSprite(), wpx=Math.round(W0*V.sideW);
+    ctx.drawImage(sp,0,0,sp.width,1, 0,0, wpx,H0);
+    ctx.save(); ctx.translate(W0,0); ctx.scale(-1,1);
+    ctx.drawImage(sp,0,0,sp.width,1, 0,0, wpx,H0);
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -299,10 +374,48 @@ function terrain(f,Z,camX,camY,blinded){
   const fx0=Math.round(bx0*.45), fy0=Math.round(by0*.45);          // 奥の岩影は遅れて流れる
   const stx=f.stair?f.stair.x*Q:-1e9, sty=f.stair?f.stair.y*Q:-1e9;
   let k=0;
+  /* 上下の端の「完全に伏せる」帯は1ドットも計算しない（extraTilt が黒で塗る）。
+     ここは画面のドットを1つずつ回す一番重い所なので、削った帯がそのまま効く。 */
+  const blackPx=Math.round(bh*CAVE_VIG.black), skipBot=bh-blackPx;
+
+  /* ---------- マス単位でまとめて片付ける ----------
+     seenV と hazAt は**画面のドット1つずつ**呼ばれていた（1フレームで数十万回）。
+     中身は「周りのマスを4点読んで混ぜる」だけなのに、混ぜる必要があるのは
+     マスの境目だけで、マスの内側は答えが決まっている。
+     そこで可視範囲のマスを1回だけ分類しておき、
+       ・周り3×3が全部見えている → seenV は必ず 1（呼ばない）
+       ・周り3×3が全部見えていない → 必ず伏せる（呼ばない）
+       ・周り3×3にハザードが1つも無い → hazAt は必ず 0（呼ばない）
+       ・周り3×3に穴が1つも無い → tileKindAt は必ず 0（呼ばない）
+     とする。**境目のマスだけ**今までどおり1ドットずつ混ぜる。
+     マスの数は画面のドット数の 1/256 なので、分類そのものは誤差の範囲。 */
+  const tx0=(bx0>>4)-1, ty0=(by0>>4)-1;
+  const txn=((bx0+bw)>>4)-tx0+2, tyn=((by0+bh)>>4)-ty0+2;
+  if(!G.cls||G.cls.length<txn*tyn) G.cls=new Uint8Array(txn*tyn+64);
+  const cls=G.cls, sn=W.seen, pitOn=!!G.hasPit;
+  for(let j=0;j<tyn;j++){ const ty=ty0+j;
+    for(let i=0;i<txn;i++){ const tx=tx0+i;
+      let all=1, none=1, haz0=1, pit0=1;
+      for(let ddy=-1;ddy<=1;ddy++){
+        const srow=sn[ty+ddy], hrow=hg?hg[ty+ddy]:null, grow=pitOn?f.g[ty+ddy]:null;
+        for(let ddx=-1;ddx<=1;ddx++){
+          if(srow&&srow[tx+ddx]) none=0; else all=0;
+          if(hrow&&hrow[tx+ddx]) haz0=0;
+          if(grow&&grow[tx+ddx]===T.PIT) pit0=0;
+        }
+      }
+      cls[j*txn+i]=(all?2:(none?0:1)) | (haz0?4:0) | (pit0?8:0);
+    } }
+
   for(let by=0;by<bh;by++){const wy=by0+by, dy=wy-lampY;
+    if(by<blackPx||by>=skipBot){ buf.fill(VOID,k,k+bw); k+=bw; continue; }
+    const clsRow=((wy>>4)-ty0)*txn - tx0;
     for(let bx=0;bx<bw;bx++,k++){const wx=bx0+bx;
       if(wx<0||wy<0||wx>=PW||wy>=PH){buf[k]=VOID;continue;}
-      { const sv=seenV(wx,wy); if(sv<SEEN_HI){ if(sv<=SEEN_LO||(sv-SEEN_LO)/(SEEN_HI-SEEN_LO)<BAYER[((wy&3)<<2)|(wx&3)]){buf[k]=VOID;continue;} } }
+      const cv2=cls[clsRow+(wx>>4)];
+      if((cv2&3)===0){ buf[k]=VOID; continue; }                 // 周りが全部未踏
+      if((cv2&3)===1){                                          // 境目のマスだけ混ぜる
+        const sv=seenV(wx,wy); if(sv<SEEN_HI){ if(sv<=SEEN_LO||(sv-SEEN_LO)/(SEEN_HI-SEEN_LO)<BAYER[((wy&3)<<2)|(wx&3)]){buf[k]=VOID;continue;} } }
       const i=wy*PW+wx, c=code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;
       if(d2>blindR*blindR){buf[k]=VOID;continue;}
       let Lv=0, fc=1;
@@ -316,9 +429,9 @@ function terrain(f,Z,camX,camY,blinded){
         /* ---- 穴（降りる穴・縁の向こう） ---- */
         const sd=(wx-stx)*(wx-stx)+(wy-sty)*(wy-sty);
         if(sd<64){ buf[k]= sd>42 ? (((wx+wy)&1)?Pp.pit:rim[Math.min(4,1+Math.floor(Lv*4+b))]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
-        if(G.hasPit){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
+        if(pitOn&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
-        if(hg){const hv=hazAt(hg,wx,wy); if(hv>.5){
+        if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(hv>.5){
           const tier=(hg[wy>>4]&&hg[wy>>4][wx>>4])|0;
           let lv = hz.glow ? 1+((Math.sin(t*1.6+(wx+wy)*.05)*.5+.5)*1.6+b)|0 : Math.floor(Math.max(Lv,Cv*.8)*4+b*.9);
           if(haz.kind==='water'){ lv-=(tier>=2?1:0); if(tier>=3) lv-=1; }
