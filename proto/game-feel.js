@@ -721,8 +721,20 @@ function drawFeelSpriteImage(im,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0,blob=fa
   ctx.drawImage(im,coreL,0,coreR-coreL,hipY+unitY,x4,upperTop,x12-x4,upperH);
   // The fixed belt overlaps the torso by one row, so the idle inhale never opens a seam.
   ctx.drawImage(im,coreL,hipY,coreR-coreL,legY-hipY,x4,hipTop,x12-x4,hipH);
-  ctx.drawImage(im,coreL,legY,coreM-coreL,sh-legY,x4,legTop+pose.leftLegY*pixel,x8-x4,legH);
-  ctx.drawImage(im,coreM,legY,coreR-coreM,sh-legY,x8,legTop+pose.rightLegY*pixel,x12-x8,legH);
+  /* 踏み出す側の脚は、切り出しを**1行ぶん上（腰の最下行）から**取る。
+     脚は legY から下を切って pose.legY ドットぶん下へずらして描くので、
+     下げた側はちょうど1ドット、腰との間に背景が覗いていた
+     （ユーザー報告「歩行モーションで足と体の間に隙間ができているキャラがいる」）。
+     1行ぶん上から取って同じだけ上へ伸ばして置けば、上端は腰に貼り付いたまま、
+     足先だけが1ドット下がる＝踏み出して見える。
+     脚を上げる側（legY<0）は元から重なるので、そのままにする——
+     こちらにも足すと、腰の最下行が2ドット上に重なって腰が滲む。 */
+  const legPiece=(sx0,sx1,dx0,dx1,legPose)=>{
+    const pad=legPose>0?1:0, srcTop=legY-pad*unitY, srcH=sh-srcTop;
+    ctx.drawImage(im,sx0,srcTop,sx1-sx0,srcH,dx0,legTop-pad*pixel+legPose*pixel,dx1-dx0,legH+pad*pixel);
+  };
+  legPiece(coreL,coreM,x4,x8,pose.leftLegY);
+  legPiece(coreM,coreR,x8,x12,pose.rightLegY);
   ctx.restore();
   return true;
 }

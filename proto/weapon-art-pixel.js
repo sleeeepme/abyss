@@ -1503,9 +1503,18 @@
   function shotAirN(t, o) {
     const E = elemOf(o), x = o.x, y = o.y, a = o.ang, ux = Math.cos(a), uy = Math.sin(a), fr = Math.floor(t * 24);
     if (o.kind === 'arrow') {
-      drawArrow(x, y, a, 1, o.elem === 'fire');
+      /* 火属性でも**矢そのものは木の色のまま**にする。
+         以前は火のときだけ軸を炎色（P.fi2）で塗っていたが、軸は矢の8ドットのうち
+         5ドットを占めるので、塗った時点で矢ではなく「飛んでいる火の棒」になっていた
+         （ユーザー報告「火属性の矢を飛ばした際に矢ではなくて火が飛んでいるように見える」）。
+         属性は矢の**後ろ**に出す。形は矢のまま、尾だけが燃える。 */
+      drawArrow(x, y, a, 1, false);
       if (o.elem && o.elem !== 'neutral') plus(x, y, E.acc, 1);
       for (let k = 1; k <= 3; k++) px(x - ux * (8 + k * 3), y - uy * (8 + k * 3), k === 1 ? P.bw0 : P.bw1, 1 - k / 4);
+      if (o.elem === 'fire') for (let k = 0; k < 3; k++) {          // 尾を引く炎
+        const d = 12 + k * 3.4, w = ((fr + k) & 1) ? 1 : -1;
+        flamePuff(x - ux * d - uy * w * 0.8, y - uy * d + ux * w * 0.8, 1, Math.min(5, 2 + k), (fr + k) % 3 - 1);
+      }
       return;
     }
     // 魔弾：芯＋属性色の輪＋うねる尾
