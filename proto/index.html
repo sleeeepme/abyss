@@ -4912,6 +4912,24 @@ function hitEnemyByAlly(a, st, e, mult){
 }
 
 /* 置き型の効果（焦土・聖域）。毎フレーム進めて、消えたら捨てる。 */
+/* ---------- 本人に付く置き型を、描く直前にもう一度合わせる ----------
+   扇（フレイム）は「本人の向きに付いて回る」置き型で、座標は tickArts が
+   合わせている。ところが tickArts は update() の**前半**で走り、主人公が動くのは
+   その**後**なので、動いているあいだ扇はいつも1フレームぶん後ろに残っていた。
+   1フレームでも 0.1 マス＝画面で 5px ほどあり、炎のように大きい絵だと
+   「本体と別の場所に出ている」と読める（報告）。
+
+   当たり判定の時刻は動かしたくないので、tickArts の順番はそのままにして、
+   **絵を描く直前にもう一度だけ座標を合わせる。** 当たりは今までどおりの位置、
+   見た目だけが本人に貼り付く。 */
+function syncArtFollow(){
+  if(!W.arts || !W.arts.length) return;
+  for(const f of W.arts){
+    if(!f.follow || !artSrcAlive(f.c)) continue;
+    artNow(f.c); f.x=f.c.x; f.y=f.c.y;
+    f.a=artFaceAngle(f.c, f.a);
+  }
+}
 function tickArts(dt){
   if(!W.arts || !W.arts.length) return;
   for(const f of W.arts){
@@ -13511,6 +13529,7 @@ function draw(){
   }
 
   /* 仲間の大技が置いた効果。キャラより下に敷く（上に描くと足元が見えない）。 */
+  syncArtFollow();      // 描く直前に、本人に付く置き型の座標を合わせ直す（下の注記）
   (W.arts||[]).forEach(f=>{
     const sx=f.x*TS-camX, sy=f.y*TS-camY;
     if(sx<-160||sy<-160||sx>innerWidth+160||sy>innerHeight+160) return;

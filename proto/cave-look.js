@@ -106,7 +106,7 @@ const lookOf=Z=>LOOK[Z&&Z.id]||LOOK.stone;
 /* 明かりの中で地面の模様をどれだけ透かすか（0で透かさない） */
 const PAT_A=.15;
 /* 画面上下のぼかし（本編は blur 5 / band .40 / fade .30） */
-const CAVE_TILT={strength:5, band:.30, fade:.24, strips:10};   // strength＝端での縮小率（大きいほど強くぼける）
+const CAVE_TILT={strength:6, band:.30, fade:.24, strips:10};   // strength＝端での縮小率（大きいほど強くぼける）
 const TILT_C=document.createElement('canvas'), TILT_X=TILT_C.getContext('2d');
 function extraTilt(){
   if(!CAVE.on||S.screen!=='game') return;
@@ -123,7 +123,8 @@ function extraTilt(){
       const f=1+((k+.5)/n)*(T0_.strength-1), sw=Math.max(1,Math.round(W0/f)), sh=Math.max(1,Math.round(h/f)), pad=Math.ceil(f*2);
       const ya=Math.max(0,Math.round(a)-pad), hb=Math.min(H0,Math.round(a)+h+pad)-ya, shp=Math.max(1,Math.round(hb/f));
       if(TILT_C.width<sw) TILT_C.width=sw; if(TILT_C.height<shp) TILT_C.height=shp;
-      TILT_X.clearRect(0,0,sw,shp); TILT_X.drawImage(cv,0,ya,W0,hb,0,0,sw,shp);
+      TILT_X.clearRect(0,0,sw,shp);
+      TILT_X.drawImage(cv,0,ya,W0,hb,0,0,sw,shp);
       const sy=(Math.round(a)-ya)/hb*shp, shh=h/hb*shp;
       ctx.drawImage(TILT_C,0,sy,sw,shh,0,Math.round(a),W0,h);
     }
@@ -199,7 +200,9 @@ function ensure(px0,py0,px1,py1){
 function seenTile(tx,ty){ const r=W.seen[ty]; return r?(r[tx]?1:0):0; }
 function seenV(px,py){ // 0..1。探索済みの縁ほど小さい
   const u=(px+.5)/Q-.5, v=(py+.5)/Q-.5, x0=Math.floor(u), y0=Math.floor(v);
-  const a=seenTile(x0,y0), b=seenTile(x0+1,y0), c=seenTile(x0,y0+1), d=seenTile(x0+1,y0+1);
+  // ここも1ドットごと。行は2本しか要らないので、4回引き直さず1度だけ取る。
+  const sn=W.seen, r0=sn[y0], r1=sn[y0+1], x1=x0+1;
+  const a=(r0&&r0[x0])?1:0, b=(r0&&r0[x1])?1:0, c=(r1&&r1[x0])?1:0, d=(r1&&r1[x1])?1:0;
   const s=a+b+c+d; if(s===4) return 1; if(s===0) return 0;
   const fx=u-x0, fy=v-y0;
   return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZB[((py&255)<<8)|(px&255)]-.5)*.35;
@@ -207,17 +210,30 @@ function seenV(px,py){ // 0..1。探索済みの縁ほど小さい
 function seenAt(f,L,px,py){ return seenV(px,py)>.5; }
 /* 縁を1マスかけて網点で消していく（パキッと切らない） */
 const SEEN_LO=.22, SEEN_HI=.78;
+/* この2つは**画面のドット1つごとに**呼ばれる（1フレームで数十万回）。
+   中で (x,y)=>... の小さな関数を毎回作っていたが、呼ぶ回数がこれだけ多いと
+   その作り直しだけで効いてくる（プロファイルでも hazAt 5.7% / 無名の k 1.5%）。
+   やっていることは4点の読み出しなので、その場に開いてある。 */
 function tileKindAt(f,px,py,kind){ // マスの種類の滑らかな縁（穴）
   const u=(px+.5)/Q-.5, v=(py+.5)/Q-.5, x0=Math.floor(u), y0=Math.floor(v), fx=u-x0, fy=v-y0;
-  const k=(x,y)=>(x<0||y<0||x>=f.W||y>=f.H)?0:(f.g[y][x]===kind?1:0);
-  const a=k(x0,y0),b=k(x0+1,y0),c=k(x0,y0+1),d=k(x0+1,y0+1); if(a+b+c+d===0) return 0;
+  const x1=x0+1, y1=y0+1, W=f.W, H=f.H, g=f.g;
+  const r0 = (y0<0||y0>=H) ? null : g[y0];
+  const r1 = (y1<0||y1>=H) ? null : g[y1];
+  const a = (r0 && x0>=0 && x0<W && r0[x0]===kind)?1:0;
+  const b = (r0 && x1>=0 && x1<W && r0[x1]===kind)?1:0;
+  const c = (r1 && x0>=0 && x0<W && r1[x0]===kind)?1:0;
+  const d = (r1 && x1>=0 && x1<W && r1[x1]===kind)?1:0;
+  if(a+b+c+d===0) return 0;
   return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZ[((py&255)<<8)|(px&255)]-.5)*.45;
 }
 function hazAt(g,px,py){
   const u=(px+.5)/Q-.5, v=(py+.5)/Q-.5, x0=Math.floor(u), y0=Math.floor(v), fx=u-x0, fy=v-y0;
-  const k=(x,y)=>{const r=g[y]; return r&&r[x]?1:0;};
-  const a=k(x0,y0),b=k(x0+1,y0),c=k(x0,y0+1),d=k(x0+1,y0+1); if(a+b+c+d===0) return 0;
-  if(a+b+c+d===4) return 1;
+  const x1=x0+1, r0=g[y0], r1=g[y0+1];
+  const a = (r0 && r0[x0])?1:0, b = (r0 && r0[x1])?1:0;
+  const c = (r1 && r1[x0])?1:0, d = (r1 && r1[x1])?1:0;
+  const s4=a+b+c+d;
+  if(s4===0) return 0;
+  if(s4===4) return 1;
   return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZS[((py&255)<<8)|(px&255)]-.5)*.5;
 }
 
@@ -1173,7 +1189,28 @@ function install(){
   window.drawFeelVignette=noop;
   // チルトシフト：本編のぼかしのあとに、上下へもう一段ぼかしを重ねる（探索画面だけ。本編の設定は凍結されていて変えられない）
   const oldTilt=window.drawFeelTiltShift;
-  if(typeof oldTilt==='function') window.drawFeelTiltShift=function(){ oldTilt(); try{ extraTilt(); }catch(err){ console.error(err); } };
+  /* ---------- 端のぼかしは、どちらか片方だけ掛ける ----------
+     ここは長いあいだ **本編のぼかし（applyFeelTilt）と洞窟版のぼかし（extraTilt）を
+     両方とも毎フレーム掛けていた。** 実測（第13階層・iPhone 13 相当）:
+
+       両方          40.6 fps
+       洞窟版だけ     59.7 fps
+       本編だけ       48.1 fps
+       どちらも無し    60.1 fps
+
+     CPUプロファイルでも drawImage が全体の 7 割を占め、内訳は
+     applyFeelTilt 52% / extraTilt 17%。**盤面の絵より、端のぼかしのほうが重かった。**
+     報告「スマホが熱くなりやすくなった」の主因はこれ。
+
+     2つは同じ帯に同じことをしているので、重ねても見た目はほとんど変わらない
+     （並べて比べても、ディザの粒がわずかに滑らかになる程度）。洞窟版のほうは
+     この絵に合わせた縮小・拡大だけの安い作りなので、そちらを残す。
+     失われるわずかな柔らかさは strength を 5→6 に上げて取り返す（これは只）。
+     CAVE.on が落ちた（描画が例外で止まった）ときだけ本編側へ戻す。 */
+  window.drawFeelTiltShift=function(){
+    if(!CAVE.on) return oldTilt && oldTilt();
+    try{ extraTilt(); }catch(err){ console.error(err); CAVE.on=false; return oldTilt && oldTilt(); }
+  };
   if(typeof window.drawFeelMist==='function') window.drawFeelMist=noop;
   if(typeof window.drawFeelDarkness==='function') window.drawFeelDarkness=noop;
   // 漂う粒は1ドットに

@@ -84,6 +84,19 @@ function feelUltimate(ent,col='#f7d898'){
 const PIXEL_ART_FX=window.PixelArtFx;
 // 持続する技は W.arts 側の時計で描く（絵と当たりの時刻を揃えるため、ここでは二重に積まない）
 const FEEL_PERSISTENT_ARTS=['stflame','stbolt','dgdance'];
+/* 同時に生かしておける演出の数。**1ヶ所にまとめてある。**
+   ここは長いあいだ、同じ FEEL.weaponArts を
+     feelWeaponArtStart … 24 で切る
+     feelPixelArt      … 64 で切る
+   と別々の数で切っていた。つまり演出が 24 個より多く出ているところへ
+   武器技を1つ出すと、**まだ生きている演出が最大40個、その場で消えた。**
+   実測（第3階層で単発演出を40個出してから剣技を1つ）: 40個 → 24個、17個が消失。
+   報告「一度に多くのエフェクトを出すとバグる／描画欠損があった」はこれ。
+   数を分ける理由は無いので1つにする。 */
+const FEEL_ART_MAX=96;
+function feelTrimArts(){
+  if(FEEL.weaponArts.length>FEEL_ART_MAX) FEEL.weaponArts.splice(0,FEEL.weaponArts.length-FEEL_ART_MAX);
+}
 function feelWeaponArtStart(ent,def,x,y,angle){
   if(!def||(!PIXEL_ART_FX&&!WEAPON_ART_FX))return;
   const m=feelMotion(ent);m.artId=def.id;m.artAge=0;m.artLife=def.id==='dgmirage'?(def.t||2.6):.48;
@@ -96,7 +109,7 @@ function feelWeaponArtStart(ent,def,x,y,angle){
   }else if(!['stflame','stbolt','dgdance','bwrain'].includes(def.id))
     FEEL.weaponArts.push({id:def.id,x,y,angle,age:0,max:1.45,range:def.r||def.len||def.dist||3,
       element:feelElement(def.dt),ent,follow:def.k!=='dash'});
-  if(FEEL.weaponArts.length>24)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-24);
+  feelTrimArts();
 }
 /* 狙いが決まってから座標を渡す（レイジングアッパー・ドラグーン）。 */
 function feelWeaponArtAim(ent,id,tx,ty){
@@ -109,7 +122,7 @@ function feelPixelArt(id,x,y,o={}){
   if(!PIXEL_ART_FX||!PIXEL_ART_FX.span(id))return;
   FEEL.weaponArts.push({id,x,y,angle:o.angle||0,age:-(o.delay||0),max:PIXEL_ART_FX.span(id)||1,range:o.range,life:o.life,
     tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:o.ent||null,follow:!!o.ent,wide:o.wide,arc:o.arc,kind:o.kind,elem:o.elem});
-  if(FEEL.weaponArts.length>64)FEEL.weaponArts.splice(0,FEEL.weaponArts.length-64);
+  feelTrimArts();
 }
 function feelArtScale(){return clamp(TS/48,.58,1.35);}
 function feelDrawPixelArt(f,layer,camX,camY){
