@@ -109,7 +109,7 @@ R.unidentLeaks = await pg.evaluate(()=>{
 //      ので、行頭の絵文字はこれまで通り残す（持ち込み一覧で装備と並ぶので）。
 R.charmIcon = await pg.evaluate(()=>{
   const nm=charmName(CHARMS[0]);
-  return {nm, ok: nm.startsWith('🔮') && nm.includes(CHARMS[0].nm)};
+  return {nm, ok: nm.startsWith('<i class="pi pi-orb">') && nm.includes(CHARMS[0].nm)};
 });
 
 /* ================= 3. 実画面に出る ================= */

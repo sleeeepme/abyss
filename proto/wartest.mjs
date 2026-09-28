@@ -309,7 +309,7 @@ R.saysName = await pg.evaluate(()=>{
   return out;
 });
 
-// 6-b. 閃いた瞬間は頭上に 💡 が出る
+// 6-b. 閃いた瞬間は頭上に閃きの灯り（ドット絵）が出る
 R.flashFx = await pg.evaluate(()=>{
   TH.dummy('sword');
   S.arts={};
@@ -320,7 +320,7 @@ R.flashFx = await pg.evaluate(()=>{
   ART_FLASH_P[0]=P0[0];
   const txts=W.pops.filter(p=>p.txt).map(p=>p.txt);
   return {got:got&&got.id, txts,
-          bulb: txts.includes('💡'),
+          bulb: W.pops.some(p=>p.pic==='bulb'),
           named: txts.includes('居合'),
           ring: W.fx.some(f=>f.t==='ultring')};
 });
@@ -435,7 +435,7 @@ R.renameArt = await pg.evaluate(()=>{
    依頼と食い違っていたので開くようにした（報告：窓が開かない）。 */
 
 /* A. 閃いたら窓が開き、既定値が入っていること。
-      ただし**すぐには開かない**——頭上の💡と輪を出し切ってから訊く。 */
+      ただし**すぐには開かない**——頭上の灯りと輪を出し切ってから訊く。 */
 R.flashOpensRenameWindow = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; S.deepest=1; startRun(3); enterFloor(3);
   S.hero.party=[]; S.arts={}; S.artName={};
@@ -448,7 +448,7 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
   window.artFlashChance=chanceOrig;
   // 閃いた直後は、まだ窓を出さない（演出を見せている最中）
   const openAtOnce=document.getElementById('m-artname').classList.contains('on');
-  const bulbOverhead = W.pops.some(p=>p.txt==='💡');
+  const bulbOverhead = W.pops.some(p=>p.pic==='bulb');
   const ringOut = W.fx.some(f=>f.t==='ultring');
   // 少しだけ進めても、まだ出ない
   stepSim(0.4,{draw:true});
@@ -458,7 +458,7 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
   const open=document.getElementById('m-artname').classList.contains('on');
   const shown=document.getElementById('an-input').value;
   const sub=document.getElementById('an-sub').textContent;
-  const title=document.getElementById('an-title').textContent;
+  const title=document.getElementById('an-title').innerHTML;   // 灯りは <i> なので中身で見る
   const paused=gamePaused();
   closeArtRename();
   const resumed=!gamePaused();
@@ -470,12 +470,12 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
           waitsForEffect: !openAtOnce && !openMidway,
           windowOpened: open,
           defaultFilled: !!def && shown===def.nm,
-          titleSaysIdea: title.indexOf('技を思いついた！')>=0 && title.indexOf('💡')>=0,
+          titleSaysIdea: title.indexOf('技を思いついた！')>=0 && title.indexOf('pi-bulb')>=0,
           pausedWhileOpen: paused,
           resumedAfterClose: resumed,
           ok: !!def && bulbOverhead && ringOut && !openAtOnce && !openMidway && open
               && shown===def.nm && title.indexOf('技を思いついた！')>=0
-              && title.indexOf('💡')>=0 && paused && resumed};
+              && title.indexOf('pi-bulb')>=0 && paused && resumed};
 });
 
 /* A-2. ✎ から開いたときは「思いついた！」とは出さない（嘘になる）。 */

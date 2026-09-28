@@ -306,12 +306,12 @@ R.lockUi = await pg.evaluate(() => {
   S.bossClear = 0; S.upg = {}; S.shards = 9999;
   setScreen('upg'); renderUpg();
   const html = el('upgrades').innerHTML;
-  const hasLock = html.indexOf('🔒') >= 0;
+  const hasLock = html.indexOf('pi-lock') >= 0;      // 錠のドット絵
   const namesRevive = html.indexOf('不屈') >= 0;
   const tellsHow = html.indexOf('中ボスを倒す') >= 0;
   S.bossClear = 5; renderUpg();
   const openedHtml = el('upgrades').innerHTML;
-  const reviveUnlocked = openedHtml.indexOf('🔒 不屈') < 0 && openedHtml.indexOf('不屈') >= 0;
+  const reviveUnlocked = !/pi-lock[^]{0,40}不屈/.test(openedHtml) && openedHtml.indexOf('不屈') >= 0;
   setScreen('none');
   return {hasLock, namesRevive, tellsHow, reviveUnlocked,
           showsLockedNodes: hasLock && namesRevive,
