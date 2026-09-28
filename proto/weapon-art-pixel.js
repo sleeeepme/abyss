@@ -2607,7 +2607,7 @@
       /* sky … 上に取る余白。火の粉が上空まで舞うので、既定の14ドットでは切れる。
          glow … 炎のまわりの空気がにじむ光（ユーザー要望）。扇の真ん中あたりに置く。 */
       sky: 46,
-      glow: {col:'#ff8a3a', a:0.50, at:'gem', along:0.40, r:0.68, dy:4, puff:0.06, fade:0.5},
+      glow: {col:'#ff8a3a', a:0.52, at:'gem', along:0.42, rx:0.66, ry:0.38, dy:4, puff:0.06, fade:0.5},
       castAt: 0.55, span: 3.1, loop: 3.9, charge: 0.25, recover: [2.5, 2.8], life: 2.5, pose: 'thrust',
       cx: 30, cy: 70, ang: 0, R: T16(3.6), arc: 35 * Math.PI / 180, status: 'burn',
       enemies: [[76, 56], [92, 70], [80, 86]],
@@ -2733,6 +2733,8 @@
       ground: bwrapidGround, air: bwrapidAir
     },
     bwburst: {
+      // 通り道が燃える一直線。光も同じだけ細長くする
+      glow: {col:'#ff8a3a', a:0.34, at:'center', along:0.40, rx:0.50, ry:0.10, dy:-7, puff:0.05, fade:0.3},
       group: 'bow', label: 'バーストショット', who: '弓 lv3', caster: 'hunter', castAt: 0.35, span: 0.9, loop: 1.9, charge: 0.25, recover: [0.2, 0.5], pose: 'melee', swings: [0], status: 'burn',
       cx: 14, cy: 70, ang: 0, R: T16(7.5), enemies: [[70, 68], [110, 72]],
       hits: H.line([0], BURST_T, true, 8, 2), ground: bwburstGround, air: bwburstAir
@@ -2779,7 +2781,7 @@
       hits: H.line([0], BLINK_T, false, 10, 2), ground: uBlinkGround, air: uBlinkAir
     },
     u_blaze: {
-      glow: {col:'#ff7a2e', a:0.44, at:'center', along:0.40, r:0.55, dy:-14, puff:0.08},   // 炎の大技（火柱を包む高さに置く）
+      glow: {col:'#ff7a2e', a:0.46, at:'center', along:0.40, rx:0.54, ry:0.26, dy:-14, puff:0.08},   // 炎の大技（前へ伸びる火柱に合わせて横長に）
       group: 'ult', label: '灼髄', who: '大技・前へ火柱が噴き上がる', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.6, loop: 2.8, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
       cx: 14, cy: 70, ang: 0, R: T16(6.5), wide: T16(1.15), enemies: [[60, 64], [92, 76], [116, 66]],
       hits: H.line([0], 0.25, true, 20, 1.5), ground: uBlazeGround, air: uBlazeAir
@@ -2807,6 +2809,8 @@
       ground: aRainGround, air: aRainAir
     },
     a_field: {
+      // 地面に敷く火の輪。向きを持たないので傾けず、上から見た輪の形（横長）に合わせる
+      glow: {col:'#ff7a2e', a:0.42, at:'center', rx:0.95, ry:0.50, dy:-8, spin:false, puff:0.05, fade:0.4},
       group: 'ally', label: '焦土', who: '魔法使い Lv.50（実機は6秒）', caster: 'mage', ramp: 'fire', rimCol: P.fi2, castAt: 0.5, span: 6.3, loop: 3.4, charge: 0.3, recover: [2.4, 2.7], life: 2.4, pose: 'thrust', status: 'burn',
       cx: 24, cy: 68, ang: 0, at: [104, 68], R: T16(2.6), enemies: [[96, 60], [116, 74], [134, 58]],
       hits: (o, e) => Math.hypot(e[0] - o.x, (e[1] - o.y) / 0.5) <= o.R ? [0.2, 0.7, 1.2, 1.7, 2.2].map(t => ({ t, k: 0 })) : [],
@@ -3087,15 +3091,21 @@
     c.fillStyle = rg; c.fillRect(0, 0, N, N);
     glowCache.set(col, cv); return cv;
   }
-  /* sx,sy … 画面座標、rpx … 半径（画面px） */
-  function paintGlow(ctx, sx, sy, rpx, col, a) {
-    if (!(rpx > 1) || !(a > 0)) return;
+  /* sx,sy … 画面座標、rx,ry … 半径（画面px）、rot … 傾き（ラジアン）。
+     **正円にしない。** 炎は扇だったり帯だったり地面の輪だったりで、
+     形はどれも横長か平たい。正円を置くと炎の無い所まで光ってしまうので、
+     効果の届く範囲に合わせて潰す。焼いた丸を縦横ばらばらに引き伸ばすだけなので、
+     楕円にしても仕事は増えない（drawImage 1回のまま）。 */
+  function paintGlow(ctx, sx, sy, rx, ry, col, a, rot) {
+    if (!(rx > 1) || !(ry > 0.5) || !(a > 0)) return;
     const cv = glowSprite(col);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = a;
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(cv, 0, 0, cv.width, cv.height, sx - rpx, sy - rpx, rpx * 2, rpx * 2);
+    ctx.translate(sx, sy);
+    if (rot) ctx.rotate(rot);
+    ctx.drawImage(cv, 0, 0, cv.width, cv.height, -rx, -ry, rx * 2, ry * 2);
     ctx.restore();
   }
   function blit(ctx, b, dx, dy, dw, dh, fit) {
@@ -3155,8 +3165,12 @@
     if (id === 'stbolt') o.gx = null;
     const layer = p.layer || 'all';
     /* にじむ光は**ドット絵より先に**敷く（上に重ねると絵が白く飛ぶ）。
-       g.at … 'gem'（杖先）か 'center'（効果の中心）、g.along … そこから o.ang へ R の何割進んだ所、
-       g.r … R に対する半径の割合、g.fade … 消え際で薄くする秒数。 */
+       g.at    … 'gem'（杖先）か 'center'（効果の中心）
+       g.along … そこから o.ang へ R の何割進んだ所   g.dx,g.dy … 微調整（ドット）
+       g.rx,g.ry … R に対する半径の割合。**進む向きが rx、その横が ry。**
+                   正円にしたい時だけ g.r ひとつで済ませられる
+       g.spin  … false で傾けない（地面に敷く輪のように、向きに関係なく形が決まる物）
+       g.puff  … 呼吸でふくらむ割合   g.fade … 消え際で薄くする秒数 */
     const g = d.glow;
     if (g && layer !== 'air') {
       const life = o.life || d.span;
@@ -3167,8 +3181,10 @@
         const bx = ax + Math.cos(ang) * R * (g.along || 0) + (g.dx || 0);
         const by = ay + Math.sin(ang) * R * (g.along || 0) * 0.85 + (g.dy || 0);
         const puff = g.puff ? 1 + g.puff * Math.sin(age * 9.1) : 1;
+        const grx = R * (g.rx != null ? g.rx : (g.r || 0.8)) * k * puff;
+        const gry = R * (g.ry != null ? g.ry : (g.r || 0.8)) * k * puff;
         paintGlow(ctx, p.x + (bx - ox) * k, p.y + (by - oy) * k,
-                  R * (g.r || 0.8) * k * puff, g.col, g.a * env);
+                  grx, gry, g.col, g.a * env, g.spin === false ? 0 : ang);
       }
     }
     if (layer !== 'air') d.ground(age, o);
