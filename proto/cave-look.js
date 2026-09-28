@@ -395,10 +395,22 @@ const DECO_PAL={
   stone:dcR(['#1c1914','#5a5040','#b0a080']), stoneDk:C('#0e0c0a'), lamp:C('#ffd878'), lampDim:C('#8a6a30'),
   pipe:dcR(['#1a1010','#4a3028','#8a6048']), hot:dcR(['#6a1a08','#e0661a','#ffd070']), slag:dcR(['#140a08','#2e1a14','#4e3024']),
   pale:dcR(['#8e8c86','#c8c5be','#f4f2ec']), paleDk:C('#6e6c66'),
+  /* 石の層の深い側（第6階層〜）。水の層が近づいてきた気配を床に置く。 */
+  /* 床（石の層は #0f192b〜#16243d の青）に対して、**寒色の中に置く暖色の緑**に
+     しないと沈んで見えない。最初に彩度を落として置いたら、床と見分けが付かなかった。 */
+  mossBed:dcR(['#1b2714','#33491f','#587536']), mossBedTip:C('#87a850'),
+  /* 水溜りは逆に、床より**暗く**してから縁と照り返しで拾わせる。
+     床と同じ明るさの青を置くと、ただの模様になる。 */
+  pool:dcR(['#050a13','#0a1422','#122238']), poolLip:C('#5a7ea2'), poolGleam:C('#d6ecf8'),
 };
 // 層ごとの品目：[名前, 置き場所, 出やすさ]
 const DECO_SET={
-  stone:[['stalagC','corner',.35],['rock','open',.006],['vine','north',.05],['skel','floor',.006],['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
+  /* 4つめは「この深さから出る」最小の階層（省略＝最初から出る）。
+     石の層の後半（第6階層〜第10階層）だけ、床に苔の足場と水溜りを混ぜる
+     ——次が水の層なので、**床が湿っていく**ことを絵で先に言う（ユーザー要望）。 */
+  stone:[['stalagC','corner',.35],['rock','open',.006],['vine','north',.05],['skel','floor',.006],
+         ['pool','floor',.016,6],['mossbed','floor',.020,6],
+         ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
   sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014]],
   root:[['shroom','wall',.024],['tendril','wall',.026],['bulb','floor',.010],['moss','wall',.014]],
   ruin:[['foundation','floor',.010],['colonnade','wall',.012],['pillar','wall',.022],['brokenwall','wall',.018],['arch','wall',.010],['steps','wall',.009],['lamppost','wall',.012],['plaque','floor',.008],['rubble','floor',.010]],
@@ -415,7 +427,8 @@ function genDeco(f,Z){
     const inW=water&&water[ty]&&water[ty][tx];
     const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>f.g[ty+dy][tx+dx]===T.WALL||f.g[ty+dy][tx+dx]===T.PIT);
     const hz=haz&&!water&&haz.g[ty]&&haz.g[ty][tx];
-    for(let n=0;n<set.length;n++){const [kind,where,p]=set[n];
+    for(let n=0;n<set.length;n++){const [kind,where,p,minDep]=set[n];
+      if(minDep && depth<minDep) continue;      // その層の中でも、深い側にだけ出る品目
       const h=hs(tx*92821+ty*68917+depth*31,n+1), r=(h%100000)/100000;
       if(r>=p*(DECO_MUL[Z.id]||1)) continue;
       if(where==='water'&&!inW) continue;
@@ -537,6 +550,38 @@ function drawDeco(bx0,by0,t,blindR){
         const tx=bx+sw+(h%3-1)*2, ty=y-H; dp(tx,ty,sh3(P_.reedHead,L,tx|0,ty|0)); dp(tx,ty-1,sh3(P_.reedHead,L*1.3,tx|0,ty|0)); dp(tx,ty-2,sh3(P_.reedHead,L,tx|0,ty|0));}
       break; }
     case 'pebble': for(let i=0;i<3;i++){const h=hs(s,i),px=x+(h%9)-4,py=y+((h>>>4)%5)-2; rockPx(px,py,-.6,-.8,0); rockPx(px+1,py,.6,-.8,0); rockPx(px,py+1,0,1,1);} break;
+    /* 苔の足場：床に貼り付いた低い苔。壁の苔（'moss'）と違って**平ら**に広がる。
+       輪郭を崩すのに楕円ではなく1マスずつの判定を使う——平たい面なので、
+       縁がきれいな楕円だと「置いた物」に見えてしまう。 */
+    case 'mossbed': { const rx=5+s%4, ry=2+(s>>>3)%2;
+      for(let dy=-ry;dy<=ry;dy++)for(let dx=-rx;dx<=rx;dx++){
+        const nx=dx/rx, ny=dy/ry; const dd=nx*nx+ny*ny;
+        if(dd>1) continue;
+        const hh=hs(s,(dx+16)*32+(dy+16));
+        if(dd>.42 && hh%5<2) continue;                          // 縁を虫食いにする
+        const px=x+dx, py=y+dy;
+        // 中は平らに塗らない。粒ごとに明るさを散らして、面ではなく「苔」に見せる
+        dp(px,py,sh3(P_.mossBed, L*(1-dd*.30)*(.78+(hh>>>4)%4*.11), px,py));
+      }
+      for(let i=0;i<4;i++){const h=hs(s,i+70), px=x+(h%(rx*2))-rx, py=y+((h>>>5)%(ry*2+1))-ry;
+        if(Math.sin(t*1.2+i*2+s)>.25) dp(px,py,P_.mossBedTip);} break; }
+    /* 水溜り：浅い窪みに溜まった水。縁を1段明るくして「窪み」だと分からせ、
+       面の上を光の筋がゆっくり横切る。波は立てない——流れていない水なので。 */
+    case 'pool': { const rx=6+s%5, ry=3+(s>>>3)%2;
+      for(let dy=-ry;dy<=ry;dy++)for(let dx=-rx;dx<=rx;dx++){
+        const nx=dx/rx, ny=dy/ry, dd=nx*nx+ny*ny;
+        if(dd>1) continue;
+        const px=x+dx, py=y+dy;
+        if(dd>.82){ dp(px,py,P_.poolLip); continue; }            // 縁
+        dp(px,py,sh3(P_.pool,Math.min(1,L*1.1)*(.5+dd*.3),px,py));
+      }
+      // 面をゆっくり横切る光の筋（1本だけ。動かしすぎると「流れている水」になる）
+      const gx=x-rx+((t*3.5+s%17)%(rx*2));
+      for(let dy=-ry+1;dy<=ry-1;dy++){
+        const dx=gx-x+dy*.6, nx=dx/rx, ny=dy/ry;
+        if(nx*nx+ny*ny>.72) continue;
+        dp(x+dx,y+dy,P_.poolGleam);
+      } break; }
     case 'crystal': for(let i=0;i<3;i++){const h=hs(s,i), bx=x-2+i*2, H=3+h%4; for(let j=0;j<H;j++) dp(bx,y-j,P_.crys[j===H-1?2:(Math.sin(t*2+i+s)>.5?1:0)+((j+i)%2&&L>.3?1:0)]);} break;
     case 'weed': { for(let i=0;i<4;i++){const h=hs(s,i), bx=x-4+i*3, H=8+h%8; for(let j=0;j<H;j++){const px=bx+Math.sin(t*2+j*.6+i)*1.2*(j/H); dp(px,y-j,sh3(P_.weed,L+.1,px|0,y-j));}} break; }
     case 'fish': { const R=10+s%10, sp=.5+(s%5)*.12, a=t*sp+(s%628)/100, fx=x+Math.cos(a)*R, fy=y+Math.sin(a*2)*R*.35;

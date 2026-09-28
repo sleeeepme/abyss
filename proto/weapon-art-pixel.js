@@ -724,6 +724,23 @@
       if (ci >= 6) { disc(x, y, s - 1, P.sm0); px(x, y - s, P.sm0); continue; }
       flamePuff(x, y, s, ci, (Math.floor(hash(k, fr12 + 7) * 3) - 1));
     }
+    /* ---------- 上空へ舞う火花（ユーザー要望） ----------
+       炎そのものは扇の中で完結していて、上へ抜けていく物が何も無かった。
+       炎の面から粒を1つずつ立ち上げ、揺れながら細くなって消えるようにする。
+       発生は時刻から決め打ち（hash）なので、状態を持たない＝粒の配列が増えない。 */
+    const SPK = 20, SPK_LIFE = 1.05;
+    const p0 = Math.max(0, Math.ceil((tq - SPK_LIFE) * SPK)), p1 = Math.floor(Math.min(tq, o.life) * SPK);
+    for (let sp = p0; sp <= p1; sp++) {
+      const a = tq - sp / SPK; if (a < 0 || a > SPK_LIFE) continue;
+      const f = a / SPK_LIFE;
+      const u = hash(sp, 41) * 2 - 1, v = hash(sp, 42), w2 = hash(sp, 43);
+      const th = o.ang + o.arc * u * 0.9, dd = o.R * (0.25 + 0.65 * v);
+      const x = o.gx + Math.cos(th) * dd + Math.sin(a * 7 + sp) * (2 + 2 * w2) * f;
+      const y = o.gy + Math.sin(th) * dd * 0.85 - (14 + 22 * w2) * f - 6 * f * f;
+      const ci = Math.min(6, Math.floor(f * 7.4));
+      px(x, y, RAMP.fire[ci], 1 - f * 0.55);
+      if (f < 0.3) px(x, y - 1, RAMP.fire[Math.max(0, ci - 1)], 0.75);   // 立ち上がりだけ2ドット
+    }
     if (t <= o.life) {                                              // 杖先の噴き出し口
       const big = (fr12 & 1) === 0;
       plus(o.gx, o.gy, P.fi1, big ? 2 : 1); px(o.gx, o.gy, P.fi0);
@@ -2587,6 +2604,9 @@
     /* ---- 杖 ---- */
     stflame: {
       group: 'staff', label: 'フレイム', who: '杖 lv1', caster: 'mage', ramp: 'fire', rimCol: P.fi2,
+      /* sky … 上に取る余白。火の粉が上空まで舞うので、既定の14ドットでは切れる。
+         glow … 炎だけ、にじんだ光を1枚下に敷く（ユーザー要望）。 */
+      sky: 46, glow: 0.42,
       castAt: 0.55, span: 3.1, loop: 3.9, charge: 0.25, recover: [2.5, 2.8], life: 2.5, pose: 'thrust',
       cx: 30, cy: 70, ang: 0, R: T16(3.6), arc: 35 * Math.PI / 180, status: 'burn',
       enemies: [[76, 56], [92, 70], [80, 86]],
@@ -2758,6 +2778,7 @@
       hits: H.line([0], BLINK_T, false, 10, 2), ground: uBlinkGround, air: uBlinkAir
     },
     u_blaze: {
+      glow: 0.36,          // 炎の大技。フレイムと同じにじんだ光を1枚下に敷く
       group: 'ult', label: '灼髄', who: '大技・前へ火柱が噴き上がる', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.6, loop: 2.8, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
       cx: 14, cy: 70, ang: 0, R: T16(6.5), wide: T16(1.15), enemies: [[60, 64], [92, 76], [116, 66]],
       hits: H.line([0], 0.25, true, 20, 1.5), ground: uBlazeGround, air: uBlazeAir
@@ -3042,8 +3063,21 @@
     blit(ctx, SCENE_BUF, shx, shy, ctx.canvas.width, ctx.canvas.height, true);
   }
   /* fit=true のときは dx,dy を「揺れ（ドット単位）」として扱う */
-  function blit(ctx, b, dx, dy, dw, dh, fit) {
+  /* glow … 0 より大きいと、同じ絵を**少しだけ大きく・にじませて・加算で**
+     1枚先に敷く。キャンバスの blur フィルタは全画面の塗り直しになって重いので
+     （端のぼかしで実測済み）、ここでは「小さな元絵を1回だけ引き伸ばす」で済ませる。
+     引き伸ばしの補間がそのままぼかしになるので、追加の仕事は drawImage 1回だけ。 */
+  function blit(ctx, b, dx, dy, dw, dh, fit, glow) {
     b.cx.putImageData(b.img, 0, 0, 0, 0, b.w, b.h);
+    if (glow > 0 && !fit) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = glow;
+      const pad = Math.max(2, Math.round(dw * 0.05));
+      ctx.drawImage(b.cv, 0, 0, b.w, b.h, dx - pad, dy - pad, dw + pad * 2, dh + pad * 2);
+      ctx.restore();
+    }
     ctx.save(); ctx.imageSmoothingEnabled = false;
     if (fit) {
       const kf = Math.min(dw / b.w, dh / b.h); let k = Math.floor(kf);
@@ -3100,7 +3134,7 @@
     const layer = p.layer || 'all';
     if (layer !== 'air') d.ground(age, o);
     if (layer !== 'ground') d.air(age, o);
-    blit(ctx, FX_BUF, Math.round(p.x - ox * k), Math.round(p.y - oy * k), Math.round(w * k), Math.round(h * k), false);
+    blit(ctx, FX_BUF, Math.round(p.x - ox * k), Math.round(p.y - oy * k), Math.round(w * k), Math.round(h * k), false, d.glow);
   }
 
   window.PixelArtFx = Object.freeze({
