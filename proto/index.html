@@ -6562,22 +6562,31 @@ const HOP_SEC   = 0.42;
 const HOP_DIST  = 1.7;
 const HOP_NEAR  = 2.6;      // これより近ければ、跳ぶのは逃げる向き
 function hopsHere(){ return ((S.run && S.run.depth) || 1) >= HOP_FROM_DEPTH; }
-function hopStart(e, dx, dy, d){
-  const away = d < HOP_NEAR;
+/* 跳び方は呼ぶ側が決められるようにしてある（o を渡さなければ雑魚の跳ねのまま）。
+   o = {dist, sec, lift, spread, away, every}
+     away … true で「逃げる向き」へ。省略すると近いとき（HOP_NEAR）だけ逃げる
+     lift … 跳ねの高さ（TS の何倍ぶん浮いて見えるか。描画だけ） */
+function hopStart(e, dx, dy, d, o){
+  const O = o || {};
+  const dist = O.dist!=null ? O.dist : HOP_DIST;
+  const away = O.away!=null ? O.away : (d < HOP_NEAR);
   const ux = (away?-dx:dx)/d, uy = (away?-dy:dy)/d;
   // 真っ直ぐだけだと列になって並ぶので、跳ぶ向きを少し散らす
-  const a = Math.atan2(uy, ux) + rf(-0.5, 0.5);
-  const nx = e.x + Math.cos(a)*HOP_DIST, ny = e.y + Math.sin(a)*HOP_DIST;
+  const spread = O.spread!=null ? O.spread : 0.5;
+  const a = Math.atan2(uy, ux) + rf(-spread, spread);
+  const nx = e.x + Math.cos(a)*dist, ny = e.y + Math.sin(a)*dist;
   if(!standable(nx, ny)) return false;
   if(!standable((e.x+nx)/2, (e.y+ny)/2)) return false;   // 角を斜めに抜けない
-  e.hop = {t:0, x0:e.x, y0:e.y, x1:nx, y1:ny};
-  e.hopCd = rf(HOP_EVERY[0], HOP_EVERY[1]);
+  e.hop = {t:0, x0:e.x, y0:e.y, x1:nx, y1:ny,
+           sec:(O.sec!=null?O.sec:HOP_SEC), lift:(O.lift!=null?O.lift:0.42)};
+  const ev = O.every || HOP_EVERY;
+  e.hopCd = rf(ev[0], ev[1]);
   return true;
 }
 function hopTick(e, dt, slow){
   const H=e.hop; if(!H) return false;
   H.t += dt*slow;
-  const k = Math.min(1, H.t/HOP_SEC);
+  const k = Math.min(1, H.t/(H.sec||HOP_SEC));
   e.x = H.x0 + (H.x1-H.x0)*k;
   e.y = H.y0 + (H.y1-H.y0)*k;
   if(k>=1) e.hop=null;
@@ -6586,8 +6595,26 @@ function hopTick(e, dt, slow){
 /* 跳ねているあいだの見かけの浮き（描画だけ。当たり判定は動かさない）。 */
 function hopLift(e){
   const H=e&&e.hop; if(!H) return 0;
-  const k=Math.min(1,H.t/HOP_SEC);
-  return Math.sin(k*Math.PI) * TS * 0.42;
+  const k=Math.min(1,H.t/(H.sec||HOP_SEC));
+  return Math.sin(k*Math.PI) * TS * (H.lift||0.42);
+}
+
+/* ---------- 跳ねて動くボス ----------
+   ユーザー要望「5Fボスは移動時にジャンプしながら動くようにしたい」。
+   雑魚の癖（ZAKO_TRAITS）はボスに混ぜない決まりだが、これは癖ではなく
+   **移動のしかたそのもの**——歩く代わりに跳ぶ、というだけ。
+
+   **速さは変えない。** 1回の跳びで dist マス進み、次の跳びまで待つので、
+   待ち時間を `dist/e.ms - sec` にすれば、平均の速さは歩いていたときと同じになる
+   （激昂や呪いで e.ms が動いても自分で付いてくる）。
+   跳んでいる最中は攻撃しない＝着地の瞬間だけ間合いが決まるので、
+   近づき方は「じりじり」から「ひと跳びずつ」に変わるが、
+   1秒あたりに詰まる距離は同じ。 */
+const BOSS_HOP = {
+  5: {dist:2.2, sec:0.42, lift:0.62, spread:0.22, minCd:0.10},   // 灰の大蛙
+};
+function bossHopSpec(e){
+  return (e && e.boss && e.uniqueBoss && BOSS_HOP[e.uniqueBoss]) || null;
 }
 /* 格子。null は「その層のその形式には癖を足さない」——
    全部のマスを埋めると、逆にどの階も同じだけ賑やかになって差が消える。 */
@@ -10390,7 +10417,13 @@ function enemyUpdate(e,dt){
   e.cd-=dt*slow;
 
   // ボスの範囲攻撃。溜め中は移動も通常攻撃も止まるので、避ける時間が必ずある。
-  if(e.boss){ bossRage(e); finalBossTick(e, dt); if(bossCast(e, dt, slow, tg)) return; }
+  if(e.boss){
+    bossRage(e); finalBossTick(e, dt);
+    /* 跳ねて動くボス（5Fの大蛙）は、**溜めを始める前に着地させる。**
+       順番を逆にすると、跳んでいる途中で溜めが入って空中で止まって見えた。 */
+    if(bossHopSpec(e) && hopTick(e, dt, slow)) return;
+    if(bossCast(e, dt, slow, tg)) return;
+  }
 
   // 癖「跳ぶ」。溜めている最中には跳ばない（避けた側が損をするので）。
   if(e.trait==='blink' && vis && e.tele<=0) zakoBlink(e, dt, tg, d);
@@ -10464,6 +10497,34 @@ function enemyUpdate(e,dt){
      見え方で決めずに、**進めているかどうか**で決める。
      直線で進めなかったら、しばらく（PATH_HOLD 秒）経路探索に切り替える。
      理由が壁でも角でも詰まりでも、同じ1つの規則で拾える。 */
+  /* 跳ねて動くボスは、ここで歩かずに跳ぶ。向きは歩くときと同じ（上で決めた mvx,mvy）
+     ——間合いの取り方（keep / range）はそのまま効いたままにしたいので、
+     移動の判断には一切触れず、**進み方だけ**を差し替える。 */
+  const BH = e.boss ? bossHopSpec(e) : null;
+  if(BH && (mvx||mvy) && e.tele<=0 && !e.cast){
+    if(e.hopCd===undefined) e.hopCd = 0;
+    e.hopCd -= dt*slow;
+    if(e.hopCd<=0){
+      /* 詰めたい距離より遠くへは跳ばない。跳び幅は 2.2 マスあるので、
+         あと 1 マスの所で跳ぶと相手を飛び越してしまい、寄ったり離れたりを
+         繰り返す（実測で、歩きに比べて寄るのが 17% 遅くなっていた）。 */
+      const toward = (mvx*dx + mvy*dy) > 0;
+      const gap = toward ? Math.max(0, d - a.range*0.85) : BH.dist;
+      const dist = Math.max(0.8, Math.min(BH.dist, gap));
+      // 近い跳びは短く速く。1回の跳びの時間も距離に合わせる
+      const sec = BH.sec * (0.6 + 0.4*dist/BH.dist);
+      // 待ち時間をこう置くと、平均の速さは歩いていたときと同じになる
+      const wait = Math.max(BH.minCd, dist/Math.max(0.2, e.ms) - sec);
+      if(hopStart(e, mvx, mvy, 1, {dist, sec, lift:BH.lift,
+                                   spread:BH.spread, away:false,
+                                   every:[wait*0.85, wait*1.15]})) return;
+      e.hopCd = 0.12;        // 跳び先が壁だった。すぐ測り直す（その場で固まらせない）
+    }
+    /* 跳ぶ番でないあいだは**歩かずに溜める。** ここで歩かせると、
+       跳びと歩きの両方で進んで平均の速さが上がってしまう（実測で 1.06 倍になった）。
+       溜めて跳ぶ、を繰り返すのがカエルの動き方でもある。 */
+    return;
+  }
   e.pathHold = Math.max(0, (e.pathHold||0) - dt);
   if(e.intruder && (mvx||mvy)
      && (e.pathHold>0 || !losClear(e.x, e.y, tg.x, tg.y))){

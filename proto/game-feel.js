@@ -335,9 +335,51 @@ function drawFeelMotes(camX,camY){
   ctx.save();
   for(const p of FEEL.motes){if(!tileSeen(p.x,p.y))continue;ctx.globalAlpha=clamp(p.life/p.max,0,1)*.85;ctx.fillStyle=p.col;
     const z=FEEL_REDUCED.matches?0:Math.max(0,p.z),q=Math.max(1,Math.round(TS*p.size));
+    /* 風の筋（疾風の加護）だけ、点ではなく**流れる向きへ伸びた線**にする。
+       点のままだと「粉が落ちた」にしか見えず、速さとして読めない。 */
+    if(p.kind==='wind'){
+      const L=Math.max(2,Math.round(TS*0.30)), w=Math.max(1,Math.round(TS*0.055));
+      const horiz=Math.abs(p.vx)>=Math.abs(p.vy);
+      ctx.fillRect(Math.round(p.x*TS-camX),Math.round((p.y-z)*TS-camY), horiz?L:w, horiz?w:L);
+      continue;
+    }
     ctx.fillRect(Math.round(p.x*TS-camX),Math.round((p.y-z)*TS-camY),q,q);
   }
   ctx.restore();
+}
+
+/* ---------- 疾風の加護が掛かっているあいだ ----------
+   「未踏の階まで足が速い」は数字としては効いているが、画面では何も変わらないので
+   掛かっていること自体に気づけない（ユーザー要望「スピードが上がっているのが
+   分かるようなエフェクトをキャラにつけたい」）。
+   足元から**進んできた向きと逆へ**、細い筋を流す。
+
+   粒（FEEL.motes）の仕組みにそのまま乗せてあるので、増える仕事は1人あたり
+   毎秒 36 個ぶんの小さな矩形だけ——発熱を増やさないことを優先した。
+   加護は主人公と仲間の全員に掛かるので、筋も全員に出す。 */
+const GRACE_EVERY=0.055, GRACE_COL='#bfe9ff';
+let _graceT=0;
+function tickGraceTrail(dt){
+  if(FEEL_REDUCED.matches) return;
+  if(typeof windGrace!=='function' || !windGrace()) return;
+  _graceT-=dt; if(_graceT>0) return;
+  _graceT=GRACE_EVERY;
+  const who=[P].concat(typeof livingParty==='function'?livingParty():[]);
+  for(const m of who){
+    if(!m || m.dead) continue;
+    const mo=feelMotion(m);
+    if(!mo || mo.speed<FEEL_TUNING.characterMoveThreshold*1.4) continue;
+    const dx=m.dirx||0, dy=m.diry||0, n=Math.hypot(dx,dy);
+    if(!n) continue;
+    const ux=dx/n, uy=dy/n;
+    for(let i=0;i<2;i++){
+      const off=(i-0.5)*0.24;                 // 左右に1本ずつ
+      FEEL.motes.push({x:m.x-ux*0.22-uy*off, y:m.y+0.10-uy*0.22+ux*off, z:0.05,
+        vx:-ux*1.6, vy:-uy*1.6, vz:0, col:GRACE_COL, kind:'wind',
+        life:0.24, max:0.24, size:0.055, ent:null, ex:0, ey:0});
+    }
+  }
+  if(FEEL.motes.length>420)FEEL.motes.splice(0,FEEL.motes.length-420);
 }
 function drawFeelRipples(camX,camY){
   if(!W.haz)return;ctx.save();const q=Math.max(1,Math.round(TS/20));
@@ -627,6 +669,7 @@ function updateFeel(dt){
   FEEL.motes=FEEL.motes.filter(p=>{
     if(p.ent&&!p.ent.dead&&Number.isFinite(p.ent.x)&&Number.isFinite(p.ent.y)){p.x+=p.ent.x-p.ex;p.y+=p.ent.y-p.ey;p.ex=p.ent.x;p.ey=p.ent.y;}
     p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=dt*3;return p.life>0;});
+  tickGraceTrail(dt);
   FEEL.ripples=FEEL.ripples.filter(r=>{r.age+=dt;return r.age<.85;});
   FEEL.hits=FEEL.hits.filter(f=>{f.age+=dt;return f.age<.48;});
   FEEL.weaponArts=FEEL.weaponArts.filter(f=>{f.age+=dt;return f.age<f.max;});
