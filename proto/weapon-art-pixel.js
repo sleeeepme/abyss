@@ -2605,8 +2605,9 @@
     stflame: {
       group: 'staff', label: 'フレイム', who: '杖 lv1', caster: 'mage', ramp: 'fire', rimCol: P.fi2,
       /* sky … 上に取る余白。火の粉が上空まで舞うので、既定の14ドットでは切れる。
-         glow … 炎だけ、にじんだ光を1枚下に敷く（ユーザー要望）。 */
-      sky: 46, glow: 0.42,
+         glow … 炎のまわりの空気がにじむ光（ユーザー要望）。扇の真ん中あたりに置く。 */
+      sky: 46,
+      glow: {col:'#ff8a3a', a:0.50, at:'gem', along:0.40, r:0.68, dy:4, puff:0.06, fade:0.5},
       castAt: 0.55, span: 3.1, loop: 3.9, charge: 0.25, recover: [2.5, 2.8], life: 2.5, pose: 'thrust',
       cx: 30, cy: 70, ang: 0, R: T16(3.6), arc: 35 * Math.PI / 180, status: 'burn',
       enemies: [[76, 56], [92, 70], [80, 86]],
@@ -2778,7 +2779,7 @@
       hits: H.line([0], BLINK_T, false, 10, 2), ground: uBlinkGround, air: uBlinkAir
     },
     u_blaze: {
-      glow: 0.36,          // 炎の大技。フレイムと同じにじんだ光を1枚下に敷く
+      glow: {col:'#ff7a2e', a:0.44, at:'center', along:0.40, r:0.55, dy:-14, puff:0.08},   // 炎の大技（火柱を包む高さに置く）
       group: 'ult', label: '灼髄', who: '大技・前へ火柱が噴き上がる', caster: 'warrior', ramp: 'fire', rimCol: P.fi2, castAt: 0.55, span: 1.6, loop: 2.8, charge: 0.4, recover: [0.5, 0.9], pose: 'melee', swings: [0], status: 'burn',
       cx: 14, cy: 70, ang: 0, R: T16(6.5), wide: T16(1.15), enemies: [[60, 64], [92, 76], [116, 66]],
       hits: H.line([0], 0.25, true, 20, 1.5), ground: uBlazeGround, air: uBlazeAir
@@ -3063,21 +3064,42 @@
     blit(ctx, SCENE_BUF, shx, shy, ctx.canvas.width, ctx.canvas.height, true);
   }
   /* fit=true のときは dx,dy を「揺れ（ドット単位）」として扱う */
-  /* glow … 0 より大きいと、同じ絵を**少しだけ大きく・にじませて・加算で**
-     1枚先に敷く。キャンバスの blur フィルタは全画面の塗り直しになって重いので
-     （端のぼかしで実測済み）、ここでは「小さな元絵を1回だけ引き伸ばす」で済ませる。
-     引き伸ばしの補間がそのままぼかしになるので、追加の仕事は drawImage 1回だけ。 */
-  function blit(ctx, b, dx, dy, dw, dh, fit, glow) {
+  /* ---------- 空気ににじむ光（炎系） ----------
+     最初は「同じ絵を少し大きく加算で重ねる」で出していたが、それだと
+     **炎そのものが二重になって形が濁る**（暗い煙まで明るくなる）。
+     光っているのは炎の形ではなく、炎のまわりの空気なので、
+     ぼかした丸を1枚、炎の下に薄く置くほうが素直に出る。
+
+     丸は色ごとに1回だけ焼いて使い回す。毎フレームやる仕事は drawImage 1回だけで、
+     キャンバスの blur フィルタ（全画面の塗り直し＝端のぼかしで実測した重さ）は使わない。 */
+  const glowCache = new Map();
+  function glowSprite(col) {
+    let cv = glowCache.get(col); if (cv) return cv;
+    const N = 96, r = parseInt(col.slice(1, 3), 16), g = parseInt(col.slice(3, 5), 16), b2 = parseInt(col.slice(5, 7), 16);
+    cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const c = cv.getContext('2d');
+    const rg = c.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+    // 中心をベタ白にしない。芯はドット絵側が持っているので、ここは「まわりの空気」だけ
+    rg.addColorStop(0.00, `rgba(${r},${g},${b2},0.85)`);
+    rg.addColorStop(0.28, `rgba(${r},${g},${b2},0.42)`);
+    rg.addColorStop(0.58, `rgba(${r},${g},${b2},0.14)`);
+    rg.addColorStop(1.00, `rgba(${r},${g},${b2},0)`);
+    c.fillStyle = rg; c.fillRect(0, 0, N, N);
+    glowCache.set(col, cv); return cv;
+  }
+  /* sx,sy … 画面座標、rpx … 半径（画面px） */
+  function paintGlow(ctx, sx, sy, rpx, col, a) {
+    if (!(rpx > 1) || !(a > 0)) return;
+    const cv = glowSprite(col);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = a;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(cv, 0, 0, cv.width, cv.height, sx - rpx, sy - rpx, rpx * 2, rpx * 2);
+    ctx.restore();
+  }
+  function blit(ctx, b, dx, dy, dw, dh, fit) {
     b.cx.putImageData(b.img, 0, 0, 0, 0, b.w, b.h);
-    if (glow > 0 && !fit) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = true;
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = glow;
-      const pad = Math.max(2, Math.round(dw * 0.05));
-      ctx.drawImage(b.cv, 0, 0, b.w, b.h, dx - pad, dy - pad, dw + pad * 2, dh + pad * 2);
-      ctx.restore();
-    }
     ctx.save(); ctx.imageSmoothingEnabled = false;
     if (fit) {
       const kf = Math.min(dw / b.w, dh / b.h); let k = Math.floor(kf);
@@ -3132,9 +3154,26 @@
     if (id === 'collapse') { o.gx = null; if (p.casterX != null) { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; o.gx = a + 5; o.gy = b - 12; } }
     if (id === 'stbolt') o.gx = null;
     const layer = p.layer || 'all';
+    /* にじむ光は**ドット絵より先に**敷く（上に重ねると絵が白く飛ぶ）。
+       g.at … 'gem'（杖先）か 'center'（効果の中心）、g.along … そこから o.ang へ R の何割進んだ所、
+       g.r … R に対する半径の割合、g.fade … 消え際で薄くする秒数。 */
+    const g = d.glow;
+    if (g && layer !== 'air') {
+      const life = o.life || d.span;
+      const env = g.fade ? Math.min(1, Math.max(0, (life + g.fade - age) / g.fade)) : 1;
+      if (env > 0.02) {
+        const ax = g.at === 'gem' && o.gx != null ? o.gx : o.x;
+        const ay = g.at === 'gem' && o.gy != null ? o.gy : o.y;
+        const bx = ax + Math.cos(ang) * R * (g.along || 0) + (g.dx || 0);
+        const by = ay + Math.sin(ang) * R * (g.along || 0) * 0.85 + (g.dy || 0);
+        const puff = g.puff ? 1 + g.puff * Math.sin(age * 9.1) : 1;
+        paintGlow(ctx, p.x + (bx - ox) * k, p.y + (by - oy) * k,
+                  R * (g.r || 0.8) * k * puff, g.col, g.a * env);
+      }
+    }
     if (layer !== 'air') d.ground(age, o);
     if (layer !== 'ground') d.air(age, o);
-    blit(ctx, FX_BUF, Math.round(p.x - ox * k), Math.round(p.y - oy * k), Math.round(w * k), Math.round(h * k), false, d.glow);
+    blit(ctx, FX_BUF, Math.round(p.x - ox * k), Math.round(p.y - oy * k), Math.round(w * k), Math.round(h * k), false);
   }
 
   window.PixelArtFx = Object.freeze({
