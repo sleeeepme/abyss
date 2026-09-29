@@ -569,4 +569,21 @@ R.puddlesHugWallsAvoidRocks = await pg.evaluate(()=>{
   return {n, nearWall, rockHit, ok: n>20 && nearWall===n && rockHit===0};
 });
 
+/* 波紋は水面の高さの場で解く（リファレンス：輪が広がり、岸で跳ね返り、重なって干渉する）。
+   踏むと広がる／水でない所には波が乗らない／しばらくで静まって計算も止まる。 */
+R.waterWavesSpreadAndSettle = await pg.evaluate(()=>{
+  TH.run(13,{seed:12}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; CAVE.waveFixed=true;
+  const g=W.haz.g; let best=null; for(let y=4;y<g.length-4&&!best;y++) for(let x=4;x<g[0].length-4;x++) if(g[y][x]===1){best={x,y};break;}
+  P.x=best.x+.5; P.y=best.y+.5; draw(); draw();
+  FEEL.ripples.push({x:P.x,y:P.y,age:0}); draw();
+  const w=CAVE.wave(), span0=w.x1-w.x0;
+  for(let i=0;i<14;i++) draw();
+  const span1=w.x1-w.x0;
+  let dryWave=0; for(let j=w.y0;j<=w.y1;j++) for(let i=w.x0;i<=w.x1;i++){ const k=j*w.cw+i; if(w.wet[k]<=0&&Math.abs(w.h[k])>1e-6) dryWave++; }
+  for(let i=0;i<600;i++) CAVE.waveStep(1);
+  const settled=w.x1<0;
+  CAVE.waveFixed=false;
+  return {span0, span1, dryWave, settled, ok: span1>span0+4 && dryWave===0 && settled};
+});
+
 await done(b, errs, R);

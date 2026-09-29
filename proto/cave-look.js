@@ -366,41 +366,142 @@ function waterPost(bx0,by0,t){
     if(!any) continue;
     for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
   }
-  /* 波紋は**水面の歪み**として描く（報告「元々入れていたように歪みのような波紋を」）。
-     輪の帯の中のドットを、輪の中心から外向き（外側の半分）／内向き（内側の半分）へずらした所から
-     取ってくる——水面の帯や水草が輪の形にたわんで見える。稜線だけ網点で薄く明るくする。 */
-  const rs=(typeof FEEL!=='undefined'&&FEEL.ripples)||[];
-  if(!rs.length) return;
+  /* 波紋は**水面の高さの場**を解いて描く（リファレンス：水面そのものが波打ち、輪が岸で跳ね返り、
+     重なった輪が干渉する）。描き方は3つだけ：
+       ・屈折：面の傾きの分だけ、下の模様を丸ごと数ドットずらして持ってくる
+       ・陰影：灯り（左上）へ向いた斜面は明るく、背を向けた斜面は暗く。網点で3段
+       ・等高線：高さの等しい所に細い線（稜は明るく、谷は暗く）——同心の輪が自然に何本も出る */
+  if(reduced||!WV||WV.x1<0||WV.G!==G) return;
+  wvTick();
+  if(WV.x1<0) return;
   if(!ripSrc||ripSrc.length!==buf.length) ripSrc=new Uint32Array(buf.length);
   ripSrc.set(buf);
-  const W_=HZ.water;
-  for(const r of rs){
-    if(!Number.isFinite(r.x)||!Number.isFinite(r.y)) continue;
-    const a=Math.max(0,r.age), q=1-a/RIP_LIFE; if(q<=0) continue;
-    const cx=r.x*Q-bx0, cy=r.y*Q+2-by0;
-    if(cx<-40||cy<-30||cx>bw+40||cy>bh+30) continue;
-    for(let ring=0;ring<2;ring++){                              // 外の輪が先に広がり、内の輪が遅れて追う
-      const R=2+a*26-ring*7; if(R<1.5) continue;
-      const fade=Math.pow(q,.6)*(ring?.6:1), amp=3.4*fade, band=3.6;
-      const x0=Math.max(1,Math.floor(cx-R-band-1)), x1=Math.min(bw-2,Math.ceil(cx+R+band+1));
-      const y0=Math.max(1,Math.floor(cy-(R+band)*.62-1)), y1=Math.min(bh-2,Math.ceil(cy+(R+band)*.62+1));
-      for(let y=y0;y<=y1;y++){ const dy=(y-cy)/.62;
-        for(let x=x0;x<=x1;x++){
-          const k=y*bw+x, m=wmask[k]; if(!m) continue;
-          const dx=x-cx, e=Math.sqrt(dx*dx+dy*dy), d=e-R; if(d<=-band||d>=band||e<.5) continue;
-          const sn=Math.sin(d/band*Math.PI), sft=sn*amp, ux=dx/e, uy=dy/e*.62;   // 帯の外側は外へ、内側は内へ
-          const sx=Math.round(x-ux*sft), sy=Math.round(y-uy*sft), sk=sy*bw+sx;
-          let c=(sx>0&&sy>0&&sx<bw&&sy<bh&&wmask[sk]===m)?ripSrc[sk]:buf[k];
-          /* 盛り上がった外側は明るく、窪んだ内側は暗く——水面が輪の形にたわむ。
-             段は網点で3段に丸める（ドット絵の色数に収める） */
-          const b=BAYER[(((y+by0)&3)<<2)|((x+bx0)&3)], st=Math.floor(Math.abs(sn)*fade*2.2+b)/3;
-          if(st>0) c= sn>0 ? mixU(c, m===2?DECO_PAL.poolGleam:W_.band[5], st*.55) : mixU(c, RIP_DARK, st*.5);
-          if(d>-.7&&d<.7&&fade*.6>b) c= m===2 ? DECO_PAL.poolGleam : (fade>.6&&!ring?W_.hi:W_.band[5]);   // 稜線
-          buf[k]=c;
-        } }
+  const g=WV, cw=g.cw, C=WV_C, H=g.h, GX=g.gx, GY=g.gy, W_=HZ.water;
+  for(let j=Math.max(1,g.y0-1);j<=Math.min(g.ch-2,g.y1+1);j++) for(let i=Math.max(1,g.x0-1);i<=Math.min(cw-2,g.x1+1);i++){          // 傾き（岸の外は自分と同じ高さ＝岸で傾きを作らない）
+    const k=j*cw+i; if(!g.wet[k]||g.wet[k]<0){ GX[k]=0; GY[k]=0; continue; }
+    const c=H[k], l=g.wet[k-1]>0?H[k-1]:c, r=g.wet[k+1]>0?H[k+1]:c, u=g.wet[k-cw]>0?H[k-cw]:c, d=g.wet[k+cw]>0?H[k+cw]:c;
+    GX[k]=(r-l)*.5/C; GY[k]=(d-u)*.5/C;
+  }
+  const X0=Math.max(1,g.x0*C-bx0-C), X1=Math.min(bw-2,(g.x1+1)*C-bx0+C), Y0=Math.max(1,g.y0*C-by0-C), Y1=Math.min(bh-2,(g.y1+1)*C-by0+C);
+  for(let y=Y0;y<=Y1;y++){
+    const fy=(by0+y+.5)/C-.5, j=Math.floor(fy), ty0=fy-j, ty=ty0*ty0*(3-2*ty0);
+    if(j<g.y0-1||j>g.y1) continue;
+    for(let x=X0;x<=X1;x++){
+      const k=y*bw+x, m=wmask[k]; if(!m) continue;
+      const fx=(bx0+x+.5)/C-.5, i=Math.floor(fx), tx0=fx-i, tx=tx0*tx0*(3-2*tx0);
+      if(i<g.x0-1||i>g.x1) continue;
+      const a=j*cw+i, w00=(1-tx)*(1-ty), w10=tx*(1-ty), w01=(1-tx)*ty, w11=tx*ty;
+      const h=H[a]*w00+H[a+1]*w10+H[a+cw]*w01+H[a+cw+1]*w11;
+      const sx=GX[a]*w00+GX[a+1]*w10+GX[a+cw]*w01+GX[a+cw+1]*w11;
+      const sy=GY[a]*w00+GY[a+1]*w10+GY[a+cw]*w01+GY[a+cw+1]*w11;
+      const sl=Math.abs(sx)+Math.abs(sy);
+      if(Math.abs(h)<.025&&sl<.006) continue;
+      // 屈折：傾きの分だけ下の模様をずらす（最大3ドット、同じ水の中からだけ）
+      let ox=Math.round(-sx*WV_REF), oy=Math.round(-sy*WV_REF*.35);   // 縦は控えめ（横縞の水面を縦にずらすと梯子になる）
+      ox=ox<-2?-2:ox>2?2:ox; oy=oy<-1?-1:oy>1?1:oy;
+      const sk=(y+oy)*bw+(x+ox);
+      let c=(wmask[sk]===m)?ripSrc[sk]:buf[k];
+      const b=BAYER[(((y+by0)&3)<<2)|((x+bx0)&3)];
+      // 陰影：左上の灯りへ向いた面は明るく
+      const lit=(sx*.6+sy*.8)*WV_LIT;
+      const st=Math.floor(Math.min(1,Math.abs(lit))*2.2+b)/3;
+      const hiC= m===2?DECO_PAL.poolGleam:W_.band[5];
+      if(st>0) c= lit>0 ? mixU(c,hiC,st*.5) : mixU(c,RIP_DARK,st*.42);
+      // 等高線：高さの等しい所に細い線
+      const ah=Math.abs(h);
+      if(ah>.05&&ah<.42){                                         // 深い窪み（踏んだ直後の足元）には線を重ねない
+        const rg=Math.sin(h*WV_CONT), gate=Math.min(1,(ah-.05)*8,(.42-ah)*8);
+        if(rg>.93&&b<gate*.75) c=mixU(c, m===2?DECO_PAL.poolGleam:W_.hi, .5);
+        else if(rg<-.93&&b<gate*.5) c=mixU(c,RIP_DARK,.25);
+      }
+      buf[k]=c;
     }
   }
 }
+/* ---------- 水面の高さの場 ----------
+   1セル＝4ドット（1マス＝4×4セル）の格子で、高さと速さを持つ。毎秒60歩で
+     速さ += K×（上下左右の高さ − 4×自分）、速さ ×= VD、高さ += 速さ、高さ ×= HD
+   岸（水でないセル）は隣を自分と同じ高さとみなす＝波は岸で跳ね返る。
+   動いているのは波がある範囲（x0..x1, y0..y1）だけで、静まったら止める（重さは波の広さぶんだけ）。 */
+const WV_C=4, WV_K=.19, WV_VD=.975, WV_HD=.995, WV_REF=26, WV_LIT=40, WV_CONT=15;
+let WV=null;
+function wvGrid(){
+  if(!G) return null;
+  const haz=(typeof W!=='undefined'&&W.haz)||null;
+  if(WV&&WV.G===G&&WV.haz===haz) return WV;
+  const cw=Math.ceil(G.PW/WV_C)+2, ch=Math.ceil(G.PH/WV_C)+2, n=cw*ch;
+  WV={G,haz,cw,ch,h:new Float32Array(n),v:new Float32Array(n),wet:new Int8Array(n).fill(-1),
+      gx:new Float32Array(n),gy:new Float32Array(n),x0:1e9,y0:1e9,x1:-1,y1:-1,acc:0,last:performance.now(),
+      seen:new WeakSet(),pos:new WeakMap()};
+  return WV;
+}
+function wvWet(k){
+  const g=WV; let w=g.wet[k]; if(w>=0) return w;
+  const cx=k%g.cw, cy=(k/g.cw)|0; w=0;
+  if(cx>0&&cy>0&&cx<g.cw-1&&cy<g.ch-1){
+    const px=cx*WV_C+2, py=cy*WV_C+2, tx=Math.floor(px/Q), ty=Math.floor(py/Q), f=G.f, row=f.g[ty], tt=row&&row[tx];
+    if(tt!==undefined&&tt!==T.WALL){
+      if(g.haz&&g.haz.kind==='water'&&g.haz.g[ty]&&g.haz.g[ty][tx]) w=1;
+      else if(G.pools&&G.pools.length&&poolU(G.pools,px,py)>0) w=1;
+    }
+  }
+  g.wet[k]=w; return w;
+}
+/* 水面を押し下げる（x,y はマス単位の足元）。周りが盛り上がって輪になって広がる。 */
+function wvPoke(x,y,amp,rad){
+  const g=wvGrid(); if(!g||!Number.isFinite(x)||!Number.isFinite(y)) return false;
+  const cx=x*Q/WV_C-.5, cy=(y*Q+2)/WV_C-.5, R=Math.ceil(rad);
+  let any=false;
+  for(let j=Math.floor(cy)-R;j<=Math.ceil(cy)+R;j++) for(let i=Math.floor(cx)-R;i<=Math.ceil(cx)+R;i++){
+    if(i<2||j<2||i>=g.cw-2||j>=g.ch-2) continue;
+    const k=j*g.cw+i; if(!wvWet(k)) continue;
+    const d=Math.hypot(i-cx,j-cy)/rad; if(d>=1) continue;
+    const q=1-d*d; g.h[k]-=amp*q*q; any=true;
+    if(i<g.x0)g.x0=i; if(i>g.x1)g.x1=i; if(j<g.y0)g.y0=j; if(j>g.y1)g.y1=j;
+  }
+  return any;
+}
+function wvStep(){
+  const g=WV; if(!g||g.x1<0) return;
+  const cw=g.cw, H=g.h, V=g.v;
+  const x0=Math.max(2,g.x0-1), x1=Math.min(cw-3,g.x1+1), y0=Math.max(2,g.y0-1), y1=Math.min(g.ch-3,g.y1+1);
+  for(let j=y0;j<=y1;j++) for(let i=x0;i<=x1;i++){
+    const k=j*cw+i; if(!wvWet(k)) continue;
+    const c=H[k], l=wvWet(k-1)?H[k-1]:c, r=wvWet(k+1)?H[k+1]:c, u=wvWet(k-cw)?H[k-cw]:c, d=wvWet(k+cw)?H[k+cw]:c;
+    V[k]=(V[k]+(l+r+u+d-4*c)*WV_K)*WV_VD;
+  }
+  let nx0=1e9,ny0=1e9,nx1=-1,ny1=-1;
+  for(let j=y0;j<=y1;j++) for(let i=x0;i<=x1;i++){
+    const k=j*cw+i; if(g.wet[k]<=0) continue;
+    const h=(H[k]+V[k])*WV_HD; H[k]=h;
+    if(Math.abs(h)+Math.abs(V[k])>.004){ if(i<nx0)nx0=i; if(i>nx1)nx1=i; if(j<ny0)ny0=j; if(j>ny1)ny1=j; }
+  }
+  if(nx1<0){ for(let j=y0;j<=y1;j++){ H.fill(0,j*cw+x0,j*cw+x1+1); V.fill(0,j*cw+x0,j*cw+x1+1); } g.x0=g.y0=1e9; g.x1=g.y1=-1; return; }
+  g.x0=nx0; g.x1=nx1; g.y0=ny0; g.y1=ny1;
+}
+/* 1フレームぶん：足音・滴の波紋（FEEL.ripples に積まれた物）と、水の中を動く者の航跡を入れて、時間ぶん進める。 */
+function wvFeed(){
+  const g=wvGrid(); if(!g) return;
+  const rs=(typeof FEEL!=='undefined'&&FEEL.ripples)||[];
+  for(const r of rs){ if(g.seen.has(r)) continue; g.seen.add(r); if(r.age<.2) wvPoke(r.x,r.y,r.amp||WV_STEP,2.4); }
+  const movers=[P].concat((S.hero&&S.hero.party)||[], W.enemies||[]);
+  for(const e of movers){
+    if(!e||e.dead||e.fallAnim||!Number.isFinite(e.x)||!Number.isFinite(e.y)) continue;
+    const o=g.pos.get(e);
+    if(o){ const d=Math.hypot(e.x-o.x,e.y-o.y); if(d>.004&&d<.6) wvPoke(e.x,e.y,Math.min(.5,d*WV_WAKE),1.7); o.x=e.x; o.y=e.y; }
+    else g.pos.set(e,{x:e.x,y:e.y});
+  }
+}
+const WV_STEP=1.0, WV_WAKE=2.0;
+function wvTick(){
+  const g=WV; if(CAVE.waveFixed){ wvStep(); return; }                 // テスト用：1フレーム＝1歩
+  const now=performance.now();
+  g.acc+=Math.min(.1,(now-g.last)/1000); g.last=now;
+  let n=0; while(g.acc>=1/60&&n<4){ wvStep(); g.acc-=1/60; n++; }
+  if(n===4) g.acc=0;
+}
+CAVE.waveStep=(n)=>{ wvGrid(); for(let i=0;i<(n||1);i++) wvStep(); };
+CAVE.wave=()=>WV;
 let ripSrc=null; const RIP_DARK=(0xff000000|(0x14<<16)|(0x0c<<8)|0x04)>>>0;   // 窪みの暗さ（ABGR）
 /* 足元が石の層の水溜りか（波紋を出すため）。水溜りは見た目だけの賑やかしなので、ここで引く。 */
 function puddleAt(x,y){
@@ -622,6 +723,7 @@ function terrain(f,Z,camX,camY,blinded){
     }}
   if(!G.deco){ G.deco=genDeco(f,Z); G.bats=genBats(f,Z); }
   drawDeco(bx0,by0,t,blindR);
+  if(!(typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches)) wvFeed();
   waterPost(bx0,by0,t);
   bufX.putImageData(img,0,0);
   ctx.save(); ctx.imageSmoothingEnabled=false;
