@@ -152,4 +152,18 @@ R.noRawTagText = await pg.evaluate(()=>{
   return {hits, ok: hits.length===0};
 });
 
+/* 実際にキャンバスへ渡った文字にタグが無いこと。熟練の帯に武器のアイコン（<i …>）が混ざり、
+   データURL込みのタグが「謎の英文字列」として出ていた（報告）。 */
+R.canvasTextHasNoTags = await pg.evaluate(()=>{
+  TH.run(3,{seed:12}); setScreen('game'); TH.immortal();
+  // 熟練の帯（剣で熟練を1段上げる）に、タグが入っていない
+  S.mastery={}; gainMastery('sword', masteryNeed(1));
+  const title=(_banner&&_banner.title)||'';
+  // 描く所の砦：タグ付きの文字を描いても、タグ無しと同じ絵になる
+  const pix=t=>{ const c=document.createElement('canvas'); c.width=120; c.height=30; const x=c.getContext('2d');
+    x.font='16px sans-serif'; x.fillStyle='#fff'; x.fillText(t,4,20); return c.toDataURL(); };
+  const same = pix('<i class="pi" style="background-image:url(data:x)"></i> 剣')===pix('剣');
+  return {title, same, ok: title.indexOf('<')<0 && title.indexOf('熟練')>=0 && same};
+});
+
 await done(b, errs, R);

@@ -841,7 +841,8 @@ function rockPx(x,y,nx,ny,edge){ // nx,ny：外向きの法線、edge：縁か�
 /* ---------- 雨漏り（石の層の第6〜第9階層） ----------
    天井から水滴が落ちて、水溜りに波紋を立てる（ユーザー要望「6-9階は雨漏りみたいなものを少し垂らしたい」）。
    水は漏れる所の下に溜まるので、**滴る場所は水溜りの中**を基本にし、床に落ちる物を少しだけ混ぜる。
-   量は控えめ：水溜り2つに1つ前後。間隔は1滴ごとに1.6〜3.8秒。 */
+   量は控えめ：水溜り2つに1つ前後と、床のおよそ60マスに1つ（床には濡れた染みを残す）。間隔は1滴ごとに1.6〜3.8秒。
+   （「水溜り以外のところにも落ちてほしい」で床の分を4倍に増やした） */
 function genDrips(f,pools,depth){
   const z=zoneFloor(depth); if(!G||G.Z.id!=='stone'||z<6||z>9) return [];
   const out=[];
@@ -849,8 +850,8 @@ function genDrips(f,pools,depth){
     const l=p.lobes[0]; out.push({x:p.x+Math.round(l.ox*.5), y:p.y+Math.round(l.oy*.5), s:h, pool:p, per:1.6+(h%1000)/1000*2.2, last:-1}); }
   for(let ty=1;ty<f.H-1;ty++)for(let tx=1;tx<f.W-1;tx++){
     if(f.g[ty][tx]!==T.FLOOR) continue; const h=hs(tx*7919+ty*104729+depth*13,778);
-    if(h%1000>=4) continue;
-    out.push({x:tx*Q+8, y:ty*Q+8, s:h, pool:null, per:1.8+(h%997)/997*2.0, last:-1});
+    if(h%1000>=16) continue;                                   // 床にも落ちる（床のおよそ60マスに1つ）
+    out.push({x:tx*Q+4+(h>>>10)%9, y:ty*Q+4+(h>>>14)%9, s:h, pool:null, per:1.8+(h%997)/997*2.0, last:-1});
   }
   return out;
 }
@@ -863,6 +864,9 @@ function drawDrips(bx0,by0,t,blindR){
     if(d.x<bx0-4||d.y<by0-DRIP_H-4||d.x>bx0+bw+4||d.y>by0+bh+8) continue;
     if(!seenAt(G.f,G.L,d.x|0,d.y|0)) continue;
     if(Math.hypot(d.x-lampX,d.y-lampY)>blindR) continue;
+    if(!d.pool){                                                 // 床の滴り跡：濡れて少し暗い小さな染み
+      const L=Math.max(.15,pxLight(d.x,d.y)); for(let dy=-1;dy<=1;dy++)for(let dx=-2;dx<=2;dx++){ if(Math.abs(dx)===2&&dy) continue;
+        if(ihash(d.x+dx,d.y+dy)%3===0) continue; dp(d.x+dx,d.y+dy,sh3(DECO_PAL.pool,L*.9,d.x+dx,d.y+dy)); } }
     const ph=(d.s%1000)/1000*d.per, u=(t+ph)%d.per, cyc=Math.floor((t+ph)/d.per);
     if(u<DRIP_FALL){                                             // 落ちている
       const k=u/DRIP_FALL, y=d.y-DRIP_H*(1-k*k);

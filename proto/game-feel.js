@@ -42,6 +42,18 @@ function feelWeaponKind(base,dt,proj){
   return ({great:'greatsword',mace:'hammer',spear:'spear',sword:'swordaxe',axe:'swordaxe',dagger:'dagger'})[base]
     ||(dt==='pierce'?'spear':dt==='blunt'?'hammer':'swordaxe');
 }
+/* ---------- キャンバスの文字にタグを出さない（最後の砦） ----------
+   ログ（innerHTML）にはアイコンの <i …> を置くが、帯・名札・頭上の文字はキャンバスに描く。
+   同じ文字列を渡すと、タグ（データURL込みの長い英数字）がそのまま画面に出る。
+   渡す側は直してあるが、1ヶ所でも取りこぼすと同じ事故になるので、描く所で落とす。 */
+(function(){
+  const C2=window.CanvasRenderingContext2D&&CanvasRenderingContext2D.prototype; if(!C2||C2._noTags)return;
+  const clean=t=>(typeof t==='string'&&t.indexOf('<')>=0)?t.replace(/<[^>]*>/g,'').replace(/\s{2,}/g,' ').trim():t;
+  const f=C2.fillText, s=C2.strokeText;
+  C2.fillText=function(t,...a){return f.call(this,clean(t),...a);};
+  C2.strokeText=function(t,...a){return s.call(this,clean(t),...a);};
+  C2._noTags=true;
+})();
 function feelImpact(e,src,crit,dt,elem){
   const m=feelMotion(e);m.flash=.22;m.crit=crit?.25:0;
   // Replace the visual recoil on each hit; never accumulate or change simulation coordinates.

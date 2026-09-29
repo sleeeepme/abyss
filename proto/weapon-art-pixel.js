@@ -3110,8 +3110,28 @@
     ctx.drawImage(cv, 0, 0, cv.width, cv.height, -rx, -ry, rx * 2, ry * 2);
     ctx.restore();
   }
+  /* ---------- 貼り付けに使う画用紙は、1フレームの中で使い回さない ----------
+     以前は全部の効果が同じ1枚（b.cv）に書いては drawImage で貼っていた。iPhone の Safari では
+     drawImage が「その時点の中身」ではなく**後で書き換えた中身**を貼ることがあり、
+     同じフレームで後から描いた当たりの火花（n_hit）が、先に貼った振りの絵（n_swing）の
+     枠の中にも出ていた——主人公から左上へ2マスほどの何も無い所に、もう1つ火花が出る
+     （報告「ヒットエフェクトがズレている」5回目。枠の左上からの位置が
+     振りの枠と一致した：(20,34)−(52,66) ドット × 1.875 ≒ 左へ60・上へ60px）。
+     貼るたびに別の画用紙へ移してから貼る。画用紙はフレームの頭で先頭から使い直す。 */
+  const POOL = [], POOL_MAX = 64; let poolI = 0;
+  (function resetPool() { poolI = 0; if (typeof requestAnimationFrame === 'function') requestAnimationFrame(resetPool); })();
+  function sheet(w, h) {
+    if (poolI >= POOL_MAX) poolI = 0;
+    let c = POOL[poolI];
+    if (!c) { c = document.createElement('canvas'); c.width = Math.max(1, w); c.height = Math.max(1, h); c._x = c.getContext('2d'); POOL[poolI] = c; }
+    poolI++;
+    if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); c._x = c.getContext('2d'); }
+    return c;
+  }
   function blit(ctx, b, dx, dy, dw, dh, fit) {
-    b.cx.putImageData(b.img, 0, 0, 0, 0, b.w, b.h);
+    const sc = sheet(b.w, b.h);
+    sc._x.putImageData(b.img, 0, 0, 0, 0, b.w, b.h);
+    b = { w: b.w, h: b.h, cv: sc };
     ctx.save(); ctx.imageSmoothingEnabled = false;
     if (fit) {
       const kf = Math.min(dw / b.w, dh / b.h); let k = Math.floor(kf);

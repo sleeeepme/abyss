@@ -5879,8 +5879,11 @@ function gainMastery(baseId, n){
     const b=BASES.find(x=>x.id===baseId);
     const nm=(b?BASE_IC[b.id]+' '+b.nm:baseId);
     log('<i class="pi pi-j_warrior"></i> '+nm+'の熟練 '+m.lv);
-    if(m.lv===MASTERY_MAX){ m.xp=0; showBanner(nm+'　熟練 極み', '攻撃力 +'+(MASTERY_ATK*MASTERY_MAX)+'%　攻速 +'+(MASTERY_ASPD*MASTERY_MAX)+'%', '#d6b34a', 2.6); }
-    else showBanner(nm+'　熟練 '+m.lv, '攻撃力 +'+(MASTERY_ATK*m.lv).toFixed(1)+'%　攻速 +'+(MASTERY_ASPD*m.lv).toFixed(1)+'%', '#d6b34a', 1.8);
+    /* 帯はキャンバスに文字を描くだけなので、アイコン（<i …> のタグ）を混ぜない。混ぜると
+       「<i class="pi" style="background-image:url(data:image/png;base64,…」がそのまま出る（報告「謎の英文字列」）。 */
+    const bn=(b?b.nm:baseId);
+    if(m.lv===MASTERY_MAX){ m.xp=0; showBanner(bn+'　熟練 極み', '攻撃力 +'+(MASTERY_ATK*MASTERY_MAX)+'%　攻速 +'+(MASTERY_ASPD*MASTERY_MAX)+'%', '#d6b34a', 2.6); }
+    else showBanner(bn+'　熟練 '+m.lv, '攻撃力 +'+(MASTERY_ATK*m.lv).toFixed(1)+'%　攻速 +'+(MASTERY_ASPD*m.lv).toFixed(1)+'%', '#d6b34a', 1.8);
   }
 }
 function stashCap(){ return 20 + bldLv('stash')*6; }
@@ -18853,10 +18856,10 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260929a"></script>
-<script src="game-feel.js?v=20260929b"></script>
+<script src="weapon-art-pixel.js?v=20260929b"></script>
+<script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20260929f"></script>
+<script src="cave-look.js?v=20260929g"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
