@@ -7,7 +7,8 @@
 // つるっとした絵が並び、しかも端末ごとに形が違う。全部こちらの絵に置き換えた。
 //
 // 描き方の決まりは ui-icons.js の頭に書いた。ここはその見張り番。
-//   ・1枚 = 16行×16文字、1枚に6色まで
+//   ・1枚 = 16行×16文字、1枚に8色まで（輪郭込み。第3版で6→8に緩めた）
+//   ・輪郭 '1' は全アイコン共通の色（炎のように縁まで光る物だけ差し替え可）
 //   ・**左右対称にすべき物は、形が左右対称**（陰影は光の向きがあるので別）
 //   ・描いた升目そのものが対称であること。読み込み側が直してしまうと
 //     「半分だけ描いた絵」に気づけないので、直した跡が残っていたら落とす。
@@ -31,7 +32,7 @@ const R={};
    ここが空でないということは、絵が1枚壊れている。 */
 R.grids = await pg.evaluate(()=>{
   const d=UI_ICONS.defs, names=Object.keys(d);
-  const tooMany=names.filter(k=>d[k].colors>6).map(k=>k+':'+d[k].colors);
+  const tooMany=names.filter(k=>d[k].colors>8).map(k=>k+':'+d[k].colors);
   /* 対称を名乗っている物は、**焼いたあとの形**も必ず左右対称 */
   const broken=names.filter(k=>{
     if(!d[k].sym) return false;
