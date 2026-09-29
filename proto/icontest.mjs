@@ -6,7 +6,14 @@
 // 絵文字は端末のフォントで描かれるので、ドット絵の盤面の横に
 // つるっとした絵が並び、しかも端末ごとに形が違う。全部こちらの絵に置き換えた。
 //
-// ここで見るのは5つ。
+// 描き方の決まりは ui-icons.js の頭に書いた。ここはその見張り番。
+//   ・1枚 = 16行×16文字、1枚に6色まで
+//   ・**左右対称にすべき物は、形が左右対称**（陰影は光の向きがあるので別）
+//   ・描いた升目そのものが対称であること。読み込み側が直してしまうと
+//     「半分だけ描いた絵」に気づけないので、直した跡が残っていたら落とす。
+//
+// ここで見るのは8つ。
+//   0) 升目そのものに不備が無い（行数・長さ・色数・左右のずれ）
 //   1) 焼き込みが全部できている（名前の数だけ data: URL があり、中身が空でない）
 //   2) **index.html が呼んでいる pi-○○ が、全部ちゃんと在る。**
 //      綴りを1文字間違えるとその場所だけ無言で消える——見た目の事故なので
@@ -18,6 +25,28 @@ import { boot, install, done } from './_h.mjs';
 import fs from 'fs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
+
+/* ============ 0. 升目そのものに不備が無い ============
+   ui-icons.js は読み込みながら不備を problems に貯める。
+   ここが空でないということは、絵が1枚壊れている。 */
+R.grids = await pg.evaluate(()=>{
+  const d=UI_ICONS.defs, names=Object.keys(d);
+  const tooMany=names.filter(k=>d[k].colors>6).map(k=>k+':'+d[k].colors);
+  /* 対称を名乗っている物は、**焼いたあとの形**も必ず左右対称 */
+  const broken=names.filter(k=>{
+    if(!d[k].sym) return false;
+    const g=d[k].g;
+    for(let y=0;y<16;y++) for(let x=0;x<8;x++)
+      if(!!g[y][x] !== !!g[y][15-x]) return true;
+    return false;
+  });
+  /* 空っぽの升目（描き忘れ） */
+  const empty=names.filter(k=>!d[k].g.some(r=>r.some(c=>c)));
+  const symCount=names.filter(k=>d[k].sym).length;
+  return {problems:UI_ICONS.problems, tooMany, broken, empty, symCount,
+          ok: UI_ICONS.problems.length===0 && tooMany.length===0
+              && broken.length===0 && empty.length===0 && symCount>=20};
+});
 
 /* ============ 1. 焼き込みが全部できている ============ */
 R.baked = await pg.evaluate(()=>{
