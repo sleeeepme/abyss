@@ -216,7 +216,7 @@ const LIGHT_A=.64, LIGHT_CORE=.22;   // 明かりの濃さ（1で元）／中央
 
 /* ---------- 地形ハザードの色（面として描く） ---------- */
 const HZ={
-  water:{ramp:cs(['#0a2230','#103650','#1a5070','#3a88b0']), hi:C('#c8f0ff'), glow:false},
+  water:{ramp:cs(['#0a2230','#103650','#1a5070','#3a88b0']), band:cs(['#0a2230','#103650','#1a5070','#3a88b0','#5fa6c8','#8ccbe2']), hi:C('#c8f0ff'), glow:false},
   lava:{ramp:cs(['#6a1a08','#b0360e','#e8661a','#ffb040']), hi:C('#fff0b0'), glow:true},
   poison:{ramp:cs(['#15240f','#243c18','#3a5a24','#6a9a3a']), hi:C('#b8e070'), glow:false},
   spore:{ramp:cs(['#1a1428','#2a2040','#44345e','#7a5ea0']), hi:C('#e8c0ff'), glow:false},
@@ -312,6 +312,81 @@ function hazAt(g,px,py){
   return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZS[((py&255)<<8)|(px&255)]-.5)*.5;
 }
 
+/* ---------- 水面（以前の本編の「生きた水面」を、洞窟のドットで描き直したもの） ----------
+   本編の drawLivingLiquid は、1マスずつ半透明の横線を重ねて
+     ・屈折の帯（2行おきの短い横線が、行ごとに揺れてずれる）
+     ・流れの筋（4行おきに、明るい短い線がゆっくり横へ流れる）
+     ・下にある物を横にずらす屈折
+     ・歩いた所の波紋
+   を出していた。洞窟版に替えたときに平らな色の面になっていたので、同じ4つを戻す。
+   半透明は使えない（1ドット＝パレットの1色）ので、濃さは「段を1つ上げるかどうか」で出す。
+   帯も筋も**世界の座標**で決めるので、マスの境目で途切れない。 */
+function waterDepthAt(g,px,py){
+  const u=(px+.5)/Q-.5, v=(py+.5)/Q-.5, x0=Math.floor(u), y0=Math.floor(v), fx=u-x0, fy=v-y0;
+  const r0=g[y0], r1=g[y0+1];
+  const a=r0?(r0[x0]|0):0, b=r0?(r0[x0+1]|0):0, c=r1?(r1[x0]|0):0, d=r1?(r1[x0+1]|0):0;
+  if(a===b&&b===c&&c===d&&a<=1) return a;                     // 浅瀬の内側は混ぜる必要が無い
+  return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZS[((py&255)<<8)|(px&255)]-.5)*.9;
+}
+function waterSurface(ramp,hi,lv,wx,wy,t,Lv,D,rowW1,rowW2,colW){
+  /* ramp は6段（0..3 が水面の地の色、4..5 は帯と筋だけに使う明るい段）。
+     帯を「段を1つ上げる」だけにすると、灯りの真下（地が既に最上段）で帯が消えていた。 */
+  let up=0;
+  const row=wy>>1, rh=ihash(row,77);
+  // 屈折の帯：2行おきの短い横線。長さと間隔を行ごとに変え、行の揺れでずらす（煉瓦のように揃えない）
+  if(!(wy&1)&&(rh%3)===0&&D<2.7){
+    const per=9+(rh>>>4)%6, len=2+(rh>>>8)%3, u=(wx+rowW1+colW+(rh>>>12)%per)|0;
+    if(((u%per)+per)%per<len) up=1;
+  }
+  // 流れの筋：4行おきに、明るい短い線が横へ流れる。深い所ほど見えにくい
+  if((wy&3)===2&&D<2.4){ const u=wx+(wy>>2)*29+Math.floor(t*5+rowW2*2); if((((u%23)+23)%23)<2+((wy>>2)%3)) up=2; }
+  let col=ramp[Math.min(ramp.length-1,lv+up+(up&&lv>=3?1:0))];
+  if(Lv>.2&&ihash(wx,wy+((t*4)|0)*13)%61===0) col=hi;          // 灯りの照り返し
+  return col;
+}
+/* 屈折（下にある水草・魚・帯を横にずらす）と波紋。水面の印（wmask）がある所だけ。 */
+const RIP_LIFE=.85;
+function waterPost(bx0,by0,t){
+  if(!wmask) return;
+  const reduced=typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches;
+  if(!reduced) for(let by=0;by<bh;by++){
+    const wy=by0+by, sh=Math.round(Math.sin(wy*.16+t*1.6+Math.sin(wy*.05)*2));
+    if(!sh) continue;
+    const o=by*bw; let any=false;
+    for(let x=0;x<bw;x++){ const m=wmask[o+x]; wrow[x]=buf[o+x]; if(m) any=true; }
+    if(!any) continue;
+    for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
+  }
+  const rs=(typeof FEEL!=='undefined'&&FEEL.ripples)||[];
+  const W_=HZ.water, pool=DECO_PAL.pool;
+  for(const r of rs){
+    if(!Number.isFinite(r.x)||!Number.isFinite(r.y)) continue;
+    const a=Math.max(0,r.age), q=1-a/RIP_LIFE; if(q<=0) continue;
+    const cx=r.x*Q-bx0, cy=r.y*Q+2-by0;
+    if(cx<-40||cy<-30||cx>bw+40||cy>bh+30) continue;
+    // 輪を2本。外の輪が先に広がり、内の輪が少し遅れて追う
+    for(let ring=0;ring<2;ring++){
+      const R=2+a*24-ring*6; if(R<1.5) continue;
+      const n=Math.ceil(R*6.4), fade=q*(ring?.7:1);
+      for(let i=0;i<n;i++){
+        const ang=i/n*6.2831853, x=Math.round(cx+Math.cos(ang)*R), y=Math.round(cy+Math.sin(ang)*R*.62);
+        if(x<0||y<0||x>=bw||y>=bh) continue;
+        const k=y*bw+x, m=wmask[k]; if(!m) continue;
+        if(fade<BAYER[(((y+by0)&3)<<2)|((x+bx0)&3)]) continue;   // 薄れるほど網点で間引く
+        buf[k]= m===2 ? (fade>.6?DECO_PAL.poolGleam:DECO_PAL.poolLip) : (fade>.6&&!ring?W_.hi:W_.ramp[3]);
+      }
+    }
+  }
+}
+/* 足元が石の層の水溜りか（波紋を出すため）。水溜りは見た目だけの賑やかしなので、ここで引く。 */
+function puddleAt(x,y){
+  if(!G||!G.pools) return false;
+  const px=x*Q, py=y*Q+2;
+  for(const d of G.pools){ const dx=(px-d.x)/d.rx, dy=(py-d.y)/d.ry; if(dx*dx+dy*dy<1) return true; }
+  return false;
+}
+CAVE.puddleAt=puddleAt;
+
 /* ---------- 光 ---------- */
 const NA=720, ray=new Float32Array(NA);
 let lampX=0, lampY=0, Rpx=100, shadowOn=true, flatL=.45;
@@ -334,7 +409,9 @@ CAVE.lightAt=function(xT,yT){
 
 /* ---------- 地形を描く（draw() のマス塗りの代わり） ---------- */
 const bufC=document.createElement('canvas'), bufX=bufC.getContext('2d');
-let bw=0,bh=0,img=null,buf=null,cool=null;
+let bw=0,bh=0,img=null,buf=null,cool=null,wmask=null,wrow=null,wcolX=null;
+/* wmask … このフレームで「水面」として塗ったドット（1=水の層の水／2=石の層の水溜り）。
+   屈折のずらしと波紋は、ここに印のあるドットの上にだけ描く。 */
 let T0=performance.now();
 CAVE.terrain=function(f,Z,camX,camY,blinded){
   try{ return terrain(f,Z,camX,camY,blinded); }catch(err){ console.error(err); CAVE.on=false; return false; }
@@ -344,7 +421,8 @@ function terrain(f,Z,camX,camY,blinded){
   const L=G.L, Pp=G.P, t=(performance.now()-T0)/1000;
   const ps=TS/Q;
   const nbw=Math.ceil(innerWidth/ps)+3, nbh=Math.ceil(innerHeight/ps)+3;
-  if(nbw!==bw||nbh!==bh){bw=nbw;bh=nbh;bufC.width=bw;bufC.height=bh;img=bufX.createImageData(bw,bh);buf=new Uint32Array(img.data.buffer);cool=new Float32Array(bw*bh);}
+  if(nbw!==bw||nbh!==bh){bw=nbw;bh=nbh;bufC.width=bw;bufC.height=bh;img=bufX.createImageData(bw,bh);buf=new Uint32Array(img.data.buffer);cool=new Float32Array(bw*bh);wmask=new Uint8Array(bw*bh);wrow=new Uint32Array(bw);wcolX=new Float32Array(bw);}
+  wmask.fill(0);
   const bx0=Math.floor(camX/ps)-1, by0=Math.floor(camY/ps)-1;
   // ランタン
   lampX=P.x*Q; lampY=P.y*Q-4;
@@ -407,8 +485,10 @@ function terrain(f,Z,camX,camY,blinded){
       cls[j*txn+i]=(all?2:(none?0:1)) | (haz0?4:0) | (pit0?8:0);
     } }
 
+  for(let bx=0;bx<bw;bx++) wcolX[bx]=Math.sin((bx0+bx)*.056+t)*1.5;
   for(let by=0;by<bh;by++){const wy=by0+by, dy=wy-lampY;
     if(by<blackPx||by>=skipBot){ buf.fill(VOID,k,k+bw); k+=bw; continue; }
+    const rowW1=Math.sin(wy*.22+t*1.7)*2, rowW2=Math.sin(wy*.24+t*1.4);
     const clsRow=((wy>>4)-ty0)*txn - tx0;
     for(let bx=0;bx<bw;bx++,k++){const wx=bx0+bx;
       if(wx<0||wy<0||wx>=PW||wy>=PH){buf[k]=VOID;continue;}
@@ -432,9 +512,18 @@ function terrain(f,Z,camX,camY,blinded){
         if(pitOn&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
         if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(hv>.5){
-          const tier=(hg[wy>>4]&&hg[wy>>4][wx>>4])|0;
           let lv = hz.glow ? 1+((Math.sin(t*1.6+(wx+wy)*.05)*.5+.5)*1.6+b)|0 : Math.floor(Math.max(Lv,Cv*.8)*4+b*.9);
-          if(haz.kind==='water'){ lv-=(tier>=2?1:0); if(tier>=3) lv-=1; }
+          if(haz.kind==='water'){
+            /* 深さはマスごとの段（1浅瀬/2深み/3淵）を**マスの中心どうしで混ぜた値**で塗る。
+               以前は wy>>4 のマスの段をそのまま使っていたので、深い所が四角の寄せ集めに見えた（報告）。
+               混ぜた値が2.5を越える所＝淵のマスの縁なので、落ちる場所とは食い違わない。 */
+            const D=waterDepthAt(hg,wx,wy);
+            lv-=Math.floor(Math.max(0,Math.min(2,D-1.2))+(b-.5)*.45+.15);
+            lv=Math.max(0,Math.min(3,lv));
+            if(hv<.56){ buf[k]=hz.ramp[Math.min(3,lv+1)]; continue; }    // 岸
+            buf[k]=waterSurface(hz.band,hz.hi,lv,wx,wy,t,Lv,D,rowW1,rowW2,wcolX[bx]);
+            wmask[k]=1; continue;
+          }
           lv=Math.max(0,Math.min(3,lv));
           let col=hz.ramp[lv];
           const n=NZB[((wy&255)<<8)|(wx&255)];
@@ -485,6 +574,7 @@ function terrain(f,Z,camX,camY,blinded){
     }}
   if(!G.deco){ G.deco=genDeco(f,Z); G.bats=genBats(f,Z); }
   drawDeco(bx0,by0,t,blindR);
+  waterPost(bx0,by0,t);
   bufX.putImageData(img,0,0);
   ctx.save(); ctx.imageSmoothingEnabled=false;
   ctx.drawImage(bufC,0,0,bw,bh,bx0*ps-camX,by0*ps-camY,bw*ps,bh*ps);
@@ -515,6 +605,7 @@ const DECO_PAL={
   /* 水溜りは逆に、床より**暗く**してから縁と照り返しで拾わせる。
      床と同じ明るさの青を置くと、ただの模様になる。 */
   pool:dcR(['#050a13','#0a1422','#122238']), poolLip:C('#5a7ea2'), poolGleam:C('#d6ecf8'),
+  poolW:cs(['#0c1a2c','#16304a','#22486a','#335f86','#5a8ab0','#8ab4d4']), poolShade:C('#0a121e'),
 };
 // 層ごとの品目：[名前, 置き場所, 出やすさ]
 const DECO_SET={
@@ -543,7 +634,7 @@ function genDeco(f,Z){
     for(let n=0;n<set.length;n++){const [kind,where,p,minDep]=set[n];
       if(minDep && depth<minDep) continue;      // その層の中でも、深い側にだけ出る品目
       const h=hs(tx*92821+ty*68917+depth*31,n+1), r=(h%100000)/100000;
-      if(r>=p*(DECO_MUL[Z.id]||1)) continue;
+      if(r>=p*(DECO_MUL[Z.id]||1)*(kind==='pool'?poolMore(depth):1)) continue;
       if(where==='water'&&!inW) continue;
       if(where!=='water'&&(inW||hz)) continue;
       if(where==='wall'&&!nb.length) continue;
@@ -559,10 +650,20 @@ function genDeco(f,Z){
       if(where==='wall'){ const [dx,dy]=nb[(h>>>16)%nb.length], o=f.g[ty+dy][tx+dx]===T.PIT?2:6; wdx=dx; wdy=dy; x=tx*Q+8+dx*o; y=ty*Q+8+dy*o; }
       if(where==='corner'){ x=tx*Q+8+cdx*3; y=ty*Q+8+cdy*3+2; wdx=cdx; wdy=cdy; }
       if(where==='north'){ x=tx*Q+2+(h>>>8)%12; y=ty*Q-2; wdx=0; wdy=-1; }
-      out.push({k:kind,x,y,s:h,wdx,wdy,ok:0}); break; }
+      const o={k:kind,x,y,s:h,wdx,wdy,ok:0};
+      if(kind==='pool'){ const g=poolGrow(depth); o.rx=6+h%5+g; o.ry=3+((h>>>3)%2)+g*.45; }
+      out.push(o); break; }
   }
+  G.pools=out.filter(o=>o.k==='pool');
   return out;
 }
+/* 石の層の後半（第6〜第10階層）の水溜り。**水の層へ近づくほど増えて広がる。**
+   第6階層は今までどおりまばら、第10階層で数が約2.6倍・一つずつも一回り大きい
+   （ユーザー要望「水の層に近づくにつれて水の面積を増やしたい」）。
+   層は一周するので、階の数ではなく「層の中の何階目か」で決める。 */
+function zoneFloor(depth){ return ((Math.max(1,depth)-1)%10)+1; }
+function poolMore(depth){ return 1+Math.max(0,zoneFloor(depth)-6)*.4; }
+function poolGrow(depth){ return Math.max(0,zoneFloor(depth)-6)*.9; }
 const DEMIT={boiler:[30,.6],crystal:[14,.35],plankton:[18,.4],shroom:[18,.45],bulb:[14,.3],lamppost:[34,.7],vent:[20,.45],slag:[14,.3],pipe:[10,.2]};
 function decoEmit(bx0,by0){
   for(const d of G.deco){ const em=DEMIT[d.k]; if(!em||d.ok<0) continue;
@@ -573,6 +674,7 @@ function decoEmit(bx0,by0){
 let DB0x=0,DB0y=0;
 function dpf(x,y,c){ x=Math.round(x)-DB0x; y=Math.round(y)-DB0y; if(x>=0&&y>=0&&x<bw&&y<bh) buf[y*bw+x]=c; }
 function sh5(r,L,x,y){ const i=Math.floor(Math.min(1,L)*4.99+(BAYER[((y&3)<<2)|(x&3)]-.5)*.9); return r[i<0?0:i>4?4:i]; }
+function dpw(x,y,c,m){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ buf[y*bw+x]=c; wmask[y*bw+x]=m; } }
 function dp(x,y,c){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh) buf[y*bw+x]=c; }
 function sh3(r,L,x,y){ const i=Math.floor(Math.min(1,L*1.5)*2.99+(BAYER[((y&3)<<2)|(x&3)]-.5)*.9); return r[i<0?0:i>2?2:i]; }
 function dl(x0,y0,x1,y1,r,L){ const n=Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0)))||1; for(let i=0;i<=n;i++){const x=Math.round(x0+(x1-x0)*i/n),y=Math.round(y0+(y1-y0)*i/n); dp(x,y,typeof r==='number'?r:sh3(r,L,x,y));} }
@@ -680,20 +782,17 @@ function drawDeco(bx0,by0,t,blindR){
         if(Math.sin(t*1.2+i*2+s)>.25) dp(px,py,P_.mossBedTip);} break; }
     /* 水溜り：浅い窪みに溜まった水。縁を1段明るくして「窪み」だと分からせ、
        面の上を光の筋がゆっくり横切る。波は立てない——流れていない水なので。 */
-    case 'pool': { const rx=6+s%5, ry=3+(s>>>3)%2;
-      for(let dy=-ry;dy<=ry;dy++)for(let dx=-rx;dx<=rx;dx++){
-        const nx=dx/rx, ny=dy/ry, dd=nx*nx+ny*ny;
+    case 'pool': { const rx=d.rx||(6+s%5), ry=d.ry||(3+(s>>>3)%2), ir=Math.ceil(ry), cr=Math.ceil(rx);
+      /* 浅い窪みに溜まった水。上の縁は窪みの影（暗い）、下の縁は光を受けて明るい——これで
+         「穴」ではなく「窪みに溜まった水」と読める。面は水の層と同じ流れる水面で、
+         波紋は waterPost が印（wmask=2）の上に描く。 */
+      for(let dy=-ir;dy<=ir;dy++)for(let dx=-cr;dx<=cr;dx++){
+        const nx=dx/rx, ny=dy/ry, px=x+dx, py=y+dy;
+        const dd=(nx*nx+ny*ny)*(1+(NZS[((py&255)<<8)|(px&255)]-.5)*.7);   // 縁をゆがめる（きれいな楕円は置いた物に見える）
         if(dd>1) continue;
-        const px=x+dx, py=y+dy;
-        if(dd>.82){ dp(px,py,P_.poolLip); continue; }            // 縁
-        dp(px,py,sh3(P_.pool,Math.min(1,L*1.1)*(.5+dd*.3),px,py));
-      }
-      // 面をゆっくり横切る光の筋（1本だけ。動かしすぎると「流れている水」になる）
-      const gx=x-rx+((t*3.5+s%17)%(rx*2));
-      for(let dy=-ry+1;dy<=ry-1;dy++){
-        const dx=gx-x+dy*.6, nx=dx/rx, ny=dy/ry;
-        if(nx*nx+ny*ny>.72) continue;
-        dp(x+dx,y+dy,P_.poolGleam);
+        if(dd>.78){ dp(px,py, ny<-.15 ? P_.poolShade : P_.poolLip); continue; }   // 縁
+        const lv=Math.max(0,Math.min(3,Math.floor(Math.min(1,L*1.25)*(1-dd*.25)*3.6+(BAYER[((py&3)<<2)|(px&3)]-.5)*.9)));
+        dpw(px,py,waterSurface(P_.poolW,P_.poolGleam,lv,px,py,t,L,1,Math.sin(py*.22+t*1.7)*2,Math.sin(px*.056+t)*1.5),2);
       } break; }
     case 'crystal': for(let i=0;i<3;i++){const h=hs(s,i), bx=x-2+i*2, H=3+h%4; for(let j=0;j<H;j++) dp(bx,y-j,P_.crys[j===H-1?2:(Math.sin(t*2+i+s)>.5?1:0)+((j+i)%2&&L>.3?1:0)]);} break;
     case 'weed': { for(let i=0;i<4;i++){const h=hs(s,i), bx=x-4+i*3, H=8+h%8; for(let j=0;j<H;j++){const px=bx+Math.sin(t*2+j*.6+i)*1.2*(j/H); dp(px,y-j,sh3(P_.weed,L+.1,px|0,y-j));}} break; }
@@ -1363,6 +1462,19 @@ function install(){
   /* 当たりの絵：壁の向こう・未探索の場所にいる相手への当たりは出さない。
      主人公の自動攻撃は視線を見ずに一番近い敵を狙う（本編の仕様）ので、
      壁の向こうの見えない敵に当たると、暗がりの何も無い所に火花だけが出て「ずれた」ように見える。 */
+  /* 波紋は地形のバッファに描く（waterPost）。本編の点の輪は重ねない。 */
+  const oldRip=window.drawFeelRipples;
+  if(typeof oldRip==='function') window.drawFeelRipples=function(camX,camY){ if(!CAVE.on) return oldRip(camX,camY); };
+  /* 石の層の水溜りを踏んでも、水の層と同じく波紋としぶきを出す。 */
+  const oldStep=window.feelFootstep;
+  if(typeof oldStep==='function') window.feelFootstep=function(e){
+    oldStep(e);
+    if(!CAVE.on||!e||!Number.isFinite(e.x)||!Number.isFinite(e.y)) return;
+    if(W.haz&&W.haz.g[Math.floor(e.y)]?.[Math.floor(e.x)]) return;          // 水の層の水は本編が出している
+    if(!puddleAt(e.x,e.y)) return;
+    FEEL.ripples.push({x:e.x,y:e.y,age:0,col:'#5a7ea2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift();
+    if(typeof feelSpray==='function') feelSpray(e.x,e.y+.16,'#8ab0d0',4,.6,'water');
+  };
   const oldHits=window.drawFeelHits;
   if(typeof oldHits==='function') window.drawFeelHits=function(camX,camY){
     if(!CAVE.on||!FEEL||!FEEL.hits) return oldHits(camX,camY);

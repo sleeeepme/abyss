@@ -3180,7 +3180,19 @@ function hazardDef(k){ return HAZARDS[k] || HAZARDS.poison; }
 function hazardCoverage(depth){
   if(depth < HAZARD_FROM_DEPTH) return 0;
   const base = Math.min(0.16, 0.045 + (depth-HAZARD_FROM_DEPTH)*0.0035);
-  return base * (HAZ_COVER_MUL[zoneAt(depth).id] || 1);
+  const z = zoneAt(depth).id;
+  return base * (HAZ_COVER_MUL[z] || 1) * hazCoverRamp(z, depth);
+}
+/* ---------- 層の奥へ進むほど、さらに広げる ----------
+   水の層は、入口（第11階層）では歩ける床のおよそ3割、層の終わり（第20階層）で
+   その**約2倍（6割近く）**にする（ユーザー指定）。base の伸びだけでは 1.5倍どまりだったので、
+   層の中の位置（1階目=0 … 10階目=1）で倍率を足す。層は一周するので階の数では決めない。
+   値は実測で合わせた（5本の平均で 11F 0.28 → 20F 0.60、約2.1倍）。 */
+const HAZ_COVER_RAMP = {sump:1.42};
+function hazCoverRamp(z, depth){
+  const k = HAZ_COVER_RAMP[z]; if(!k) return 1;
+  const p = ((Math.max(1,depth)-1)%10)/9;
+  return 1 + (k-1)*p;
 }
 /* 部屋の中に「池」をいくつか作る。散らすより塊のほうが避け方を考えられる。 */
 function spawnHazards(fl, depth){
@@ -18820,7 +18832,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929a"></script>
 <script src="game-feel.js?v=20260929a"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js"></script>
+<script src="cave-look.js?v=20260929a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

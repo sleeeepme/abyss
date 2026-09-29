@@ -526,4 +526,28 @@ R.clearedFloorShowsStairOnMap = await pg.evaluate(()=>{
           ok: afterHits>beforeHits};
 });
 
+/* 水の層の奥ほど水が広い（ユーザー指定「20階に近づくにつれて水の面積を増やしたい」）。
+   層の入口（11階）に対して、層の終わり（19階）で歩ける床に占める水が約2倍。 */
+R.waterGrowsTowardZoneEnd = await pg.evaluate(()=>{
+  const frac=d=>{ let s=0; for(const seed of [21,22,23]){ TH.run(d,{seed}); const f=W.fl; let walk=0,wet=0;
+      for(let y=0;y<f.H;y++)for(let x=0;x<f.W;x++){ if(!tileWalk(f,x,y)) continue; walk++; if(W.haz&&W.haz.kind==='water'&&W.haz.g[y][x]) wet++; }
+      s+=wet/walk; } return s/3; };
+  const a=frac(11), z=frac(19);
+  return {f11:+a.toFixed(3), f19:+z.toFixed(3), ratio:+(z/a).toFixed(2), ok: z/a>=1.7 && z<0.75};
+});
+/* 石の層の後半の水溜りは、踏むと波紋が出る。数は10階へ向けて増える（6階と9階を床1マスあたりで比べる）。 */
+R.puddlesRippleAndGrow = await pg.evaluate(()=>{
+  const pools=d=>{ TH.run(d,{seed:12}); setScreen('game'); draw(); const G=CAVE._G(); return (G&&G.pools)||[]; };
+  // 10階は大広間で床が狭いので、数ではなく「床1マスあたり」で比べる
+  const per=d=>{ const n=pools(d).length; let fl=0; for(const r of W.fl.g) for(const t of r) if(t===T.FLOOR) fl++; return n/fl; };
+  const n6=+per(6).toFixed(4), n9=+per(9).toFixed(4);
+  const list=pools(9), pool=list.slice().sort((a,b)=>b.rx-a.rx)[0];
+  if(!pool) return {n6,n9,ok:false};
+  TH.immortal(); W.enemies.length=0;
+  P.x=pool.x/16-1.2; P.y=(pool.y-2)/16; FEEL.ripples.length=0;
+  let rip=0;
+  stepSim(1.2,{draw:true, each:()=>{stickDx=1;stickDy=0;}, after:()=>{ rip=Math.max(rip,FEEL.ripples.length); }}); stickDx=0;
+  return {n6, n9, rip, ok: n9>n6*1.5 && rip>0};
+});
+
 await done(b, errs, R);
