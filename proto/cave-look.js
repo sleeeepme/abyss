@@ -366,27 +366,42 @@ function waterPost(bx0,by0,t){
     if(!any) continue;
     for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
   }
+  /* 波紋は**水面の歪み**として描く（報告「元々入れていたように歪みのような波紋を」）。
+     輪の帯の中のドットを、輪の中心から外向き（外側の半分）／内向き（内側の半分）へずらした所から
+     取ってくる——水面の帯や水草が輪の形にたわんで見える。稜線だけ網点で薄く明るくする。 */
   const rs=(typeof FEEL!=='undefined'&&FEEL.ripples)||[];
-  const W_=HZ.water, pool=DECO_PAL.pool;
+  if(!rs.length) return;
+  if(!ripSrc||ripSrc.length!==buf.length) ripSrc=new Uint32Array(buf.length);
+  ripSrc.set(buf);
+  const W_=HZ.water;
   for(const r of rs){
     if(!Number.isFinite(r.x)||!Number.isFinite(r.y)) continue;
     const a=Math.max(0,r.age), q=1-a/RIP_LIFE; if(q<=0) continue;
     const cx=r.x*Q-bx0, cy=r.y*Q+2-by0;
     if(cx<-40||cy<-30||cx>bw+40||cy>bh+30) continue;
-    // 輪を2本。外の輪が先に広がり、内の輪が少し遅れて追う
-    for(let ring=0;ring<2;ring++){
-      const R=2+a*24-ring*6; if(R<1.5) continue;
-      const n=Math.ceil(R*6.4), fade=q*(ring?.7:1);
-      for(let i=0;i<n;i++){
-        const ang=i/n*6.2831853, x=Math.round(cx+Math.cos(ang)*R), y=Math.round(cy+Math.sin(ang)*R*.62);
-        if(x<0||y<0||x>=bw||y>=bh) continue;
-        const k=y*bw+x, m=wmask[k]; if(!m) continue;
-        if(fade<BAYER[(((y+by0)&3)<<2)|((x+bx0)&3)]) continue;   // 薄れるほど網点で間引く
-        buf[k]= m===2 ? (fade>.6?DECO_PAL.poolGleam:DECO_PAL.poolLip) : (fade>.6&&!ring?W_.hi:W_.ramp[3]);
-      }
+    for(let ring=0;ring<2;ring++){                              // 外の輪が先に広がり、内の輪が遅れて追う
+      const R=2+a*26-ring*7; if(R<1.5) continue;
+      const fade=Math.pow(q,.6)*(ring?.6:1), amp=3.4*fade, band=3.6;
+      const x0=Math.max(1,Math.floor(cx-R-band-1)), x1=Math.min(bw-2,Math.ceil(cx+R+band+1));
+      const y0=Math.max(1,Math.floor(cy-(R+band)*.62-1)), y1=Math.min(bh-2,Math.ceil(cy+(R+band)*.62+1));
+      for(let y=y0;y<=y1;y++){ const dy=(y-cy)/.62;
+        for(let x=x0;x<=x1;x++){
+          const k=y*bw+x, m=wmask[k]; if(!m) continue;
+          const dx=x-cx, e=Math.sqrt(dx*dx+dy*dy), d=e-R; if(d<=-band||d>=band||e<.5) continue;
+          const sn=Math.sin(d/band*Math.PI), sft=sn*amp, ux=dx/e, uy=dy/e*.62;   // 帯の外側は外へ、内側は内へ
+          const sx=Math.round(x-ux*sft), sy=Math.round(y-uy*sft), sk=sy*bw+sx;
+          let c=(sx>0&&sy>0&&sx<bw&&sy<bh&&wmask[sk]===m)?ripSrc[sk]:buf[k];
+          /* 盛り上がった外側は明るく、窪んだ内側は暗く——水面が輪の形にたわむ。
+             段は網点で3段に丸める（ドット絵の色数に収める） */
+          const b=BAYER[(((y+by0)&3)<<2)|((x+bx0)&3)], st=Math.floor(Math.abs(sn)*fade*2.2+b)/3;
+          if(st>0) c= sn>0 ? mixU(c, m===2?DECO_PAL.poolGleam:W_.band[5], st*.55) : mixU(c, RIP_DARK, st*.5);
+          if(d>-.7&&d<.7&&fade*.6>b) c= m===2 ? DECO_PAL.poolGleam : (fade>.6&&!ring?W_.hi:W_.band[5]);   // 稜線
+          buf[k]=c;
+        } }
     }
   }
 }
+let ripSrc=null; const RIP_DARK=(0xff000000|(0x14<<16)|(0x0c<<8)|0x04)>>>0;   // 窪みの暗さ（ABGR）
 /* 足元が石の層の水溜りか（波紋を出すため）。水溜りは見た目だけの賑やかしなので、ここで引く。 */
 function puddleAt(x,y){
   if(!G||!G.pools) return false;
@@ -539,13 +554,23 @@ function terrain(f,Z,camX,camY,blinded){
             /* 境は網点のグラデーションでなじませる（報告「はっきり分かれすぎて不自然、少しだけ網グラデを」）。
                深さの値に網点のしきい値（BAYER）をずらして足してから段を決めるので、境の前後
                WATER_BLEND ぶんだけ2つの色が市松に混ざる。棚・落ち込みの線も網点で間引いて細く見せる。 */
-            const Db=D+(b-.5)*WATER_BLEND;
-            if(Math.abs(D-1.5)<.075&&b<.5){ buf[k]=hz.shelf; wmask[k]=1; continue; }
-            if(Math.abs(D-2.5)<.075&&b<.5){ buf[k]=hz.drop; wmask[k]=1; continue; }
-            const tr=Db<1.5?hz.shallow:Db<2.5?hz.deep:hz.abyss;
-            const lv2=Db<1.5?Math.min(3,lv+1):Db<2.5?lv:Math.max(0,lv-1);
-            buf[k]=waterSurface(tr,hz.hi,lv2,wx,wy,t,D<2.5?Lv:0,D,rowW1,rowW2,wcolX[bx]);
-            wmask[k]=1; continue;
+            /* 境のなめらかさ（報告「もう少しスムーズに」）。2色を市松に混ぜるだけだと粒が粗いので、
+               境の前後 WATER_BLEND の中では、浅い側と深い側の色を**4段に混ぜた中間色**を網点でつなぐ。
+               浅瀬の棚の線はやめ、落ちる淵の縁だけ網点の細い線を残す（落ちる場所は読めないと困る）。 */
+            if(Math.abs(D-2.5)<.05&&b<.4){ buf[k]=hz.drop; wmask[k]=1; continue; }
+            const sh=Math.min(3,lv+1), dpv=lv, ab=Math.max(0,lv-1), Lk=D<2.5?Lv:0;
+            let col;
+            const e1=(D-1.5)/WATER_BLEND+.5, e2=(D-2.5)/WATER_BLEND+.5;         // 0..1 で境の中
+            // 境の中は網点で4段に混ぜる。0段・3段のドットは片方の水面だけ描けば足りる（計算を半分に）
+            let ta, la, La=Lk, tb=null, lb=0, Lb=Lk, st=0;
+            if(e1>0&&e1<1){ ta=hz.shallow; la=sh; tb=hz.deep; lb=dpv; st=Math.floor(e1*3+b); }
+            else if(e2>0&&e2<1){ ta=hz.deep; la=dpv; tb=hz.abyss; lb=ab; Lb=0; st=Math.floor(e2*3+b); }
+            else{ ta=D<1.5?hz.shallow:D<2.5?hz.deep:hz.abyss; la=D<1.5?sh:D<2.5?dpv:ab; }
+            st=st<0?0:st>3?3:st;
+            if(st===3) col=waterSurface(tb,hz.hi,lb,wx,wy,t,Lb,D,rowW1,rowW2,wcolX[bx]);
+            else{ col=waterSurface(ta,hz.hi,la,wx,wy,t,La,D,rowW1,rowW2,wcolX[bx]);
+              if(st) col=mixU(col, waterSurface(tb,hz.hi,lb,wx,wy,t,Lb,D,rowW1,rowW2,wcolX[bx]), st/3); }
+            buf[k]=col; wmask[k]=1; continue;
           }
           lv=Math.max(0,Math.min(3,lv));
           let col=hz.ramp[lv];
@@ -855,7 +880,7 @@ function genDrips(f,pools,depth){
   }
   return out;
 }
-const WATER_BLEND=.35;   // 深さの境の網グラデの幅（深さの値で。1段＝1.0）
+const WATER_BLEND=.7;   // 深さの境の網グラデの幅（深さの値で。1段＝1.0）
 const DRIP_FALL=.34, DRIP_SPLASH=.30, DRIP_H=30;
 function drawDrips(bx0,by0,t,blindR){
   if(!G.drips||!G.drips.length) return;
@@ -1633,6 +1658,37 @@ function install(){
     FEEL.ripples.push({x:e.x,y:e.y,age:0,col:'#5a7ea2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift();
     if(typeof feelSpray==='function') feelSpray(e.x,e.y+.16,'#8ab0d0',4,.6,'water');
   };
+  /* 深み（2段目）に入ったら、足元が水に浸かって見える（報告「深みに入ったときは足元が水に浸かるように」）。
+     水面の線より下は薄く（水越しに透ける）、上はそのまま描き、水面の線に揺れる輪を引く。
+     当たり判定・座標は変えない。落ちている最中・倒れた相手には掛けない。 */
+  const wadeLine=(ent)=>{
+    if(!CAVE.on||!ent||ent.dead||ent.fallAnim||!W.haz||W.haz.kind!=='water'||typeof hazTier!=='function') return 0;
+    return hazTier(ent.x,ent.y)>=2 ? .25 : 0;               // 絵の中心から、大きさの何割下が水面か（.25＝すね）
+  };
+  const wadeDraw=(draw,x,y,n,frac,ent)=>{  // 水面より下は .40 で透かす
+    const wl=Math.round(y+n*frac), big=n*3;
+    ctx.save(); ctx.beginPath(); ctx.rect(x-big,y-big,big*2,wl-(y-big)); ctx.clip(); const r=draw(); ctx.restore();
+    if(!r) return r;
+    ctx.save(); ctx.beginPath(); ctx.rect(x-big,wl,big*2,big); ctx.clip(); ctx.globalAlpha*=.40; draw(); ctx.restore();
+    // 水面の輪：体の周りに2ドット幅の楕円。手前の弧を明るく、ゆっくり揺らす
+    const px=Math.max(1,Math.round(n/16)), rw=n*.36, rh=n*.10, ph=performance.now()/260+(ent&&ent.uidA||0);
+    ctx.save(); ctx.fillStyle='#bfe6f2';
+    for(let i=0;i<24;i++){ const ang=i/24*6.2831853, wob=Math.sin(ph+i*.9)*.6;
+      const fx=x+Math.cos(ang)*(rw+wob*px), fy=wl+Math.sin(ang)*(rh+wob*px*.5);
+      ctx.globalAlpha=Math.sin(ang)>0?.85:.35; ctx.fillRect(Math.round(fx),Math.round(fy),px*(i%3?1:2),px); }
+    ctx.restore();
+    return r;
+  };
+  const oldChar=window.drawFeelCharacterSprite;
+  if(typeof oldChar==='function') window.drawFeelCharacterSprite=function(id,x,y,size,ent,...rest){
+    const f=wadeLine(ent); if(!f) return oldChar(id,x,y,size,ent,...rest);
+    return wadeDraw(()=>oldChar(id,x,y,size,ent,...rest),x,y,Math.round(size),f,ent);
+  };
+  const oldEnemy=CAVE.enemy;
+  CAVE.enemy=function(e,sx,sy,R){
+    const f=wadeLine(e); if(!f) return oldEnemy(e,sx,sy,R);
+    return wadeDraw(()=>oldEnemy(e,sx,sy,R),sx,sy,Math.round(R*2.6),f*.9,e);
+  };
   const oldHits=window.drawFeelHits;
   if(typeof oldHits==='function') window.drawFeelHits=function(camX,camY){
     if(!CAVE.on||!FEEL||!FEEL.hits) return oldHits(camX,camY);
@@ -1693,6 +1749,11 @@ function install(){
   // 足元の影もドットで
   window.drawFeelGroundShadow=function(x,y,size,scale=1,alpha=1){
     if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(size)) return;
+    // 深みに浸かっている足元には影を落とさない（水の中に黒い楕円が沈んで見えた）
+    if(W.haz&&W.haz.kind==='water'&&typeof hazTier==='function'){
+      const wx=(x+P.x*TS-innerWidth/2)/TS, wy=(y+P.y*TS-innerHeight/2)/TS;
+      if(hazTier(wx,wy)>=2) return;
+    }
     const ps=TS/Q, s=Math.max(2,size*scale), w=Math.max(3,Math.round(s*.34/ps)), h=Math.max(1,Math.round(w*.3));
     const fx=Math.round(x), fy=Math.round(y+s*.36);
     ctx.save(); ctx.globalAlpha*=.55*Math.max(0,Math.min(1,alpha)); ctx.fillStyle='#000';
