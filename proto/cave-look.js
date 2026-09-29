@@ -382,7 +382,8 @@ function waterPost(bx0,by0,t){
 function puddleAt(x,y){
   if(!G||!G.pools) return false;
   const px=x*Q, py=y*Q+2;
-  for(const d of G.pools){ const dx=(px-d.x)/d.rx, dy=(py-d.y)/d.ry; if(dx*dx+dy*dy<1) return true; }
+  for(const d of G.pools){ const dx=Math.round(px-d.x), dy=Math.round(py-d.y); if(Math.abs(dx)>d.ext||Math.abs(dy)>d.ext) continue;
+    if(poolV(d,dx,dy,Math.round(px),Math.round(py))>0) return true; }
   return false;
 }
 CAVE.puddleAt=puddleAt;
@@ -651,7 +652,7 @@ function genDeco(f,Z){
       if(where==='corner'){ x=tx*Q+8+cdx*3; y=ty*Q+8+cdy*3+2; wdx=cdx; wdy=cdy; }
       if(where==='north'){ x=tx*Q+2+(h>>>8)%12; y=ty*Q-2; wdx=0; wdy=-1; }
       const o={k:kind,x,y,s:h,wdx,wdy,ok:0};
-      if(kind==='pool'){ const g=poolGrow(depth); o.rx=6+h%5+g; o.ry=3+((h>>>3)%2)+g*.45; }
+      if(kind==='pool') poolShape(o,h,poolGrow(depth));
       out.push(o); break; }
   }
   G.pools=out.filter(o=>o.k==='pool');
@@ -661,6 +662,42 @@ function genDeco(f,Z){
    第6階層は今までどおりまばら、第10階層で数が約2.6倍・一つずつも一回り大きい
    （ユーザー要望「水の層に近づくにつれて水の面積を増やしたい」）。
    層は一周するので、階の数ではなく「層の中の何階目か」で決める。 */
+/* 水溜りの形。楕円1つだと、並んだときに全部同じ判子に見える（報告「楕円ばかりで不自然」）。
+   傾けた楕円（葉）を何枚か重ね、縁をノイズで崩す。形は5通りから引く:
+     ・ふくらみ … 大きな葉に小さな葉が1〜2枚くっつく（いちばん多い）
+     ・細長い   … 葉を一列に並べ、傾けた「溝に溜まった水」
+     ・くびれ   … 同じくらいの葉2枚が浅くつながる（瓢箪・腎臓形）
+     ・小さな丸 … 小さく丸い1枚
+     ・飛び石   … 本体の横に、離れた小さな水溜りが1〜2個
+   上から見下ろす絵なので、葉は横長（縦は横の0.45〜0.8倍）を基本にする。 */
+function poolShape(o,h,g){
+  const r=i=>(hs(h,i+300)%10000)/10000;
+  const kinds=['blob','blob','blob','long','neck','round','spots'], kind=kinds[hs(h,299)%kinds.length];
+  const R=5.5+r(0)*4.5+g, lobes=[];
+  const lobe=(ox,oy,rx,ry,a)=>lobes.push({ox,oy,rx,ry,c:Math.cos(a),s:Math.sin(a)});
+  const tilt=(r(1)-.5)*.9;
+  if(kind==='round'){ const rr=3.5+r(2)*2.5+g*.6; lobe(0,0,rr,rr*(.65+r(3)*.2),tilt*.5); }
+  else if(kind==='long'){ const n=3+(hs(h,298)%2), step=R*.75, ca=Math.cos(tilt*1.3), sa=Math.sin(tilt*1.3);
+    for(let i=0;i<n;i++){ const k=i-(n-1)/2, w=R*(.55+r(10+i)*.3); lobe(ca*k*step, sa*k*step*.6+(r(20+i)-.5)*2, w, w*(.45+r(30+i)*.15), tilt*1.3); } }
+  else if(kind==='neck'){ const a=tilt, d=R*(.8+r(4)*.3);
+    lobe(-Math.cos(a)*d*.5,-Math.sin(a)*d*.3,R*.7,R*.7*(.55+r(5)*.2),a);
+    lobe( Math.cos(a)*d*.5, Math.sin(a)*d*.3,R*(.55+r(6)*.2),R*.55*(.55+r(7)*.25),-a*.5); }
+  else { lobe(0,0,R,R*(.5+r(8)*.25),tilt);
+    const n=kind==='spots'?1:1+(hs(h,297)%2);
+    for(let i=0;i<n;i++){ const a=r(40+i)*6.2831853, d=R*(.55+r(50+i)*.35), rr=R*(.35+r(60+i)*.3);
+      lobe(Math.cos(a)*d, Math.sin(a)*d*.55, rr, rr*(.55+r(70+i)*.25), (r(80+i)-.5)*1.2); }
+    if(kind==='spots'){ const m=1+(hs(h,296)%2);
+      for(let i=0;i<m;i++){ const a=r(90+i)*6.2831853, d=R*(1.45+r(95+i)*.5), rr=1.8+r(99+i)*1.8;
+        lobe(Math.cos(a)*d, Math.sin(a)*d*.55, rr, rr*.7, 0); } } }
+  let ext=0; for(const l of lobes) ext=Math.max(ext, Math.hypot(l.ox,l.oy)+Math.max(l.rx,l.ry)+2);
+  o.lobes=lobes; o.ext=Math.ceil(ext);
+}
+/* その点が水溜りの中か。1以上＝内側の深さの目安（0で縁）。ノイズで縁を崩す。 */
+function poolV(o,dx,dy,px,py){
+  let v=-1;
+  for(const l of o.lobes){ const x=dx-l.ox, y=dy-l.oy, u=(x*l.c+y*l.s)/l.rx, w=(-x*l.s+y*l.c)/l.ry; const q=1-(u*u+w*w); if(q>v) v=q; }
+  return v + (NZ[((py&255)<<8)|(px&255)]-.5)*.7 + (NZS[(((py+60)&255)<<8)|((px+30)&255)]-.5)*.35;
+}
 function zoneFloor(depth){ return ((Math.max(1,depth)-1)%10)+1; }
 function poolMore(depth){ return 1+Math.max(0,zoneFloor(depth)-6)*.4; }
 function poolGrow(depth){ return Math.max(0,zoneFloor(depth)-6)*.9; }
@@ -748,7 +785,8 @@ function rockPx(x,y,nx,ny,edge){ // nx,ny：外向きの法線、edge：縁か�
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=DECO_PAL, code=G.code, PW=G.PW;
   for(const d of G.deco){
-    if(d.x<bx0-24||d.y<by0-8||d.x>bx0+bw+24||d.y>by0+bh+30) continue;
+    const mg=d.ext||0;                                  // 大きな水溜りは端で切らない
+    if(d.x<bx0-24-mg||d.y<by0-8-mg||d.x>bx0+bw+24+mg||d.y>by0+bh+30+mg) continue;
     if(d.ok===0){ // 岩に埋まっていたら床の側へずらす。ずらしきれなければ出さない
       let x=d.x,y=d.y,okk=-1; for(let i=0;i<10;i++){ const c=code[(y|0)*PW+(x|0)]; if(!c){okk=1;break;} x-=d.wdx||0; y-=d.wdy||0; if(!d.wdx&&!d.wdy) break; }
       d.ok=okk; d.x=x; d.y=y; }
@@ -782,16 +820,17 @@ function drawDeco(bx0,by0,t,blindR){
         if(Math.sin(t*1.2+i*2+s)>.25) dp(px,py,P_.mossBedTip);} break; }
     /* 水溜り：浅い窪みに溜まった水。縁を1段明るくして「窪み」だと分からせ、
        面の上を光の筋がゆっくり横切る。波は立てない——流れていない水なので。 */
-    case 'pool': { const rx=d.rx||(6+s%5), ry=d.ry||(3+(s>>>3)%2), ir=Math.ceil(ry), cr=Math.ceil(rx);
+    case 'pool': { if(!d.lobes) poolShape(d,s,0); const E=d.ext;
       /* 浅い窪みに溜まった水。上の縁は窪みの影（暗い）、下の縁は光を受けて明るい——これで
          「穴」ではなく「窪みに溜まった水」と読める。面は水の層と同じ流れる水面で、
          波紋は waterPost が印（wmask=2）の上に描く。 */
-      for(let dy=-ir;dy<=ir;dy++)for(let dx=-cr;dx<=cr;dx++){
-        const nx=dx/rx, ny=dy/ry, px=x+dx, py=y+dy;
-        const dd=(nx*nx+ny*ny)*(1+(NZS[((py&255)<<8)|(px&255)]-.5)*.7);   // 縁をゆがめる（きれいな楕円は置いた物に見える）
-        if(dd>1) continue;
-        if(dd>.78){ dp(px,py, ny<-.15 ? P_.poolShade : P_.poolLip); continue; }   // 縁
-        const lv=Math.max(0,Math.min(3,Math.floor(Math.min(1,L*1.25)*(1-dd*.25)*3.6+(BAYER[((py&3)<<2)|(px&3)]-.5)*.9)));
+      for(let dy=-E;dy<=E;dy++)for(let dx=-E;dx<=E;dx++){
+        const px=x+dx, py=y+dy, v=poolV(d,dx,dy,px,py);
+        if(v<=0) continue;
+        if(v<.2){                                                 // 縁：上が外なら影、下が外なら光
+          const up=poolV(d,dx,dy-1,px,py-1)<=0, dn=poolV(d,dx,dy+1,px,py+1)<=0;
+          dp(px,py, up&&!dn ? P_.poolShade : P_.poolLip); continue; }
+        const lv=Math.max(0,Math.min(3,Math.floor(Math.min(1,L*1.25)*(.75+Math.min(1,v)*.25)*3.6+(BAYER[((py&3)<<2)|(px&3)]-.5)*.9)));
         dpw(px,py,waterSurface(P_.poolW,P_.poolGleam,lv,px,py,t,L,1,Math.sin(py*.22+t*1.7)*2,Math.sin(px*.056+t)*1.5),2);
       } break; }
     case 'crystal': for(let i=0;i<3;i++){const h=hs(s,i), bx=x-2+i*2, H=3+h%4; for(let j=0;j<H;j++) dp(bx,y-j,P_.crys[j===H-1?2:(Math.sin(t*2+i+s)>.5?1:0)+((j+i)%2&&L>.3?1:0)]);} break;

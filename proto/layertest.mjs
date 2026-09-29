@@ -541,7 +541,7 @@ R.puddlesRippleAndGrow = await pg.evaluate(()=>{
   // 10階は大広間で床が狭いので、数ではなく「床1マスあたり」で比べる
   const per=d=>{ const n=pools(d).length; let fl=0; for(const r of W.fl.g) for(const t of r) if(t===T.FLOOR) fl++; return n/fl; };
   const n6=+per(6).toFixed(4), n9=+per(9).toFixed(4);
-  const list=pools(9), pool=list.slice().sort((a,b)=>b.rx-a.rx)[0];
+  const list=pools(9), pool=list.slice().sort((a,b)=>b.ext-a.ext)[0];
   if(!pool) return {n6,n9,ok:false};
   TH.immortal(); W.enemies.length=0;
   P.x=pool.x/16-1.2; P.y=(pool.y-2)/16; FEEL.ripples.length=0;
