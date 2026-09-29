@@ -8357,18 +8357,30 @@ function healEnt(h, v){
   h.hpNow = Math.min(mx, h.hpNow + v);
 }
 
+/* 振りの絵が「どこで相手に当たったか」。槍の穂先・槌の火花は、何もしなければ
+   **届く距離いっぱい**に出る。大きな相手（5Fの灰の大蛙は半径0.85マス）だと中心が
+   間合いの半分ほどにあるので、穂先の「＋」が相手を突き抜けた先の何も無い所に光り、
+   「ヒットエフェクトがズレている」と見えた（ユーザー報告・画面録画）。
+   当てた相手の体の手前半分（中心から半径の半分だけ手前）で止める。
+   何本も当てたときは一番手前。空振りなら今までどおり届く距離いっぱい。 */
+function swingMeets(sw, e, d){
+  const at=Math.max(0.35, d - (e.r||0.32)*0.5);
+  sw.hitR=Math.min(sw.hitR!=null ? sw.hitR : sw.r, at);
+}
 /* 近接の一振り。「連撃」の追撃からも呼ぶので独立させてある。 */
 function meleeSwing(st, ang, mult){
   const range=st.range, halfArc=(st.arc||75)*Math.PI/180;
   // 属性を持たせて描画側で見た目を変える。槍を振れば「刺した」ように見えてほしい。
-  W.fx.push({t:'swing',x:P.x,y:P.y,ent:P,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
-             dt:st.dmgType, elem:elemOf(st), weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
+  const sw={t:'swing',x:P.x,y:P.y,ent:P,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
+             dt:st.dmgType, elem:elemOf(st), weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true};
+  W.fx.push(sw);
   nearEnemies(P.x, P.y, range+1).forEach(e=>{
     if(e.dead) return;
     const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
     if(d>range+e.r) return;
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da>halfArc) return;
+    swingMeets(sw, e, d);
     hitEnemy(e,st,mult);
     relicShockwave(st, e);          // 遺物「震撼」
   });
@@ -9839,14 +9851,16 @@ function allyAttack(a, st, tgt){
     return;
   }
   const range=st.range, halfArc=(st.arc||75)*Math.PI/180;
-  W.fx.push({t:'swing',x:a.x,y:a.y,ent:a,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
-             dt:st.dmgType, elem:elemOf(st), weaponBase:a.equip.weapon&&a.equip.weapon.base, ally:true});
+  const sw={t:'swing',x:a.x,y:a.y,ent:a,a:ang,life:FEEL_ATTACK_SECONDS,max:FEEL_ATTACK_SECONDS,r:range,arc:halfArc,
+             dt:st.dmgType, elem:elemOf(st), weaponBase:a.equip.weapon&&a.equip.weapon.base, ally:true};
+  W.fx.push(sw);
   nearEnemies(a.x, a.y, range+1).forEach(e=>{
     if(e.dead) return;
     const dx=e.x-a.x, dy=e.y-a.y, d=Math.hypot(dx,dy);
     if(d>range+e.r) return;
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da>halfArc) return;
+    swingMeets(sw, e, d);
     hitEnemy(e, st, 1, {src:a, forceCrit});
     applyAllyOnHit(a, e, st);            // 専用技の命中時効果
     // 重騎士の「打ち払い」: 大剣の一撃でよろめかせる
@@ -18803,8 +18817,8 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260924c"></script>
-<script src="game-feel.js?v=20260924-toad"></script>
+<script src="weapon-art-pixel.js?v=20260929a"></script>
+<script src="game-feel.js?v=20260929a"></script>
 <script src="ui-icons.js"></script>
 <script src="cave-look.js"></script>
 <script>

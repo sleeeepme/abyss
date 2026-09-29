@@ -560,7 +560,7 @@ function drawFeelSwing(f,camX,camY){
     if(f.skill)return;                      // 衝撃波は s_wave が描く
     const kind=f.weaponKind||feelWeaponKind(f.weaponBase,f.dt);
     PIXEL_ART_FX.renderEffect(ctx,{id:'n_swing',kind,elem:feelElement(f.dt,f.elem),age:Math.max(0,(f.max||FEEL_ATTACK_SECONDS)-f.life),
-      x:f.x*TS-camX,y:f.y*TS-camY,angle:f.a||0,scale:feelArtScale(),range:f.r||1.4,layer:'all'});
+      x:f.x*TS-camX,y:f.y*TS-camY,angle:f.a||0,scale:feelArtScale(),range:f.r||1.4,hitR:f.hitR,layer:'all'});   // hitR: 当てた相手の所（穂先・槌の火花をそこで止める）
     return;
   }
   if(!ALLY_EFFECT_FX)return;

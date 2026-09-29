@@ -502,4 +502,23 @@ R.swingFollows = await pg.evaluate(()=>{
   return {swingMoved:+(sw.x-px0).toFixed(2), motes:m.length, mgap:+mgap.toFixed(2), ok: Math.abs(sw.x-P.x)<1e-6 && m.length>0 && mgap<1};
 });
 
+/* 槍の穂先・槌の火花は当てた相手の所で止まる（ユーザー報告「ヒットエフェクトがまだズレている」、
+   5Fの灰の大蛙を槍で突くと、穂先の「＋」が大蛙を突き抜けた先の何も無い所に光っていた）。
+   大きな相手（半径0.85）でも、止まる所は相手の中心より手前・体の内側。空振りは届く距離いっぱい。 */
+R.swingStopsAtTarget = await pg.evaluate(()=>{
+  TH.run(1,{seed:77}); TH.floor(3); TH.immortal();
+  const e0=W.enemies[0]; W.enemies.forEach(x=>x.dead=true);
+  const big=Object.assign({}, e0, {x:P.x+1.5, y:P.y, r:0.85, hp:1e7, maxHp:1e7, dead:false, boss:false});
+  W.enemies=[big]; P.dirx=1; P.diry=0;
+  const st=Object.assign({}, stats(S.hero), {range:2.3, arc:30});
+  W.fx.length=0; _tickCount++;                      // 敵の格子を作り直させる（前の検証の敵が残らないように）
+  meleeSwing(st, 0, 1);
+  const hit=W.fx.find(f=>f.t==='swing');
+  const d=Math.hypot(big.x-P.x, big.y-P.y);
+  W.fx.length=0; W.enemies=[]; _tickCount++; meleeSwing(st, 0, 1);
+  const miss=W.fx.find(f=>f.t==='swing');
+  const inside = hit && hit.hitR!=null && hit.hitR>d-0.85 && hit.hitR<d;
+  return {d:+d.toFixed(3), hitR:hit&&hit.hitR&&+hit.hitR.toFixed(3), missR:miss&&miss.hitR, ok: !!inside && !!miss && miss.hitR==null};
+});
+
 await done(b, errs, R);

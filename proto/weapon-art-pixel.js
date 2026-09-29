@@ -1461,12 +1461,14 @@
       slash(cx, cy, 10, a - 2.2, a + 0.3, 2, 0.8, E.cols, t, 0.11, 503);
       slash(cx, cy, 10, a + 2.2, a - 0.3, 2, 0.8, E.cols, t - 0.07, 0.11, 504);
     } else if (k === 'hammer') {
-      const sg = ux >= 0 ? 1 : -1, hx = bx + ux * R * 0.75, hy = by + uy * R * 0.75 + 4;
+      const sg = ux >= 0 ? 1 : -1, reach = o.hitR != null ? Math.min(R * 0.75, o.hitR) : R * 0.75,   // 当てた相手の所で打つ
+            hx = bx + ux * reach, hy = by + uy * reach + 4;
       slash(bx + sg * 3, by - 2, 11, -Math.PI / 2 - sg * 0.5, Math.atan2(hy - by, hx - bx), 5, 0.9, E.cols, t, 0.12, 505);
       spark(hx, hy - 2, t - 0.07, E.ramp, 506, 6, 1);
     } else if (k === 'spear') {
       if (t < 0 || t > 0.22) return;
-      const ext = R * easeOut(clamp(q24(t) / 0.06)), cut = t < 0.1 ? 0 : clamp((t - 0.1) / 0.12) * ext, nx = -uy, ny = ux;
+      const tip = o.hitR != null ? Math.min(R, o.hitR) : R;   // 刺した相手の所で止める（突き抜けて何も無い所に＋を出さない）
+      const ext = tip * easeOut(clamp(q24(t) / 0.06)), cut = t < 0.1 ? 0 : clamp((t - 0.1) / 0.12) * ext, nx = -uy, ny = ux;
       for (let s = Math.round(cut); s <= ext; s++) {
         const x = bx + ux * s, y = by + uy * s;
         px(x, y, E.cols[0]); if (s > ext * 0.3 && t < 0.12) { px(x + nx, y + ny, E.cols[1]); px(x - nx, y - ny, E.cols[2]); }
@@ -3156,7 +3158,8 @@
     Object.assign(o, { x: ox, y: oy, R, ang, arc: d.arc || 0, life: p.life != null ? p.life : (d.life || 0), skyY: 4, charge: 0,
                        gx: ox + Math.round(Math.cos(ang) * 6), gy: oy - 9, targets: null, healR: d.healR, orbitA: p.orbitA, fall: p.fall,
                        arrows: false, shots: false, kind: p.kind || d.kind, elem: p.elem || d.elem, target: p.target, aura: p.aura, ring: p.ring || 0,
-                       wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0 });
+                       wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0,
+                       hitR: p.hitR != null && Number.isFinite(p.hitR) ? Math.round(p.hitR * TILE) : null });
     if (p.arc != null) o.arc = p.arc;
     if (p.isFloor) o.floor = (bx, by) => p.isFloor(p.x + (bx - ox) * k, p.y + (by - oy) * k);   // 床かどうか（画面座標で聞く）
     if (p.tx != null) { const [a, b] = toBuf(p.tx, p.ty, ox, oy); o.tx = a; o.ty = b; }
