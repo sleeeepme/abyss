@@ -382,9 +382,9 @@ function waterPost(bx0,by0,t){
 function puddleAt(x,y){
   if(!G||!G.pools) return false;
   const px=x*Q, py=y*Q+2;
-  for(const d of G.pools){ const dx=Math.round(px-d.x), dy=Math.round(py-d.y); if(Math.abs(dx)>d.ext||Math.abs(dy)>d.ext) continue;
-    if(poolV(d,dx,dy,Math.round(px),Math.round(py))>0) return true; }
-  return false;
+  const X=Math.round(px), Y=Math.round(py);
+  if(X<0||Y<0||X>=G.PW||Y>=G.PH||G.code[Y*G.PW+X]||obsHit(X/Q,Y/Q)) return false;
+  return poolU(G.pools,X,Y)>0;
 }
 CAVE.puddleAt=puddleAt;
 
@@ -613,8 +613,11 @@ const DECO_SET={
   /* 4つめは「この深さから出る」最小の階層（省略＝最初から出る）。
      石の層の後半（第6階層〜第10階層）だけ、床に苔の足場と水溜りを混ぜる
      ——次が水の層なので、**床が湿っていく**ことを絵で先に言う（ユーザー要望）。 */
-  stone:[['stalagC','corner',.35],['rock','open',.006],['vine','north',.05],['skel','floor',.006],
-         ['pool','floor',.016,6],['mossbed','floor',.020,6],
+  /* 水溜りは**角**に置く（床のまん中にぽつぽつ置くと不自然、という指摘）。
+     低い所＝壁の付け根に水は溜まる。角の石筍より先に引くので、水溜りの角には石筍が立たない。
+     壁沿いにも少しだけ。 */
+  stone:[['pool','corner',.24,6],['stalagC','corner',.35],['pool','wall',.005,6],['rock','open',.006],['vine','north',.05],['skel','floor',.006],
+         ['mossbed','floor',.020,6],
          ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
   sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014]],
   root:[['shroom','wall',.024],['tendril','wall',.026],['bulb','floor',.010],['moss','wall',.014]],
@@ -650,13 +653,25 @@ function genDeco(f,Z){
       let x=tx*Q+8+((h>>>8)%7)-3, y=ty*Q+8+((h>>>12)%7)-3, wdx=0, wdy=0;
       if(where==='wall'){ const [dx,dy]=nb[(h>>>16)%nb.length], o=f.g[ty+dy][tx+dx]===T.PIT?2:6; wdx=dx; wdy=dy; x=tx*Q+8+dx*o; y=ty*Q+8+dy*o; }
       if(where==='corner'){ x=tx*Q+8+cdx*3; y=ty*Q+8+cdy*3+2; wdx=cdx; wdy=cdy; }
+      if(kind==='pool'&&where==='corner'){ x=tx*Q+8+cdx*5; y=ty*Q+8+cdy*5; }
+      if(kind==='pool'&&where==='wall'){ x=tx*Q+8+wdx*4; y=ty*Q+8+wdy*4; }
       if(where==='north'){ x=tx*Q+2+(h>>>8)%12; y=ty*Q-2; wdx=0; wdy=-1; }
       const o={k:kind,x,y,s:h,wdx,wdy,ok:0};
-      if(kind==='pool') poolShape(o,h,poolGrow(depth));
+      if(kind==='pool'){ poolShape(o,h,poolGrow(depth)); o.ok=1;
+        /* 角・壁に寄せた中心から、大きさに応じて床の側へ少し戻す。
+           中心を角に置いたままだと、形の大半が壁に埋もれて大きくしても見える量が増えない。 */
+        const back=o.ext*(where==='corner'?.3:.25); o.x=Math.round(o.x-wdx*back); o.y=Math.round(o.y-wdy*back); }
       out.push(o); break; }
   }
-  G.pools=out.filter(o=>o.k==='pool');
-  return out;
+  /* 岩と重ねない。岩・石筍に近い水溜りは置かない（岩が水に浸かって見える）。
+     水溜りの中に来た骨・小石・苔の足場は、水溜りのほうを残して捨てる。 */
+  const ROCKS={rock:22,stalagC:16}, SMALL={skel:1,pebble:1,mossbed:1};
+  const rocks=out.filter(o=>ROCKS[o.k]);
+  let res=out.filter(o=>o.k!=='pool'||!rocks.some(r=>Math.hypot(r.x-o.x,r.y-o.y)<o.ext*.8+ROCKS[r.k]));
+  const pools=res.filter(o=>o.k==='pool');
+  res=res.filter(o=>!SMALL[o.k]||!pools.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<p.ext+4));
+  G.pools=pools;
+  return res;
 }
 /* 水溜りの形。楕円1つだと、並んだときに全部同じ判子に見える（報告「楕円ばかりで不自然」）。
    傾けた楕円（葉）を何枚か重ね、縁をノイズで崩す。形は5通りから引く:
@@ -689,11 +704,25 @@ function poolShape(o,h,g){
   o.lobes=lobes; o.ext=Math.ceil(ext);
 }
 /* その点が水溜りの中か。1以上＝内側の深さの目安（0で縁）。ノイズで縁を崩す。 */
-function poolV(o,dx,dy,px,py){
+function poolRaw(o,dx,dy){
   let v=-1;
-  for(const l of o.lobes){ const x=dx-l.ox, y=dy-l.oy, u=(x*l.c+y*l.s)/l.rx, w=(-x*l.s+y*l.c)/l.ry; const q=1-(u*u+w*w); if(q>v) v=q; }
-  return v + (NZ[((py&255)<<8)|(px&255)]-.5)*.7 + (NZS[(((py+60)&255)<<8)|((px+30)&255)]-.5)*.35;
+  for(const l of o.lobes){ const x=dx-l.ox, y=dy-l.oy, u=(x*l.c+y*l.s)/l.rx, w=(-x*l.s+y*l.c)/l.ry; const q=1-(u*u+w*w); v=smax(v,q,.3); }
+  return v;
 }
+/* 滑らかな最大（2つの形の間を、近ければ橋を架けるようにつなぐ）。k が大きいほど太くつながる。 */
+function smax(a,b,k){ const h=Math.max(k-Math.abs(a-b),0)/k; return Math.max(a,b)+h*h*k*.25; }
+const poolNoise=(px,py)=>(NZ[((py&255)<<8)|(px&255)]-.5)*.7+(NZS[(((py+60)&255)<<8)|((px+30)&255)]-.5)*.35;
+/* 重なった水溜りは**1つの形**として扱う（報告「重なる場合は結合した形に」）。
+   それぞれの形を滑らかな最大で足し合わせ、縁はその合わさった形の外周にだけ引く——
+   2つの縁が水の中を横切ることがなくなる。list は近くの水溜り。best に一番効いている水溜りを返す。 */
+let poolBest=null;
+function poolU(list,px,py){
+  let v=-1; poolBest=null; let bv=-9;
+  for(const o of list){ const dx=px-o.x, dy=py-o.y; if(dx<-o.ext||dx>o.ext||dy<-o.ext||dy>o.ext) continue;
+    const q=poolRaw(o,dx,dy); if(q>bv){bv=q;poolBest=o;} v=smax(v,q,.45); }
+  return v<=-1 ? -1 : v+poolNoise(px,py);
+}
+function poolV(o,dx,dy,px,py){ return poolRaw(o,dx,dy)+poolNoise(px,py); }
 function zoneFloor(depth){ return ((Math.max(1,depth)-1)%10)+1; }
 /* 石の層の後半（第6〜第10階層）の水溜り。**水の層へ近づくほど広がる。**
    数は増やさず、一つずつを大きくする——数で増やしたら第9階層が水溜りだらけで
@@ -782,8 +811,40 @@ function rockPx(x,y,nx,ny,edge){ // nx,ny：外向きの法線、edge：縁か�
     dp(X,Y,edge===0?Pp.edge[0]:edge===1?Pp.edge[1]:Pp.edge[2]); return; }
   dp(X,Y,Pp.deep[NZB[((Y&255)<<8)|(X&255)]>.56?1:0]);
 }
+/* 水溜りをまとめて描く。重なった物は1つの形に合わさる（poolU）。
+   浅い窪みに溜まった水：上の縁は窪みの影（暗い）、下の縁は光を受けて明るい——これで
+   「穴」ではなく「窪みに溜まった水」と読める。面は水の層と同じ流れる水面で、
+   波紋は waterPost が印（wmask=2）の上に描く。岩（壁の続き・当たり判定の円）の上には塗らない。 */
+let pdone=null;
+function drawPools(bx0,by0,t,blindR){
+  if(!G.pools||!G.pools.length) return;
+  const P_=DECO_PAL, vis=[];
+  for(const d of G.pools){ const E=d.ext;
+    if(d.x+E<bx0||d.y+E<by0||d.x-E>bx0+bw||d.y-E>by0+bh) continue;
+    if(!seenAt(G.f,G.L,d.x|0,d.y|0)) continue;
+    if(Math.hypot(d.x-lampX,d.y-lampY)>blindR+E) continue;
+    d.L=Math.max(.22,pxLight(d.x,d.y)); vis.push(d); }
+  if(!vis.length) return;
+  if(!pdone||pdone.length!==bw*bh) pdone=new Uint8Array(bw*bh); else pdone.fill(0);
+  const code=G.code, PW=G.PW;
+  for(const d of vis){ const E=d.ext;
+    for(let py=d.y-E;py<=d.y+E;py++)for(let px=d.x-E;px<=d.x+E;px++){
+      const X=px-bx0, Y=py-by0; if(X<0||Y<0||X>=bw||Y>=bh) continue;
+      const k=Y*bw+X; if(pdone[k]) continue; pdone[k]=1;
+      if(px<0||py<0||px>=G.PW||py>=G.PH||code[py*PW+px]) continue;
+      const v=poolU(vis,px,py); if(v<=0) continue;
+      const o=poolBest||d, L=o.L;
+      if(obsHit(px/Q,py/Q)) continue;
+      if(v<.2){                                                   // 縁：上が外なら影、下が外なら光
+        const up=poolU(vis,px,py-1)<=0, dn=poolU(vis,px,py+1)<=0;
+        buf[k]= up&&!dn ? P_.poolShade : P_.poolLip; continue; }
+      const lv=Math.max(0,Math.min(3,Math.floor(Math.min(1,L*1.25)*(.75+Math.min(1,v)*.25)*3.6+(BAYER[((py&3)<<2)|(px&3)]-.5)*.9)));
+      buf[k]=waterSurface(P_.poolW,P_.poolGleam,lv,px,py,t,L,1,Math.sin(py*.22+t*1.7)*2,Math.sin(px*.056+t)*1.5); wmask[k]=2;
+    } }
+}
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=DECO_PAL, code=G.code, PW=G.PW;
+  drawPools(bx0,by0,t,blindR);
   for(const d of G.deco){
     const mg=d.ext||0;                                  // 大きな水溜りは端で切らない
     if(d.x<bx0-24-mg||d.y<by0-8-mg||d.x>bx0+bw+24+mg||d.y>by0+bh+30+mg) continue;
@@ -820,19 +881,7 @@ function drawDeco(bx0,by0,t,blindR){
         if(Math.sin(t*1.2+i*2+s)>.25) dp(px,py,P_.mossBedTip);} break; }
     /* 水溜り：浅い窪みに溜まった水。縁を1段明るくして「窪み」だと分からせ、
        面の上を光の筋がゆっくり横切る。波は立てない——流れていない水なので。 */
-    case 'pool': { if(!d.lobes) poolShape(d,s,0); const E=d.ext;
-      /* 浅い窪みに溜まった水。上の縁は窪みの影（暗い）、下の縁は光を受けて明るい——これで
-         「穴」ではなく「窪みに溜まった水」と読める。面は水の層と同じ流れる水面で、
-         波紋は waterPost が印（wmask=2）の上に描く。 */
-      for(let dy=-E;dy<=E;dy++)for(let dx=-E;dx<=E;dx++){
-        const px=x+dx, py=y+dy, v=poolV(d,dx,dy,px,py);
-        if(v<=0) continue;
-        if(v<.2){                                                 // 縁：上が外なら影、下が外なら光
-          const up=poolV(d,dx,dy-1,px,py-1)<=0, dn=poolV(d,dx,dy+1,px,py+1)<=0;
-          dp(px,py, up&&!dn ? P_.poolShade : P_.poolLip); continue; }
-        const lv=Math.max(0,Math.min(3,Math.floor(Math.min(1,L*1.25)*(.75+Math.min(1,v)*.25)*3.6+(BAYER[((py&3)<<2)|(px&3)]-.5)*.9)));
-        dpw(px,py,waterSurface(P_.poolW,P_.poolGleam,lv,px,py,t,L,1,Math.sin(py*.22+t*1.7)*2,Math.sin(px*.056+t)*1.5),2);
-      } break; }
+    case 'pool': break;                                        // drawPools がまとめて描く
     case 'crystal': for(let i=0;i<3;i++){const h=hs(s,i), bx=x-2+i*2, H=3+h%4; for(let j=0;j<H;j++) dp(bx,y-j,P_.crys[j===H-1?2:(Math.sin(t*2+i+s)>.5?1:0)+((j+i)%2&&L>.3?1:0)]);} break;
     case 'weed': { for(let i=0;i<4;i++){const h=hs(s,i), bx=x-4+i*3, H=8+h%8; for(let j=0;j<H;j++){const px=bx+Math.sin(t*2+j*.6+i)*1.2*(j/H); dp(px,y-j,sh3(P_.weed,L+.1,px|0,y-j));}} break; }
     case 'fish': { const R=10+s%10, sp=.5+(s%5)*.12, a=t*sp+(s%628)/100, fx=x+Math.cos(a)*R, fy=y+Math.sin(a*2)*R*.35;

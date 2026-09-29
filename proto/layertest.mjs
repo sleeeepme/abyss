@@ -552,4 +552,21 @@ R.puddlesRippleAndGrow = await pg.evaluate(()=>{
   return {n6, n9, z6, z9, rip, ok: n9<n6*1.3 && z9>z6*1.3 && rip>0};
 });
 
+/* 水溜りは角・壁沿いに置き、岩（岩・石筍）とは重ねない。
+   床のまん中にぽつぽつ置くと不自然、岩が水に浸かって見える、という指摘で決めた。 */
+R.puddlesHugWallsAvoidRocks = await pg.evaluate(()=>{
+  let n=0, nearWall=0, rockHit=0;
+  for(const d of [6,7,8,9,10]) for(const seed of [31,32]){
+    TH.run(d,{seed}); setScreen('game'); draw(); const G=CAVE._G(); const f=W.fl;
+    const rocks=G.deco.filter(o=>o.k==='rock'||o.k==='stalagC');
+    for(const p of G.pools){ n++;
+      const tx=Math.floor(p.x/16), ty=Math.floor(p.y/16); let w=false;
+      for(let dy=-2;dy<=2&&!w;dy++)for(let dx=-2;dx<=2;dx++){ const r=f.g[ty+dy]; if(!r||r[tx+dx]===T.WALL){w=true;break;} }
+      if(w) nearWall++;
+      if(rocks.some(r=>Math.hypot(r.x-p.x,r.y-p.y)<p.ext*.8+14)) rockHit++;
+    }
+  }
+  return {n, nearWall, rockHit, ok: n>20 && nearWall===n && rockHit===0};
+});
+
 await done(b, errs, R);
