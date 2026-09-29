@@ -12246,6 +12246,9 @@ let _fxFails=0;          // 演出の描画で落ちた回数（最初の1回だ
    「敵まで描けて仲間で落ちた」のように場所が一言で伝わる。
    代入1つぶんなので、毎フレーム通っても費用はほぼ無い。 */
 let _drawStage='開始前';
+/* draw() のたびに1つ進む。敵・主人公は「このフレームで描いた場所」を控え（_drawn/_dwx/_dwy）、
+   当たりの絵はそこに付ける（game-feel.js の drawFeelHits）。描かれなかった相手には出さない。 */
+let _drawSerial=0;
 /* ---------- 盤面を止める窓 ----------
    探索中に開く窓（閃いた技の名前など）は、開いているあいだ時間を止める。
    止めるのは update だけで draw は回す——画面まで落とすと、
@@ -12888,6 +12891,7 @@ addEventListener('resize',resize);
 function draw(){
   _uiQ=null;
   _drawStage='画面消し';
+  _drawSerial++;
   ctx.fillStyle='#0d0f14'; ctx.fillRect(0,0,innerWidth,innerHeight);
   if(S.screen!=='game'||!W.fl||!S.hero||!S.run) return;
   _drawStage='地形';
@@ -13080,15 +13084,11 @@ function draw(){
       ctx.restore();
     }
   }else{
-  ctx.strokeStyle='#7fc3e0'; ctx.lineWidth=2.5;
-  ctx.setLineDash([5,4]);
-  ctx.beginPath(); ctx.arc(stx,sty,TS*0.55,0,7); ctx.stroke();
-  ctx.setLineDash([]);
+  /* 穴の周りの点線の輪と、封鎖中の赤い輪はやめた（報告「下への穴…に出ている円をなくして」）。
+     穴そのものは地形の側で描いてある。印は▼と文字だけにする。 */
   ctx.fillStyle='#7fc3e0'; ctx.font='bold '+(TS*0.55)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('▼',stx,sty);
   if(S.run.bossAlive){
-    ctx.strokeStyle='#c4433f'; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(stx,sty,TS*0.7,0,7); ctx.stroke();
     label('封鎖中', stx, sty-TS*0.95, '#c4433f');
   }else{
     label(returnPortalAt(S.run.depth)?'帰還ポータル':'降りる穴', stx, sty-TS*0.85, '#7fc3e0');
@@ -13197,6 +13197,7 @@ function draw(){
       }
       e.spotted = true;
     }
+    e._drawn=_drawSerial; e._dwx=(sx+camX)/TS; e._dwy=(sy+camY)/TS;   // 当たりの絵はここに付ける
     if(e.dead){ ctx.globalAlpha=Math.max(0,e.fade/0.3); }
     // 見た目の大きさは被弾半径 e.r をそのまま使う。
     // ボスだけ半径を大きくしても、描画がここで固定値のままだと
@@ -13208,8 +13209,9 @@ function draw(){
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast) uiLater(()=>drawBossCast(e, sx, sy, R));
-    // 予兆リング（攻撃が来る合図）
-    if(e.tele>0){
+    // 予兆リング（攻撃が来る合図）。ボスは出さない——大きい体の中に小さな赤い輪が出るだけで
+    // 読めず、「ボスの周りの円」として邪魔になっていた（報告）。ボスの技は drawBossCast が形で予告する。
+    if(e.tele>0 && !e.boss){
       const p=1-e.tele/e.arch.tele;
       uiLater(()=>{
         ctx.strokeStyle='rgba(255,110,80,'+(0.4+p*0.55)+')'; ctx.lineWidth=2+p*3;
@@ -13292,10 +13294,8 @@ function draw(){
     // 金の輪と王冠は「これが主だ」の印。幻が出ているあいだは本体からも外す。
     if(e.boss && !disg){
       const gold = e.tier==='final' ? '#ff9a5a' : e.tier==='great' ? '#ffd06a' : '#d6b34a';
-      ctx.strokeStyle=gold; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.arc(sx,sy,R+5,0,7); ctx.stroke();
-      ctx.globalAlpha=0.35+0.25*Math.sin(performance.now()/300);
-      ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,R+11,0,7); ctx.stroke();
+      /* 周りの金の二重の輪はやめた（報告「ボスの周りに出ている円をなくして」）。
+         主の印は王冠と上の HP バーで足りている。 */
       ctx.globalAlpha=e.dead?Math.max(0,e.fade/0.3):1;
       // 王冠
       ctx.fillStyle=gold;
@@ -13363,6 +13363,7 @@ function draw(){
     const motion=finiteXY(feelEntityOffset(a));
     const sx=a.x*TS-camX+motion.x, sy=a.y*TS-camY+motion.y;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
+    a._drawn=_drawSerial; a._dwx=(sx+camX)/TS; a._dwy=(sy+camY)/TS;   // 振り・当たりの絵はここに付ける
     /* 落とし穴の演出（主人公と同じ規則）。点滅で消えているフレームは丸ごと描かない。 */
     const aFallK = a.fallAnim ? clamp(a.fallAnim.t/a.fallAnim.dur,0,1) : 0;
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
@@ -13927,6 +13928,7 @@ function draw(){
      ctx.translate(NaN) は例外を出さずに**そのフレームの絵を捨てる**ので、
      ここで有限に丸めておかないと「主人公だけ消える」が起きる。 */
   const heroBob=finiteXY(feelHeroOffset());
+  P._drawn=_drawSerial; P._dwx=(px+heroBob.x+camX)/TS; P._dwy=(py+heroBob.y+camY)/TS;
   if(!heroBlinkOff) drawFeelGroundShadow(px+heroBob.x,py+heroBob.y,TS,heroScale);
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
@@ -15085,12 +15087,34 @@ function layoutLeftColumn(base){
     top = r.bottom - base + 6;
   }
 }
+/* ボスの HP バー（と試練のバー）は中央の上に置いてあるが、右肩の「階・層・点/金・SP/黒鉄」が
+   4行あり、バーの右端が SP の行に被っていた（報告）。右肩と横に重なるなら、右肩の一番下の下へ落とす。 */
+function layoutTopBars(base){
+  const dp=el('depth'); if(!dp) return;
+  const d=dp.getBoundingClientRect();
+  const shown=n=>n && n.style.display!=='none' && getComputedStyle(n).display!=='none';
+  const bb=el('bossbar'), tb=el('trialbar');
+  let below=null;                                   // ボスのバーの下端（両方出ているときは、帯をその下へ積む）
+  if(shown(bb)){
+    bb.style.top='';
+    const r=bb.getBoundingClientRect();
+    if(!(r.right<d.left+1 || r.top>d.bottom-1)) bb.style.top=Math.round(d.bottom-base+4)+'px';
+    below=bb.getBoundingClientRect().bottom;
+  }
+  if(shown(tb)){
+    if(below!=null){ tb.style.top=Math.round(below-base+8)+'px'; return; }
+    tb.style.top='';
+    const r=tb.getBoundingClientRect();
+    if(!(r.right<d.left+1 || r.top>d.bottom-1)) tb.style.top=Math.round(d.bottom-base+4)+'px';
+  }
+}
 function layoutHud(force){
   const lg=el('log'); if(!lg) return;
   if(!force && _tickCount-_hudLaidTick<HUD_LAYOUT_EVERY) return;
   _hudLaidTick=_tickCount;
 
   const base = el('hud').getBoundingClientRect().top;
+  layoutTopBars(base);                      // ボスのバーを右肩の下へ
   layoutLeftColumn(base);                   // 左肩を先に積んでから
   layoutTargetInfo(base);                   // ログより先に、こちらの位置を決める
 
@@ -18830,9 +18854,9 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20260929a"></script>
-<script src="game-feel.js?v=20260929a"></script>
+<script src="game-feel.js?v=20260929b"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20260929d"></script>
+<script src="cave-look.js?v=20260929e"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

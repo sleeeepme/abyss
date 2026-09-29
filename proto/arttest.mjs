@@ -521,4 +521,20 @@ R.swingStopsAtTarget = await pg.evaluate(()=>{
   return {d:+d.toFixed(3), hitR:hit&&hit.hitR&&+hit.hitR.toFixed(3), missR:miss&&miss.hitR, ok: !!inside && !!miss && miss.hitR==null};
 });
 
+/* 当たりの絵は「このフレームで敵を描いた場所」に付く。描かれなかった（見えていない）敵には出さない。
+   座標から計算し直す作りだと、絵の側だけのずらしを取りこぼした所で敵と違う所に出た（報告が4回）。 */
+R.hitUsesDrawnPlace = await pg.evaluate(()=>{
+  TH.run(1,{seed:77}); TH.floor(3); TH.immortal(); setScreen('game');
+  const e0=W.enemies[0]; W.enemies.forEach(x=>x.dead=true);
+  const e=Object.assign({}, e0, {x:P.x+1.2, y:P.y, hp:1e7, maxHp:1e7, dead:false, boss:false, _drawn:undefined});
+  W.enemies=[e]; for(const r of W.seen) r.fill(1);
+  FEEL.hits.length=0; feelImpact(e,P,false,'slash','neutral'); draw();
+  const h=FEEL.hits.find(q=>q.ent===e);
+  const onDrawn = !!h && Math.abs(h.x-e._dwx)<1e-6 && Math.abs(h.y-e._dwy)<1e-6;
+  // 見えなくなった（このフレームで描かれなかった）相手：当たりの位置を動かさず、絵も出さない
+  const before={x:h.x,y:h.y}; e.x+=3; e._drawn=-5;
+  const hidden=(()=>{ const s=_drawSerial; drawFeelHits(0,0); return h.x===before.x && h.y===before.y && e._drawn!==s; })();
+  return {onDrawn, hidden, ok: onDrawn && hidden};
+});
+
 await done(b, errs, R);

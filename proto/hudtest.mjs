@@ -415,6 +415,16 @@ R.bossBarClearOfBaneBar = await pg.evaluate(()=>{
           ok: bossShown && baneShown && noOverlap && baneBelow};
 });
 
+/* ボスの HP バーが右肩（階・層・点/金・SP/黒鉄）と重ならない（報告「ボスのHPバーとゴールドなどのUIが被っている」） */
+R.bossBarClearOfDepth = await pg.evaluate(()=>{
+  TH.run(10,{seed:7}); TH.immortal();
+  const boss=W.enemies.find(e=>e.boss); boss.revealed=true;
+  TH.step(0.2); layoutHud(true);
+  const rb=el('bossbar').getBoundingClientRect(), rd=el('depth').getBoundingClientRect();
+  const overlap = rb.right>rd.left && rd.right>rb.left && rb.bottom>rd.top && rd.bottom>rb.top;
+  return {boss:[Math.round(rb.left),Math.round(rb.top),Math.round(rb.right),Math.round(rb.bottom)], depth:[Math.round(rd.left),Math.round(rd.top),Math.round(rd.right),Math.round(rd.bottom)], ok: el('bossbar').style.display!=='none' && !overlap};
+});
+
 // 7-b. 白の層に居るだけ（ラスボス以外）では、効果は掛かっていてもゲージは出さない
 R.zoneBaneHasNoGauge = await pg.evaluate(()=>{
   TH.run(55,{seed:9}); TH.immortal();   // 55階も白の層。ボスはいるが「アビスの口」ではない

@@ -583,9 +583,19 @@ function feelHitImage(element,target,age,scale){
 function drawFeelHits(camX,camY){
   if(PIXEL_ART_FX){
     const sc=feelArtScale();
+    const serial=typeof _drawSerial!=='undefined'?_drawSerial:null;
     for(const f of FEEL.hits){
       const e=f.ent;
-      if(e&&!e.dead&&Number.isFinite(e.x)&&Number.isFinite(e.y)){   // 倒れたら最後の場所に残す
+      /* **このフレームで絵を描いた場所**に付ける（本編が e._dwx/_dwy に控える）。
+         座標から計算し直すと、跳ね・反動・画風の差し替えなど、絵の側だけの
+         ずらしを1つでも取りこぼした所で「敵と違う所に出る」（報告が4回あった）。
+         生きているのにこのフレームで描かれなかった相手（壁の向こう・暗がり・跡の層で
+         まだ見えていない敵）には、当たりの絵も出さない——何も無い所に火花だけが出る。 */
+      if(e&&serial!=null&&e._drawn!=null){
+        if(e._drawn===serial&&Number.isFinite(e._dwx)&&Number.isFinite(e._dwy)){ f.x=e._dwx; f.y=e._dwy; f.seen=true; }
+        else if(!e.dead) continue;
+        else if(!f.seen) continue;                                   // 一度も見えなかった相手が倒れても出さない
+      }else if(e&&!e.dead&&Number.isFinite(e.x)&&Number.isFinite(e.y)){   // 倒れたら最後の場所に残す
         const off=finiteXY(feelEntityOffset(e)),lift=(e.arch&&typeof hopLift==='function')?hopLift(e):0;
         f.x=e.x+off.x/TS;f.y=e.y+(off.y-lift)/TS;   // 反動・跳ねている高さは画面px（絵と同じだけずらす）
       }

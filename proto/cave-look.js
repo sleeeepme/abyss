@@ -106,7 +106,10 @@ const lookOf=Z=>LOOK[Z&&Z.id]||LOOK.stone;
 /* 明かりの中で地面の模様をどれだけ透かすか（0で透かさない） */
 const PAT_A=.15;
 /* 画面上下のぼかし（本編は blur 5 / band .40 / fade .30） */
-const CAVE_TILT={strength:6, band:.30, fade:.24, strips:10};   // strength＝端での縮小率（大きいほど強くぼける）
+const CAVE_TILT={strength:6, band:.30, fade:.24, strips:10, blur:false};
+/* blur:false … 上下のぼかしを掛けない（報告「本体が熱を持ちやすい、厳しかったら上下のブラーはなくして」）。
+   ぼかしは帯ごとに画面を縮小して戻す drawImage で、端の処理の中で一番重い。暗くする帯（ビネット）は
+   塗るだけなので残す。 */   // strength＝端での縮小率（大きいほど強くぼける）
 /* ---------- 画面の端へ向かって暗くなるビネット ----------
    ユーザー要望「主人公の灯りとは別に、画面端にかけて暗くなるビネットを入れたい。
    ぼかしの領域あたりが暗くなるようなイメージ」。
@@ -160,7 +163,7 @@ function extraTilt(){
       const h=Math.round(b-a); if(h<=0) continue;
       const t=(k+.5)/n, dark=V.max*Math.pow(t,V.pow);
       // 伏せてしまう一番外の帯はぼかさない（ぼけているかどうか読めないので）
-      if(!(outer && dark>=V.skipBlur)){
+      if(T0_.blur && !(outer && dark>=V.skipBlur)){
         const f=1+t*(T0_.strength-1), sw=Math.max(1,Math.round(W0/f)), pad=Math.ceil(f*2);
         const ya=Math.max(0,Math.round(a)-pad), hb=Math.min(H0,Math.round(a)+h+pad)-ya, shp=Math.max(1,Math.round(hb/f));
         if(TILT_C.width<sw) TILT_C.width=sw; if(TILT_C.height<shp) TILT_C.height=shp;
@@ -216,7 +219,13 @@ const LIGHT_A=.64, LIGHT_CORE=.22;   // 明かりの濃さ（1で元）／中央
 
 /* ---------- 地形ハザードの色（面として描く） ---------- */
 const HZ={
-  water:{ramp:cs(['#0a2230','#103650','#1a5070','#3a88b0']), band:cs(['#0a2230','#103650','#1a5070','#3a88b0','#5fa6c8','#8ccbe2']), hi:C('#c8f0ff'), glow:false},
+  water:{ramp:cs(['#0a2230','#103650','#1a5070','#3a88b0']), band:cs(['#0a2230','#103650','#1a5070','#3a88b0','#5fa6c8','#8ccbe2']), hi:C('#c8f0ff'), glow:false,
+    /* 深さの3段。浅瀬は底の砂が透ける緑がかった明るい水、深みは濃い青、淵は底の見えない黒。
+       段ごとに**色の系統ごと**変える（明るさだけの差だと、灯りの強弱と区別がつかない）。 */
+    shallow:cs(['#12303a','#1a4a56','#256a74','#3a8c92','#62b0b0','#94d4cc']),
+    deep:cs(['#081a2c','#0c2842','#12385e','#1c5080','#4a86b0','#7ab0d0']),
+    abyss:cs(['#020509','#03080f','#050d17','#081522','#12304a','#1e4a68']),
+    shelf:C('#8ad0d0'), drop:C('#3c78a4')},
   lava:{ramp:cs(['#6a1a08','#b0360e','#e8661a','#ffb040']), hi:C('#fff0b0'), glow:true},
   poison:{ramp:cs(['#15240f','#243c18','#3a5a24','#6a9a3a']), hi:C('#b8e070'), glow:false},
   spore:{ramp:cs(['#1a1428','#2a2040','#44345e','#7a5ea0']), hi:C('#e8c0ff'), glow:false},
@@ -509,7 +518,10 @@ function terrain(f,Z,camX,camY,blinded){
       if(c===0){
         /* ---- 穴（降りる穴・縁の向こう） ---- */
         const sd=(wx-stx)*(wx-stx)+(wy-sty)*(wy-sty);
-        if(sd<64){ buf[k]= sd>42 ? (((wx+wy)&1)?Pp.pit:rim[Math.min(4,1+Math.floor(Lv*4+b))]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
+        /* 降りる穴。縁をノイズで崩し、網点の輪（点線の円に見えた）をやめる。
+           手前（下）の縁は灯りを受けた岩、奥（上）の縁は影——穴の縁が段になって見える。 */
+        const hn=NZ[((wy&255)<<8)|(wx&255)]-.5, HR=64*(1+hn*.6);
+        if(sd<HR){ buf[k]= sd>HR*.66 ? (wy>sty ? rim[Math.min(4,Math.floor(Lv*4.5+b))] : ed[0]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
         if(pitOn&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
         if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(hv>.5){
@@ -519,10 +531,16 @@ function terrain(f,Z,camX,camY,blinded){
                以前は wy>>4 のマスの段をそのまま使っていたので、深い所が四角の寄せ集めに見えた（報告）。
                混ぜた値が2.5を越える所＝淵のマスの縁なので、落ちる場所とは食い違わない。 */
             const D=waterDepthAt(hg,wx,wy);
-            lv-=Math.floor(Math.max(0,Math.min(2,D-1.2))+(b-.5)*.45+.15);
             lv=Math.max(0,Math.min(3,lv));
-            if(hv<.56){ buf[k]=hz.ramp[Math.min(3,lv+1)]; continue; }    // 岸
-            buf[k]=waterSurface(hz.band,hz.hi,lv,wx,wy,t,Lv,D,rowW1,rowW2,wcolX[bx]);
+            if(hv<.56){ buf[k]=hz.shallow[Math.min(5,lv+2)]; continue; }    // 岸
+            /* 深さの段（報告「10階以降の水の深さの段階がわからなくなった」）。
+               境目は 1.5（浅瀬→深み）と 2.5（深み→淵）。境には1ドットの線を引く：
+               浅瀬の縁は明るい棚の線、淵の縁は青い落ち込みの線。線の内側は網点を使わず塗り分ける。 */
+            if(Math.abs(D-1.5)<.075){ buf[k]=hz.shelf; wmask[k]=1; continue; }
+            if(Math.abs(D-2.5)<.075){ buf[k]=hz.drop; wmask[k]=1; continue; }
+            const tr=D<1.5?hz.shallow:D<2.5?hz.deep:hz.abyss;
+            const lv2=D<1.5?Math.min(3,lv+1):D<2.5?lv:Math.max(0,lv-1);
+            buf[k]=waterSurface(tr,hz.hi,lv2,wx,wy,t,D<2.5?Lv:0,D,rowW1,rowW2,wcolX[bx]);
             wmask[k]=1; continue;
           }
           lv=Math.max(0,Math.min(3,lv));
@@ -671,6 +689,7 @@ function genDeco(f,Z){
   const pools=res.filter(o=>o.k==='pool');
   res=res.filter(o=>!SMALL[o.k]||!pools.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<p.ext+4));
   G.pools=pools;
+  G.drips=genDrips(f,pools,depth);
   return res;
 }
 /* 水溜りの形。楕円1つだと、並んだときに全部同じ判子に見える（報告「楕円ばかりで不自然」）。
@@ -815,6 +834,47 @@ function rockPx(x,y,nx,ny,edge){ // nx,ny：外向きの法線、edge：縁か�
    浅い窪みに溜まった水：上の縁は窪みの影（暗い）、下の縁は光を受けて明るい——これで
    「穴」ではなく「窪みに溜まった水」と読める。面は水の層と同じ流れる水面で、
    波紋は waterPost が印（wmask=2）の上に描く。岩（壁の続き・当たり判定の円）の上には塗らない。 */
+/* ---------- 雨漏り（石の層の第6〜第9階層） ----------
+   天井から水滴が落ちて、水溜りに波紋を立てる（ユーザー要望「6-9階は雨漏りみたいなものを少し垂らしたい」）。
+   水は漏れる所の下に溜まるので、**滴る場所は水溜りの中**を基本にし、床に落ちる物を少しだけ混ぜる。
+   量は控えめ：水溜り2つに1つ前後。間隔は1滴ごとに1.6〜3.8秒。 */
+function genDrips(f,pools,depth){
+  const z=zoneFloor(depth); if(!G||G.Z.id!=='stone'||z<6||z>9) return [];
+  const out=[];
+  for(const p of pools){ const h=hs(p.s,777); if(h%2) continue;
+    const l=p.lobes[0]; out.push({x:p.x+Math.round(l.ox*.5), y:p.y+Math.round(l.oy*.5), s:h, pool:p, per:1.6+(h%1000)/1000*2.2, last:-1}); }
+  for(let ty=1;ty<f.H-1;ty++)for(let tx=1;tx<f.W-1;tx++){
+    if(f.g[ty][tx]!==T.FLOOR) continue; const h=hs(tx*7919+ty*104729+depth*13,778);
+    if(h%1000>=4) continue;
+    out.push({x:tx*Q+8, y:ty*Q+8, s:h, pool:null, per:1.8+(h%997)/997*2.0, last:-1});
+  }
+  return out;
+}
+const DRIP_FALL=.34, DRIP_SPLASH=.30, DRIP_H=30;
+function drawDrips(bx0,by0,t,blindR){
+  if(!G.drips||!G.drips.length) return;
+  const drop=C('#cfeaff'), trail=C('#6f9cc0'), spl=C('#9cc8e8');
+  for(const d of G.drips){
+    if(d.x<bx0-4||d.y<by0-DRIP_H-4||d.x>bx0+bw+4||d.y>by0+bh+8) continue;
+    if(!seenAt(G.f,G.L,d.x|0,d.y|0)) continue;
+    if(Math.hypot(d.x-lampX,d.y-lampY)>blindR) continue;
+    const ph=(d.s%1000)/1000*d.per, u=(t+ph)%d.per, cyc=Math.floor((t+ph)/d.per);
+    if(u<DRIP_FALL){                                             // 落ちている
+      const k=u/DRIP_FALL, y=d.y-DRIP_H*(1-k*k);
+      dpf(d.x,y,drop); dpf(d.x,y-1,drop); dpf(d.x,y-2,trail); if(k>.4) dpf(d.x,y-3,trail);
+    }else if(u<DRIP_FALL+DRIP_SPLASH){                           // 着いた
+      const k=(u-DRIP_FALL)/DRIP_SPLASH;
+      if(d.pool){
+        if(d.last!==cyc && typeof FEEL!=='undefined' && FEEL.ripples){ d.last=cyc;
+          FEEL.ripples.push({x:d.x/Q,y:(d.y-2)/Q,age:0,col:'#5a7ea2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift(); }
+        if(k<.35){ dpf(d.x,d.y-1-k*6,drop); }                    // 跳ね返りの1粒
+      }else{
+        const r=1+k*4; if(k<.7) for(const [ax,ay] of [[-1,0],[1,0],[-.7,-.5],[.7,-.5]]) dpf(d.x+ax*r,d.y+ay*r,spl);
+        if(k<.3) dpf(d.x,d.y,drop);
+      }
+    }
+  }
+}
 let pdone=null;
 function drawPools(bx0,by0,t,blindR){
   if(!G.pools||!G.pools.length) return;
@@ -845,6 +905,7 @@ function drawPools(bx0,by0,t,blindR){
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=DECO_PAL, code=G.code, PW=G.PW;
   drawPools(bx0,by0,t,blindR);
+  drawDrips(bx0,by0,t,blindR);
   for(const d of G.deco){
     const mg=d.ext||0;                                  // 大きな水溜りは端で切らない
     if(d.x<bx0-24-mg||d.y<by0-8-mg||d.x>bx0+bw+24+mg||d.y>by0+bh+30+mg) continue;
