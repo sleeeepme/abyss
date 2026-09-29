@@ -536,10 +536,14 @@ function terrain(f,Z,camX,camY,blinded){
             /* 深さの段（報告「10階以降の水の深さの段階がわからなくなった」）。
                境目は 1.5（浅瀬→深み）と 2.5（深み→淵）。境には1ドットの線を引く：
                浅瀬の縁は明るい棚の線、淵の縁は青い落ち込みの線。線の内側は網点を使わず塗り分ける。 */
-            if(Math.abs(D-1.5)<.075){ buf[k]=hz.shelf; wmask[k]=1; continue; }
-            if(Math.abs(D-2.5)<.075){ buf[k]=hz.drop; wmask[k]=1; continue; }
-            const tr=D<1.5?hz.shallow:D<2.5?hz.deep:hz.abyss;
-            const lv2=D<1.5?Math.min(3,lv+1):D<2.5?lv:Math.max(0,lv-1);
+            /* 境は網点のグラデーションでなじませる（報告「はっきり分かれすぎて不自然、少しだけ網グラデを」）。
+               深さの値に網点のしきい値（BAYER）をずらして足してから段を決めるので、境の前後
+               WATER_BLEND ぶんだけ2つの色が市松に混ざる。棚・落ち込みの線も網点で間引いて細く見せる。 */
+            const Db=D+(b-.5)*WATER_BLEND;
+            if(Math.abs(D-1.5)<.075&&b<.5){ buf[k]=hz.shelf; wmask[k]=1; continue; }
+            if(Math.abs(D-2.5)<.075&&b<.5){ buf[k]=hz.drop; wmask[k]=1; continue; }
+            const tr=Db<1.5?hz.shallow:Db<2.5?hz.deep:hz.abyss;
+            const lv2=Db<1.5?Math.min(3,lv+1):Db<2.5?lv:Math.max(0,lv-1);
             buf[k]=waterSurface(tr,hz.hi,lv2,wx,wy,t,D<2.5?Lv:0,D,rowW1,rowW2,wcolX[bx]);
             wmask[k]=1; continue;
           }
@@ -850,6 +854,7 @@ function genDrips(f,pools,depth){
   }
   return out;
 }
+const WATER_BLEND=.35;   // 深さの境の網グラデの幅（深さの値で。1段＝1.0）
 const DRIP_FALL=.34, DRIP_SPLASH=.30, DRIP_H=30;
 function drawDrips(bx0,by0,t,blindR){
   if(!G.drips||!G.drips.length) return;
