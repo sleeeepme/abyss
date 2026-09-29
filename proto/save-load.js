@@ -115,6 +115,8 @@
     if(d.ui.phase==='btarget'&&(!d.ui.bt||!d.ui.btTargets.length))throw Error('付与先が不正です');
     if(d.ui.phase==='fallen'&&!d.ui.fallen)throw Error('仲間情報が不正です');
   }
+  // Back to a fresh S, but keep the session-only debug switches (see restore()).
+  function resetState(){const keepDebug=S.debug;for(const k of Object.keys(S))delete S[k];Object.assign(S,JSON.parse(JSON.stringify(defaults)));if(keepDebug)S.debug=keepDebug;}
   let active=false,ready=false,owned=false,release=null,held=false,failed=false,dirty=false,newRequested=false;
   let debugSession=false,pending=null,recovery=null,currentRaw=null,revision=0,lastWrite=0,lastSaved=0,lastPayload=null,metrics={};
   const style=document.createElement('style');
@@ -206,7 +208,11 @@
       return map.get(v)||v;
     }
     const roots=[d.s,d.p,d.w];remap(d);
+    // S.debug is session-only (never saved). Keep it across the swap, otherwise
+    // switches turned on at the title (e.g. 階層全開放) vanish on 「つづきから」.
+    const keepDebug=S.debug;
     for(const [i,target] of [S,P,W].entries()){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,roots[i]);}
+    if(keepDebug)S.debug=keepDebug;
     W.pops=[];RNG=mulberry32(d.rng);genItem._n=d.itemId;
     _intrF=null;_intrKey='';_fallen=null;_fallenQueue=d.ui.fallenQueue||[];
     _deathPool=d.ui.deathPool;_deathBase=d.ui.deathBase;_deathCap=d.ui.deathCap;
@@ -274,7 +280,7 @@
     if(!owned||!confirm('保存データと復旧用データを完全に消去します。元には戻せません。よろしいですか？'))return;
     failed=false;
     if(!clear())return;
-    for(const k of Object.keys(S))delete S[k];Object.assign(S,JSON.parse(JSON.stringify(defaults)));
+    resetState();
     close();setScreen('title');title();
   });
   fresh.addEventListener('click',()=>{
@@ -309,7 +315,7 @@
   }
   const baseConfirmName=confirmName;confirmName=function(){
     if(newRequested){
-      for(const k of Object.keys(S))delete S[k];Object.assign(S,JSON.parse(JSON.stringify(defaults)));
+      resetState();
       genItem._n=0;newRequested=false;pending=null;lastPayload=null;
     }
     baseConfirmName();active=true;request();

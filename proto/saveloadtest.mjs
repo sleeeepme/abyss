@@ -26,6 +26,21 @@ await check('town survives reload with inventory and growth',async()=>{
   await reload();assert.equal(await page.locator('#t-start').textContent(),'つづきから');await page.click('#t-help');await page.click('#help-ok');assert.equal(await page.locator('#t-start').textContent(),'つづきから');await page.screenshot({path:'/tmp/abyss-save-title.png'});await resume();
   assert.equal(await page.evaluate(()=>JSON.stringify([S.name,S.gold,S.shards,S.stash,S.mastery])),before);
 });
+/* タイトルで入れたデバッグの切り替え（S.debug は保存しない）が「つづきから」で消えていた。
+   階層全開放を入れて続きから入ると、階層選択が出ずに第1階層へ直行した（報告）。 */
+await check('debug switches set on the title survive resume',async()=>{
+  await reload();
+  for(let i=0;i<5;i++)await page.click('#scr-title .ver');
+  await page.click('#dbgbtn');await page.click('#dbg-depth');
+  await page.evaluate(()=>el('m-debug').classList.remove('on'));
+  await resume();
+  assert.deepEqual(await page.evaluate(()=>[S.screen,dbg('allDepths'),unlockedDepths().length>1,el('dbgbtn').classList.contains('on')]),['town',true,true,true]);
+  await page.click('#btn-dive');
+  assert.equal(await page.evaluate(()=>el('m-depthsel').classList.contains('on')),true);
+  assert.equal(await page.evaluate(()=>ABYSS_SAVE.info().debugSession),true);
+  await reload();await resume();                         // 検証の汚れを持ち越さない
+  assert.equal(await page.evaluate(()=>!!(S.debug&&S.debug.allDepths)),false);
+});
 await check('unclaimed gacha result resumes without reroll or lost reward',async()=>{
   await page.evaluate(()=>{setScreen('gacha');doGachaPull();});await flush();
   const before=await page.evaluate(()=>JSON.stringify([_pending,S.gachaLeft,S.carry]));await reload();await resume();
