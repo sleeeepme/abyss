@@ -658,10 +658,6 @@ function genDeco(f,Z){
   G.pools=out.filter(o=>o.k==='pool');
   return out;
 }
-/* 石の層の後半（第6〜第10階層）の水溜り。**水の層へ近づくほど増えて広がる。**
-   第6階層は今までどおりまばら、第10階層で数が約2.6倍・一つずつも一回り大きい
-   （ユーザー要望「水の層に近づくにつれて水の面積を増やしたい」）。
-   層は一周するので、階の数ではなく「層の中の何階目か」で決める。 */
 /* 水溜りの形。楕円1つだと、並んだときに全部同じ判子に見える（報告「楕円ばかりで不自然」）。
    傾けた楕円（葉）を何枚か重ね、縁をノイズで崩す。形は5通りから引く:
      ・ふくらみ … 大きな葉に小さな葉が1〜2枚くっつく（いちばん多い）
@@ -676,7 +672,7 @@ function poolShape(o,h,g){
   const R=5.5+r(0)*4.5+g, lobes=[];
   const lobe=(ox,oy,rx,ry,a)=>lobes.push({ox,oy,rx,ry,c:Math.cos(a),s:Math.sin(a)});
   const tilt=(r(1)-.5)*.9;
-  if(kind==='round'){ const rr=3.5+r(2)*2.5+g*.6; lobe(0,0,rr,rr*(.65+r(3)*.2),tilt*.5); }
+  if(kind==='round'){ const rr=3.5+r(2)*2.5+g*.7; lobe(0,0,rr,rr*(.65+r(3)*.2),tilt*.5); }
   else if(kind==='long'){ const n=3+(hs(h,298)%2), step=R*.75, ca=Math.cos(tilt*1.3), sa=Math.sin(tilt*1.3);
     for(let i=0;i<n;i++){ const k=i-(n-1)/2, w=R*(.55+r(10+i)*.3); lobe(ca*k*step, sa*k*step*.6+(r(20+i)-.5)*2, w, w*(.45+r(30+i)*.15), tilt*1.3); } }
   else if(kind==='neck'){ const a=tilt, d=R*(.8+r(4)*.3);
@@ -699,8 +695,12 @@ function poolV(o,dx,dy,px,py){
   return v + (NZ[((py&255)<<8)|(px&255)]-.5)*.7 + (NZS[(((py+60)&255)<<8)|((px+30)&255)]-.5)*.35;
 }
 function zoneFloor(depth){ return ((Math.max(1,depth)-1)%10)+1; }
-function poolMore(depth){ return 1+Math.max(0,zoneFloor(depth)-6)*.4; }
-function poolGrow(depth){ return Math.max(0,zoneFloor(depth)-6)*.9; }
+/* 石の層の後半（第6〜第10階層）の水溜り。**水の層へ近づくほど広がる。**
+   数は増やさず、一つずつを大きくする——数で増やしたら第9階層が水溜りだらけで
+   気持ち悪い、という指摘があった。第10階層で半径が第6階層の約1.7倍（面積で約3倍）。
+   層は一周するので、階の数ではなく「層の中の何階目か」で決める。 */
+function poolMore(depth){ return 1; }
+function poolGrow(depth){ return Math.max(0,zoneFloor(depth)-6)*1.4; }
 const DEMIT={boiler:[30,.6],crystal:[14,.35],plankton:[18,.4],shroom:[18,.45],bulb:[14,.3],lamppost:[34,.7],vent:[20,.45],slag:[14,.3],pipe:[10,.2]};
 function decoEmit(bx0,by0){
   for(const d of G.deco){ const em=DEMIT[d.k]; if(!em||d.ok<0) continue;

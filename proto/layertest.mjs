@@ -535,19 +535,21 @@ R.waterGrowsTowardZoneEnd = await pg.evaluate(()=>{
   const a=frac(11), z=frac(19);
   return {f11:+a.toFixed(3), f19:+z.toFixed(3), ratio:+(z/a).toFixed(2), ok: z/a>=1.7 && z<0.75};
 });
-/* 石の層の後半の水溜りは、踏むと波紋が出る。数は10階へ向けて増える（6階と9階を床1マスあたりで比べる）。 */
+/* 石の層の後半の水溜りは、踏むと波紋が出る。10階へ向けて**数ではなく大きさ**が増える
+   （数を増やしたら第9階層が水溜りだらけで気持ち悪い、という指摘で変えた）。 */
 R.puddlesRippleAndGrow = await pg.evaluate(()=>{
   const pools=d=>{ TH.run(d,{seed:12}); setScreen('game'); draw(); const G=CAVE._G(); return (G&&G.pools)||[]; };
-  // 10階は大広間で床が狭いので、数ではなく「床1マスあたり」で比べる
-  const per=d=>{ const n=pools(d).length; let fl=0; for(const r of W.fl.g) for(const t of r) if(t===T.FLOOR) fl++; return n/fl; };
-  const n6=+per(6).toFixed(4), n9=+per(9).toFixed(4);
+  const stat=d=>{ const ps=pools(d); let fl=0; for(const r of W.fl.g) for(const t of r) if(t===T.FLOOR) fl++;
+    return {per:ps.length/fl, size:ps.reduce((a,p)=>a+p.ext,0)/Math.max(1,ps.length)}; };
+  const s6=stat(6), s9=stat(9);
+  const n6=+s6.per.toFixed(4), n9=+s9.per.toFixed(4), z6=+s6.size.toFixed(1), z9=+s9.size.toFixed(1);
   const list=pools(9), pool=list.slice().sort((a,b)=>b.ext-a.ext)[0];
-  if(!pool) return {n6,n9,ok:false};
+  if(!pool) return {n6,n9,z6,z9,ok:false};
   TH.immortal(); W.enemies.length=0;
   P.x=pool.x/16-1.2; P.y=(pool.y-2)/16; FEEL.ripples.length=0;
   let rip=0;
   stepSim(1.2,{draw:true, each:()=>{stickDx=1;stickDy=0;}, after:()=>{ rip=Math.max(rip,FEEL.ripples.length); }}); stickDx=0;
-  return {n6, n9, rip, ok: n9>n6*1.5 && rip>0};
+  return {n6, n9, z6, z9, rip, ok: n9<n6*1.3 && z9>z6*1.3 && rip>0};
 });
 
 await done(b, errs, R);
