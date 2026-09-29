@@ -586,4 +586,20 @@ R.waterWavesSpreadAndSettle = await pg.evaluate(()=>{
   return {span0, span1, dryWave, settled, ok: span1>span0+4 && dryWave===0 && settled};
 });
 
+/* 水溜りに落ちる滴は水しぶきだけ。波紋を立てると水面がずっと動いて見えた（報告）。
+   じっと立っている間は、滴が何度落ちても波は立たない。 */
+R.dripsDoNotRipple = await pg.evaluate(async ()=>{
+  let drips=0, pushes=0, wave=0;
+  for(const seed of [31,32]){
+    TH.run(9,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; draw();
+    const G=CAVE._G(), pd=(G.drips||[]).filter(d=>d.pool); if(!pd.length) continue;
+    P.x=pd[0].x/16+.9; P.y=pd[0].y/16; drips+=pd.length; FEEL.ripples.length=0; draw(); draw();
+    const push=FEEL.ripples.push.bind(FEEL.ripples); FEEL.ripples.push=(...a)=>{ pushes++; return push(...a); };
+    for(let i=0;i<110;i++){ draw(); await new Promise(r=>setTimeout(r,40)); }
+    delete FEEL.ripples.push;
+    const w=CAVE.wave(); if(w&&w.x1>=0) wave++;
+  }
+  return {drips, pushes, wave, ok: drips>0 && pushes===0 && wave===0};
+});
+
 await done(b, errs, R);

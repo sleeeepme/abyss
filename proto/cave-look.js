@@ -994,20 +994,16 @@ function drawDrips(bx0,by0,t,blindR){
     if(!d.pool){                                                 // 床の滴り跡：濡れて少し暗い小さな染み
       const L=Math.max(.15,pxLight(d.x,d.y)); for(let dy=-1;dy<=1;dy++)for(let dx=-2;dx<=2;dx++){ if(Math.abs(dx)===2&&dy) continue;
         if(ihash(d.x+dx,d.y+dy)%3===0) continue; dp(d.x+dx,d.y+dy,sh3(DECO_PAL.pool,L*.9,d.x+dx,d.y+dy)); } }
-    const ph=(d.s%1000)/1000*d.per, u=(t+ph)%d.per, cyc=Math.floor((t+ph)/d.per);
+    const ph=(d.s%1000)/1000*d.per, u=(t+ph)%d.per;
     if(u<DRIP_FALL){                                             // 落ちている
       const k=u/DRIP_FALL, y=d.y-DRIP_H*(1-k*k);
       dpf(d.x,y,drop); dpf(d.x,y-1,drop); dpf(d.x,y-2,trail); if(k>.4) dpf(d.x,y-3,trail);
     }else if(u<DRIP_FALL+DRIP_SPLASH){                           // 着いた
       const k=(u-DRIP_FALL)/DRIP_SPLASH;
-      if(d.pool){
-        if(d.last!==cyc && typeof FEEL!=='undefined' && FEEL.ripples){ d.last=cyc;
-          FEEL.ripples.push({x:d.x/Q,y:(d.y-2)/Q,age:0,col:'#5a7ea2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift(); }
-        if(k<.35){ dpf(d.x,d.y-1-k*6,drop); }                    // 跳ね返りの1粒
-      }else{
-        const r=1+k*4; if(k<.7) for(const [ax,ay] of [[-1,0],[1,0],[-.7,-.5],[.7,-.5]]) dpf(d.x+ax*r,d.y+ay*r,spl);
-        if(k<.3) dpf(d.x,d.y,drop);
-      }
+      /* 着水は水しぶきだけ（水溜りでも床でも同じ）。水溜りに波紋を立てると、滴が落ちるたびに
+         水面がずっと動いて見えた（報告）——波紋はキャラや敵が通った時だけにする。 */
+      const r=1+k*4; if(k<.7) for(const [ax,ay] of [[-1,0],[1,0],[-.7,-.5],[.7,-.5]]) dpf(d.x+ax*r,d.y+ay*r,spl);
+      if(k<.3) dpf(d.x,d.y,drop);
     }
   }
 }
