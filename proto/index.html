@@ -7405,9 +7405,14 @@ const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見え�
 const STONE_DROP  = 0.07;   // 灯りを帯びた敵が蛍石を落とす率（精鋭は2倍）
 /* 灯りを帯びた敵（系統×形式）。洞窟版で自分で光る敵と同じ顔ぶれ。 */
 const STONE_DROPPERS = {slime:['turret'], arcane:['swarm','range'], armor:['range'], flame:['turret','swarm','rush'], storm:['range']};
-/* 灯りがあるのは暗い層（石の層・水の層）だけ。根の層から先は明るい空間になるので、
-   灯りは減らず（常に10）、蛍石も出ず、巡回者も来ない。61階からの二周目は暗い層に戻る。 */
+/* 灯りで暗くなるのは暗い層（石の層・水の層）だけ。根の層から先は明るい空間なので、
+   同じ時計（1〜10、90秒で1段）は**瘴気**として働く：時間とともに画面の外から禍々しい気が迫り、
+   3以下では体を蝕む（継続ダメージ）。蛍石は瘴気を払う（同じく 10 に戻す）。巡回者は来ない。
+   61階からの二周目の石・水の層では、また暗さに戻る。 */
 function lightZone(depth){ return zoneIndexAt(depth ?? (S.run&&S.run.depth) ?? 1) <= 1; }
+function miasmaZone(depth){ return !lightZone(depth); }
+/* 瘴気の継続ダメージ（最大HPに対する毎秒の割合）。明るさ3以下で効く */
+const MIASMA_DOT = {3:0.006, 2:0.012, 1:0.02};
 function glowFoe(e){ return !!(e && !e.dead && e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id)); }
 const GLOW_R = 2.6;   // 光る敵の周りで、ほかの敵も見える半径（マス）
 function lightFuel(){
@@ -7421,9 +7426,12 @@ function lightBonus(){
   const allies = livingParty();
   return allies.length + kinCount(S.hero) + allies.reduce((n,a)=>n+kinCount(a),0);
 }
+/* 画面を暗くする明るさ（暗い層だけ。明るい層では常に10）と、瘴気の濃さ（明るい層だけ。暗い層では常に10） */
+function lightDarkLevel(){ return lightZone() ? lightLevel() : LIGHT_MAX; }
+function miasmaLevel(){ return miasmaZone() ? lightLevel() : LIGHT_MAX; }
 /* 今の明るさ（1〜10） */
 function lightLevel(){
-  if(!S.run || !lightZone()) return LIGHT_MAX;
+  if(!S.run) return LIGHT_MAX;
   return clamp(lightFuel() + lightBonus(), 1, LIGHT_MAX);
 }
 /* 新しい蛍石に替える */
@@ -7437,22 +7445,47 @@ function newStone(why){
     log('蛍石の灯りは時間とともに弱まる。新しい蛍石を拾えば灯り直せる');
     return;
   }
-  log('<i class="pi pi-bulb"></i> '+(why||'蛍石')+' — 新しい灯りに替えた');
+  log('<i class="pi pi-bulb"></i> '+(why||'蛍石')+(miasmaZone() ? ' — 瘴気が払われた' : ' — 新しい灯りに替えた'));
 }
 /* 毎フレーム。暗さの節目で一言だけ言い、明るさ1の時間を数える（巡回者の時計）。 */
 function tickLight(dt){
   if(!S.run) return;
-  if(!lightZone()){ S.run.stoneAt = S.run.elapsed||0; S.run.lightSaid = LIGHT_MAX; return; }   // 明るい層では灯りを使わない
   if(S.run.noStone) return;                                    // 最初の蛍石を拾うまでは、暗闇の時計も進めない
-  const L = lightLevel();
-  if(L<=1) S.run.darkT = (S.run.darkT||0) + dt;
+  const L = lightLevel(), mz = miasmaZone();
+  if(L<=1 && !mz) S.run.darkT = (S.run.darkT||0) + dt;        // 巡回者の時計は暗い層だけ
   const said = S.run.lightSaid ?? LIGHT_MAX;
   if(L < said){
-    if(L===6)      log('灯りが弱まってきた');
-    else if(L===LIGHT_BLIND) log('灯りが心許ない。灯りの外は何も見えない');
-    else if(L===1) log('<i class="pi pi-warn"></i> 灯りが尽きかけている');
+    if(mz){
+      if(L===6)      log('瘴気が濃くなってきた');
+      else if(L===LIGHT_BLIND) log('<i class="pi pi-warn"></i> 瘴気が体を蝕み始めた');
+      else if(L===1) log('<i class="pi pi-warn"></i> 瘴気が満ちている');
+    }else{
+      if(L===6)      log('灯りが弱まってきた');
+      else if(L===LIGHT_BLIND) log('灯りが心許ない。灯りの外は何も見えない');
+      else if(L===1) log('<i class="pi pi-warn"></i> 灯りが尽きかけている');
+    }
   }
   S.run.lightSaid = L;
+}
+/* 瘴気の継続ダメージ。1秒ごとに、主人公と仲間の最大HPの一定割合を削る。
+   主人公が倒れる判定は呼び出し元（状態異常のすぐ前）に任せる。 */
+function tickMiasma(dt){
+  if(!S.run) return;
+  const pct = (miasmaZone() && !S.run.noStone) ? MIASMA_DOT[lightLevel()] : 0;
+  if(!pct){ S.run.miaT=0; return; }
+  S.run.miaT = (S.run.miaT||0) + dt;
+  if(S.run.miaT < 1) return;
+  S.run.miaT -= 1;
+  const col='#c04a9a';
+  if(!godMode()){
+    const d=Math.max(1, Math.round(stats(S.hero).maxHp*pct));
+    S.hero.hpNow-=d; popPlayerDamage(d,col,true);
+  }
+  livingParty().forEach(a=>{
+    const d=Math.max(1, Math.round(allyStats(a).maxHp*pct));
+    a.hpNow-=d; pop(a.x,a.y-0.4,d,col);
+    if(a.hpNow<=0) downAlly(a);
+  });
 }
 /* 巡回者の時計＝明るさ1で過ごした秒数 */
 function intrClock(){ return (S.run && S.run.darkT) || 0; }
@@ -10419,7 +10452,7 @@ function killEnemy(e, byAlly){
   if(rnd() < CONSUM_DROP_RATE * (e.elite?2.2:1))
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), it:makeConsum()});
   // 蛍石。灯りを帯びた敵だけが稀に落とす
-  if(lightZone() && e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id) && rnd() < STONE_DROP*(e.elite?2:1))
+  if(e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id) && rnd() < STONE_DROP*(e.elite?2:1))
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), stone:true});
 
   /* ---------- 落ちる量を 1/3 に ----------
@@ -11993,7 +12026,7 @@ function spawnMerchant(fl, depth, avoid){
   c.price=Math.round(itemValue(c)*CONSUM_SHOP_MUL*MERCHANT_MARKUP);
   stock.push(c);
   // 蛍石。買うとその場で新しい灯りに替わる
-  if(lightZone(depth)) stock.push({uid:(genItem._n=(genItem._n||0)+1), stone:true, nm:'蛍石', price:stonePrice(depth)});
+  stock.push({uid:(genItem._n=(genItem._n||0)+1), stone:true, nm:'蛍石', price:stonePrice(depth)});
   return {x:spot.x, y:spot.y, seed:rnd()*6.28, stock};
 }
 function stonePrice(depth){ return Math.round((50+depth*8)*MERCHANT_MARKUP); }
@@ -12037,7 +12070,7 @@ function renderMerchant(){
           const afford=g>=it.price;
           return `<div class="item" data-mbuy="${it.uid}" style="border-left-color:#6fe8b8;opacity:${afford?1:0.5}">
           <div class="nm" style="color:#6fe8b8">蛍石</div>
-          <div class="af">買うとすぐ新しい灯りに替わる（今の灯りは捨てる）</div>
+          <div class="af">${miasmaZone()?'買うとすぐ瘴気が払われる':'買うとすぐ新しい灯りに替わる（今の灯りは捨てる）'}</div>
           <div class="af" style="color:${afford?'#d6b34a':'#e0705a'}">${it.price} G</div>
         </div>`;
         }
@@ -12469,6 +12502,7 @@ function update(dt){
   tickLight(dt);                    // 灯りが減り、明るさ1の時間を数える
 
   // 主人公の状態異常（火傷・出血の継続ダメージ、凍傷の減速、感電の被ダメ増）
+  tickMiasma(dt);                    // 明るい層の瘴気（倒れたかは下の判定に任せる）
   const pt={isPlayer:true, st:S.run.pst};
   tickStatus(pt, dt, (d,col)=>{
     if(godMode()) return;
@@ -19044,7 +19078,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20260930d"></script>
+<script src="cave-look.js?v=20260930e"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

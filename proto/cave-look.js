@@ -148,6 +148,48 @@ function sideSprite(){
   c.fillStyle=g; c.fillRect(0,0,N,1);
   return SIDE_C;
 }
+/* ---------- 瘴気（根の層から先） ----------
+   明るい層では、時間とともに暗くなる代わりに、画面の外から禍々しい気が迫ってくる（本編の miasmaLevel、1〜10）。
+   2ドット角の粗い升目に、縁がうねる帯を描く：外側は濃い暗紫、迫ってくる縁は明るい紫の点で光る。
+   3以下（継続ダメージ）では脈打つ。升目は2回に1回だけ塗り直す（地形と同じく発熱対策）。 */
+const MIA_C=document.createElement('canvas'), MIA_X=MIA_C.getContext('2d');
+let miaImg=null, miaU=null, miaFrame=0, miaLv=10;
+const MS_N=1024, MS=new Float32Array(MS_N); for(let i=0;i<MS_N;i++) MS[i]=Math.sin(i/MS_N*6.2831853);
+const msin=(a)=>MS[((a*162.97466)|0)&1023];   // 速い sin（表引き。升目の模様にはこれで足りる）
+function drawMiasma(){
+  if(!CAVE.on||typeof S==='undefined'||S.screen!=='game'||!S.run) return;
+  const target=(typeof miasmaLevel==='function')?miasmaLevel():10;
+  const now=performance.now(), dtM=Math.min(.25,(now-(CAVE._miaAt||now))/1000); CAVE._miaAt=now;
+  miaLv = CAVE.lightSnap ? target : miaLv+(target-miaLv)*Math.min(1,dtM*1.2);
+  CAVE.miasma=miaLv;
+  const m=(10-miaLv)/9; if(m<.02) return;
+  const ps=TS/Q, cell=2*ps, cw=Math.ceil(innerWidth/cell), ch=Math.ceil(innerHeight/cell);
+  if(!miaImg||miaImg.width!==cw||miaImg.height!==ch){ MIA_C.width=cw; MIA_C.height=ch; miaImg=MIA_X.createImageData(cw,ch); miaU=new Uint32Array(miaImg.data.buffer); miaFrame=0; }
+  if((miaFrame++%3)===0||CAVE.lightSnap){                         // 3回に1回塗り直す（ゆっくり動くので足りる）
+    /* 主人公（画面の中心）の周りの澄んだ輪が縮んでいく形。輪の外は瘴気、輪の縁はうねって明るく光る。 */
+    const t=(now-T0)/1000, U=miaU, cx=cw/2, cy=ch/2, Rmax=Math.hypot(cx,cy*.8)+2, Rc=Rmax*(1-.86*m), band=4+3*m;
+    const hurt=miaLv<=3.5, pulse=hurt?.5+.5*Math.sin(t*3.2):0;
+    const aIn=Math.round(255*(.40+.30*m+.12*pulse));
+    const cIn =(Math.min(255,aIn+40)<<24|(0x1c<<16)|(0x06<<8)|0x1a)>>>0;   // 外ほど濃い暗紫（ABGR）
+    const cMid=(aIn<<24|(0x3a<<16)|(0x10<<8)|0x4a)>>>0;                     // 紫
+    const cRim=(Math.round(255*(.7+.2*pulse))<<24|(0x7a<<16)|(0x3a<<8)|(hurt?0xd0:0xb0))>>>0;   // 縁の明るい紫
+    for(let y=0;y<ch;y++){ const dy=(y+.5-cy)*.8;
+      for(let x=0;x<cw;x++){ const k=y*cw+x, dx=x+.5-cx, r=Math.sqrt(dx*dx+dy*dy);
+        if(r<Rc-band-6){ U[k]=0; continue; }
+        const n=msin(x*.21+t*.9+msin(y*.13-t*.6)*2)*.55+msin(y*.17-t*.7+x*.05)*.45;   // 縁のうねり
+        const q=(r-Rc+n*(2.5+3*m))/band, b=BAYER[((y&3)<<2)|(x&3)];
+        if(q>=1){ const wisp=msin(x*.19+t*.8+msin(y*.07)*2)*msin(y*.23-t*.6+x*.07);   // 瘴気の中を漂うもや（まばら）
+          U[k]= (wisp>.62&&b<.5) ? cMid : (q>2.2||b<.55) ? cIn : cMid; }
+        else if(q>0){ U[k]= q>b ? (q<.45 ? cRim : cMid) : 0; }
+        else U[k]=0;
+      } }
+    MIA_X.putImageData(miaImg,0,0);
+  }
+  const d=cv.width/innerWidth;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(MIA_C,0,0,cw,ch,0,0,cw*cell*d,ch*cell*d);
+  ctx.restore();
+}
 function extraTilt(){
   if(!CAVE.on||S.screen!=='game') return;
   const W0=cv.width, H0=cv.height, T0_=CAVE_TILT, n=T0_.strips, V=CAVE_VIG;
@@ -597,7 +639,7 @@ function terrain(f,Z,camX,camY,blinded){
   const flick=CAVE.noFlicker?1:1+.035*Math.sin(t*8.3)+.02*Math.sin(t*21.7);   // noFlicker：画面の明るさを測るテスト用
   /* 灯り（蛍石）の明るさ 1〜10（本編の lightLevel）。段が変わったときに灯りがぱっと縮まないよう、
      1.6/秒 の速さで追いかける。灯りの半径は明るさで縮み、灯りの外の闇（視界の輪）も迫ってくる。 */
-  const lvT=(typeof lightLevel==='function'&&typeof S!=='undefined'&&S.run)?lightLevel():10;
+  const lvT=(typeof lightDarkLevel==='function'&&typeof S!=='undefined'&&S.run)?lightDarkLevel():10;   // 暗い層だけ暗くなる（明るい層は瘴気）
   const nowL=performance.now(), dL=Math.min(.25,(nowL-(CAVE._lvAt||nowL))/1000); CAVE._lvAt=nowL;
   CAVE.lvS=(CAVE.lvS==null||CAVE.lvF!==f||CAVE.lightSnap)?lvT:CAVE.lvS+(lvT-CAVE.lvS)*Math.min(1,dL*1.6); CAVE.lvF=f;
   const lmul=lightMul(CAVE.lvS);
@@ -1896,7 +1938,7 @@ function install(){
      CAVE.on が落ちた（描画が例外で止まった）ときだけ本編側へ戻す。 */
   window.drawFeelTiltShift=function(){
     if(!CAVE.on) return oldTilt && oldTilt();
-    try{ extraTilt(); }catch(err){ console.error(err); CAVE.on=false; return oldTilt && oldTilt(); }
+    try{ extraTilt(); drawMiasma(); }catch(err){ console.error(err); CAVE.on=false; return oldTilt && oldTilt(); }
   };
   if(typeof window.drawFeelMist==='function') window.drawFeelMist=noop;
   if(typeof window.drawFeelDarkness==='function') window.drawFeelDarkness=noop;

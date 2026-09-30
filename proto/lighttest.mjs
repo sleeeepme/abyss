@@ -117,21 +117,36 @@ R.firstDiveStartsWithoutStone = await pg.evaluate(()=>{
               && !second.noStone && second.lv===10 && !second.stone};
 });
 
-/* 根の層から先は明るい空間。灯りは減らず、蛍石も巡回者も出ない、灯りの外の影も無い。 */
-R.brightZonesHaveNoLight = await pg.evaluate(()=>{
-  TH.run(1,{seed:4}); TH.floor(24); S.hero.party=[]; TH.immortal();
-  S.run.elapsed += LIGHT_STEP*20;
-  for(let i=0;i<5;i++) stepSim(1);
-  const lv = lightLevel();
+/* 根の層から先は明るい空間。暗くならない代わりに瘴気が溜まる（同じ時計）。
+   画面は暗くならず、影も巡回者も無い。明るさ3以下で継続ダメージ。蛍石は瘴気を払う。 */
+R.brightZonesUseMiasma = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(24); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true;
+  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*6 - 1;              // 4
+  draw();
+  const lv4 = {lv:lightLevel(), dark:lightDarkLevel(), mia:miasmaLevel(), lit:+CAVE.litTiles.toFixed(2)};
+  const hp0 = S.hero.hpNow = stats(S.hero).maxHp;
+  for(let i=0;i<4;i++) tickMiasma(1);
+  const noHurtAt4 = S.hero.hpNow===hp0;
+  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*7 - 1;              // 3
+  const a=TH.ally(24,'knight',20); S.hero.party=[a];             // 仲間がいると +1 になるので、4 のまま
+  const withAlly = lightLevel();
+  S.hero.party=[];
+  for(let i=0;i<4;i++) tickMiasma(1);
+  const hurtAt3 = hp0 - S.hero.hpNow;
+  const want3 = 4*Math.max(1, Math.round(stats(S.hero).maxHp*MIASMA_DOT[3]));
   S.run.darkT = INTRUDER_AFTER + 10; tickIntruder();
   const noIntruder = !liveIntruder();
-  let m=null; for(let i=0;i<200 && !m;i++) m=spawnMerchant(W.fl, 24, []);
-  const noStoneSold = !m.stock.some(x=>x.stone);
   const e=W.enemies.find(x=>!x.boss); e.x=P.x+12; e.y=P.y;
   const far = enemyLit(e);
-  const back = (()=>{ TH.floor(15); return lightLevel(); })();   // 水の層へ戻れば灯りがある（明るい層にいた間は減っていない）
-  return {lv, noIntruder, noStoneSold, far, back,
-          ok: lv===10 && noIntruder && noStoneSold && far==='lit' && back===10};
+  let m=null; for(let i=0;i<200 && !m;i++) m=spawnMerchant(W.fl, 24, []);
+  const sold = m.stock.some(x=>x.stone);
+  S.hero.hpNow = hp0; W.drops.push({x:P.x, y:P.y, stone:true}); autoPickup();
+  for(let i=0;i<3;i++) tickMiasma(1);
+  const cleansed = lightLevel()===10 && S.hero.hpNow===hp0;
+  CAVE.lightSnap=false;
+  return {lv4, noHurtAt4, withAlly, hurtAt3, want3, noIntruder, far, sold, cleansed,
+          ok: lv4.lv===4 && lv4.dark===10 && lv4.mia===4 && lv4.lit>5 && noHurtAt4 && withAlly===4
+              && hurtAt3===want3 && noIntruder && far==='lit' && sold && cleansed};
 });
 
 /* シルトジェリーなど自分で光る敵は、暗くても見え、そばの敵も照らす。 */
