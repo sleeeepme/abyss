@@ -413,7 +413,14 @@ function waterPost(bx0,by0,t){
       if(h>T){
         const inn=m===2?(Math.abs(cur[x-1])>T&&Math.abs(cur[x+1])>T&&Math.abs(up[x])>T&&Math.abs(dn[x])>T):(cur[x-1]>T&&cur[x+1]>T&&up[x]>T&&dn[x]>T);
         if(inn) continue;
-        buf[k]= m===2 ? (h>T2?hi2P:hiP) : (h>T2?hi2W:hiW);
+        /* 線は半分の濃さで重ね、ところどころ網かけ・途切れにし、弱い波ほど間引く（報告「目立ち過ぎる」）。
+           途切れ・網かけの場所は世界に固定したノイズで決める——輪が広がると、切れ目を通り抜けて見える。 */
+        const wx=bx0+x, wy=by0+y;
+        if(ihash(wx>>2,wy>>1)%100<WV_GAP) continue;                // 途切れ（横4×縦2ドットの切れ目）
+        if(ihash((wx>>3)+911,(wy>>2)+377)%100<WV_NET&&((wx+wy)&1)) continue;   // 網かけ（横8×縦4ドットの区間）
+        const st=Math.min(1,(h-T)/(WV_FULL-T)), bb=BAYER[((wy&3)<<2)|(wx&3)];
+        if(st<.5&&bb>.3+st) continue;                              // 減衰：消えかけの波は点がまばらになって消える
+        buf[k]=mixU(buf[k], m===2 ? hi2P : hi2W, h>T2?WV_ALPHA+.2:WV_ALPHA);   // 色は照り返しの色を半分の濃さで
       }
     }
     const tmp=up; up=cur; cur=dn; dn=tmp;
@@ -426,6 +433,7 @@ let wvRows=null;
    岸（水でないセル）は隣を自分と同じ高さとみなす＝波は岸で跳ね返る。
    動いているのは波がある範囲（x0..x1, y0..y1）だけで、静まったら止める（重さは波の広さぶんだけ）。 */
 const WV_CX=4, WV_CY=3, WV_K=.19, WV_VD=.975, WV_HD=.995, WV_T=.06, WV_T2=.2;
+const WV_ALPHA=.55, WV_GAP=16, WV_NET=35, WV_FULL=.16;    // 線の濃さ／途切れ・網かけになる区間の割合（%）／これ以上の強さで点が揃う
 let WV=null;
 function wvGrid(){
   if(!G) return null;
