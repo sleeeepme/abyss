@@ -1,0 +1,191 @@
+{
+  "earth-wave": {
+    "size": [
+      64,
+      20
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      90,
+      70,
+      70,
+      80,
+      110,
+      90,
+      100,
+      150
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#17231d",
+        1074
+      ],
+      [
+        "#51483a",
+        701
+      ],
+      [
+        "#ae8955",
+        222
+      ],
+      [
+        "#786146",
+        183
+      ],
+      [
+        "#343d35",
+        67
+      ],
+      [
+        "#e0bf73",
+        56
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        34,
+        13
+      ],
+      [
+        17,
+        14
+      ],
+      [
+        51,
+        14
+      ]
+    ],
+    "near_duplicate_colors": []
+  },
+  "flame": {
+    "size": [
+      45,
+      28
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      70,
+      70,
+      90,
+      110,
+      90,
+      100,
+      150
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#dc412b",
+        1091
+      ],
+      [
+        "#651d29",
+        1045
+      ],
+      [
+        "#a52a2e",
+        870
+      ],
+      [
+        "#f36b29",
+        516
+      ],
+      [
+        "#fff09a",
+        305
+      ],
+      [
+        "#ffad38",
+        270
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        25,
+        8
+      ]
+    ],
+    "near_duplicate_colors": []
+  },
+  "raging-upper": {
+    "size": [
+      38,
+      42
+    ],
+    "frames": 6,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      50,
+      50,
+      100,
+      80,
+      140
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#f7fff2",
+        198
+      ],
+      [
+        "#425a6a",
+        172
+      ],
+      [
+        "#7397aa",
+        144
+      ],
+      [
+        "#b8d8df",
+        74
+      ],
+      [
+        "#d9bd4f",
+        16
+      ],
+      [
+        "#fff19a",
+        9
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        33,
+        2
+      ],
+      [
+        27,
+        9
+      ],
+      [
+        21,
+        18
+      ],
+      [
+        9,
+        35
+      ]
+    ],
+    "near_duplicate_colors": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "nativeSize": [
+    384,
+    256
+  ],
+  "loop": "loop.png",
+  "repeatPreview": "repeat-2x2.png",
+  "sourceTileSize": 32,
+  "method": "Periodic organic density mask with irregular wrapped RD texture patches. No mirrored strip repetition.",
+  "note": "Loop background prototype; 12 material samples are not a complete independently connectable autotile set."
+}

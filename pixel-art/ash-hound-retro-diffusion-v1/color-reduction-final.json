@@ -1,0 +1,21 @@
+{
+  "note": "13 total palette entries requested to obtain 12 opaque colors plus transparency; previous 12-count request yielded 11 opaque colors.",
+  "request": {
+    "tool_id": "color_reducer",
+    "input_image": "ash-hound-rd-02-raw.png",
+    "color_count": 13,
+    "dither_strength": 0
+  },
+  "response": {
+    "tool_id": "color_reducer",
+    "inference_id": "inf_Z7EkzV4bayRonqzpenkwmOgpWe1r9jdD",
+    "balance_cost": 0,
+    "credit_cost": 0,
+    "charged": false,
+    "remaining_balance": 4.370000000000001,
+    "remaining_credits": null,
+    "output_urls": [
+      "https://da8ztllw6by0f.cloudfront.net/4f29451a052c88e1bf11f6ffeb626c8f.png"
+    ]
+  }
+}

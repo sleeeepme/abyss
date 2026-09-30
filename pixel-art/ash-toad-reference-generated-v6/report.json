@@ -1,0 +1,15 @@
+{
+  "size": [
+    32,
+    32
+  ],
+  "bounds": [
+    2,
+    5,
+    30,
+    24
+  ],
+  "opaque": 367,
+  "colors": 12,
+  "method": "reference-conditioned ImageGen coarse sprite; recovered 36x20 logical grid; removed eight selected columns and one row; palette cleanup and eye edit"
+}

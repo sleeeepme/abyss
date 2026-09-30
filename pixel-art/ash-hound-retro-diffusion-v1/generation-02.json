@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-23",
+  "request": {
+    "width": 32,
+    "height": 32,
+    "num_images": 1,
+    "prompt": "One Ash Hound enemy sprite. Preserve the input sprite's exact compact silhouette and placement: low horizontal dog body, large square head on the right, raised curled split tail on the left, four very short legs. Keep the character within the same 28 by 19 pixel occupied area on the 32 by 32 canvas. Refine the existing dog as native 32x32 pixel art. A continuous opaque near-black ONE PIXEL outer outline around the whole dog is essential. Crisp high-contrast connected pixel clusters. Dark charcoal fur, muted blue-violet body shadows, three small uneven pale exposed ribs, one dull amber eye pixel, a small rust-orange mouth in the large square jaw. Exactly twelve solid colors. Keep the input's large simple shapes and restrained detail. Transparent background, full creature, clear margins. No ground shadow, no text, no detached pixels.",
+    "prompt_style": "rd_pro__default",
+    "bypass_prompt_expansion": true,
+    "upscale_output_factor": 1,
+    "input_image": "reference-rgb.png",
+    "strength": 0.3,
+    "seed": 230923,
+    "remove_bg": true,
+    "upload_outputs": true
+  },
+  "response": {
+    "created_at": 1790122059,
+    "model": "rd_pro",
+    "balance_cost": 0.18,
+    "remaining_balance": 4.37,
+    "remaining_credits": 0,
+    "output_images_count": 0,
+    "base64_images_count": 1,
+    "downloadable_data": null,
+    "request_id": "cce9eaf3-d118-4f19-bb13-a2bda7acec0f",
+    "outputs_retained_until": 1790208428,
+    "output_url_expires_at": 1790122961,
+    "warnings": null,
+    "delivery_status": "url",
+    "requested_images_count": 1,
+    "resolved_prompt_style": "rd_pro__default",
+    "used_input_image": true,
+    "reference_images_count": 0,
+    "used_extra_input_image": false,
+    "used_input_palette": false,
+    "used_strength": true,
+    "effective_timeout_seconds": 180
+  }
+}

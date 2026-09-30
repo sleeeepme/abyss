@@ -1,0 +1,57 @@
+{
+  "source": "firewyrm-source.gif",
+  "source_size": [
+    660,
+    660
+  ],
+  "source_total_frames": 47,
+  "source_frames_used": [
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "frames": 15,
+  "logical_size": [
+    46,
+    42
+  ],
+  "direction_cell_size": [
+    46,
+    46
+  ],
+  "directions": [
+    "right",
+    "up",
+    "left",
+    "down"
+  ],
+  "units": [
+    "throat",
+    "body",
+    "head"
+  ],
+  "recomposition_mismatched_pixels": 0,
+  "duration_ms_each": 70,
+  "duration_ms_total": 1050,
+  "colors_used": 5,
+  "semi_alpha": 0,
+  "duplicate_frames": 4,
+  "left_mirror_mismatched_pixels": 0,
+  "vertical_symmetry_mismatched_pixels": {
+    "up": 0,
+    "down": 0
+  },
+  "change": "brighter flame glow and environmental bounce light; left is a gravity-preserving mirror; vertical casts have symmetric lateral volume"
+}

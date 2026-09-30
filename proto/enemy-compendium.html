@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Abyss 敵図鑑</title>
+<meta name="description" content="Abyss Relic の雑魚・苔玉・規格外・中ボス・大ボスの一覧（名前・絵・出現階・攻撃・属性）">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+JP:wght@400;700&family=Silkscreen&display=swap">
+<style>
+/* 単一テーマ（ゲーム画面に合わせた暗色）で固定。色はすべてここから引く */
+:root{
+  color-scheme: dark;
+  --ground:#0f1218; --panel:#171c26; --panel2:#1e2431; --line:#2a3242;
+  --ink:#dfe2ea; --mute:#8b93a6; --faint:#5b6477;
+  --accent:#7fc3e0; --gold:#e0c98a; --purple:#c98adf; --red:#e0735a;
+  --dot:"DotGothic16","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+  --body:"Noto Sans JP","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+  --px:"Silkscreen",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{background:var(--ground);color:var(--ink)}
+body{font:14px/1.7 var(--body);padding-inline:16px;padding-block:0 48px;margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+header.top{padding-block:28px 12px}
+.eyebrow{font:11px var(--px);letter-spacing:.14em;color:var(--accent)}
+h1{font:400 clamp(26px,5vw,38px)/1.2 var(--dot);margin:4px 0 6px;text-wrap:balance}
+.lede{color:var(--mute);max-width:64ch;margin:0}
+.lede b{color:var(--ink);font-weight:700}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--ground);
+  padding-block:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tab,.chip{font:13px var(--dot);color:var(--mute);background:var(--panel);border:1px solid var(--line);
+  padding:4px 10px;border-radius:3px;cursor:pointer}
+.tab[aria-pressed="true"]{color:var(--ground);background:var(--accent);border-color:var(--accent)}
+.chip[aria-pressed="true"]{color:var(--ink);border-color:var(--c,var(--accent));box-shadow:inset 0 -2px 0 var(--c,var(--accent))}
+.tab .n{font:10px var(--px);opacity:.7;margin-left:4px}
+.tab:focus-visible,.chip:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#q{flex:1 1 200px;min-width:0;font:14px var(--body);color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:3px;padding:5px 10px}
+.count{font:11px var(--px);color:var(--faint)}
+
+section.group{margin-top:28px}
+.gh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:10px}
+.gh h2{font:400 22px var(--dot);margin:0}
+.gh p{margin:0;color:var(--mute);font-size:13px;flex-basis:100%;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+
+.card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--c);
+  border-radius:3px;padding:12px;display:grid;grid-template-columns:72px 1fr;gap:4px 12px;align-content:start}
+.card.boss{background:linear-gradient(180deg,var(--panel2),var(--panel))}
+.art{grid-row:span 2;width:72px;height:72px;background:
+  repeating-conic-gradient(#1b2130 0 25%,#151a24 0 50%) 0 0/12px 12px;
+  border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;position:relative}
+.art img{width:64px;height:64px;image-rendering:pixelated;object-fit:contain}
+.art img.photo{width:100%;height:100%;object-fit:cover;image-rendering:auto}
+.art .ph{font:30px var(--dot);color:var(--c);opacity:.55}
+.art .tag{position:absolute;bottom:0;left:0;right:0;font:9px var(--dot);text-align:center;
+  background:rgba(0,0,0,.55);color:var(--mute);line-height:1.5}
+.nm{font:18px/1.3 var(--dot);margin:0}
+.en{font:10px var(--px);color:var(--mute);letter-spacing:.04em}
+.reg{font:12px var(--dot);color:var(--gold)}
+.meta{display:flex;flex-wrap:wrap;gap:4px;align-self:start}
+.pill{font:11px/1.6 var(--body);padding:0 7px;border-radius:2px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);white-space:nowrap}
+.pill.el{border-color:var(--ec);color:var(--ec)}
+.pill.depth{font-family:var(--px);font-size:10px;color:var(--accent)}
+.pill.warn{color:var(--red);border-color:var(--red)}
+.line{grid-column:1/-1;margin:6px 0 0;color:var(--mute);font-size:13px;border-top:1px dashed var(--line);padding-top:6px}
+.line q{quotes:"「" "」"}
+details{grid-column:1/-1}
+summary{cursor:pointer;color:var(--faint);font-size:12px;list-style:none}
+summary::before{content:"＋ ";}
+details[open] summary::before{content:"－ ";}
+dl{display:grid;grid-template-columns:5.5em 1fr;gap:2px 10px;margin:6px 0 0;font-size:12.5px}
+dt{color:var(--faint)} dd{margin:0}
+.res span{margin-right:8px;white-space:nowrap}
+.res .w{color:var(--red)} .res .r{color:var(--accent)}
+.empty{color:var(--mute);padding:24px 0}
+
+.legend{margin-top:36px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.legend > div{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:12px}
+.legend h3{font:400 16px var(--dot);margin:0 0 6px}
+.legend table{border-collapse:collapse;width:100%;font-size:12.5px}
+.legend td,.legend th{text-align:left;padding:2px 6px 2px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.legend th{color:var(--faint);font-weight:400}
+.tw{overflow-x:auto}
+footer{margin-top:28px;color:var(--faint);font-size:12px}
+footer code{font-size:11px;color:var(--mute)}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}.card:hover{border-color:var(--c)}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">ABYSS RELIC · BESTIARY</div>
+  <h1>敵図鑑</h1>
+  <p class="lede">雑魚32・苔玉6・規格外12・中ボス5・大ボス6・眷属1の<b>全62種</b>。
+  数値と出現条件は <code>proto/index.html</code> の実装から、見た目の指定と一行は
+  <code>abyss-敵とボス設定書</code>（第3稿）から取っている。カードを開くと耐性・技・シルエット指定が出る。</p>
+</header>
+
+<div class="bar">
+  <div class="row" id="tabs" role="group" aria-label="区分"></div>
+  <div class="row">
+    <input id="q" type="search" placeholder="名前・英名・技・一行で検索" aria-label="検索">
+    <span class="count" id="count"></span>
+  </div>
+  <div class="row" id="fams" role="group" aria-label="系統"></div>
+</div>
+
+<main id="list"></main>
+
+<div class="legend">
+  <div>
+    <h3>四つの形式（型）</h3>
+    <div class="tw"><table id="archT"></table></div>
+  </div>
+  <div>
+    <h3>攻撃属性</h3>
+    <div class="tw"><table id="dtT"></table></div>
+  </div>
+  <div>
+    <h3>六つの層</h3>
+    <div class="tw"><table id="zoneT"></table></div>
+  </div>
+</div>
+
+<footer>
+  絵の正本は <code>proto/assets/sprites/enemies/</code> と <code>docs/CHARACTER_ART_LIST.md</code>。
+  「絵なし」は型の記号で代用。データを直すときはこのファイル末尾の <code>DATA</code> を編集する
+  （本体の <code>FAMILY</code> / <code>ZAKO</code> / <code>ABERRANT</code> / <code>MOSS_KINDS</code> / <code>UNIQUE_BOSSES</code> の写し）。
+  <br>生成 2026-09-17
+</footer>
+</div>
+
+<script>
+/* ============ DATA（本体 proto/index.html の写し） ============ */
+const IMG = {
+  'ash-hound':     {src:'assets/sprites/enemies/ash-hound/right-idle-v5.png',            st:'本体に内蔵'},
+  'dust-spider':   {src:'assets/sprites/enemies/dust-spider/right-idle-v2-draft.png',    st:'本体に内蔵'},
+  'ash-toad':      {src:'assets/sprites/enemies/ash-toad/right-idle-v3-draft.png',       st:'本体に内蔵'},
+  'stone-boar':    {src:'assets/sprites/enemies/stone-boar/right-idle-v3-draft.png',     st:'本体に内蔵'},
+  'moss-ball':     {src:'assets/sprites/enemies/moss-ball/front-idle-v1.png',            st:'ゲーム反映済み'},
+  'great-ash-frog':{src:'assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png', st:'本体に内蔵・v4'},
+  'vera':          {src:'../concept-art/enemies/vera-v1/vera-concept-01.png', photo:true, st:'コンセプト'},
+  'vera2':         {src:'../concept-art/enemies/vera-form2-pixel-v1/front-pixel-concept.png', photo:true, st:'第2形態案'},
+};
+const DT = {
+  slash:{nm:'斬撃',col:'#e8e2c8',ail:'出血'}, pierce:{nm:'刺突',col:'#c8d8e8',ail:'—（防御45%貫通）'},
+  blunt:{nm:'打撃',col:'#d8c0a0',ail:'よろめき'}, fire:{nm:'炎',col:'#ff8a4a',ail:'火傷'},
+  shock:{nm:'雷',col:'#ffe066',ail:'感電'}, frost:{nm:'冷気',col:'#7fd8ff',ail:'凍傷'},
+  arcane:{nm:'魔法',col:'#c98adf',ail:'—'},
+};
+const AIL_NM = {bleed:'出血',burn:'火傷',chill:'凍傷',shock:'感電',stagger:'よろめき'};
+const ARCH = {
+  rush:  {k:'寄',nm:'寄り',  en:'Rush',   how:'まっすぐ来る。止まらない', stat:'HP×1.0 攻×1.0 速2.6 射程0.9'},
+  range: {k:'回',nm:'回り',  en:'Circle', how:'距離5.5を保って回り、隙で入る', stat:'HP×0.7 攻×0.9 速1.9 射程6.5'},
+  turret:{k:'飛',nm:'飛ばし',en:'Cast',   how:'動かず、離れて撃つ', stat:'HP×1.6 攻×1.2 速0 射程5.0'},
+  swarm: {k:'溜',nm:'溜め',  en:'Charge', how:'止まって溜め、一直線に来る', stat:'HP×0.42 攻×0.55 速3.2 予兆0.28s'},
+};
+const ZONES = [
+  {id:'stone',  nm:'石の層', reg:'第一層／乾', d:[1,10],  fam:{}},
+  {id:'sump',   nm:'水の層', reg:'第二層／滞', d:[11,20], fam:{slime:2.6,undead:1.3,beast:0.6}},
+  {id:'root',   nm:'根の層', reg:'第三層／生', d:[21,30], fam:{arcane:2.8,slime:1.5,frost:1.2,beast:0.5}},
+  {id:'ruin',   nm:'跡の層', reg:'第四層／築', d:[31,40], fam:{armor:2.8,storm:1.6,undead:1.3,beast:0.4}},
+  {id:'furnace',nm:'炉の層', reg:'第五層／熱', d:[41,50], fam:{flame:3.0,armor:1.3,storm:1.2,frost:0.25}},
+  {id:'pale',   nm:'白の層', reg:'第六層／欠', d:[51,51], fam:{frost:2.6,arcane:2.2,undead:1.8,beast:0.3}},
+];
+// 実装の id → 設定書の系統。並びは設定書の順
+const FAM = [
+  {id:'beast', nm:'アッシュ',       en:'Ash',      reg:'乾', col:'#b5563f', min:1,  atk:'slash',  res:{}, what:'粉と乾いた石'},
+  {id:'slime', nm:'ボグ',           en:'Bog',      reg:'滞', col:'#6f9a4a', min:6,  atk:'blunt',  res:{pierce:55,slash:-25,fire:-30,shock:25}, what:'沈殿したもの'},
+  {id:'arcane',nm:'ルート',         en:'Root',     reg:'生', col:'#a97fe0', min:30, atk:'arcane', res:{arcane:45,slash:-10,pierce:-10,blunt:-10}, what:'内側に生えたもの'},
+  {id:'armor', nm:'ルイン',         en:'Ruin',     reg:'築', col:'#7d8794', min:11, atk:'pierce', res:{slash:35,pierce:30,blunt:-40,shock:-25}, what:'建物の部品'},
+  {id:'flame', nm:'エンバー',       en:'Ember',    reg:'熱', col:'#e06a35', min:15, atk:'fire',   res:{fire:75,frost:-50}, what:'冷めきらなかったもの'},
+  {id:'frost', nm:'ペイル',         en:'Pale',     reg:'欠', col:'#5fb8e0', min:19, atk:'frost',  res:{frost:75,fire:-50}, what:'輪郭が定まらない'},
+  {id:'storm', nm:'レント',         en:'Lent',     reg:'貸', col:'#e0c040', min:24, atk:'shock',  res:{shock:75,blunt:-25}, what:'持ち主のいない遺物'},
+  {id:'undead',nm:'フォーセイクン', en:'Forsaken', reg:'損', col:'#b9b3a0', min:4,  atk:'slash',  res:{slash:40,blunt:-35,frost:30,fire:-20}, what:'人の形。返しそこねたもの'},
+];
+const FAM_AIL = {flame:'burn',frost:'chill',storm:'shock',undead:'bleed',slime:'chill',armor:'stagger',arcane:'shock',beast:'bleed'};
+// [名, EN, シルエット, 一行, 絵]  並び: rush / range / turret / swarm
+const ZAKO = {
+ beast:{rush:['アッシュハウンド','Ash Hound','痩せた犬。あばらが浮き、走ると粉が舞う','群れない。群れる必要がないだけ。','ash-hound'],
+        range:['ダストスパイダー','Dust Spider','細い長脚の蜘蛛。砂色','足音を真似る。自分の足音だと思った方が負ける。','dust-spider'],
+        turret:['アッシュトード','Ash Toad','座った大蛙。喉が膨らむ','息を吐く器官はない。それでも吐く。','ash-toad'],
+        swarm:['ストーンボア','Stone Boar','岩塊のような猪。頭が異様に重い','崩れる直前に、一度だけ形が整う。','stone-boar']},
+ slime:{rush:['ボグクロウラー','Bog Crawler','水底を這う四つ足。掌が先に出る','掌だけが水面から出ている。手首から先の記録がない。'],
+        range:['リードサーペント','Reed Serpent','細長い水蛇。うねりながら回る','絡んだ相手の分だけ嵩が増える。'],
+        turret:['シルトジェリー','Silt Jelly','浮遊する濁った袋。触手が垂れる','吐いたものは、しばらくその場に残る。'],
+        swarm:['ブロートグラブ','Bloat Grub','膨らむ巨大な芋虫。節が張る','膨らみきるまで無害。膨らみきる。']},
+ arcane:{rush:['ルートワーム','Root Worm','地を割って這う根の蟲。頭が裂ける','切っても減らない。切った分だけ本数が増える。'],
+        range:['ヴァインスパイダー','Vine Spider','蔦が脚になった蜘蛛。緑と黒','掴むためではなく、測るために巻きつく。'],
+        turret:['シードポッド','Seed Pod','脚の生えた鞘状の植物。開いて撃つ','当たった場所から生える。生えたものはルートワームになる。'],
+        swarm:['パスブロート','Pus Bloat','膿を溜めた嚢。歩くたび揺れる','溜めているのは膿ではない。膿に見える方がまだ良かった。']},
+ armor:{rush:['ラブルウォーカー','Rubble Walker','瓦礫が人型に組み上がったもの。前傾','建物だったもの。運ぶものがないので、こちらを運ぼうとする。'],
+        range:['ランタンレイス','Lantern Wraith','灯りを提げて浮く亡霊。細長い','照らされた側だけが、向こうから見える。'],
+        turret:['ベルリンガー','Bell Ringer','鐘を背負って座る。腕だけが長い','鳴る前に一度沈黙する。沈黙が合図だと気づいた頃には鳴っている。'],
+        swarm:['ピラーゴーレム','Pillar Golem','石柱そのもの。倒れ込んでくる','支えるものがなくなってから、ずっと倒れ続けている。']},
+ flame:{rush:['エンバーハウンド','Ember Hound','犬。ひび割れた表皮の奥が赤い','二百年冷めていない。冷ます役の者がいなくなった。'],
+        range:['スートバット','Soot Bat','煤の蝙蝠。翼が広い','触れた面は、二度と熱を持たない。'],
+        turret:['シンダーモス','Cinder Moth','火の粉を撒く蛾。鱗粉が燃える','撒いた先で、床が薄く溶ける。'],
+        swarm:['モルテンラム','Molten Ram','溶けた鉄の牡羊。角が流れている','何かを鋳る工程が、途中で止まったまま繰り返されている。']},
+ frost:{rush:['シャドウレス','Shadowless','白い人型。輪郭が薄い','影がない。自分の影も、近づかれると薄くなる。'],
+        range:['ペイルスタルカー','Pale Stalker','白い四つ足。縁が滲んでいる','どこまでが本体か決まっていない。決めた側が間違える。'],
+        turret:['ペイルレイス','Pale Wraith','浮遊する白い布状の亡霊','遠くにいる。遠さが当たらない理由にならない。'],
+        swarm:['ヒューイーター','Hue-Eater','口だけがある白い球体。膨らむ','溜めている間、周囲の色が抜けていく。']},
+ storm:{rush:['ホロウアーマー','Hollow Armour','中身のない鎧。関節が空いている','中身は返却済み。外側だけが登録に残っている。'],
+        range:['フローティングブレイド','Floating Blade','宙に浮く抜き身の剣。数本が回る','鞘がどこかにある。探した者はいない。'],
+        turret:['ドリフトスピア','Drifting Spear','浮いた槍。撃っては戻る','投げる。拾いに行く。また投げる。'],
+        swarm:['インペイラー','Impaler','巨大な杭を掲げた無人の鎧','突き立てるべき相手を、二百年間探している。']},
+ undead:{rush:['クロウリングデッド','Crawling Dead','這う死者。腕だけで進む','上りの口の方角へ這っている。方角だけは合っている。'],
+        range:['フォールンカンパニー','Fallen Company','三人で組んで回る。装備がばらばら','組み方が、こちらの組み方と同じ。'],
+        turret:['プレイングデッド','Praying Dead','跪いて手を組む。動かない','耳の作法で祈る。祈りの届く先がこちらにある。'],
+        swarm:['デッドスプリンター','Dead Sprinter','走り出す姿勢のまま固まっている','思い出したように走る。']},
+};
+// [層, 型, 名, EN, 流用元, 壊す一箇所, 一行]
+const ABER = [
+ ['stone','range','粉挽き','The Miller','ダストスパイダー','脚の一本が石臼','挽いている。挽く前のものが何だったか、粉からは分からない。'],
+ ['stone','swarm','無音','The Hush','ストーンボア','体表のディテールが消え、黒一色の塊','石の層は元から静かだが、これが来ると静かさの質が変わる。'],
+ ['sump','rush','底浚い','The Dredge','ボグクロウラー','背に浚い上げたものが積み上がる','沈んだものを浚い上げては、また沈める。'],
+ ['sump','range','溺れ番','The Drowned Warden','リードサーペント','胴に鎧の破片、頭に兜','誰も来ない場所で見張っている。見張る対象がこちらになった。'],
+ ['root','range','千絡み','Thousandwind','ヴァインスパイダー','脚が多すぎて数えられない','一本ずつ数えた記録が協会にある。九百までで途切れている。'],
+ ['root','swarm','実守り','The Fruitkeeper','パスブロート','嚢の中に実が透けている','守っている実を、こちらが欲しがると勘違いしている。'],
+ ['ruin','rush','鍵持ち','The Keybearer','ラブルウォーカー','胸に鍵束が埋まっている','鍵を持っている。合う扉は、どの記録にもない。'],
+ ['ruin','turret','番地なし','The Unnumbered','ベルリンガー','鐘ではなく番地板。数字が一つ欠ける','壁に彫られた番地が、一つだけ欠けている。その番地がこれ。'],
+ ['furnace','swarm','鋳型','The Mould','モルテンラム','腹が開いて中が空','中が空になったまま閉じている。開けた者は戻っていない。'],
+ ['furnace','range','煤払い','The Sootsweep','スートバット','翼が箒状に裂けている','払っている。払われた面は、二度と熱を持たない。'],
+ ['pale','turret','丈無し','The Measureless','ペイルレイス','大きさが一定しない（描画スケールが揺れる）','大きさが決まらない。近づくほど記録と合わなくなる。'],
+ ['pale','rush','影拾い','The Shadow-Gatherer','シャドウレス','自分だけ影を持っている','白の層に影は落ちない。それでも拾っている。'],
+];
+const ZONE_FAM = {stone:'beast',sump:'slime',root:'arcane',ruin:'armor',furnace:'flame',pale:'frost'};
+const MOSS = {
+  stone:  {nm:'ダストモス',   col:'#7f8040', dt:'blunt',  res:{blunt:20,pierce:-15}},
+  sump:   {nm:'シルトモス',   col:'#5f8f7a', dt:'blunt',  res:{pierce:45,slash:-20}},
+  root:   {nm:'ヴァインモス', col:'#8fbf58', dt:'arcane', res:{arcane:35,fire:-30}},
+  ruin:   {nm:'グラウトモス', col:'#8f9aa8', dt:'pierce', res:{slash:30,blunt:-30}},
+  furnace:{nm:'エンバーモス', col:'#d08a4a', dt:'fire',   res:{fire:60,frost:-45}},
+  pale:   {nm:'フロストモス', col:'#8fd0e0', dt:'frost',  res:{frost:60,fire:-45}},
+};
+const MOVES = {
+  slam:'叩きつけ（足元・半径2.7）', cleave:'薙ぎ払い（正面75°）', burst:'散弾（全方位）', wave:'波動（広がる輪・近づけば安全）',
+  charge:'突進（直線9マス）', pillars:'落石（離れた4ヶ所）', beam:'貫き（細長い直線12マス）', summon:'招来（取り巻き3体）',
+  clone:'分身（幻2体・4.5秒）',
+};
+const TIER = {
+  mid:  {nm:'中ボス・現象体', stat:'HP×16.5 攻×1.45 防×1.7 ・ ドロップ2'},
+  great:{nm:'大ボス・登録名持ち', stat:'HP×34 攻×1.95 防×2.2 ・ ドロップ4'},
+  final:{nm:'ラスボス', stat:'HP×100 攻×2.6 防×2.8 ・ ドロップ7'},
+};
+// [階, tier, 名, EN, 登録, 系統, 攻撃属性, 技, 激昂, 一行, シルエット, 特記, 絵]
+const BOSSES = [
+ [5,'mid','灰の大蛙','Great Ash Toad','現象体・一号／乾','beast','blunt',['slam','pillars'],['cleave'],
+  '石の層が最初に濃くなる場所。ここまでが信仰で、ここから先が商売だ。','座った巨蛙。喉が部屋の幅ほど膨らむ（アッシュトードの巨大版）','','great-ash-frog'],
+ [10,'great','空引きのヴェラ','Vela of the Empty Draw','登録：弓・百四番','undead','pierce',['beam','burst','wave'],['pillars'],
+  '矢はとうに尽きている。それでも引く動作をやめない。','四人のうち最も人の形に近い。顔がまだある','距離を保ち続ける射手。取り巻き無しの大広間','vera'],
+ [15,'mid','沼の大蛭','Great Bog Leech','現象体・二号／滞','slime','blunt',['wave','burst','summon'],['slam'],
+  '二百年、吸い続けている。吸うとき、水位が下がる。','水面から立ち上がる環状の胴。口が輪',''],
+ [20,'great','打ち直しのブレヒト','Brecht, Ever-Reforged','登録：鎚・三十一番','armor','blunt',['slam','cleave','charge'],['burst'],
+  '戦いながら自分を打ち直している。直すたび、元の形から遠くなる。','直しすぎて形を失った鍛冶','2体同時に出る（1体あたりHP×0.65・攻×0.8）'],
+ [25,'mid','根の大蜘蛛','Great Root Spider','現象体・三号／生','arcane','pierce',['pillars','slam','cleave'],['wave'],
+  '脚が七本ある。離さないのではない。離す機能が最初から無い。','脚が七本。掌のように床を覆う',''],
+ [30,'great','施しのマレット','Mareth the Almsgiver','登録：薬・九番','undead','arcane',['summon','pillars','beam'],['wave'],
+  'いまも配っている。悪意はない。区別する機能がもう無いだけ。','他人との区別がつかなくなった薬師',''],
+ [35,'mid','炉の大蛇','Great Furnace Serpent','現象体・四号／熱','flame','fire',['charge','cleave','beam'],['wave'],
+  '炉の熱はすべてこの口から出ている。胴の先を見た記録はない。','壁の穴から胴だけが出ている。全長不明',''],
+ [40,'great','凍てついた盾、オルト','Ort, the Icebound Shield','登録：盾・一番','armor','blunt',['burst','pillars','beam','wave'],['charge'],
+  '二百年、この階から動いていない。降りる者を止め、上がる者は通す。','目的だけが残って中身が消えた護衛','周期的に全員を凍らせて止める'],
+ [45,'mid','白の大眼','The Great Pale Eye','現象体・五号／欠','frost','frost',['beam','burst','pillars'],['summon'],
+  '開いたという報告が三件。三件とも、報告者は五十階から戻っていない。','閉じた瞼。開くと部屋の大きさが変わる',''],
+ [50,'great','初めの供物','The First Offering','登録：初号／職種欄・番号欄ともに空白','arcane','arcane',
+  ['slam','cleave','burst','wave','beam','pillars','charge','summon'],['charge'],
+  '「降りた。」——街に残る最も古い一文であり、最も古い嘘。','人ではないが人並みの体格。遺物を身につけ道具を使う',
+  '眷属3体（供物の眷属）と周回刃3本を連れる。味方は常時出血'],
+ [51,'final','アビスの門番、アズレイア','The Mouth of the Abyss','登録なし——記録の外','arcane','arcane',
+  ['clone','beam','burst','pillars','wave','cleave'],['charge'],
+  '名前を呼んでも応えない。応える機能を、最初から持っていない。','人型サイズ。ここまでの誰よりも小さく見える',
+  '定期的に跳ぶ。HP½で全体攻撃、¼で常に4体、⅒で幻を捨てて逃げ撃ち'],
+];
+
+/* ============ 出現階の計算（本体と同じ式） ============ */
+const LAST = 51;
+function famFits(f,d){ return d<8 || f.min >= Math.floor(d*0.35)-4; }
+function famRange(f){ let hi=f.min; for(let d=f.min; d<=LAST; d++) if(famFits(f,d)) hi=d; return [f.min,hi]; }
+function zoneOf(d){ return ZONES[Math.floor((Math.max(1,d)-1)/10)%ZONES.length]; }
+function famZones(f){
+  const [lo,hi]=famRange(f);
+  return ZONES.filter(z=>z.d[0]<=hi && z.d[1]>=lo && (z.fam[f.id]||1)>=1.2).map(z=>z.nm);
+}
+const famById = Object.fromEntries(FAM.map(f=>[f.id,f]));
+
+/* ============ レコード化 ============ */
+const R = [];
+FAM.forEach(f=>{
+  const [lo,hi]=famRange(f), fav=famZones(f);
+  ['rush','range','turret','swarm'].forEach(a=>{
+    const z=ZAKO[f.id][a];
+    R.push({kind:'zako', fam:f.id, col:f.col, nm:z[0], en:z[1], reg:`${f.reg}・${ARCH[a].k}`, arch:a,
+      dt:f.atk, res:f.res, depth:`${lo}–${hi}F`, sil:z[2], line:z[3], img:z[4],
+      where: (fav.length?`出やすい層：${fav.join('・')}`:'層の偏りなし') + (lo>=20?'':'') ,
+      extra: (a==='range'||a==='turret') ? `20F以降、16%前後で「崩し役」になり${AIL_NM[FAM_AIL[f.id]]}を置いてくる` : ''});
+  });
+});
+Object.entries(MOSS).forEach(([zid,m])=>{
+  const z=ZONES.find(x=>x.id===zid);
+  R.push({kind:'moss', fam:'moss', col:m.col, nm:m.nm, en:'Moss Ball', reg:`苔玉／${z.reg}`, arch:'rush',
+    dt:m.dt, res:m.res, depth:`${z.d[0]}–${z.d[1]}F`, img:'moss-ball',
+    sil:'段状の頭、1pxの両目、短い腕（正面向き・反転しない）',
+    line:'弱い。遅い。ほとんど何もしない。それが役目。',
+    where:`${z.nm}のボス階以外に1階2〜4体`,
+    extra:'HP×0.45 攻×0.35 速1.15。各層20体ずつ倒すと隠し仲間が加入。51Fの苔玉は玉鋼を落とす(12%)'});
+});
+ABER.forEach(([zid,a,nm,en,base,brk,line])=>{
+  const z=ZONES.find(x=>x.id===zid), f=famById[ZONE_FAM[zid]];
+  const lo=Math.max(3,z.d[0]);
+  const partial = f.min>lo;
+  R.push({kind:'aber', fam:f.id, col:'#c98adf', nm, en, reg:`${f.reg}・${ARCH[a].k}／外`, arch:a,
+    dt:f.atk, res:f.res, depth:`${lo}–${z.d[1]}F`, sil:`${base}を流用。${brk}`, line,
+    where:`${z.nm}・ボス階以外で1階に最大1体（22%〜42%）`,
+    extra:`精鋭性質を2つ持つ。${partial?`※${f.nm}の解禁が${f.min}Fなので、それより浅い階では別系統の色・耐性で出る`:''}`});
+});
+BOSSES.forEach(([d,t,nm,en,reg,fid,dt,mv,rage,line,sil,note,img])=>{
+  const f=famById[fid];
+  R.push({kind:t==='mid'?'mid':'great', tier:t, fam:fid, col:t==='mid'?'#e0c98a':(t==='final'?'#e0735a':'#c98adf'),
+    nm, en, reg, dt, res:f.res, depth:`${d}F`, d, sil, line, img, moves:mv, rage, extra:note, where:zoneOf(d).nm+(d===51?'（アビスの口）':'')});
+});
+R.push({kind:'great', tier:'escort', fam:'arcane', col:'#c07fe0', nm:'供物の眷属', en:'Kin of the Offering', reg:'随行／欠',
+  dt:'arcane', res:famById.arcane.res, depth:'50F', d:50, arch:'range',
+  sil:'初めの供物が二百年で吸い上げた者たちの成れの果て', line:'戦いながら急速に力をつけていく。',
+  where:'白の層・初めの供物の周囲に3体', extra:'回り型。HP×3.0 攻×1.2。当たると出血'});
+
+/* ============ 描画 ============ */
+const KINDS = [
+  {id:'all',  nm:'すべて'},
+  {id:'zako', nm:'雑魚',   h:'雑魚 ／ 四形式 × 八系統', p:'表示名はカタカナ。形＝行動、色＝系統。系統が攻撃属性と耐性を決める。出現階は解禁階から「深層で格の合わない系統を落とす」規則が効くまで。'},
+  {id:'moss', nm:'苔玉',   h:'苔玉 ／ 層ごとの息抜き', p:'倒しても見返りが薄く、放っても困らない相手。層の属性をそのまま被るので、属性を学ぶ練習台になる。'},
+  {id:'aber', nm:'規格外', h:'規格外 ／ Aberrant', p:'表記は漢字。層と形式の組で12通りだけ。同じ層の雑魚の絵を流用し、一箇所だけ壊す。'},
+  {id:'mid',  nm:'中ボス', h:'中ボス ／ 現象体（5階ごと）', p:'層が濃くなりすぎて動けなくなったもの。その層の雑魚と同じ型を巨大化する。倒すと帰還ポータル。'},
+  {id:'great',nm:'大ボス', h:'大ボス ／ 登録名持ち・初めの供物・門番', p:'10階ごとの大広間に単独（取り巻きなし）。倒した階は次から普通の階に戻る。'},
+];
+const state = {kind:'all', fam:null, q:''};
+try{ const s=JSON.parse(localStorage.getItem('abyss-bestiary')||'{}'); Object.assign(state,{kind:s.kind||'all',fam:s.fam||null}); }catch(e){}
+const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function resHTML(res){
+  const e=Object.entries(res||{}); if(!e.length) return '<span>なし</span>';
+  return e.sort((a,b)=>a[1]-b[1]).map(([k,v])=>`<span class="${v<0?'w':'r'}">${DT[k].nm} ${v>0?'+':''}${v}%</span>`).join('');
+}
+function artHTML(r){
+  const im = r.img && IMG[r.img];
+  if(im) return `<div class="art"><img class="${im.photo?'photo':''}" src="${im.src}" alt="${esc(r.nm)}" loading="lazy"><span class="tag">${esc(im.st)}</span></div>`;
+  const glyph = r.arch ? ARCH[r.arch].k : (r.tier==='mid'?'現':r.tier==='final'?'口':'名');
+  return `<div class="art"><span class="ph">${glyph}</span><span class="tag">絵なし</span></div>`;
+}
+function card(r){
+  const d=DT[r.dt], boss=r.kind==='mid'||r.kind==='great';
+  const pills = [
+    `<span class="pill depth">${esc(r.depth)}</span>`,
+    `<span class="pill el" style="--ec:${d.col}">${d.nm}</span>`,
+    r.arch ? `<span class="pill">${ARCH[r.arch].nm}</span>` : '',
+    boss && TIER[r.tier] ? `<span class="pill">${TIER[r.tier].nm}</span>` : '',
+  ].join('');
+  const famNm = r.fam==='moss' ? '苔玉' : `${famById[r.fam].nm}（${famById[r.fam].reg}）`;
+  const rows = [
+    ['出現', esc(r.where)],
+    ['系統', esc(famNm)],
+    ['攻撃', `${d.nm}・付与：${d.ail}`],
+    ['耐性', `<span class="res">${resHTML(r.res)}</span>`],
+    r.arch ? ['挙動', `${esc(ARCH[r.arch].how)}<br><span style="color:var(--faint)">${ARCH[r.arch].stat}</span>`] : null,
+    r.moves ? ['技', r.moves.map(m=>esc(MOVES[m])).join('<br>')] : null,
+    r.rage ? ['激昂で', r.rage.map(m=>esc(MOVES[m])).join('<br>')] : null,
+    boss && TIER[r.tier] ? ['基礎倍率', TIER[r.tier].stat] : null,
+    ['見た目', esc(r.sil)],
+    r.extra ? ['特記', esc(r.extra)] : null,
+    r.img==='vera' ? ['別案', `<a href="${IMG.vera2.src}" style="color:var(--accent)">第2形態ピクセル案</a>`] : null,
+  ].filter(Boolean).map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+  return `<article class="card ${boss?'boss':''}" style="--c:${r.col}">
+    ${artHTML(r)}
+    <div><p class="nm">${esc(r.nm)}</p><div class="en">${esc(r.en)}</div><div class="reg">${esc(r.reg)}</div></div>
+    <div class="meta">${pills}</div>
+    <p class="line"><q>${esc(r.line)}</q></p>
+    <details><summary>詳細</summary><dl>${rows}</dl></details>
+  </article>`;
+}
+function match(r){
+  if(state.kind!=='all' && r.kind!==state.kind) return false;
+  if(state.fam && r.fam!==state.fam) return false;
+  if(state.q){
+    const hay=[r.nm,r.en,r.reg,r.line,r.sil,r.where,r.extra,DT[r.dt].nm,(r.moves||[]).map(m=>MOVES[m]).join()].join(' ').toLowerCase();
+    if(!state.q.toLowerCase().split(/\s+/).every(w=>hay.includes(w))) return false;
+  }
+  return true;
+}
+function render(){
+  try{ localStorage.setItem('abyss-bestiary', JSON.stringify({kind:state.kind,fam:state.fam})); }catch(e){}
+  document.getElementById('tabs').innerHTML = KINDS.map(k=>{
+    const n = k.id==='all'?R.length:R.filter(r=>r.kind===k.id).length;
+    return `<button class="tab" data-k="${k.id}" aria-pressed="${state.kind===k.id}">${k.nm}<span class="n">${n}</span></button>`;
+  }).join('');
+  document.getElementById('fams').innerHTML =
+    `<button class="chip" data-f="" aria-pressed="${!state.fam}">全系統</button>` +
+    FAM.map(f=>`<button class="chip" style="--c:${f.col}" data-f="${f.id}" aria-pressed="${state.fam===f.id}">${f.reg} ${f.nm}</button>`).join('');
+  const hits = R.filter(match);
+  document.getElementById('count').textContent = `${hits.length} / ${R.length}`;
+  const groups = KINDS.filter(k=>k.id!=='all').map(k=>{
+    const items = hits.filter(r=>r.kind===k.id);
+    if(!items.length) return '';
+    if(k.id==='mid'||k.id==='great') items.sort((a,b)=>a.d-b.d);
+    return `<section class="group"><div class="gh"><h2>${k.h}</h2><span class="count">${items.length}</span><p>${k.p}</p></div>
+      <div class="grid">${items.map(card).join('')}</div></section>`;
+  }).join('');
+  document.getElementById('list').innerHTML = groups || '<p class="empty">該当なし。検索語か系統の絞り込みを外してください。</p>';
+}
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-k]'); if(b){state.kind=b.dataset.k; render();}});
+document.getElementById('fams').addEventListener('click',e=>{const b=e.target.closest('[data-f]'); if(b){state.fam=b.dataset.f||null; render();}});
+document.getElementById('q').addEventListener('input',e=>{state.q=e.target.value.trim(); render();});
+
+// 凡例
+document.getElementById('archT').innerHTML = '<tr><th>型</th><th>挙動</th><th>基礎値</th></tr>' +
+  Object.values(ARCH).map(a=>`<tr><td>${a.k} ${a.nm}<br><span class="en">${a.en}</span></td><td>${a.how}</td><td>${a.stat}</td></tr>`).join('');
+document.getElementById('dtT').innerHTML = '<tr><th>属性</th><th>付与</th><th>主に使う系統</th></tr>' +
+  Object.entries(DT).map(([k,d])=>`<tr><td style="color:${d.col}">${d.nm}</td><td>${d.ail}</td><td>${FAM.filter(f=>f.atk===k).map(f=>f.nm).join('・')||'—'}</td></tr>`).join('');
+document.getElementById('zoneT').innerHTML = '<tr><th>層</th><th>階</th><th>出やすい系統</th></tr>' +
+  ZONES.map(z=>`<tr><td>${z.nm}<br><span class="en">${z.reg}</span></td><td style="font-family:var(--px);font-size:11px">${z.d[0]}–${z.d[1]}</td><td>${Object.entries(z.fam).filter(([,w])=>w>=1.2).map(([id])=>famById[id].nm).join('・')||'偏りなし'}</td></tr>`).join('');
+render();
+</script>
+
+</body>
+</html>

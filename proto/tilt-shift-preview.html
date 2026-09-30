@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ABYSS — チルトシフト比較</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111819;color:#e1e7de;font:14px/1.65 system-ui}main{max-width:1100px;margin:auto;padding:24px}header{display:flex;align-items:baseline;justify-content:space-between;gap:16px}h1{font-size:23px;margin:0;font-weight:550}small,p{color:#9ea9a0}small{letter-spacing:.12em}p{margin:6px 0 18px}.layout{display:grid;grid-template-columns:minmax(0,760px) 260px;gap:24px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}figure{margin:0}figcaption{display:flex;justify-content:space-between;font-size:12px;color:#b7c4b7;margin-bottom:8px}canvas{display:block;width:100%;height:auto;border-radius:4px;background:#20282a}.panel{padding:20px;background:#1b2424;border:1px solid #34403b;border-radius:8px;align-self:start}label{display:block;margin:20px 0 0;color:#ccd6cd}label span{float:right;color:#c6dca0;font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:#c4d896;margin:12px 0 0}button{background:#26332e;color:#dce6d7;border:1px solid #46584a;border-radius:5px;padding:8px 12px;font:inherit;cursor:pointer}button:hover,button[aria-pressed=true]{background:#c6d8a5;color:#172018}.presets{display:flex;gap:6px}.presets button{flex:1;padding:7px 4px}.actions{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap}.note{font-size:12px;line-height:1.8;margin-top:18px}a{color:#bdcea6}.meta{margin-top:16px;font-size:12px;color:#9da99e}#status{color:#bbccab}#guides{accent-color:#c6d8a5} @media(max-width:800px){.layout{grid-template-columns:1fr}.panel{padding:16px}.pair{max-width:640px;margin:auto}header{display:block}main{padding:16px}h1{font-size:20px}}
+.scene-nav{display:flex;gap:8px;margin:0 0 16px}fieldset{border:0;border-top:1px solid #46584a;margin:24px 0 0;padding:10px 0 0}legend{color:#b9cba6;font-size:12px}input[type=checkbox]{accent-color:#c6d8a5}fieldset label:first-of-type{margin-top:8px}button,input{touch-action:manipulation}@media(max-width:800px){figcaption{flex-wrap:wrap;gap:2px}.pair{width:100%}figcaption span{font-size:10px}input[type=range]{min-height:32px}}
+</style>
+<main>
+<header><h1>チルトシフト / 小さな世界の奥行き</h1><small>ABYSS · POST EFFECT STUDY 02</small></header>
+<p>中央40%をくっきり残す設定。拠点・ダンジョンの両方で画面端の暗さも比較できます。</p>
+<nav class="scene-nav" aria-label="比較シーン"><button data-scene="dungeon" aria-pressed="true">ダンジョン</button><button data-scene="hub" aria-pressed="false">拠点</button></nav>
+<p><a href="index.html" target="_blank">本編で試す（ぼかしON）</a> · <a href="index.html?tiltshift=off" target="_blank">ぼかしOFFで負荷を比較</a></p>
+<div class="layout"><section class="pair" aria-label="加工前後の比較">
+<figure><figcaption><b>ORIGINAL</b><span>エフェクトなし</span></figcaption><canvas id="before" width="342" height="600" aria-label="加工前の背景"></canvas></figure>
+<figure><figcaption><b>AFTER</b><span>タップしてピント移動</span></figcaption><canvas id="after" width="342" height="600" aria-label="チルトシフトとビネットを加工した背景"></canvas></figure>
+</section><aside class="panel">
+<div class="presets" aria-label="強さのプリセット"><button data-preset="soft" aria-pressed="false">弱め</button><button data-preset="standard" aria-pressed="true">標準</button><button data-preset="miniature" aria-pressed="false">強め</button></div>
+<label for="blur">ぼかしの強さ <span id="blurValue"></span></label><input id="blur" type="range" min="0" max="14" step="0.5" value="5">
+<label for="focus">ピントの位置 <span id="focusValue"></span></label><input id="focus" type="range" min="10" max="90" value="50">
+<label for="band">くっきり残す幅 <span id="bandValue"></span></label><input id="band" type="range" min="4" max="100" value="40">
+<label for="fade">ぼけへの移行幅 <span id="fadeValue"></span></label><input id="fade" type="range" min="8" max="100" value="30">
+<fieldset id="vignetteControls"><legend>拠点・ダンジョンのビネット</legend><label><input id="vignetteEnabled" type="checkbox" checked> 画面端を暗くする</label><label for="vignette">暗さ <span id="vignetteValue"></span></label><input id="vignette" type="range" min="0" max="90" value="90"><label for="vignetteRange">明るく残す範囲 <span id="vignetteRangeValue"></span></label><input id="vignetteRange" type="range" min="15" max="80" value="15"></fieldset>
+<label><input id="guides" type="checkbox"> ピント範囲を表示</label>
+<div class="actions"><button id="pause">一時停止</button><button id="reset">リセット</button></div>
+<p class="note">弱・標準・強は、ぼかしの強さだけを切り替えます。幅40%などの調整値は維持します。</p>
+<p class="note">ダンジョンは本編の描画を使った鑑賞用シーン。中央をゆっくり移動し、床や敵の見え方を比較します。</p>
+</aside></div>
+<div class="meta"><span id="status">背景を読み込み中…</span> · <a href="https://x.com/aurelien_gz/status/2100290836915171470" target="_blank" rel="noreferrer">参照投稿</a> · 静止画の焦点表現を参考に制作（動画再生は未確認）</div>
+</main><script src="tilt-shift-preview.js"></script>
+</html>

@@ -1,0 +1,159 @@
+{
+  "demon": {
+    "source": "source/Tiny RPG Character Asset Pack 02 -Free Demon_A&Blood Monster_A/Characters(100x100 split)/Demon_A/Demon_A/Demon_A_Idle.png",
+    "cell_bbox": [
+      43,
+      39,
+      63,
+      59
+    ],
+    "native": {
+      "size": [
+        20,
+        20
+      ],
+      "opaque": 215,
+      "colors": 21,
+      "palette": {
+        "#000000": 106,
+        "#655457": 5,
+        "#9a918f": 2,
+        "#7b6a6b": 6,
+        "#8d8080": 4,
+        "#6f1a29": 12,
+        "#7e222a": 14,
+        "#972f34": 9,
+        "#a6483a": 2,
+        "#4a142c": 1,
+        "#d79970": 2,
+        "#44534b": 3,
+        "#596c5d": 2,
+        "#738a74": 1,
+        "#4d5a53": 14,
+        "#972f2f": 1,
+        "#5c2c26": 2,
+        "#7e8881": 10,
+        "#754b38": 1,
+        "#a6aba8": 8,
+        "#929894": 10
+      },
+      "nonblack_boundary": [
+        [
+          2,
+          11
+        ],
+        [
+          5,
+          17
+        ]
+      ]
+    },
+    "reconstruction_mismatch_pixels": 0,
+    "local_edit_pixels": 9,
+    "local_edit_coordinates": [
+      [
+        4,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ]
+    ],
+    "unchanged_outside_region": true,
+    "region": [
+      4,
+      0,
+      7,
+      4
+    ]
+  },
+  "blood": {
+    "source": "source/Tiny RPG Character Asset Pack 02 -Free Demon_A&Blood Monster_A/Characters(100x100 split)/Blood Monster_A/Blood Monster_A/Blood Monster_A_Idle.png",
+    "cell_bbox": [
+      42,
+      42,
+      62,
+      57
+    ],
+    "native": {
+      "size": [
+        20,
+        15
+      ],
+      "opaque": 189,
+      "colors": 8,
+      "palette": {
+        "#000000": 64,
+        "#6e1438": 30,
+        "#d9d8d8": 11,
+        "#a22b4b": 50,
+        "#311339": 24,
+        "#c0bfbf": 5,
+        "#1f1a1a": 3,
+        "#cf4554": 2
+      },
+      "nonblack_boundary": [
+        [
+          6,
+          14
+        ],
+        [
+          12,
+          14
+        ]
+      ]
+    },
+    "reconstruction_mismatch_pixels": 0,
+    "local_edit_pixels": 3,
+    "local_edit_coordinates": [
+      [
+        10,
+        3
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        13,
+        5
+      ]
+    ],
+    "unchanged_outside_region": true,
+    "region": [
+      9,
+      3,
+      14,
+      6
+    ]
+  }
+}

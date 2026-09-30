@@ -1,0 +1,23 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "opaque_bounds": [
+    1,
+    9,
+    31,
+    29
+  ],
+  "colors": 13,
+  "alpha": [
+    0,
+    255
+  ],
+  "reference_scale": 4,
+  "reference_small_monster_color_range": [
+    10,
+    17
+  ],
+  "target_colors": 13
+}

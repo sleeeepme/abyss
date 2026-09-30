@@ -1,0 +1,128 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v39/flame-breath/right",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5998,
+      "isolated_pixels_total": 31,
+      "changed_pixels_between_frames": [
+        430,
+        582,
+        513,
+        494,
+        460,
+        522,
+        513,
+        494,
+        460,
+        541,
+        409,
+        227,
+        138,
+        65
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v39/flame-breath/up",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 6364,
+      "isolated_pixels_total": 32,
+      "changed_pixels_between_frames": [
+        324,
+        602,
+        502,
+        484,
+        424,
+        508,
+        502,
+        484,
+        424,
+        514,
+        410,
+        288,
+        132,
+        110
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v39/flame-breath/left",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5998,
+      "isolated_pixels_total": 31,
+      "changed_pixels_between_frames": [
+        430,
+        582,
+        513,
+        494,
+        460,
+        522,
+        513,
+        494,
+        460,
+        541,
+        409,
+        227,
+        138,
+        65
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v39/flame-breath/down",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 6364,
+      "isolated_pixels_total": 32,
+      "changed_pixels_between_frames": [
+        324,
+        602,
+        502,
+        484,
+        424,
+        508,
+        502,
+        484,
+        424,
+        514,
+        410,
+        288,
+        132,
+        110
+      ],
+      "duplicate_transitions": 0
+    }
+  ]
+}

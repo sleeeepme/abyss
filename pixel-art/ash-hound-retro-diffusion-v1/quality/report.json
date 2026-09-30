@@ -1,0 +1,59 @@
+{
+  "Approved": {
+    "canvas": [
+      32,
+      32
+    ],
+    "alpha_bbox": [
+      2,
+      5,
+      30,
+      24
+    ],
+    "opaque_colors": 12,
+    "partial_alpha_pixels": 0
+  },
+  "RD Pro": {
+    "canvas": [
+      32,
+      32
+    ],
+    "alpha_bbox": [
+      1,
+      5,
+      31,
+      31
+    ],
+    "opaque_colors": 17,
+    "partial_alpha_pixels": 0
+  },
+  "RD Pro 02": {
+    "canvas": [
+      32,
+      32
+    ],
+    "alpha_bbox": [
+      1,
+      5,
+      31,
+      24
+    ],
+    "opaque_colors": 33,
+    "partial_alpha_pixels": 0
+  },
+  "RD Pro 02 reduced": {
+    "canvas": [
+      32,
+      32
+    ],
+    "alpha_bbox": [
+      1,
+      5,
+      31,
+      24
+    ],
+    "opaque_colors": 12,
+    "partial_alpha_pixels": 0,
+    "alpha_unchanged_from_raw": true
+  }
+}

@@ -1,0 +1,544 @@
+{
+  "type": "tileset",
+  "name": "stone-room",
+  "tilewidth": 32,
+  "tileheight": 32,
+  "columns": 0,
+  "tilecount": 41,
+  "objectalignment": "bottomleft",
+  "tiles": [
+    {
+      "id": 0,
+      "image": "pieces/floor-0.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "image": "pieces/floor-1.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "image": "pieces/floor-2.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "image": "pieces/floor-3.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "image": "pieces/floor-4.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "image": "pieces/floor-5.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "image": "pieces/floor-6.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "image": "pieces/floor-7.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "image": "pieces/floor-8.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "image": "pieces/floor-9.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "image": "pieces/floor-10.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "image": "pieces/floor-11.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "image": "pieces/floor-12.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "image": "pieces/floor-13.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "image": "pieces/floor-14.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "image": "pieces/floor-15.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "image": "pieces/floor-16.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "image": "pieces/floor-17.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "image": "pieces/floor-18.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "image": "pieces/floor-19.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "image": "pieces/floor-20.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "image": "pieces/floor-21.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "image": "pieces/floor-22.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "image": "pieces/floor-23.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "image": "pieces/floor-24.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "image": "pieces/floor-25.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "image": "pieces/floor-26.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "image": "pieces/floor-27.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "image": "pieces/floor-28.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "image": "pieces/floor-29.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "image": "pieces/floor-30.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "image": "pieces/floor-31.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "image": "pieces/bare-0.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "image": "pieces/bare-1.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "image": "pieces/bare-2.png",
+      "imagewidth": 16,
+      "imageheight": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "image": "pieces/moss-unified-0.png",
+      "imagewidth": 32,
+      "imageheight": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "grass"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "image": "pieces/moss-unified-1.png",
+      "imagewidth": 32,
+      "imageheight": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "grass"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "image": "pieces/moss-unified-2.png",
+      "imagewidth": 32,
+      "imageheight": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "grass"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "image": "pieces/moss-unified-3.png",
+      "imagewidth": 32,
+      "imageheight": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "grass"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "image": "pieces/mushroom.png",
+      "imagewidth": 20,
+      "imageheight": 24,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "mushroom"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "image": "pieces/boulder.png",
+      "imagewidth": 32,
+      "imageheight": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "rock"
+        }
+      ]
+    }
+  ]
+}

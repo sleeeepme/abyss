@@ -1,0 +1,21 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>アッシュハウンド — 待機</title>
+<style>body{background:#24232a;color:#ebe8e0;font:15px system-ui;margin:32px}h1{font-size:22px}main{display:flex;gap:24px;flex-wrap:wrap}.card{background:#515055;border-radius:12px;padding:20px}canvas{width:256px;height:256px;image-rendering:pixelated}.native canvas{width:32px;height:32px}button{padding:10px 20px;border-radius:8px;border:0;margin:16px 8px 0 0}p{color:#d7d1c7}a{color:#f3c892}#status{font-variant-numeric:tabular-nums}small{display:block;margin-top:12px}</style>
+<h1>アッシュハウンド — 待機アニメーション</h1><p>前回の承認済みの口を維持。32×32・12色。足を固定した呼吸と、遅れて動く頭・尾・顎。</p>
+<main><section class="card"><div>静止</div><canvas id="rest" width="32" height="32"></canvas></section><section class="card"><div>待機ループ · 8倍</div><canvas id="motion" width="32" height="32"></canvas></section><section class="card native"><div>原寸</div><canvas id="native" width="32" height="32"></canvas></section></main>
+<button id="toggle">一時停止</button><button id="step">次のフレーム</button><span id="status">読み込み中</span>
+<p><a href="ash-hound-idle-32.gif">原寸透過GIF</a> · <a href="ash-hound-idle-sheet.png">スプライトシート</a></p><small>プレビュー用の接地影を表示。ゲーム本体には未反映。</small>
+<script>
+const durations=[520,160,180,240,160,180,340],total=durations.reduce((a,b)=>a+b,0);
+const canvases=['rest','motion','native'].map(id=>document.getElementById(id));
+const ctx=canvases.map(c=>c.getContext('2d'));ctx.forEach(c=>c.imageSmoothingEnabled=false);
+let running=true,index=0,started=0,elapsed=0,loops=0,frames=[],shadow;
+const load=src=>new Promise((ok,no)=>{const im=new Image;im.onload=()=>ok(im);im.onerror=no;im.src=src});
+function draw(c,frame){c.clearRect(0,0,32,32);c.drawImage(shadow,0,0);c.drawImage(frames[frame],0,0)}
+function render(){draw(ctx[1],index);draw(ctx[2],index);document.getElementById('status').textContent=`${index+1}/7 · ${durations[index]}ms · ${loops}ループ`;}
+Promise.all([Promise.all(durations.map((_,i)=>load(`frames/${String(i).padStart(2,'0')}.png`))),load('preview-shadow.png')]).then(([imgs,sh])=>{
+frames=imgs;shadow=sh;draw(ctx[0],0);started=performance.now();
+function tick(t){if(running){elapsed=t-started;loops=Math.floor(elapsed/total);let local=elapsed%total;index=0;while(local>=durations[index]){local-=durations[index++];}render();}requestAnimationFrame(tick);}requestAnimationFrame(tick);
+});
+document.getElementById('toggle').onclick=()=>{running=!running;if(running)started=performance.now()-elapsed;document.getElementById('toggle').textContent=running?'一時停止':'再生';};
+document.getElementById('step').onclick=()=>{running=false;index=(index+1)%durations.length;elapsed=durations.slice(0,index).reduce((a,b)=>a+b,0);document.getElementById('toggle').textContent='再生';render();};
+</script></html>

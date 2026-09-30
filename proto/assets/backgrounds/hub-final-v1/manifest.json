@@ -1,0 +1,38 @@
+{
+  "status": "approved",
+  "approvedDate": "2026-09-09",
+  "sourceVersion": "hub-loop-v3",
+  "durationSeconds": 6,
+  "fps": 12,
+  "frames": 72,
+  "nativeWidth": 171,
+  "nativeHeight": 300,
+  "sheetColumns": 12,
+  "sheetRows": 6,
+  "files": {
+    "approved-source.jpg": {
+      "bytes": 211223,
+      "sha256": "84a9a73e22c8bfb08a1b715211638a60fc8f1d6d584cc8ad9ebe92c3f85ad0a1"
+    },
+    "background.png": {
+      "bytes": 110309,
+      "sha256": "2b6bd09e60151b5cba049fdd24eec0102172762e72539b163d3251c4076ea928"
+    },
+    "hub-loop-4x.webp": {
+      "bytes": 1139140,
+      "sha256": "d5c1499002083a8226432c76dbc1a636081cc9383e4794f9d2be1221e96670a7"
+    },
+    "loop-spritesheet.png": {
+      "bytes": 1510116,
+      "sha256": "d5d7574e27661ee1b04749da826a82b5c5fb0d53bc87f6ac903609676d549829"
+    },
+    "preview.html": {
+      "bytes": 2014876,
+      "sha256": "0c5bd0d189784ca2762e07823cb054667dad0e13b43ddaa4b93edaa4abae8e65"
+    },
+    "verification.json": {
+      "bytes": 182,
+      "sha256": "c5b6c9e90496c2b696b7001ef2507be752d4cd63ec6a32527ed3f0990d4a88e7"
+    }
+  }
+}

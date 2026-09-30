@@ -1,0 +1,130 @@
+[
+  {
+    "name": "cliff-front",
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "cliff-left",
+    "x": 64,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "cliff-right",
+    "x": 128,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "cliff-inner",
+    "x": 192,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "stairs-north",
+    "x": 0,
+    "y": 64,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "stairs-east",
+    "x": 64,
+    "y": 64,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "bridge-north",
+    "x": 128,
+    "y": 64,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "bridge-east",
+    "x": 192,
+    "y": 64,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "boulder",
+    "x": 0,
+    "y": 128,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "pillar",
+    "x": 64,
+    "y": 128,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "rubble",
+    "x": 128,
+    "y": 128,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "mine-entrance",
+    "x": 192,
+    "y": 128,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "lantern",
+    "x": 0,
+    "y": 192,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "winch",
+    "x": 64,
+    "y": 192,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "crate",
+    "x": 128,
+    "y": 192,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  },
+  {
+    "name": "vines",
+    "x": 192,
+    "y": 192,
+    "width": 64,
+    "height": 64,
+    "anchor": "bottom-center"
+  }
+]

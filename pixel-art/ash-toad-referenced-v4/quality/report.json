@@ -1,0 +1,76 @@
+{
+  "references": [
+    "Frogs | Pixel Monsters 17 (~32px)",
+    "Pixel Art Field Enemies frog animation",
+    "Lil Froggy (16px abstraction)",
+    "Ragnarok Online Poisonous Toad",
+    "real crouched frog/toad silhouettes"
+  ],
+  "observed_features": [
+    "two raised eye mounds",
+    "neckless broad mouth",
+    "rear thigh is largest mass",
+    "folded shin and planted long foot",
+    "thin forelegs",
+    "idle throat stays under jaw"
+  ],
+  "candidates": {
+    "A SIDE PROFILE": {
+      "bounds": [
+        2,
+        6,
+        31,
+        28
+      ],
+      "size": [
+        29,
+        22
+      ],
+      "opaque": 362,
+      "density": 0.567
+    },
+    "B 3/4 CROUCH": {
+      "bounds": [
+        2,
+        6,
+        31,
+        29
+      ],
+      "size": [
+        29,
+        23
+      ],
+      "opaque": 371,
+      "density": 0.556
+    },
+    "C LOW TOAD": {
+      "bounds": [
+        2,
+        7,
+        31,
+        28
+      ],
+      "size": [
+        29,
+        21
+      ],
+      "opaque": 372,
+      "density": 0.611
+    }
+  },
+  "selected": "B 3/4 CROUCH",
+  "final": {
+    "bounds": [
+      2,
+      6,
+      31,
+      29
+    ],
+    "opaque": 403,
+    "colors": 12,
+    "alpha": [
+      0,
+      255
+    ]
+  }
+}

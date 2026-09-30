@@ -1,0 +1,25 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "opaque_bounds": [
+    1,
+    10,
+    31,
+    28
+  ],
+  "body_size": [
+    30,
+    18
+  ],
+  "visible_colors": 13,
+  "alpha_values": [
+    0,
+    255
+  ],
+  "logical_master": [
+    30,
+    18
+  ]
+}

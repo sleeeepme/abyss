@@ -1,0 +1,89 @@
+{
+  "tileSize": 24,
+  "palette": {
+    "void": "#211f24",
+    "cap": "#2b272b",
+    "wallDark": "#3a3030",
+    "wall": "#4d3d34",
+    "wallLight": "#624b38",
+    "wallLit": "#75563c",
+    "seam": "#3d332e",
+    "floor": "#88643f",
+    "earth": "#805d3b",
+    "earthLight": "#8d6742",
+    "stone": "#936e48",
+    "slab": "#ac855b",
+    "slabLight": "#bc966a",
+    "slabShade": "#87623f",
+    "crack": "#745434",
+    "chip": "#987146",
+    "moss": "#71613c",
+    "mossDark": "#5b5034"
+  },
+  "parts": [
+    {
+      "id": "north-wall-run",
+      "width": 96,
+      "height": 64,
+      "anchor": [
+        0,
+        64
+      ]
+    },
+    {
+      "id": "west-wall",
+      "width": 24,
+      "height": 24,
+      "anchor": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "east-wall",
+      "width": 24,
+      "height": 24,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "south-cutaway",
+      "width": 96,
+      "height": 24,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "floor-macro",
+      "width": 192,
+      "height": 192,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "slab",
+      "width": 64,
+      "height": 32,
+      "anchor": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "rubble",
+      "width": 24,
+      "height": 16,
+      "anchor": [
+        12,
+        16
+      ]
+    }
+  ],
+  "notes": "Generated from stone-map-terrain-v2.js. Floor macro is NOT a seamless repeat tile. Wall run is a four-cell strip; runtime generates continuous runs using world coordinates."
+}

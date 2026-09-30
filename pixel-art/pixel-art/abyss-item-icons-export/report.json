@@ -1,0 +1,182 @@
+{
+  "sword": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "great": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "dagger": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "spear": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "mace": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "axe": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "bow": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "staff": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 7,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "potion": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "vial": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "leaf": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 4,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "armor": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 7,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "chain": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 7,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "plate": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 9,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "robe": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "buckler": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "tower": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "ring": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "amulet": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  },
+  "bag": {
+    "size": [
+      16,
+      16
+    ],
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": []
+  }
+}

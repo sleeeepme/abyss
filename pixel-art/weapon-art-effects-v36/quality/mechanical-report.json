@@ -1,0 +1,35 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v36/flame-breath",
+      "size": [
+        46,
+        42
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5998,
+      "isolated_pixels_total": 31,
+      "changed_pixels_between_frames": [
+        430,
+        582,
+        513,
+        494,
+        460,
+        522,
+        513,
+        494,
+        460,
+        541,
+        409,
+        227,
+        138,
+        65
+      ],
+      "duplicate_transitions": 0
+    }
+  ]
+}

@@ -1,0 +1,195 @@
+{
+  "nativeTileSize": 16,
+  "lighting": "upper-left",
+  "anchorConvention": "bottom center on ground",
+  "assets": {
+    "ledge": {
+      "file": "sprites/ledge.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        47
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1389
+    },
+    "wall-tall": {
+      "file": "sprites/wall-tall.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        47
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1104
+    },
+    "corner": {
+      "file": "sprites/corner.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        47
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1229
+    },
+    "boulder": {
+      "file": "sprites/boulder.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        47
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1453
+    },
+    "spike": {
+      "file": "sprites/spike.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        45
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1825
+    },
+    "spikes": {
+      "file": "sprites/spikes.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        46
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1672
+    },
+    "rubble": {
+      "file": "sprites/rubble.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        45
+      ],
+      "layer": "object",
+      "collision": "footprint",
+      "transparentPixels": 1796
+    },
+    "stairs": {
+      "file": "sprites/stairs.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        43
+      ],
+      "layer": "object",
+      "collision": "none",
+      "transparentPixels": 1556
+    },
+    "moss": {
+      "file": "sprites/moss.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        37
+      ],
+      "layer": "ground",
+      "collision": "none",
+      "transparentPixels": 1946
+    },
+    "moss-stones": {
+      "file": "sprites/moss-stones.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        37
+      ],
+      "layer": "ground",
+      "collision": "none",
+      "transparentPixels": 2013
+    },
+    "vine": {
+      "file": "sprites/vine.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        42
+      ],
+      "layer": "object",
+      "collision": "none",
+      "transparentPixels": 2126
+    },
+    "slab": {
+      "file": "sprites/slab.png",
+      "width": 48,
+      "height": 48,
+      "anchor": [
+        24,
+        39
+      ],
+      "layer": "ground",
+      "collision": "none",
+      "transparentPixels": 1643
+    },
+    "floor-0": {
+      "file": "sprites/floor-0.png",
+      "width": 16,
+      "height": 16,
+      "anchor": [
+        0,
+        0
+      ],
+      "layer": "floor",
+      "collision": "none"
+    },
+    "floor-1": {
+      "file": "sprites/floor-1.png",
+      "width": 16,
+      "height": 16,
+      "anchor": [
+        0,
+        0
+      ],
+      "layer": "floor",
+      "collision": "none"
+    },
+    "floor-2": {
+      "file": "sprites/floor-2.png",
+      "width": 16,
+      "height": 16,
+      "anchor": [
+        0,
+        0
+      ],
+      "layer": "floor",
+      "collision": "none"
+    },
+    "floor-3": {
+      "file": "sprites/floor-3.png",
+      "width": 16,
+      "height": 16,
+      "anchor": [
+        0,
+        0
+      ],
+      "layer": "floor",
+      "collision": "none"
+    }
+  }
+}

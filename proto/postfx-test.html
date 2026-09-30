@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Post effect verification</title>
+<style>body{background:#10171c;color:#d5e5df;font:13px monospace}pre{white-space:pre-wrap}iframe{width:390px;height:844px;border:1px solid #567}section{display:flex;gap:12px}</style>
+<h1>Post effect verification · 390 × 844</h1><pre id="result">Running…</pre><section><iframe id="old" src="_to_delete/postfx-v1-baseline/index.html?postfx-test"></iframe><iframe id="current" src="index.html?postfx-test"></iframe></section>
+<script>
+const result=document.getElementById('result'),errors=[],report={checks:[],timings:[],errors};
+const old=document.getElementById('old'),current=document.getElementById('current');
+const loaded=f=>new Promise(ok=>f.onload=ok),raf=()=>new Promise(ok=>requestAnimationFrame(ok));
+Promise.all([loaded(old),loaded(current)]).then(async()=>{
+ for(const f of[old,current]){f.contentWindow.addEventListener('error',e=>errors.push(e.message));f.contentWindow.eval("S.screen='postfx-test';_canvasDirty=false");}
+ report.checks=current.contentWindow.eval(`(()=>{
+ const out=[],check=(name,fn)=>{try{out.push({name,pass:!!fn()})}catch(e){out.push({name,pass:false,error:e.message})}};
+ for(const dpr of[1,2])check('Sharp center and blur edges at DPR '+dpr,()=>{
+  const c=document.createElement('canvas');c.width=390*dpr;c.height=844*dpr;const g=c.getContext('2d');g.scale(dpr,dpr);
+  for(let x=0;x<390;x++){g.fillStyle=x%2?'#ffffff':'#203040';g.fillRect(x,0,1,844)}
+  const original=g.getImageData(0,0,c.width,c.height),cache={key:'',bands:[]};
+  const before=g.getTransform().toString();g.imageSmoothingEnabled=false;applyFeelTilt(c,g,390,844,cache);
+  const after=g.getImageData(0,0,c.width,c.height),mid=Math.floor(c.height/2),row=mid*c.width*4;
+  let same=true,different=false;for(let i=row;i<row+c.width*4;i++)if(original.data[i]!==after.data[i])same=false;
+  for(let i=0;i<c.width*4;i++)if(original.data[i]!==after.data[i])different=true;
+  return same&&different&&before===g.getTransform().toString()&&!g.imageSmoothingEnabled&&cache.bands.every(b=>b.width<=384);
+ });
+ check('Unchanged dimensions reuse scratch canvases',()=>{prepareFeelTilt(390,844,feelTiltGame);const a=feelTiltGame.bands.map(b=>b.a),n=FEEL_POST.stats.rebuilds;prepareFeelTilt(390,844,feelTiltGame);return FEEL_POST.stats.rebuilds===n&&a.every((v,i)=>v===feelTiltGame.bands[i].a)});
+ check('Rotation rebuilds once and clear band remains 40%',()=>{const n=FEEL_POST.stats.rebuilds;prepareFeelTilt(844,390,feelTiltGame);return FEEL_POST.stats.rebuilds===n+1&&feelTiltGame.bands.reduce((s,b)=>s+b.height,0)<=390*.6});
+ check('Disabled blur leaves pixels unchanged',()=>{const c=document.createElement('canvas');c.width=20;c.height=20;const g=c.getContext('2d');g.fillStyle='#abcdef';g.fillRect(0,0,20,20);FEEL_POST.tiltEnabled=false;applyFeelTilt(c,g,20,20,{key:'',bands:[]});FEEL_POST.tiltEnabled=true;return g.getImageData(2,2,1,1).data[0]===171});
+ drawFeelVignette();const vc=feelVignetteCanvas,v=vc.getContext('2d');
+ check('Vignette center clear and corner 90%',()=>v.getImageData(vc.width>>1,vc.height>>1,1,1).data[3]===0&&v.getImageData(0,0,1,1).data[3]>=225);
+ check('Vignette texture capped independently of DPR',()=>vc.width<=512&&vc.height<=1024);
+ check('Town applies both effects and preserves canvas state',()=>{const c=document.createElement('canvas');c.width=171;c.height=300;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,171,300);g.imageSmoothingEnabled=false;drawFeelHubTiltShift(c,g);return !g.imageSmoothingEnabled&&g.getImageData(85,150,1,1).data[0]===255&&g.getImageData(0,0,1,1).data[0]<35});
+ return out;
+ })()`);
+ function setup(f,depth){f.contentWindow.eval(`S.salt=472;S.runs=0;S.hero=newHero();S.hero.artKey=CharacterArt.heroArtKeys[0];startRun(${depth});const r=W.fl.rooms.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0];P.x=r.x+r.w/2;P.y=r.y+r.h/2;W.seen.forEach(row=>row.fill(1));FEEL.time=2;_drawDt=0;document.querySelectorAll('.modal.on').forEach(n=>n.classList.remove('on'));S.screen='postfx-test';_canvasDirty=false;`)}
+ for(const depth of[1,13,26]){
+  setup(old,depth);setup(current,depth);
+  for(const mode of['before','tilt-off','after']){
+   const f=mode==='before'?old:current,durations=[],intervals=[];let last;
+   for(let i=0;i<60;i++){
+    await raf();const now=performance.now();if(last&&i>=10)intervals.push(now-last);last=now;
+    const ms=f.contentWindow.eval(`(()=>{S.screen='game';${mode==='before'?'':"FEEL_POST.tiltEnabled="+(mode==='after')+';'}const start=performance.now();draw();const ms=performance.now()-start;S.screen='postfx-test';_canvasDirty=false;return ms})()`);
+    if(i>=10)durations.push(ms);
+   }
+   durations.sort((a,b)=>a-b);intervals.sort((a,b)=>a-b);
+   report.timings.push({depth,mode,drawMedianMs:+durations[25].toFixed(3),drawP95Ms:+durations[47].toFixed(3),frameMedianMs:+intervals[25].toFixed(2),frameP95Ms:+intervals[47].toFixed(2)});
+   result.textContent=JSON.stringify({...report,status:'Running'},null,2);
+  }
+ }
+ report.buffers=current.contentWindow.eval('({...FEEL_POST.stats,devicePixelRatio,canvasPixels:cv.width*cv.height})');
+ report.note='Draw times measure CPU submission, frame intervals include browser scheduling. Desktop browser, not iPhone hardware.';
+ report.status='complete';result.textContent=JSON.stringify(report,null,2);
+}).catch(e=>{report.status='failed';errors.push(e.message);result.textContent=JSON.stringify(report,null,2)});
+</script>

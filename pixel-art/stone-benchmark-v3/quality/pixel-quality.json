@@ -1,0 +1,68 @@
+{
+  "assets": [
+    {
+      "path": "pixel-art/stone-benchmark-v3/native-32/praying-dead.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 13,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 309,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "pixel-art/stone-benchmark-v3/native-32/dead-sprinter.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 13,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 315,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "pixel-art/stone-benchmark-v3/native-32/bog-crawler.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 13,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 296,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "pixel-art/stone-benchmark-v3/native-32/silt-jelly.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 13,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 350,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    }
+  ]
+}

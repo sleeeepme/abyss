@@ -1,0 +1,94 @@
+[
+  {
+    "id": "praying-dead",
+    "name": "プレイングデッド",
+    "canvas": [
+      32,
+      32
+    ],
+    "opaque_bounds": [
+      5,
+      4,
+      27,
+      29
+    ],
+    "body_size": [
+      22,
+      25
+    ],
+    "colors": 13,
+    "alpha": [
+      0,
+      255
+    ]
+  },
+  {
+    "id": "dead-sprinter",
+    "name": "デッドスプリンター",
+    "canvas": [
+      32,
+      32
+    ],
+    "opaque_bounds": [
+      2,
+      7,
+      30,
+      29
+    ],
+    "body_size": [
+      28,
+      22
+    ],
+    "colors": 13,
+    "alpha": [
+      0,
+      255
+    ]
+  },
+  {
+    "id": "bog-crawler",
+    "name": "ボグクロウラー",
+    "canvas": [
+      32,
+      32
+    ],
+    "opaque_bounds": [
+      1,
+      9,
+      30,
+      29
+    ],
+    "body_size": [
+      29,
+      20
+    ],
+    "colors": 13,
+    "alpha": [
+      0,
+      255
+    ]
+  },
+  {
+    "id": "silt-jelly",
+    "name": "シルトジェリー",
+    "canvas": [
+      32,
+      32
+    ],
+    "opaque_bounds": [
+      4,
+      4,
+      28,
+      29
+    ],
+    "body_size": [
+      24,
+      25
+    ],
+    "colors": 13,
+    "alpha": [
+      0,
+      255
+    ]
+  }
+]

@@ -1,0 +1,74 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v18/earth-wave",
+      "size": [
+        64,
+        20
+      ],
+      "frames": 8,
+      "duration_ms": 640,
+      "min_frame_ms": 80,
+      "colors": 6,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 2303,
+      "isolated_pixels_total": 11,
+      "changed_pixels_between_frames": [
+        61,
+        81,
+        203,
+        306,
+        101,
+        355,
+        189
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v18/flame",
+      "size": [
+        45,
+        28
+      ],
+      "frames": 8,
+      "duration_ms": 640,
+      "min_frame_ms": 80,
+      "colors": 6,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 4097,
+      "isolated_pixels_total": 15,
+      "changed_pixels_between_frames": [
+        321,
+        489,
+        440,
+        481,
+        451,
+        540,
+        402
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v18/raging-upper",
+      "size": [
+        38,
+        42
+      ],
+      "frames": 6,
+      "duration_ms": 480,
+      "min_frame_ms": 80,
+      "colors": 6,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 613,
+      "isolated_pixels_total": 8,
+      "changed_pixels_between_frames": [
+        67,
+        159,
+        285,
+        304,
+        90
+      ],
+      "duplicate_transitions": 0
+    }
+  ]
+}

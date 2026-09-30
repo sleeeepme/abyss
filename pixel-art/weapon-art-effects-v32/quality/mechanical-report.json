@@ -1,0 +1,36 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v32/flame",
+      "size": [
+        32,
+        28
+      ],
+      "frames": 16,
+      "duration_ms": 1120,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 694,
+      "isolated_pixels_total": 12,
+      "changed_pixels_between_frames": [
+        0,
+        63,
+        0,
+        71,
+        0,
+        71,
+        71,
+        67,
+        67,
+        77,
+        67,
+        0,
+        63,
+        0,
+        23
+      ],
+      "duplicate_transitions": 5
+    }
+  ]
+}

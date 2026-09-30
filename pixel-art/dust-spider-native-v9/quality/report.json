@@ -1,0 +1,22 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "bbox": [
+    5,
+    6,
+    28,
+    21
+  ],
+  "visible_size": [
+    23,
+    15
+  ],
+  "opaque_pixels": 156,
+  "colors": 8,
+  "unoutlined_boundary_pixels": [],
+  "selected_silhouette": "B",
+  "old_sprite_pixels_used_in_new_sprite": 0,
+  "spatial_downsampling": false
+}

@@ -1,0 +1,22 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "visible_bounds": [
+    2,
+    5,
+    30,
+    24
+  ],
+  "visible_colors": 11,
+  "alpha_values": [
+    0,
+    255
+  ],
+  "reference_display_scale": 4,
+  "reference_source": "user-provided JPEG preview",
+  "structural_pixel_mismatch_vs_recovered_grid": 0,
+  "rgba_pixel_mismatch_vs_quantized_recovered_grid": 0,
+  "note": "Original paid PNG/Aseprite data was not available; JPEG colors were consolidated into 11 functional colors."
+}

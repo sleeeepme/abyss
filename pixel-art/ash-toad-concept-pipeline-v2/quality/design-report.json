@@ -1,0 +1,25 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "visible_bounds": [
+    1,
+    5,
+    31,
+    29
+  ],
+  "colors": 11,
+  "alpha_values": [
+    0,
+    255
+  ],
+  "native_authored": true,
+  "final_uses_resized_pixels": false,
+  "workflow": [
+    "concept illustration",
+    "pixel-art master",
+    "32x32 reduced guide",
+    "native 32x32 redraw"
+  ]
+}

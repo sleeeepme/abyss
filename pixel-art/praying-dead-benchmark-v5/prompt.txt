@@ -1,0 +1,9 @@
++Use case: stylized-concept.
+Asset type: one game-ready tiny RPG monster sprite, Praying Dead.
+Input image 1 is the commercial pack reference for overall tiny-sprite craft. Input image 2 is the approved ABYSS Crawling Dead and is the primary benchmark: match its apparent native pixel size, outline weight, pixel-cluster density, face simplicity, and 3-tone material rendering.
+
+Create ONE compact kneeling undead pilgrim on a true 32x32 logical grid, facing right in three-quarter profile. Occupied bounds about 23 pixels wide by 23 pixels tall, aligned to the same baseline as the Crawling Dead. Large bowed hood occupies roughly half the height. Within the hood, show a tiny ivory skull profile with one dark eye socket. Two short blocky skeletal hands must be visibly CLASPED together directly in front of the face, with a dark 1-pixel seam separating them. The robe pools into one low broad base; a short muted blue-green sash hangs down. Dusty umber robe, blue-green sash, warm ivory bone.
+
+Exactly 13 opaque colors excluding transparency. Nearly-black purple 1 logical-pixel outer contour and overlap seams. Each material uses 2-3 large connected flat clusters. Top-left lighting. Single pixels only for the eye. Curves use deliberate stepped pixel runs. Transparent background.
+
+The output should be a very large exact nearest-neighbor display of the logical 32x32 sprite: identical square blocks, no subpixel detail. No realistic folds, long fingers, detailed anatomy, texture noise, scratches, gradients, dithering, antialiasing, shadow, floor, glow, text, frame, extra characters. Do not make it tall, painterly, or more detailed than the approved Crawling Dead.

@@ -1,0 +1,192 @@
+{
+ "frames": [
+  {
+   "filename": "frame_0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 90
+  },
+  {
+   "filename": "frame_1",
+   "frame": {
+    "x": 64,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 70
+  },
+  {
+   "filename": "frame_2",
+   "frame": {
+    "x": 128,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 70
+  },
+  {
+   "filename": "frame_3",
+   "frame": {
+    "x": 192,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 80
+  },
+  {
+   "filename": "frame_4",
+   "frame": {
+    "x": 256,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 110
+  },
+  {
+   "filename": "frame_5",
+   "frame": {
+    "x": 320,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 90
+  },
+  {
+   "filename": "frame_6",
+   "frame": {
+    "x": 384,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 100
+  },
+  {
+   "filename": "frame_7",
+   "frame": {
+    "x": 448,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 20
+   },
+   "duration": 150
+  }
+ ],
+ "meta": {
+  "app": "pixelstudio",
+  "version": "1.0.0",
+  "image": "earth-wave-spritesheet.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 512,
+   "h": 20
+  },
+  "scale": "1",
+  "frameTags": []
+ }
+}

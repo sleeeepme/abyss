@@ -1,0 +1,122 @@
+{
+  "sword": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "great": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "dagger": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "spear": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "mace": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "axe": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "bow": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "staff": {
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "potion": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "vial": {
+    "colors": 4,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "leaf": {
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "armor": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "chain": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "plate": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "robe": {
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "buckler": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "tower": {
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "ring": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "amulet": {
+    "colors": 5,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "bag": {
+    "colors": 6,
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  }
+}

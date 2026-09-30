@@ -1,0 +1,148 @@
+{
+ "frames": [
+  {
+   "filename": "frame_0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 100
+  },
+  {
+   "filename": "frame_1",
+   "frame": {
+    "x": 112,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 50
+  },
+  {
+   "filename": "frame_2",
+   "frame": {
+    "x": 224,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 50
+  },
+  {
+   "filename": "frame_3",
+   "frame": {
+    "x": 336,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 100
+  },
+  {
+   "filename": "frame_4",
+   "frame": {
+    "x": 448,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 80
+  },
+  {
+   "filename": "frame_5",
+   "frame": {
+    "x": 560,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 116
+   },
+   "duration": 140
+  }
+ ],
+ "meta": {
+  "app": "pixelstudio",
+  "version": "1.0.0",
+  "image": "raging-upper-spritesheet.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 672,
+   "h": 116
+  },
+  "scale": "1",
+  "frameTags": []
+ }
+}

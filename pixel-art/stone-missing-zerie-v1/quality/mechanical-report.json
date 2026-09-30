@@ -1,0 +1,420 @@
+[
+  {
+    "id": "crawling-dead",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 22,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      4,
+      10,
+      30,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "crawling-dead",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 28,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      19,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "fallen-company",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 22,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      12,
+      27,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "fallen-company",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 26,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      24,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "praying-dead",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 21,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      4,
+      2,
+      28,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "praying-dead",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      6,
+      2,
+      57,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "dead-sprinter",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 22,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      9,
+      30,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "dead-sprinter",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      18,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "bog-crawler",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 21,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      10,
+      30,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "bog-crawler",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      19,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "reed-serpent",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 21,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      2,
+      30,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "reed-serpent",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 28,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      3,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "silt-jelly",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 22,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      5,
+      2,
+      27,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "silt-jelly",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      8,
+      2,
+      55,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "bloat-grub",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 21,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      13,
+      29,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "bloat-grub",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      27,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "the-miller",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 22,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      9,
+      30,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "the-miller",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 28,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      2,
+      19,
+      62,
+      62
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "the-hush",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 1,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      3,
+      11,
+      29,
+      29
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "the-hush",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 1,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      4,
+      21,
+      61,
+      61
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "abyss-patroller",
+    "size": [
+      32,
+      32
+    ],
+    "colors": 21,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      3,
+      2,
+      28,
+      30
+    ],
+    "margin_ok": true
+  },
+  {
+    "id": "abyss-patroller",
+    "size": [
+      64,
+      64
+    ],
+    "colors": 27,
+    "alpha": [
+      0,
+      255
+    ],
+    "bbox": [
+      5,
+      2,
+      59,
+      62
+    ],
+    "margin_ok": true
+  }
+]

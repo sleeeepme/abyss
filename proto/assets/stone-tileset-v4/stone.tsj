@@ -1,0 +1,3736 @@
+{
+  "type": "tileset",
+  "version": "1.10",
+  "name": "stone-v4",
+  "tilewidth": 32,
+  "tileheight": 32,
+  "tilecount": 186,
+  "columns": 16,
+  "image": "tiles.png",
+  "imagewidth": 512,
+  "imageheight": 384,
+  "margin": 0,
+  "spacing": 0,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 4
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 5
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 6
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 7
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 8
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 9
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 10
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 11
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 12
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 13
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 14
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 15
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 16
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 17
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 18
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 19
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 20
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 21
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 22
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 23
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 24
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 25
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 26
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 27
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 28
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 29
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 30
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "floor"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 31
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 4
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 5
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 6
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 7
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 8
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 9
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 10
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 11
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 12
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 13
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 14
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 15
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 19
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 23
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 27
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 31
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 38
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 39
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 46
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 47
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 63
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 76
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 77
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 78
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 79
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 95
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 111
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 127
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 137
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 139
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 141
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 143
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 159
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 175
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 191
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 207
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 223
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 239
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 255
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "wall"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 4
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 5
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 6
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 7
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 8
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 9
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 10
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 11
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 12
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 13
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 14
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 15
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 19
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 23
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 27
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 31
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 38
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 39
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 46
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 47
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 63
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 76
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 77
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 78
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 79
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 95
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 111
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 127
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 137
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 139
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 141
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 143
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 159
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 175
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 191
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 207
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 223
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 239
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "moss"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 255
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 2
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 3
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 4
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 5
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 6
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 7
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 8
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 9
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 10
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 11
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 12
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 13
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 14
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 153,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 15
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 19
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 23
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 27
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 31
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 38
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 39
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 46
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 47
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 55
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 63
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 164,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 76
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 165,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 77
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 166,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 78
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 167,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 79
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 168,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 95
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 169,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 110
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 170,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 111
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 171,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 127
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 172,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 137
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 173,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 139
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 174,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 141
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 175,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 143
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 176,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 155
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 177,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 159
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 178,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 175
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 179,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 191
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 180,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 205
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 181,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 207
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 182,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 223
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 183,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 239
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 184,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "water"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 255
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 185,
+      "properties": [
+        {
+          "name": "kind",
+          "type": "string",
+          "value": "stairs"
+        },
+        {
+          "name": "mask",
+          "type": "int",
+          "value": 0
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    }
+  ]
+}

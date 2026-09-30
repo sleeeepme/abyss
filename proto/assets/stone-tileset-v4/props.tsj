@@ -1,0 +1,14 @@
+{
+  "type": "tileset",
+  "version": "1.10",
+  "name": "stone-props-v4",
+  "tilewidth": 64,
+  "tileheight": 64,
+  "tilecount": 12,
+  "columns": 4,
+  "image": "props.png",
+  "imagewidth": 256,
+  "imageheight": 192,
+  "margin": 0,
+  "spacing": 0
+}

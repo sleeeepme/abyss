@@ -1,0 +1,23 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "opaque_bounds": [
+    1,
+    6,
+    31,
+    28
+  ],
+  "body_size": [
+    30,
+    22
+  ],
+  "visible_colors": 13,
+  "alpha_values": [
+    0,
+    255
+  ],
+  "native_authored": true,
+  "resized_from_source": false
+}

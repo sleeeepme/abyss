@@ -1,0 +1,35 @@
+{
+  "source": "firewyrm-source.gif",
+  "source_size": [
+    660,
+    660
+  ],
+  "source_total_frames": 47,
+  "source_frames_used": [
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "frames": 15,
+  "logical_size": [
+    42,
+    42
+  ],
+  "duration_ms_each": 70,
+  "duration_ms_total": 1050,
+  "colors_used": 12,
+  "semi_alpha": 0,
+  "duplicate_frames": 4
+}

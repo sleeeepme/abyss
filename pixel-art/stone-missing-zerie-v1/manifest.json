@@ -1,0 +1,90 @@
+[
+  {
+    "id": "crawling-dead",
+    "name": "クロウリングデッド",
+    "size": 64,
+    "description": "An undead crawler with only a small dragging ruined lower torso and two massive long forearms. Huge knuckled hands planted forward toward the right, head low between shoulders, exposed warm ivory ribs, desaturated grey-green dead skin, ragged dusty ochre cloth. Readable bent elbows and finger clusters; no gore.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-f7a4663c-b0df-4b92-9c98-d883823c7f0d.png",
+    "initial_size": 32
+  },
+  {
+    "id": "fallen-company",
+    "name": "フォールンカンパニー",
+    "size": 64,
+    "description": "Exactly THREE small undead adventurers tightly grouped but with individually readable silhouettes, all facing right: front soldier with battered round shield and short spear, middle skeletal mail-clad fighter with broken sword, rear hooded dead scout with shortbow. Mismatched rusty equipment, grey-green skin, ivory faces, faded ochre/turquoise/burgundy cloth. A single compact tactical trio, feet aligned at slightly different levels, no extra characters.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-99197108-1642-42d1-beb8-c4619c81dfa0.png",
+    "initial_size": 64
+  },
+  {
+    "id": "praying-dead",
+    "name": "プレイングデッド",
+    "size": 64,
+    "description": "A kneeling undead pilgrim facing right, hunched large bowed skull under broken moss-brown hood, visibly CLASPED hands held before face, little elbows, folded knees under ragged robe. Thin ivory finger cluster, old copper prayer beads, hanging torn teal cloth. Quiet unsettling pose, dark recessed face, no staff, no weapons.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-dc078c71-f21e-471c-92eb-8c2ae9c266e2.png",
+    "initial_size": 32
+  },
+  {
+    "id": "dead-sprinter",
+    "name": "デッドスプリンター",
+    "size": 64,
+    "description": "An undead sprinter frozen in a crouched starting pose facing right. Large angular skull thrust forward, spine curved, one wiry arm forward and one back, prominent bent knees, bare bony feet, tattered short ochre tunic and dusty teal waistcloth. Grey pale dead skin, exposed ivory joints, rusty wraps. Compact dynamic silhouette, negative space separating arms and legs.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-ec34b2e4-c317-448d-8926-95d4429c53e8.png",
+    "initial_size": 32
+  },
+  {
+    "id": "bog-crawler",
+    "name": "ボグクロウラー",
+    "size": 64,
+    "description": "A low squat four-legged bog creature facing right, enormous pale webbed PALMS as its front limbs. Small flat amphibious head behind palms, waterlogged moss-green hunched back, mud-brown undersides, drooping dark wet strands. Show four short bent limbs with prominent front hand anatomy and tiny amber eye, no water scenery, no splashes.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-f13b92a2-f45f-4bfe-aafb-7504af462728.png",
+    "initial_size": 32
+  },
+  {
+    "id": "reed-serpent",
+    "name": "リードサーペント",
+    "size": 64,
+    "description": "A thin winding marsh serpent facing right, body coiled into compact asymmetric S with open negative spaces. Flattened reed-like head and snout, amber eye, desaturated olive scales, pale yellow-beige segmented belly, narrow broken reed frill along spine. One distinct head, tapered tail, attached dark strands twined round the lower coil.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-318603b0-52f8-4b56-ac70-291d3412974a.png",
+    "initial_size": 32
+  },
+  {
+    "id": "silt-jelly",
+    "name": "シルトジェリー",
+    "size": 64,
+    "description": "A floating murky jellyfish-like mud sac facing right. Asymmetric translucent dull jade bell with ochre silt clumps visible inside, very dark lower mouth opening and FIVE hanging dark olive tentacles of different lengths with clearly separated gaps. Thick wet contour, broad muted yellow-green top highlight, subtle floating pose without effects or ground shadow. No cute smile.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-799b3af6-9250-4ce2-a49a-401af68d40e4.png",
+    "initial_size": 32
+  },
+  {
+    "id": "bloat-grub",
+    "name": "ブロートグラブ",
+    "size": 64,
+    "description": "An inflated giant marsh grub facing right. Four distinct swollen rounded abdominal segments, heavy rear taper on left and small dark chitin head right with tiny mandibles. Sickly muted mustard-olive body, deep brown segment seams, cream-yellow bulging upper planes, three pairs tiny dark legs, a few dark vent spots as organized details. Broad heavy silhouette, no slime puddle.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-fdca3675-b60b-4c5d-a317-0a0061a79a94.png",
+    "initial_size": 32
+  },
+  {
+    "id": "the-miller",
+    "name": "粉挽き",
+    "size": 64,
+    "description": "A sinister dust spider facing right with SIX spindly jointed legs, but exactly ONE FRONT LEG replaced by a large circular GREY STONE MILLSTONE, visible hole and four carved radial grooves. Wide low grey-brown dusty body with small skull-like mandibles, thin bony tan limbs, little amber eye. Stone wheel is a dominant readable 14-pixel circle, organic angular legs contrast wheel. Only one millstone, no tools held, no dust particles.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-2f2312ed-3b12-4f5c-bb7e-ef08f37db164.png",
+    "initial_size": 64
+  },
+  {
+    "id": "the-hush",
+    "name": "無音",
+    "size": 64,
+    "description": "An enormous squat STONE BOAR facing right, heavy wedge head and blunt upturned tusk silhouettes, high rounded shoulders, short thick four legs, very short tail. Entire beast is a PURE SOLID NEAR-BLACK SILHOUETTE #15131c, WITHOUT eyes, markings, highlights, texture or internal lines, intentionally featureless supernatural absence. Recognition solely by highly characteristic boar contour and gaps between legs. No ground shadow.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-f6d0293e-07a5-45d0-a63e-8cea89e65814.png",
+    "initial_size": 64
+  },
+  {
+    "id": "abyss-patroller",
+    "name": "アビスの巡回者",
+    "size": 64,
+    "description": "A large ominous relentless dungeon patrol sentinel WALKING calmly to the right. Heavy hunched bell-shaped stone and black iron armor, narrow faceless visor slit glowing dull ember red, rounded huge shoulders, short thick marching legs, one enormous empty gauntlet hanging forward. Torn muted oxblood tabard, a few ash-ivory chipped edges. No weapon, no lantern, no attack pose. Oppressive compact silhouette, layered armor overlaps and clear feet, no spikes all over.",
+    "source": "/Users/daisukey.oshida/.codex/generated_images/01a09a02-dafe-7d62-a07b-e9a455892a82/exec-cc186262-05c6-4987-bd67-82e0ebfe5f70.png",
+    "initial_size": 64
+  }
+]

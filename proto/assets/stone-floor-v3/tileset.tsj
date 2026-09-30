@@ -1,0 +1,11 @@
+{
+  "type": "tileset",
+  "name": "cave-floor",
+  "tilewidth": 64,
+  "tileheight": 64,
+  "tilecount": 8,
+  "columns": 4,
+  "image": "tiles.png",
+  "imagewidth": 256,
+  "imageheight": 128
+}

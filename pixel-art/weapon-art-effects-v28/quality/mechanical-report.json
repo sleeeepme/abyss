@@ -1,0 +1,52 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v28/earth-wave",
+      "size": [
+        76,
+        23
+      ],
+      "frames": 8,
+      "duration_ms": 560,
+      "min_frame_ms": 70,
+      "colors": 6,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 2551,
+      "isolated_pixels_total": 9,
+      "changed_pixels_between_frames": [
+        56,
+        92,
+        280,
+        529,
+        191,
+        661,
+        116
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v28/flame",
+      "size": [
+        52,
+        30
+      ],
+      "frames": 8,
+      "duration_ms": 560,
+      "min_frame_ms": 70,
+      "colors": 6,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5755,
+      "isolated_pixels_total": 12,
+      "changed_pixels_between_frames": [
+        470,
+        688,
+        443,
+        650,
+        683,
+        754,
+        607
+      ],
+      "duplicate_transitions": 0
+    }
+  ]
+}

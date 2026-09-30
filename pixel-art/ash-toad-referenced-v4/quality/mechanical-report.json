@@ -1,0 +1,20 @@
+{
+  "assets": [
+    {
+      "path": "pixel-art/ash-toad-referenced-v4/ash-toad-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 12,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 403,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    }
+  ]
+}

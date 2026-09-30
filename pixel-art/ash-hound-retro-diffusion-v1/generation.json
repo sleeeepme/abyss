@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-23",
+  "request": {
+    "width": 32,
+    "height": 32,
+    "num_images": 1,
+    "prompt": "A small hostile Ash Hound for a dark fantasy dungeon game, side view facing right, standing in a low, forward-leaning idle pose.\n\nMatch the attached reference's proportions, pixel scale, outline treatment, and shading simplicity. A gaunt, low horizontal body, an oversized angular head with a broad square jaw, four short thin legs, a raised curled tail with a split tip, and three uneven exposed ribs. Preserve clear gaps beneath the belly and between the legs.\n\nCharcoal-gray fur, muted blue-violet shadows, pale ash-colored bones, a tiny dull amber eye, and a restrained rust-orange mouth. The head and jaw are the main focal point.\n\nCompact native-resolution pixel art with a continuous one-pixel dark outer outline, deliberate connected color clusters, and a limited twelve-color palette. Approximately 28 pixels wide and 19 pixels tall within the 32x32 canvas. Keep the entire tail, muzzle, and feet inside the canvas with clear margins.\n\nOne isolated creature on a transparent background. The gray in the reference is only a display background. No flames, armor, scenery, text, or detached particles.",
+    "prompt_style": "rd_pro__default",
+    "reference_images": [
+      "reference-rgb.png"
+    ],
+    "bypass_prompt_expansion": true,
+    "upscale_output_factor": 1,
+    "remove_bg": true,
+    "seed": 230923,
+    "upload_outputs": true
+  },
+  "response": {
+    "created_at": 1790121956,
+    "model": "rd_pro",
+    "balance_cost": 0.18,
+    "remaining_balance": 4.55,
+    "remaining_credits": 0,
+    "output_images_count": 0,
+    "base64_images_count": 1,
+    "downloadable_data": null,
+    "request_id": "3e304676-49d9-4705-8487-a9cd2c8132b3",
+    "outputs_retained_until": 1790208315,
+    "output_url_expires_at": 1790122856,
+    "warnings": null,
+    "delivery_status": "url",
+    "requested_images_count": 1,
+    "resolved_prompt_style": "rd_pro__default",
+    "used_input_image": false,
+    "reference_images_count": 1,
+    "used_extra_input_image": false,
+    "used_input_palette": false,
+    "used_strength": false,
+    "effective_timeout_seconds": 180
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "earth": {
+    "size": [
+      76,
+      23
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      70,
+      70,
+      80,
+      120,
+      90,
+      110,
+      170
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#302c28",
+        815
+      ],
+      [
+        "#4b4035",
+        579
+      ],
+      [
+        "#171b1a",
+        471
+      ],
+      [
+        "#725a42",
+        271
+      ],
+      [
+        "#ad8252",
+        270
+      ],
+      [
+        "#edc776",
+        145
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        46,
+        17
+      ],
+      [
+        18,
+        18
+      ]
+    ],
+    "near_duplicate_colors": []
+  },
+  "flame": {
+    "size": [
+      52,
+      30
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      70,
+      70,
+      90,
+      120,
+      90,
+      110,
+      170
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#c9342c",
+        1588
+      ],
+      [
+        "#541c2a",
+        1436
+      ],
+      [
+        "#8d2430",
+        912
+      ],
+      [
+        "#ef5a25",
+        670
+      ],
+      [
+        "#ff9c2e",
+        588
+      ],
+      [
+        "#ffe18a",
+        561
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        31,
+        7
+      ]
+    ],
+    "near_duplicate_colors": []
+  }
+}

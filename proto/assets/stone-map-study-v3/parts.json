@@ -1,0 +1,134 @@
+{
+  "paletteSource": "16-final-reference-palette.json",
+  "palette": [
+    "#332a2f",
+    "#e2c5ac",
+    "#608a9c",
+    "#5f5653",
+    "#ae904e",
+    "#9a9f9f",
+    "#837570",
+    "#4b4340",
+    "#c3a48b",
+    "#fbdbbe",
+    "#9d897c",
+    "#637077",
+    "#829097",
+    "#6d655a",
+    "#a08553",
+    "#d0b5a1",
+    "#534c48",
+    "#3e3935",
+    "#aa9383",
+    "#938278",
+    "#76888f",
+    "#58636b",
+    "#759dad",
+    "#989492",
+    "#4f575b",
+    "#c0876a",
+    "#797778",
+    "#7f6b4e",
+    "#88898b",
+    "#8f9ea2",
+    "#c3ac98",
+    "#453d3c",
+    "#b59763",
+    "#282429",
+    "#af7e61",
+    "#776f6a",
+    "#6892a5",
+    "#665b55",
+    "#474851",
+    "#6a7a83",
+    "#88754e",
+    "#b69c87",
+    "#f5d3b7",
+    "#917e55",
+    "#686d6b",
+    "#353131",
+    "#a8a7a3",
+    "#646463"
+  ],
+  "assets": {
+    "floor": {
+      "file": "floor.png",
+      "width": 256,
+      "height": 256,
+      "source": "whole",
+      "keyedBackground": false
+    },
+    "north-a": {
+      "file": "north-a.png",
+      "width": 384,
+      "height": 107,
+      "source": {
+        "left": 0,
+        "top": 0,
+        "width": 1254,
+        "height": 348
+      },
+      "keyedBackground": true
+    },
+    "north-b": {
+      "file": "north-b.png",
+      "width": 384,
+      "height": 101,
+      "source": {
+        "left": 0,
+        "top": 348,
+        "width": 1254,
+        "height": 330
+      },
+      "keyedBackground": true
+    },
+    "south": {
+      "file": "south.png",
+      "width": 384,
+      "height": 48,
+      "source": {
+        "left": 0,
+        "top": 775,
+        "width": 1254,
+        "height": 157
+      },
+      "keyedBackground": true
+    },
+    "low-ledge": {
+      "file": "low-ledge.png",
+      "width": 384,
+      "height": 59,
+      "source": {
+        "left": 0,
+        "top": 1015,
+        "width": 1254,
+        "height": 194
+      },
+      "keyedBackground": true
+    },
+    "west": {
+      "file": "west.png",
+      "width": 60,
+      "height": 204,
+      "source": {
+        "left": 87,
+        "top": 0,
+        "width": 377,
+        "height": 1283
+      },
+      "keyedBackground": true
+    },
+    "east": {
+      "file": "east.png",
+      "width": 71,
+      "height": 204,
+      "source": {
+        "left": 780,
+        "top": 0,
+        "width": 446,
+        "height": 1283
+      },
+      "keyedBackground": true
+    }
+  }
+}

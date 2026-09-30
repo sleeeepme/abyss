@@ -1,0 +1,56 @@
+{
+  "ASH HOUND / REFERENCE": {
+    "canvas": [
+      32,
+      32
+    ],
+    "bounds": [
+      2,
+      5,
+      30,
+      24
+    ],
+    "visible_size": [
+      28,
+      19
+    ],
+    "opaque": 357,
+    "colors": 12
+  },
+  "ASH TOAD / SMALLER": {
+    "canvas": [
+      32,
+      32
+    ],
+    "bounds": [
+      3,
+      4,
+      28,
+      21
+    ],
+    "visible_size": [
+      25,
+      17
+    ],
+    "opaque": 284,
+    "colors": 12
+  },
+  "DUST SPIDER / NEW": {
+    "canvas": [
+      32,
+      32
+    ],
+    "bounds": [
+      2,
+      2,
+      30,
+      21
+    ],
+    "visible_size": [
+      28,
+      19
+    ],
+    "opaque": 295,
+    "colors": 12
+  }
+}

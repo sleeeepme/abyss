@@ -1,8 +1,10 @@
 # キャラクターアート対応表
 
-最終更新: 2026-09-04
+最終更新: 2026-09-20（石の層トード・蜘蛛の採用稿を更新）
 
 キャラクター設定とスプライト画像の対応、および制作・承認・ゲーム反映の進行状況を管理する。
+
+石の層のTinyRPG系リデザインについて、採用稿・新規候補・残りの対象は [石の層の敵アート採用状況](STONE_ENEMY_ART_STATUS.md) を参照する。今回の通常敵は32×32原寸で制作しており、下記の旧16px制作ルールとは別の承認済みサイズ基準を用いる。
 
 ## 登録一覧
 
@@ -24,8 +26,8 @@
 | `ALLY-SUMMONER-001` | `summoner` | 召喚士 | 上位仲間 | ![召喚士・右向き](../proto/assets/sprites/allies/summoner/right-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/summoner/right-idle-v1.png) | 右・待機1 | 承認済み | 未反映 | 青緑の重ねフードとローブ、護符付きの杖、左後方の使い魔 |
 | `ALLY-ARCHMAGE-001` | `archmage` | 大魔導士 | 上位仲間 | ![大魔導士・右向きv2](../proto/assets/sprites/allies/archmage/right-idle-v2-4x.png) | [16×16 PNG](../proto/assets/sprites/allies/archmage/right-idle-v2.png) | 右・待機1 | 承認済み | 未反映 | 腰を深く曲げた老魔術師。白眉・白髪・長い白髭、魔力球付きの杖 |
 | `ENEMY-BEAST-RUSH-001` | `beast / rush` | アッシュハウンド | 敵 | ![アッシュハウンド・右向きv5](../proto/assets/sprites/enemies/ash-hound/right-idle-v5-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-hound/right-idle-v5.png) | 右・待機1 | 承認済み | 未反映 | 別タスクでユーザーがレタッチし、最新版に指定した64×64画像を採用。透明画素を正規化して16×16へ復元し、可視画素は元画像と完全一致 |
-| `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダー・右向きv2](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-v2-draft.png) | 右・待機1 | 承認済み | 未反映 | 胴を低くし、2〜3pxの短い8脚相当と黄白の眼・射出口を維持 |
-| `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトード・右向きv3](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 苔灰色の低い体、大きな金眼、水平口、丸い折れ後脚を優先し、カエルの横姿としてゼロベース再設計 |
+| `ENEMY-BEAST-RANGE-001` | `beast / range` | ダストスパイダー | 敵 | ![ダストスパイダーv9](../proto/assets/sprites/enemies/dust-spider/right-idle-tinyrpg-v9-8x.png) | [32×32 PNG](../proto/assets/sprites/enemies/dust-spider/right-idle-tinyrpg-v9.png) | 右・待機1 | 暫定承認（2026-09-20） | 未反映 | TinyRPG系v9。可視23×15px・8色。ユーザー「蜘蛛も一旦それで」 |
+| `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトードv10](../proto/assets/sprites/enemies/ash-toad/right-idle-tinyrpg-v10-8x.png) | [32×32 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-tinyrpg-v10.png) | 右・待機1 | 承認済み（2026-09-20） | 未反映 | TinyRPG系v10。可視22×15px・8色。v8の造形・全輪郭を維持して色面を整理。ユーザー「今回の稿で採用」 |
 | `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv3](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 選択された参考案を基準に、高い灰色の肩、茶色い耳・短脚、淡い眼、箱型の鼻と大きな上向き牙を整理 |
 | `ENEMY-MOSS-BALL-001` | `moss-ball` | 苔玉 | 敵 | ![苔玉・正面v1](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1.png) | 正面・待機1 | 承認済み | ゲーム反映済み | ユーザー指定の最新v6を採用。段状の頭、1pxの両目、短い腕、左右非対称の足、必要箇所のみの濃紺アウトライン |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
@@ -75,7 +77,7 @@
 | 召喚士 | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 大魔導士 | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | アッシュハウンド | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
-| ダストスパイダー | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
+| ダストスパイダー | 暫定承認（v9） | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | アッシュトード | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | ストーンボア | 承認済み | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 | 未着手 |
 | 苔玉 | 承認済み（正面） | 未着手 | 不要 | 未着手 | 未着手 | 未着手 | 未着手 |
@@ -104,6 +106,8 @@
 | ゲーム反映済み | 実際の描画処理から参照されている |
 
 ## 更新履歴
+
+- 2026-09-20: アッシュトードv10を採用、ダストスパイダーv9を暫定採用として原寸画像を登録。ボグ系4体の新規候補と、石の層全体の採用状況を別表に追加。ゲームへの接続は未実施。
 
 - 2026-08-24: 一覧を作成。冒険者、剣士、アッシュハウンドを登録。
 - 2026-08-24: 盗賊、僧侶、狩人の右向き・待機1の初稿を登録。

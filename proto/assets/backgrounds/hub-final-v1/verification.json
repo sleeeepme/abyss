@@ -1,0 +1,13 @@
+{
+  "frames": 72,
+  "fps": 12,
+  "durationSeconds": 6,
+  "endpointExactMatch": true,
+  "webpPages": 72,
+  "webpDelayTotalMs": 6000,
+  "native": [
+    171,
+    300
+  ],
+  "scale": 4
+}

@@ -1,0 +1,161 @@
+{
+  "earth-wave": {
+    "size": [
+      184,
+      56
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      90,
+      70,
+      70,
+      80,
+      110,
+      90,
+      100,
+      150
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#17231d",
+        5424
+      ],
+      [
+        "#514b3c",
+        3258
+      ],
+      [
+        "#756246",
+        2385
+      ],
+      [
+        "#a98554",
+        807
+      ],
+      [
+        "#343d35",
+        216
+      ],
+      [
+        "#d7bd78",
+        52
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "flame": {
+    "size": [
+      128,
+      80
+    ],
+    "frames": 8,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      70,
+      70,
+      90,
+      110,
+      90,
+      100,
+      150
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#9a2930",
+        8445
+      ],
+      [
+        "#5d1f2b",
+        5646
+      ],
+      [
+        "#d8422e",
+        5425
+      ],
+      [
+        "#f4742d",
+        2161
+      ],
+      [
+        "#ffb23f",
+        2081
+      ],
+      [
+        "#fff0a0",
+        1008
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [],
+    "near_duplicate_colors": []
+  },
+  "raging-upper": {
+    "size": [
+      112,
+      116
+    ],
+    "frames": 6,
+    "layers": [
+      "main"
+    ],
+    "durations": [
+      100,
+      50,
+      50,
+      100,
+      80,
+      140
+    ],
+    "tags": {},
+    "colors_used": 6,
+    "palette_size": 6,
+    "top_colors": [
+      [
+        "#c6e3e8",
+        1070
+      ],
+      [
+        "#f8fff4",
+        1020
+      ],
+      [
+        "#50677a",
+        641
+      ],
+      [
+        "#83aabc",
+        351
+      ],
+      [
+        "#e6c85e",
+        110
+      ],
+      [
+        "#fff0a0",
+        47
+      ]
+    ],
+    "semi_alpha_px": 0,
+    "isolated_px": [
+      [
+        91,
+        5
+      ]
+    ],
+    "near_duplicate_colors": []
+  }
+}

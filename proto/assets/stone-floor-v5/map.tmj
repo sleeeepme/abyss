@@ -1,0 +1,39 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "width": 4,
+  "height": 2,
+  "tilewidth": 32,
+  "tileheight": 32,
+  "infinite": false,
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "source": "tileset.tsj"
+    }
+  ],
+  "layers": [
+    {
+      "type": "tilelayer",
+      "name": "Floor",
+      "width": 4,
+      "height": 2,
+      "x": 0,
+      "y": 0,
+      "opacity": 1,
+      "visible": true,
+      "data": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    }
+  ]
+}

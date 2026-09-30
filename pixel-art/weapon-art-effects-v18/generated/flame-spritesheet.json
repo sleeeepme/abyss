@@ -1,0 +1,192 @@
+{
+ "frames": [
+  {
+   "filename": "frame_0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 100
+  },
+  {
+   "filename": "frame_1",
+   "frame": {
+    "x": 45,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 70
+  },
+  {
+   "filename": "frame_2",
+   "frame": {
+    "x": 90,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 70
+  },
+  {
+   "filename": "frame_3",
+   "frame": {
+    "x": 135,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 90
+  },
+  {
+   "filename": "frame_4",
+   "frame": {
+    "x": 180,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 110
+  },
+  {
+   "filename": "frame_5",
+   "frame": {
+    "x": 225,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 90
+  },
+  {
+   "filename": "frame_6",
+   "frame": {
+    "x": 270,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 100
+  },
+  {
+   "filename": "frame_7",
+   "frame": {
+    "x": 315,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 45,
+    "h": 28
+   },
+   "sourceSize": {
+    "w": 45,
+    "h": 28
+   },
+   "duration": 150
+  }
+ ],
+ "meta": {
+  "app": "pixelstudio",
+  "version": "1.0.0",
+  "image": "flame-spritesheet.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 360,
+   "h": 28
+  },
+  "scale": "1",
+  "frameTags": []
+ }
+}

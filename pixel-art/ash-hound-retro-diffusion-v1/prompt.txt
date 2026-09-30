@@ -1,0 +1,9 @@
+A small hostile Ash Hound for a dark fantasy dungeon game, side view facing right, standing in a low, forward-leaning idle pose.
+
+Match the attached reference's proportions, pixel scale, outline treatment, and shading simplicity. A gaunt, low horizontal body, an oversized angular head with a broad square jaw, four short thin legs, a raised curled tail with a split tip, and three uneven exposed ribs. Preserve clear gaps beneath the belly and between the legs.
+
+Charcoal-gray fur, muted blue-violet shadows, pale ash-colored bones, a tiny dull amber eye, and a restrained rust-orange mouth. The head and jaw are the main focal point.
+
+Compact native-resolution pixel art with a continuous one-pixel dark outer outline, deliberate connected color clusters, and a limited twelve-color palette. Approximately 28 pixels wide and 19 pixels tall within the 32x32 canvas. Keep the entire tail, muzzle, and feet inside the canvas with clear margins.
+
+One isolated creature on a transparent background. The gray in the reference is only a display background. No flames, armor, scenery, text, or detached particles.

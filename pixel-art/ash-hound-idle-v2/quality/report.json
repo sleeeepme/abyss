@@ -1,0 +1,282 @@
+{
+  "frames": [
+    {
+      "frame": 0,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "components_8way": [
+        267
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 1,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "components_8way": [
+        270
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 2,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "components_8way": [
+        274
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 3,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "components_8way": [
+        282
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 4,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "components_8way": [
+        274
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 5,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "components_8way": [
+        268
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    },
+    {
+      "frame": 6,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "components_8way": [
+        267
+      ],
+      "colors": 12,
+      "limb_checks": {
+        "far_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "far_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_hind": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        },
+        "near_fore": {
+          "limb_connected": true,
+          "connected_without_head": true,
+          "root_overlaps_torso": true
+        }
+      }
+    }
+  ],
+  "old_component_sizes": {
+    "0": [
+      280
+    ],
+    "1": [
+      275,
+      7
+    ],
+    "2": [
+      268,
+      10,
+      7
+    ],
+    "3": [
+      286,
+      7
+    ],
+    "4": [
+      268,
+      10,
+      7
+    ],
+    "5": [
+      270,
+      10
+    ],
+    "6": [
+      280
+    ]
+  },
+  "feet_fixed": true,
+  "rest_mouth_exact": true,
+  "duration_ms": 1780
+}

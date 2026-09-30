@@ -1,0 +1,25 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "bounds": [
+    2,
+    7,
+    30,
+    26
+  ],
+  "opaque": 333,
+  "colors": 12,
+  "alpha": [
+    0,
+    255
+  ],
+  "method": [
+    "silhouette",
+    "strong shadow",
+    "refined values",
+    "outline with lit upper edge",
+    "color adjustment"
+  ]
+}

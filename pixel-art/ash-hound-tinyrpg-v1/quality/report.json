@@ -1,0 +1,25 @@
+{
+  "canvas": [
+    32,
+    32
+  ],
+  "visible_bounds": [
+    2,
+    5,
+    30,
+    24
+  ],
+  "visible_colors": 12,
+  "alpha_values": [
+    0,
+    255
+  ],
+  "native_authored": true,
+  "resized_from_source": false,
+  "selected_candidate": "B",
+  "identity_markers": [
+    "gaunt lifted belly",
+    "exposed uneven ribs",
+    "single amber eye"
+  ]
+}

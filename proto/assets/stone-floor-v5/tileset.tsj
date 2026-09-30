@@ -1,0 +1,12 @@
+{
+  "type": "tileset",
+  "version": "1.10",
+  "name": "composed-cave-floor",
+  "tilewidth": 32,
+  "tileheight": 32,
+  "tilecount": 8,
+  "columns": 4,
+  "image": "tiles.png",
+  "imagewidth": 128,
+  "imageheight": 64
+}

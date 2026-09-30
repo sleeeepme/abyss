@@ -1,0 +1,20 @@
+{
+  "assets": [
+    {
+      "path": "pixel-art/ash-toad-concept-pipeline-v2/04-ash-toad-final-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 11,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 554,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    }
+  ]
+}

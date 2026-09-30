@@ -1,0 +1,36 @@
+{
+  "assets": [
+    {
+      "path": "pixel-art/tinyrpg-native-study-v1/demon-local-edit-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 21,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 208,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "pixel-art/tinyrpg-native-study-v1/blood-local-edit-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "frames": 1,
+      "duration_ms": 0,
+      "min_frame_ms": 0,
+      "colors": 8,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 189,
+      "isolated_pixels_total": 0,
+      "changed_pixels_between_frames": [],
+      "duplicate_transitions": 0
+    }
+  ]
+}

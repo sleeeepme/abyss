@@ -1,0 +1,95 @@
+{
+  "source": "firewyrm-source.gif",
+  "source_size": [
+    660,
+    660
+  ],
+  "source_total_frames": 47,
+  "source_frames_used": [
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "frames": 15,
+  "logical_size": [
+    46,
+    42
+  ],
+  "direction_cell_sizes": {
+    "right": [
+      46,
+      46
+    ],
+    "up": [
+      46,
+      46
+    ],
+    "left": [
+      46,
+      46
+    ],
+    "down": [
+      46,
+      46
+    ],
+    "up_right": [
+      66,
+      66
+    ],
+    "down_right": [
+      66,
+      66
+    ],
+    "down_left": [
+      66,
+      66
+    ],
+    "up_left": [
+      66,
+      66
+    ]
+  },
+  "directions": [
+    "right",
+    "up",
+    "left",
+    "down",
+    "up_right",
+    "down_right",
+    "down_left",
+    "up_left"
+  ],
+  "units": [
+    "throat",
+    "body",
+    "head"
+  ],
+  "recomposition_mismatched_pixels": 0,
+  "duration_ms_each": 70,
+  "duration_ms_total": 1050,
+  "colors_used": 5,
+  "semi_alpha": 0,
+  "duplicate_frames": 4,
+  "left_mirror_mismatched_pixels": 0,
+  "vertical_symmetry_mismatched_pixels": {
+    "up": 0,
+    "down": 0
+  },
+  "diagonal_mirror_mismatched_pixels": {
+    "up": 0,
+    "down": 0
+  },
+  "change": "eight directions including pivot-correct diagonals; glow is baked into GIF over the flame; enemy body emits instead of showing a rectangle"
+}

@@ -1,0 +1,89 @@
+{
+  "frame_size": [
+    32,
+    32
+  ],
+  "duration_ms": 1780,
+  "frames": [
+    {
+      "frame": 0,
+      "duration_ms": 520,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 1,
+      "duration_ms": 160,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 2,
+      "duration_ms": 180,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 3,
+      "duration_ms": 240,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 4,
+      "duration_ms": 160,
+      "bbox": [
+        2,
+        4,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 5,
+      "duration_ms": 180,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "colors": 12
+    },
+    {
+      "frame": 6,
+      "duration_ms": 340,
+      "bbox": [
+        2,
+        5,
+        30,
+        21
+      ],
+      "colors": 12
+    }
+  ],
+  "feet_fixed": true,
+  "rest_face_matches_approved": true,
+  "native_authored": true
+}

@@ -1,0 +1,108 @@
+{
+  "candidates": {
+    "A": {
+      "bounds": [
+        2,
+        8,
+        31,
+        27
+      ],
+      "size": [
+        29,
+        19
+      ],
+      "opaque": 351,
+      "density": 0.637
+    },
+    "B": {
+      "bounds": [
+        2,
+        9,
+        31,
+        27
+      ],
+      "size": [
+        29,
+        18
+      ],
+      "opaque": 315,
+      "density": 0.603
+    },
+    "C": {
+      "bounds": [
+        2,
+        8,
+        31,
+        28
+      ],
+      "size": [
+        29,
+        20
+      ],
+      "opaque": 343,
+      "density": 0.591
+    },
+    "D": {
+      "bounds": [
+        2,
+        9,
+        30,
+        27
+      ],
+      "size": [
+        28,
+        18
+      ],
+      "opaque": 321,
+      "density": 0.637
+    },
+    "E": {
+      "bounds": [
+        2,
+        8,
+        31,
+        29
+      ],
+      "size": [
+        29,
+        21
+      ],
+      "opaque": 336,
+      "density": 0.552
+    },
+    "F": {
+      "bounds": [
+        3,
+        9,
+        30,
+        27
+      ],
+      "size": [
+        27,
+        18
+      ],
+      "opaque": 301,
+      "density": 0.619
+    }
+  },
+  "selected": "C",
+  "final": {
+    "canvas": [
+      32,
+      32
+    ],
+    "bounds": [
+      2,
+      8,
+      31,
+      28
+    ],
+    "opaque": 366,
+    "colors": 12,
+    "alpha": [
+      0,
+      255
+    ]
+  },
+  "method": "native 32x32 silhouette-first; no concept art, resize, generated outline, or high-resolution source"
+}

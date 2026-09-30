@@ -1,0 +1,20 @@
+{
+  "request": {
+    "tool_id": "color_reducer",
+    "input_image": "ash-hound-rd-02-raw.png",
+    "color_count": 12,
+    "dither_strength": 0
+  },
+  "response": {
+    "tool_id": "color_reducer",
+    "inference_id": "inf_oKa0gOxYL13Z8Qb38Bvwnp7eDNvBX9kE",
+    "balance_cost": 0,
+    "credit_cost": 0,
+    "charged": false,
+    "remaining_balance": 4.370000000000001,
+    "remaining_credits": null,
+    "output_urls": [
+      "https://da8ztllw6by0f.cloudfront.net/3cb73fc504ab5cf74fa79725b3a170ba.png"
+    ]
+  }
+}

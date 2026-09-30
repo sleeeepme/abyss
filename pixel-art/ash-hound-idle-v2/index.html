@@ -1,0 +1,25 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>アッシュハウンド — 接続修正</title>
+<style>body{background:#24232a;color:#ebe8e0;font:15px system-ui;margin:32px}h1{font-size:22px}main{display:flex;gap:20px;flex-wrap:wrap}.card{background:#515055;border-radius:12px;padding:16px}canvas{width:256px;height:256px;image-rendering:pixelated}.native{width:32px;height:32px;display:block}button{padding:10px 20px;border-radius:8px;border:0;margin:16px 8px 0 0}p{color:#d7d1c7;max-width:850px}a{color:#f3c892}#status{font-variant-numeric:tabular-nums}label{display:inline-block;margin:12px 8px 0 0}</style>
+<h1>アッシュハウンド — 脚と胴の接続修正</h1>
+<p>足先を固定し、肩・股関節から脚を描き直しました。頭を外した表示でも、脚が胸・腰につながるか確認できます。</p>
+<main><section class="card"><div>修正前</div><canvas id="old" width="32" height="32"></canvas></section><section class="card"><div>修正後</div><canvas id="motion" width="32" height="32"></canvas><canvas class="native" id="native" width="32" height="32"></canvas></section><section class="card"><div id="audit-title">接続確認：頭を非表示</div><canvas id="audit" width="32" height="32"></canvas></section></main>
+<button id="toggle">一時停止</button><button id="step">次のフレーム</button><span id="status">読み込み中</span><br>
+<label><input type="checkbox" id="anatomy"> 接続確認を部位の色分けにする</label>
+<p>色分け：緑＝胴、赤＝頭・顎、紫＝尾、黄・橙＝手前の脚、青＝奥の脚。明るい点は付け根と接地位置です。</p>
+<p><a href="ash-hound-idle-32.gif">原寸透過GIF</a> · <a href="ash-hound-idle-sheet.png">スプライトシート</a> · <a href="quality/report.json">フレームごとの接続検査</a></p>
+<script>
+const durations=[520,160,180,240,160,180,340],total=durations.reduce((a,b)=>a+b,0);
+const ctx=['old','motion','native','audit'].map(id=>document.getElementById(id).getContext('2d'));ctx.forEach(c=>c.imageSmoothingEnabled=false);
+let running=true,index=0,started=0,elapsed=0,loops=0,frames=[],old=[],ghost=[],anatomy=[];
+const load=src=>new Promise((ok,no)=>{const im=new Image;im.onload=()=>ok(im);im.onerror=no;im.src=src});
+const batch=(prefix)=>Promise.all(durations.map((_,i)=>load(`${prefix}${String(i).padStart(2,'0')}.png`)));
+function draw(c,im){c.clearRect(0,0,32,32);c.drawImage(im,0,0)}
+function render(){draw(ctx[0],old[index]);draw(ctx[1],frames[index]);draw(ctx[2],frames[index]);const colored=document.getElementById('anatomy').checked;draw(ctx[3],(colored?anatomy:ghost)[index]);document.getElementById('audit-title').textContent=colored?'接続確認：部位の色分け':'接続確認：頭を非表示';document.getElementById('status').textContent=`${index+1}/7 · ${durations[index]}ms · ${loops}ループ`;}
+Promise.all([batch('frames/'),batch('../ash-hound-idle-v1/frames/'),batch('frames/without-head-'),batch('frames/anatomy-')]).then(([n,o,g,a])=>{
+frames=n;old=o;ghost=g;anatomy=a;started=performance.now();
+function tick(t){if(running){elapsed=t-started;loops=Math.floor(elapsed/total);let local=elapsed%total;index=0;while(local>=durations[index]){local-=durations[index++];}render();}requestAnimationFrame(tick);}requestAnimationFrame(tick);
+});
+document.getElementById('toggle').onclick=()=>{running=!running;if(running)started=performance.now()-elapsed;document.getElementById('toggle').textContent=running?'一時停止':'再生';};
+document.getElementById('step').onclick=()=>{running=false;index=(index+1)%durations.length;elapsed=durations.slice(0,index).reduce((a,b)=>a+b,0);document.getElementById('toggle').textContent='再生';render();};
+document.getElementById('anatomy').onchange=render;
+</script></html>

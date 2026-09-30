@@ -1,0 +1,66 @@
+{
+  "assets": [
+    {
+      "path": "proto/assets/effects/weapon-art-v42/flame-breath/up",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5684,
+      "isolated_pixels_total": 16,
+      "changed_pixels_between_frames": [
+        276,
+        514,
+        444,
+        420,
+        386,
+        458,
+        444,
+        420,
+        386,
+        444,
+        362,
+        278,
+        128,
+        114
+      ],
+      "duplicate_transitions": 0
+    },
+    {
+      "path": "proto/assets/effects/weapon-art-v42/flame-breath/down",
+      "size": [
+        46,
+        46
+      ],
+      "frames": 15,
+      "duration_ms": 1050,
+      "min_frame_ms": 70,
+      "colors": 5,
+      "semi_alpha_pixels": 0,
+      "opaque_pixels_total": 5684,
+      "isolated_pixels_total": 16,
+      "changed_pixels_between_frames": [
+        276,
+        514,
+        444,
+        420,
+        386,
+        458,
+        444,
+        420,
+        386,
+        444,
+        362,
+        278,
+        128,
+        114
+      ],
+      "duplicate_transitions": 0
+    }
+  ]
+}

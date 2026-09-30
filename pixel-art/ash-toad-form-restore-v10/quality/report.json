@@ -1,0 +1,14 @@
+{
+  "source": "/Users/daisukey.oshida/Documents/abyss/pixel-art/stone-small-enemies-v8/ash-toad-32.png",
+  "canvas": [
+    32,
+    32
+  ],
+  "visible_size": [
+    22,
+    15
+  ],
+  "colors": 8,
+  "alpha_identical_to_v8": true,
+  "all_outline_and_internal_ink_pixels_identical_to_v8": true
+}
