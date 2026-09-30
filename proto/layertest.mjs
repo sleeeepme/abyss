@@ -602,4 +602,21 @@ R.dripsDoNotRipple = await pg.evaluate(async ()=>{
   return {drips, pushes, wave, ok: drips>0 && pushes===0 && wave===0};
 });
 
+/* 発熱対策：地形は2フレームに1回だけ描き直し、間は前の絵をずらして貼る。
+   歩いても貼り直しで端が欠けない（全部描き直した絵との差が端でほぼ無い）。 */
+R.terrainHalfRate = await pg.evaluate(()=>{
+  TH.run(9,{seed:12}); setScreen('game'); W.enemies=[]; CAVE.noFlicker=true; stepSim(.2,{draw:true});
+  const cv=document.querySelector('canvas'), c2=cv.getContext('2d'); let reused=0, worstEdge=0;
+  for(const [dx,dy] of [[.06,0],[-.06,0],[0,.06],[0,-.06]]){
+    CAVE.halfRate=false; draw(); CAVE.halfRate=true; const s0=CAVE.skipped||0;
+    P.x+=dx; P.y+=dy; draw(); if((CAVE.skipped||0)>s0) reused++;
+    const A=c2.getImageData(0,0,cv.width,cv.height).data; CAVE.halfRate=false; draw();
+    const B=c2.getImageData(0,0,cv.width,cv.height).data; const W_=cv.width, H_=cv.height; let e=0,n=0;
+    for(let y=Math.floor(H_*.2);y<H_*.8;y+=2) for(const x of [0,1,W_-2,W_-1]){ const i=(y*W_+x)*4; if(Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2])>60) e++; n++; }
+    worstEdge=Math.max(worstEdge,e/n);
+  }
+  CAVE.halfRate=false; CAVE.noFlicker=false;
+  return {reused, worstEdge:+worstEdge.toFixed(3), ok: reused===4 && worstEdge<.05};
+});
+
 await done(b, errs, R);

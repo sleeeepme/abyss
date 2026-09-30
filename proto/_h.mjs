@@ -45,6 +45,9 @@ export async function install(pg){
     /* 生成の塩を落としておく。既定でも 0 だが、
        「テストは塩を持たない」を明示しておく（本編は名前を決めた瞬間に引く）。 */
     S.salt = 0;
+    /* 洞窟版は本番では地形を2フレームに1回だけ描き直す（発熱対策）。テストは「描いた直後の画面」を
+       読むので、毎回描き直させる（間引きそのものは layertest の terrainHalfRate で見る）。 */
+    if(window.CAVE) CAVE.halfRate = false;
     window.TH = {
       /* 潜りを1つ始める。**S.run を手で作らないための唯一の入口。**
          seed を渡すと生成が固定される（startRun が S.runs を ++ するので -1 して渡す）。
