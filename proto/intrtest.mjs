@@ -117,15 +117,15 @@ R.intrSpawn = await pg.evaluate(()=>{
   TH.run(1, {seed:7}); TH.floor(14);
   const before = W.enemies.length;
   // 予兆が出るところまで時計を進める
-  S.run.elapsed = INTRUDER_AFTER - INTRUDER_WARN_LEAD - 1;
+  S.run.darkT = INTRUDER_AFTER - INTRUDER_WARN_LEAD - 1;
   tickIntruder();
   const warnedEarly = !!S.run.intrWarned;
-  S.run.elapsed = INTRUDER_AFTER - INTRUDER_WARN_LEAD + 0.5;
+  S.run.darkT = INTRUDER_AFTER - INTRUDER_WARN_LEAD + 0.5;
   tickIntruder();
   const warned = !!S.run.intrWarned;
   const spawnedAtWarn = !!liveIntruder();
   // 出現時刻へ
-  S.run.elapsed = INTRUDER_AFTER + 0.1;
+  S.run.darkT = INTRUDER_AFTER + 0.1;
   tickIntruder();
   const e = liveIntruder();
   const dist = e ? Math.hypot(e.x-P.x, e.y-P.y) : -1;
@@ -151,7 +151,7 @@ R.intrGate = await pg.evaluate(()=>{
   const tryAt=(depth, killBoss)=>{
     TH.run(1, {seed:11}); TH.floor(depth);
     if(killBoss) S.run.bossAlive=false;      // ボスを倒した状態にする
-    S.run.elapsed = INTRUDER_AFTER + 5;
+    S.run.darkT = INTRUDER_AFTER + 5;
     tickIntruder();
     return !!liveIntruder();
   };
@@ -170,7 +170,7 @@ R.intrIgnoresAllies = await pg.evaluate(()=>{
   S.hero.party=[];
   const a=makeAlly(16, S.hero); a.hpNow=allyStats(a).maxHp;
   S.hero.party.push(a);
-  S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
   const e=liveIntruder();
   // 仲間を侵入者のすぐ隣に、主人公は遠くに置く
   a.x = e.x + 0.8; a.y = e.y;
@@ -190,7 +190,7 @@ R.intrIgnoresAllies = await pg.evaluate(()=>{
 R.intrChases = await pg.evaluate(()=>{
   TH.run(1, {seed:17}); TH.floor(18);
   S.hero.party=[];
-  S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
   const e=liveIntruder();
   const aggro = e.arch.aggro;
   const d0 = Math.hypot(e.x-P.x, e.y-P.y);
@@ -228,7 +228,7 @@ R.intrPathing = await pg.evaluate(()=>{
   for(let seed=40; seed<70; seed++){
     TH.run(1, {seed}); TH.floor(17);
     S.hero.party=[];
-    S.run.elapsed=INTRUDER_AFTER+0.1; tickIntruder();
+    S.run.darkT=INTRUDER_AFTER+0.1; tickIntruder();
     const e=liveIntruder(); if(!e) continue;
     n++;
     const d0=Math.hypot(e.x-P.x, e.y-P.y);
@@ -258,7 +258,7 @@ R.intrOutrun = await pg.evaluate(()=>{
   TH.run(1, {seed:19}); S.upg={}; TH.floor(21);                       // ボス階（20）を避ける
   S.hero.party=[];
   W.enemies = [];                       // 逃走そのものだけを見たいので他の敵は退ける
-  S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
   const e=liveIntruder();
   // 広い床の上で、侵入者から見て真っ直ぐ遠ざかる向きに走る
   P.x = W.fl.start.cx+0.5; P.y = W.fl.start.cy+0.5;
@@ -281,7 +281,7 @@ R.intrOutrun = await pg.evaluate(()=>{
 R.intrNoEscapeByDescent = await pg.evaluate(()=>{
   TH.run(1, {seed:23}); TH.floor(22);
   S.hero.party=[];
-  S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
   const had = !!liveIntruder();
 
   enterFloor(23);                                   // 降りる
@@ -290,10 +290,10 @@ R.intrNoEscapeByDescent = await pg.evaluate(()=>{
   const graceLeft  = intruderComingIn();            // 買えたのは猶予ぶんだけ
 
   // 猶予のあいだは出ない
-  S.run.elapsed += INTRUDER_GRACE - 1; tickIntruder();
+  S.run.darkT += INTRUDER_GRACE - 1; tickIntruder();
   const quietInGrace = !liveIntruder();
   // 猶予が切れれば追いついてくる
-  S.run.elapsed += 2; tickIntruder();
+  S.run.darkT += 2; tickIntruder();
   const caughtUp = !!liveIntruder();
 
   return {had, bodyGone, stillAwake, graceLeft:+(graceLeft||0).toFixed(1),
@@ -308,16 +308,16 @@ R.intrClearedByReturn = await pg.evaluate(()=>{
   S.runs=24; S.hero=newHero(); S.gold=0; S.stash=[]; S.ore={}; S.carry=[];
   TH.run(1, {seed:24}); TH.floor(25);   // 帰還ポータル階
   S.hero.party=[];
-  S.run.elapsed = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 10; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 10; tickIntruder();
   const beforeAwake = intruderAwake();
   const beforeTier  = intruderTier();
   returnToTown();                                   // 帰る
   const runCleared = !S.run;
   startRun(1);                                      // 潜り直す
   const afterAwake = intruderAwake();
-  const afterElapsed = S.run.elapsed;
+  const afterElapsed = S.run.darkT;
   const afterNext = S.run.intrNext;
-  S.run.elapsed = INTRUDER_AFTER - 1; tickIntruder();
+  S.run.darkT = INTRUDER_AFTER - 1; tickIntruder();
   const stillQuiet = !liveIntruder();
   return {beforeAwake, beforeTier, runCleared,
           clearedAfterReturn: !afterAwake, afterElapsed, afterNext, stillQuiet,
@@ -332,7 +332,7 @@ R.intrTiers = await pg.evaluate(()=>{
   const pms = stats(S.hero).ms;
   const rows=[];
   for(let t=0;t<=INTRUDER_TIER_MAX+1;t++){
-    S.run.elapsed = INTRUDER_AFTER + t*INTRUDER_TIER_EVERY + 1;
+    S.run.darkT = INTRUDER_AFTER + t*INTRUDER_TIER_EVERY + 1;
     S.run.intruder=null;
     const tier=intruderTier();
     const e=makeIntruder(W.fl, 28);
@@ -360,7 +360,7 @@ R.intrTiers = await pg.evaluate(()=>{
 R.intrKill = await pg.evaluate(()=>{
   TH.run(1, {seed:29}); TH.floor(26);
   S.hero.party=[];
-  S.run.elapsed = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 1;   // 段階Ⅰの状態で
+  S.run.darkT = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 1;   // 段階Ⅰの状態で
   tickIntruder();
   const e=liveIntruder();
   const tierBefore=intruderTier();
@@ -379,8 +379,8 @@ R.intrKill = await pg.evaluate(()=>{
   const stillAwake = intruderAwake();          // 倒しても状態は解けない
   const tierAfter = intruderTier();            // 段階も下がらない
   // 90秒しか買えていない
-  const bought = S.run.intrNext - S.run.elapsed;
-  S.run.elapsed = S.run.intrNext + 0.1; tickIntruder();
+  const bought = S.run.intrNext - S.run.darkT;
+  S.run.darkT = S.run.intrNext + 0.1; tickIntruder();
   const second = !!liveIntruder();
   const secondTier = second ? liveIntruder().tier : -1;
   return {maxHp:hp, spGained, shardOnFloor, items, boonOpen, cleared,
@@ -398,11 +398,11 @@ R.hud = await pg.evaluate(()=>{
   const fails=[];
   try{
     TH.run(1, {seed:31}); TH.floor(28);
-    S.run.elapsed = INTRUDER_AFTER - INTRUDER_WARN_LEAD + 1; tickIntruder();
+    S.run.darkT = INTRUDER_AFTER - INTRUDER_WARN_LEAD + 1; tickIntruder();
     updateHUD();
     const warnTxt = el('intruder').textContent;
     const warnShown = el('intruder').style.display==='block';
-    S.run.elapsed = INTRUDER_AFTER + 0.1; tickIntruder();
+    S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
     const e=liveIntruder();
     W.seen.forEach(r=>r.fill(1));
     // 近いとき＝2行目は「走れ」だけ。時計を読ませても走る以外にやることが無い。

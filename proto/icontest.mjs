@@ -116,7 +116,7 @@ R.noEmojiLeft = await pg.evaluate(async ()=>{
   TH.run(3,{seed:12}); setScreen('game'); TH.immortal();
   // ログ・足元の案内・巡回者の帯を一度出しておく
   log('<i class="pi pi-warn"></i> 見本');
-  S.run.elapsed = INTRUDER_AFTER-20;
+  S.run.darkT = INTRUDER_AFTER-20;
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   scan('盤面');
   return {hits, ok: hits.length===0};

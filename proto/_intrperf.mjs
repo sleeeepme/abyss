@@ -18,7 +18,7 @@ const R = await pg.evaluate(async ()=>{
     S.hero.equip.weapon=genBaseItem('sword',40,2);
     S.hero.hpNow=stats(S.hero).maxHp;
     P.invuln=1e9;                       // 死んだら比較にならない
-    if(withIntruder){ S.run.elapsed=INTRUDER_AFTER+0.1; tickIntruder(); }
+    if(withIntruder){ S.run.darkT=INTRUDER_AFTER+0.1; tickIntruder(); }
     const had=!!liveIntruder();
     // 走り回らせる＝毎フレーム別のマスに入る＝再計算が最も多く走る
     let t=0, frames=0;

@@ -490,15 +490,16 @@ R.blindHidesFarEnemy = await pg.evaluate(()=>{
     window.label=(t,x,y,c,s)=>{ hits.push(String(t)); return orig(t,x,y,c,s); };
     draw();
     window.label=orig;
-    return hits;
+    return {hits, drawn: e._drawn===_drawSerial};
   };
+  /* 灯り（蛍石）を入れてから、灯りの外（この層は6マス）の敵は名前の無い黒い影になった。
+     なので「見えている」は名前ではなく「描かれたか」で見る。暗幕では影も出ない。 */
   const openEyed=seen();
   S.run.trial={bane:'blind', t:30, max:30};
   const blinded=seen();
-  return {name:e.name, openEyed, blinded,
-          named:  openEyed.some(t=>t===e.name),
-          hidden: !blinded.some(t=>t===e.name),
-          ok: openEyed.some(t=>t===e.name) && !blinded.some(t=>t===e.name)};
+  return {name:e.name, openEyed:openEyed.hits, blinded:blinded.hits,
+          drawnOpen: openEyed.drawn, hidden: !blinded.drawn && !blinded.hits.some(t=>t===e.name),
+          ok: openEyed.drawn && !blinded.drawn && !blinded.hits.some(t=>t===e.name)};
 });
 
 // 8-c. 敵の名前の下に Lv が出る（上の情報パネルを畳んだぶんの代わり）

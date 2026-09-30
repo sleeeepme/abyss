@@ -217,6 +217,9 @@ function mulU(c,f){ return (0xff000000|(Math.min(255,((c>>16)&255)*f)<<16)|(Math
 function mixU(a,b,t){ const u=1-t; return (0xff000000|((((a>>16)&255)*u+((b>>16)&255)*t)<<16)|((((a>>8)&255)*u+((b>>8)&255)*t)<<8)|(((a&255)*u+(b&255)*t)|0))>>>0; }
 const LIGHT_A=.64, LIGHT_CORE=.22;
 const LUT_MAX=200; let lutR=0, lutD=null, lutA=null;
+/* 明るさ（1〜10）→ 灯りの半径の倍率。10 で今まで通り、1 で 0.14（1マスほど）。 */
+function lightMul(lv){ const s=Math.max(0,Math.min(1,(lv-1)/9)); return .14+.86*Math.pow(s,.85); }
+CAVE.lightMul=lightMul;
 const LV0=new Float32Array(1025), LV1=new Float32Array(1025);
 for(let i=0;i<=1024;i++){ const q=Math.min(1,i/1023); LV0[i]=q<LIGHT_CORE?1:Math.pow(Math.max(0,1-q)/(1-LIGHT_CORE),1.15); LV1[i]=Math.pow(Math.max(0,1-q),1.1); }
 function lightLut(r){
@@ -592,13 +595,23 @@ function terrain(f,Z,camX,camY,blinded){
   if(G.code[(lampY|0)*G.PW+(lampX|0)]){ outer: for(let r=1;r<14;r++) for(let a=0;a<16;a++){ const x=(lampX+Math.cos(a*.3927)*r)|0, y=(lampY+Math.sin(a*.3927)*r)|0; if(x>=0&&y>=0&&x<G.PW&&y<G.PH&&!G.code[y*G.PW+x]){ lampX=x; lampY=y; break outer; } } }
   shadowOn=!!L.shadow;
   const flick=CAVE.noFlicker?1:1+.035*Math.sin(t*8.3)+.02*Math.sin(t*21.7);   // noFlicker：画面の明るさを測るテスト用
-  Rpx=L.lightT*Q*flick;
-  const blindR = blinded ? BLIND_DARK*Q : 1e9;
+  /* 灯り（蛍石）の明るさ 1〜10（本編の lightLevel）。段が変わったときに灯りがぱっと縮まないよう、
+     1.6/秒 の速さで追いかける。灯りの半径は明るさで縮み、灯りの外の闇（視界の輪）も迫ってくる。 */
+  const lvT=(typeof lightLevel==='function'&&typeof S!=='undefined'&&S.run)?lightLevel():10;
+  const nowL=performance.now(), dL=Math.min(.25,(nowL-(CAVE._lvAt||nowL))/1000); CAVE._lvAt=nowL;
+  CAVE.lvS=(CAVE.lvS==null||CAVE.lvF!==f||CAVE.lightSnap)?lvT:CAVE.lvS+(lvT-CAVE.lvS)*Math.min(1,dL*1.6); CAVE.lvF=f;
+  const lmul=lightMul(CAVE.lvS);
+  Rpx=L.lightT*Q*flick*lmul;
+  const Rsys=Math.min(L.lightT,8)*lmul;                       // 灯りの届く距離（マス）。白の層のような広い灯りでも 8 マスで数える
+  const sL=Math.max(0,(CAVE.lvS-1)/9), vIn=Rsys*1.25+1.2, visT=vIn+(18-vIn)*Math.pow(sL,1.2);   // 視界の輪（マス）：10 で画面の外（18マス）、下がるほど迫り、1 で灯りのすぐ外
+  const blindR = Math.min(blinded ? BLIND_DARK*Q : 1e9, visT*Q);
+  CAVE.litTiles = blinded ? Math.min(Rsys, BLIND_DARK) : Rsys;
+  CAVE.visTiles = blindR/Q;
   if(blinded) Rpx=Math.min(Rpx,BLIND_DARK*Q);
   const Rm=Math.min(Rpx, blindR)+6;
   ensure(Math.min(bx0,(lampX-Rm)|0), Math.min(by0,(lampY-Rm)|0), Math.max(bx0+bw,(lampX+Rm)|0), Math.max(by0+bh,(lampY+Rm)|0));
   if(G.deco) stampRocks();
-  if(shadowOn) castRays(Math.ceil(Math.min(L.lightT*Q*1.06, blindR)+6));
+  if(shadowOn) castRays(Math.ceil(Math.min(L.lightT*Q*1.06*lmul, blindR)+6));
   // 光る物（前のフレームで集めた分）
   CAVE.emit=CAVE.nextEmit; CAVE.nextEmit=[];
   if(typeof stairRevealed==='function'&&stairRevealed()&&f.stair){ CAVE.emit.push({x:(f.stair.x)*Q,y:(f.stair.y)*Q,r:34,it:.55}); }
@@ -621,6 +634,7 @@ function terrain(f,Z,camX,camY,blinded){
   /* 上下の端の「完全に伏せる」帯は1ドットも計算しない（extraTilt が黒で塗る）。
      ここは画面のドットを1つずつ回す一番重い所なので、削った帯がそのまま効く。 */
   const blackPx=Math.round(bh*CAVE_VIG.black), skipBot=bh-blackPx;
+  const blindR2=blindR*blindR, visInR=Math.max(0,blindR-24), visIn2=visInR*visInR, visInv=1/Math.max(1,blindR-visInR);
 
   /* ---------- マス単位でまとめて片付ける ----------
      seenV と hazAt は**画面のドット1つずつ**呼ばれていた（1フレームで数十万回）。
@@ -663,7 +677,7 @@ function terrain(f,Z,camX,camY,blinded){
       if((cv2&3)===1){                                          // 境目のマスだけ混ぜる
         const sv=seenV(wx,wy); if(sv<SEEN_HI){ if(sv<=SEEN_LO||(sv-SEEN_LO)/(SEEN_HI-SEEN_LO)<BAYER[((wy&3)<<2)|(wx&3)]){buf[k]=VOID;continue;} } }
       const i=wy*PW+wx, c=code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;
-      if(d2>blindR*blindR){buf[k]=VOID;continue;}
+      if(d2>visIn2){ if(d2>=blindR2||(Math.sqrt(d2)-visInR)*visInv>b){buf[k]=VOID;continue;} }   // 視界の輪の外は闇。縁は網点で溶かす
       let Lv=0, fc=1;
       if(flat){ Lv=flatL+(d2<1600?.12:0); }
       else if(d2<R2&&(c===0||c<5)){
@@ -1316,6 +1330,7 @@ function airStep(Z,dt){
     else { m.x+=Math.sin(m.ph*.7)*dt*4; m.y+=Math.cos(m.ph*.5)*dt*3; }
     if(m.x<cx-hw)m.x+=hw*2; if(m.x>cx+hw)m.x-=hw*2; if(m.y<cy-hh)m.y+=hh*2; if(m.y>cy+hh)m.y-=hh*2;
     if(!tileSeen(m.x/Q,m.y/Q)) continue;
+    if(Number.isFinite(CAVE.visTiles)&&Math.hypot(m.x-cx,m.y-cy+4)>CAVE.visTiles*Q) continue;   // 灯りが迫った闇の外には漂わせない
     const tw=Math.sin(m.ph*3); if(tw<.1 && kind!=='ember') continue;
     const lit=CAVE.lightAt(m.x/Q,m.y/Q);
     const col=(lit>.2||tw>.85||kind==='ember'||kind==='spore')?L.mote[0]:L.mote[1];
