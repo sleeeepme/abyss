@@ -911,14 +911,14 @@
   <div style="height:24px"></div>
 </div>
 
-<!-- ============ 広告（ダミー） ============ -->
+<!-- ============ 広告 ============ -->
+<div id="ad-notice" role="status" aria-live="polite" hidden style="position:fixed;top:calc(16px + env(safe-area-inset-top));left:16px;right:16px;z-index:10000;padding:14px;border:1px solid #8b93a7;background:#151923;color:#fff;text-align:center;pointer-events:none"></div>
 <div class="modal" id="m-ad"><div class="box">
   <div id="adbox">
-    <div style="font-size:12px;color:#8b93a7;letter-spacing:.1em">SAMPLE AD — ダミー広告</div>
+    <div style="font-size:12px;color:#8b93a7;letter-spacing:.1em"><span id="ad-title">広告</span></div>
     <div style="font-size:24px;margin:22px 0 10px"><i class="pi pi-ad"></i></div>
     <div style="font-size:12px;color:#c3cad8;line-height:1.8">
-      製品版ではここに動画リワード広告が入ります<br>
-      <span style="font-size:12px;color:#8b93a7">（AdMob / Unity Ads のリワード動画）</span>
+      <span id="ad-description">広告を準備しています</span>
     </div>
     <div id="adtimer" style="margin-top:20px;font-size:16px;font-weight:700;color:#d6b34a"></div>
   </div>
@@ -1604,6 +1604,7 @@
   <button class="primary" id="r-ok">倉庫へ収める</button>
 </div></div>
 
+<script src="ads.js?v=20260927a"></script>
 <script>
 "use strict";
 /* ==========================================================================
@@ -12174,7 +12175,7 @@ function stairHeal(){
     livingParty().forEach(a=>{ a.hpNow = allyStats(a).maxHp; });
     log('全員のHPが回復した');
     openStairs();          // 広告で畳んだ穴画面を、更新した状態で開き直す
-  });
+  }, 'heal');
 }
 bindTap(el('st-heal'), stairHeal);
 
@@ -12265,6 +12266,7 @@ const ART_NAME_DELAY = 0.9;
 let _artNamePend = null;            // {id, t}
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
+  if(ABYSS_ADS.busy) return true;
   if(window.ABYSS_SAVE && window.ABYSS_SAVE.paused()) return true;
   /* 窓が閉じているのに止まったままになると、盤面が二度と動かない。
      止めている理由（開いている窓）が消えていたら自分で戻す。 */
@@ -15157,13 +15159,14 @@ function isMenu(s){ return !!SCREENS[s]; }
 /* 街系の画面にだけバナーを出す。ゲーム中とモーダル専有中は出さない。 */
 function syncAdBar(){
   // タイトルにも出さない。起動して最初に見る画面を広告で始めたくない。
-  const show = isMenu(S.screen) && S.screen!=='title';
+  const show = ABYSS_ADS.providerName==='demo' && isMenu(S.screen) && S.screen!=='title';
   el('adbar').classList.toggle('on', show);
   for(const k in SCREENS) el(SCREENS[k]).classList.toggle('banner', show);
   // 街は絶対配置のUIなので、バナー分の余白は .hubui 自身に持たせる。
   const hubui=el('hubui'); if(hubui) hubui.classList.toggle('banner', show);
 }
 function setScreen(s){
+  if(_adSession) closeAd(false);
   if(typeof syncDebugBtn==='function') syncDebugBtn();   // 全消去のあと 🐞 を畳む
   if(isMenu(S.screen) && S.screen!==s) S.prevScreen=S.screen;
   S.screen=s;
@@ -17018,39 +17021,63 @@ function renderGacha(){
 }
 
 /* ---------- ガチャ ---------- */
-let _adTimer=null;
-/* ダミー広告。onDone を渡すとその場で報酬処理へ回す（仲間の蘇生がこちらを使う）。
-   実装時の鉄則: 報酬の抽選・付与は必ず「視聴完了コールバックの中」でだけ行うこと。 */
-let _adDone=null;
-/* 広告の下に開いていたモーダル。閉じたときに戻すために覚えておく。
-   ここを覚えずに重ねて表示すると、同じ z-index のモーダル同士が重なって
-   「広告は出るのに視聴完了ボタンが押せない」という状態になる（実際になっていた）。 */
-let _adUnder=[];
-function openAd(onDone){
-  _adDone = onDone || null;
-  if(!_adDone && refreshGacha()<=0) return;
-  // 下のモーダルを一旦畳む。DOM 順で後ろにある物が手前に来るので、
-  // 出しっぱなしだと広告のボタンがそれに食われる。
-  _adUnder = [...document.querySelectorAll('.modal.on')].filter(m=>m.id!=='m-ad');
+let _adNoticeTimer=null;
+let _adTimer=null, _adDone=null, _adUnder=[], _adSession=null, _demoComplete=null;
+// ローカルの試遊だけ従来のダミーを使う。公開URLでは未接続扱いとし、偽の報酬を出さない。
+const _adDemo = location.protocol==='file:' || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+if(_adDemo) ABYSS_ADS.setProvider({
+  name:'demo',
+  requestRewarded({signal}){
+    return new Promise(resolve=>{
+      let left=AD_SECONDS;
+      const ok=el('ad-ok');
+      el('adtimer').textContent=left+' 秒';
+      _demoComplete=()=>{ if(left<=0) resolve({status:'rewarded'}); };
+      _adTimer=setInterval(()=>{
+        left--;
+        el('adtimer').textContent=left>0 ? left+' 秒' : '視聴完了';
+        if(left<=0){ clearInterval(_adTimer); _adTimer=null; ok.disabled=false; ok.style.opacity='1'; }
+      },1000);
+      signal.addEventListener('abort',()=>{
+        clearInterval(_adTimer); _adTimer=null; _demoComplete=null;
+      },{once:true});
+    });
+  }
+});
+function openAd(onDone, placement='gacha'){
+  if(_adSession || ABYSS_ADS.busy) return;
+  if(!onDone && refreshGacha()<=0) return;
+  clearTimeout(_adNoticeTimer); el('ad-notice').hidden=true;
+  const session={run:S.run,hero:S.hero,screen:S.screen};
+  _adSession=session; _adDone=onDone || doGachaPull;
+  _adUnder=[...document.querySelectorAll('.modal.on')].filter(m=>m.id!=='m-ad');
   _adUnder.forEach(m=>m.classList.remove('on'));
-  let left=AD_SECONDS;
-  const ok=el('ad-ok');
-  ok.disabled=true; ok.style.opacity='.45';
-  el('adtimer').textContent = left+' 秒';
+  const demo=ABYSS_ADS.providerName==='demo', ok=el('ad-ok');
+  ok.disabled=true; ok.style.opacity='.45'; ok.hidden=!demo;
+  el('ad-title').textContent=demo ? 'SAMPLE AD — テスト広告' : '広告';
+  el('ad-description').textContent=demo ? '動作確認用の広告です。広告収益は発生しません。' : '広告を準備しています';
+  el('adtimer').textContent='読み込み中…';
   el('m-ad').classList.add('on');
-  clearInterval(_adTimer);
-  _adTimer=setInterval(()=>{
-    left--;
-    if(left>0){ el('adtimer').textContent = left+' 秒'; return; }
-    clearInterval(_adTimer); _adTimer=null;
-    el('adtimer').textContent = '視聴完了';
-    ok.disabled=false; ok.style.opacity='1';
-  },1000);
+  ABYSS_ADS.requestRewarded(placement).then(result=>{
+    if(_adSession!==session) return;
+    const valid=S.run===session.run && S.hero===session.hero && S.screen===session.screen;
+    const done=_adDone;
+    const rewarded=result.status==='rewarded' && valid;
+    closeAd(!rewarded && valid);
+    if(rewarded){ done(); return; }
+    if(valid && result.status!=='cancelled'){
+      const notice=el('ad-notice');
+      notice.textContent='広告を再生できませんでした。回数は消費していません';
+      notice.hidden=false;
+      _adNoticeTimer=setTimeout(()=>{notice.hidden=true;},5000);
+    }
+  });
 }
-/* restore=true なら、広告を閉じたときに下のモーダルを戻す（＝視聴を中断した場合）。
-   報酬を受け取った場合は報酬側が画面遷移を決めるので戻さない。 */
 function closeAd(restore){
-  clearInterval(_adTimer); _adTimer=null; _adDone=null;
+  _adSession=null;
+  ABYSS_ADS.cancel();
+  clearInterval(_adTimer); _adTimer=null; _demoComplete=null; _adDone=null;
+  el('ad-ok').disabled=true;
   el('m-ad').classList.remove('on');
   if(restore) _adUnder.forEach(m=>m.classList.add('on'));
   _adUnder=[];
@@ -18457,7 +18484,7 @@ function reviveFallen(){
     log(a.name+'が蘇生した（Lv.'+a.lv+'）');
     W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
     closeFallen();
-  });
+  }, 'revive');
 }
 bindTap(el('fal-revive'), reviveFallen);
 bindTap(el('fal-let'), letFallenGo);
@@ -18575,13 +18602,7 @@ bindTap(el('btn-gacha'), ()=>{
   openAd();
 });
 bindTap(el('ad-cancel'), ()=>closeAd(true));   // 中断したら元の画面に戻す
-bindTap(el('ad-ok'), ()=>{
-  if(el('ad-ok').disabled) return;      // 視聴完了前は受け取れない
-  const done=_adDone;
-  closeAd(false);
-  if(done){ done(); return; }           // 仲間の蘇生など、ガチャ以外の報酬
-  doGachaPull();
-});
+bindTap(el('ad-ok'), ()=>{ if(!el('ad-ok').disabled) _demoComplete?.(); });
 /* 1回引いて結果を出す。**広告あり／無料枠のどちらからも同じ道を通す**——
    引く処理が2ヶ所にあると、片方だけ直した日に排出が食い違う。 */
 function doGachaPull(){
@@ -18620,7 +18641,7 @@ bindTap(el('d-ad'), ()=>{
     S.deathAdBonus = 1;
     renderDeathLegacy();
     el('m-death').classList.add('on');     // 広告が畳んだモーダルを戻す
-  });
+  }, 'inherit');
 });
 bindTap(el('d-ok'), ()=>{
   el('m-death').classList.remove('on');
