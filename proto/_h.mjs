@@ -48,6 +48,9 @@ export async function install(pg){
     /* 洞窟版は本番では地形を2フレームに1回だけ描き直す（発熱対策）。テストは「描いた直後の画面」を
        読むので、毎回描き直させる（間引きそのものは layertest の terrainHalfRate で見る）。 */
     if(window.CAVE) CAVE.halfRate = false;
+    /* 初めての潜りは蛍石を持たずに入る（入口のそばで拾うチュートリアル）。
+       各スイートは最初から灯りのある状態を見たいので、済んだことにしておく（lighttest だけが外す）。 */
+    S.tutStone = true;
     window.TH = {
       /* 潜りを1つ始める。**S.run を手で作らないための唯一の入口。**
          seed を渡すと生成が固定される（startRun が S.runs を ++ するので -1 して渡す）。

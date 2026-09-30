@@ -99,4 +99,55 @@ R.lightShrinksTheLantern = await pg.evaluate(()=>{
   return {a, m, z, ok: a.lit>m.lit && m.lit>z.lit && z.lit<1.5 && a.vis>m.vis && m.vis>z.vis && z.vis<3.5};
 });
 
+/* 初めての潜りだけ、蛍石を持たずに入る。入口のそばに1つ落ちていて、拾うと灯りが灯る。 */
+R.firstDiveStartsWithoutStone = await pg.evaluate(()=>{
+  S.tutStone = false;
+  TH.run(1,{seed:2}); S.hero.party=[];
+  const dark = lightLevel(), noStone = S.run.noStone;
+  const st = W.drops.find(d=>d.stone);
+  const dist = st ? Math.hypot(st.x-P.x, st.y-P.y) : null;
+  for(let i=0;i<20;i++) stepSim(1);                 // 拾う前は暗闇の時計も進まない
+  const darkT = S.run.darkT||0;
+  P.x=st.x; P.y=st.y; autoPickup();
+  const lit = lightLevel(), learned = S.tutStone;
+  TH.run(1,{seed:3}); S.hero.party=[];
+  const second = {noStone: S.run.noStone, lv: lightLevel(), stone: W.drops.some(d=>d.stone)};
+  return {dark, noStone, dist, darkT, lit, learned, second,
+          ok: dark===1 && noStone && dist!=null && dist>=2 && dist<=4.6 && darkT===0 && lit===10 && learned
+              && !second.noStone && second.lv===10 && !second.stone};
+});
+
+/* 根の層から先は明るい空間。灯りは減らず、蛍石も巡回者も出ない、灯りの外の影も無い。 */
+R.brightZonesHaveNoLight = await pg.evaluate(()=>{
+  TH.run(1,{seed:4}); TH.floor(24); S.hero.party=[]; TH.immortal();
+  S.run.elapsed += LIGHT_STEP*20;
+  for(let i=0;i<5;i++) stepSim(1);
+  const lv = lightLevel();
+  S.run.darkT = INTRUDER_AFTER + 10; tickIntruder();
+  const noIntruder = !liveIntruder();
+  let m=null; for(let i=0;i<200 && !m;i++) m=spawnMerchant(W.fl, 24, []);
+  const noStoneSold = !m.stock.some(x=>x.stone);
+  const e=W.enemies.find(x=>!x.boss); e.x=P.x+12; e.y=P.y;
+  const far = enemyLit(e);
+  const back = (()=>{ TH.floor(15); return lightLevel(); })();   // 水の層へ戻れば灯りがある（明るい層にいた間は減っていない）
+  return {lv, noIntruder, noStoneSold, far, back,
+          ok: lv===10 && noIntruder && noStoneSold && far==='lit' && back===10};
+});
+
+/* シルトジェリーなど自分で光る敵は、暗くても見え、そばの敵も照らす。 */
+R.glowingFoesLightTheirSurroundings = await pg.evaluate(()=>{
+  TH.run(12,{seed:12}); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true;
+  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*8 - 1;          // 明るさ2
+  const slime=FAMILY.find(f=>f.id==='slime'), beast=FAMILY.find(f=>f.id==='beast');
+  const turret=ARCH.find(a=>a.id==='turret'), rush=ARCH.find(a=>a.id==='rush');
+  const es=W.enemies.filter(x=>!x.boss).slice(0,3); W.enemies=es;
+  Object.assign(es[0],{fam:slime, arch:turret, x:P.x+5, y:P.y, dead:false});
+  Object.assign(es[1],{fam:beast, arch:rush,   x:P.x+6.2, y:P.y+0.8, dead:false});
+  Object.assign(es[2],{fam:beast, arch:rush,   x:P.x-5, y:P.y, dead:false});
+  draw();
+  const r={lv:lightLevel(), glow:enemyLit(es[0]), near:enemyLit(es[1]), far:enemyLit(es[2])};
+  CAVE.lightSnap=false;
+  return {...r, ok: r.lv===2 && r.glow==='lit' && r.near==='lit' && r.far==='hidden'};
+});
+
 await done(b, errs, R);

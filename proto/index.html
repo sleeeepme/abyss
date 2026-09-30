@@ -7405,8 +7405,14 @@ const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見え�
 const STONE_DROP  = 0.07;   // 灯りを帯びた敵が蛍石を落とす率（精鋭は2倍）
 /* 灯りを帯びた敵（系統×形式）。洞窟版で自分で光る敵と同じ顔ぶれ。 */
 const STONE_DROPPERS = {slime:['turret'], arcane:['swarm','range'], armor:['range'], flame:['turret','swarm','rush'], storm:['range']};
+/* 灯りがあるのは暗い層（石の層・水の層）だけ。根の層から先は明るい空間になるので、
+   灯りは減らず（常に10）、蛍石も出ず、巡回者も来ない。61階からの二周目は暗い層に戻る。 */
+function lightZone(depth){ return zoneIndexAt(depth ?? (S.run&&S.run.depth) ?? 1) <= 1; }
+function glowFoe(e){ return !!(e && !e.dead && e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id)); }
+const GLOW_R = 2.6;   // 光る敵の周りで、ほかの敵も見える半径（マス）
 function lightFuel(){
   if(!S.run) return LIGHT_MAX;
+  if(S.run.noStone) return 1;                                  // 初めての潜り：蛍石を持たずに入る
   if(S.run.stoneAt==null) S.run.stoneAt = S.run.elapsed||0;     // 灯りの無い古いセーブは、今から新しい灯り
   return Math.max(1, LIGHT_MAX - Math.floor(((S.run.elapsed||0) - S.run.stoneAt)/LIGHT_STEP));
 }
@@ -7417,7 +7423,7 @@ function lightBonus(){
 }
 /* 今の明るさ（1〜10） */
 function lightLevel(){
-  if(!S.run) return LIGHT_MAX;
+  if(!S.run || !lightZone()) return LIGHT_MAX;
   return clamp(lightFuel() + lightBonus(), 1, LIGHT_MAX);
 }
 /* 新しい蛍石に替える */
@@ -7425,11 +7431,19 @@ function newStone(why){
   if(!S.run) return;
   S.run.stoneAt = S.run.elapsed||0;
   S.run.lightSaid = LIGHT_MAX;
+  if(S.run.noStone){                       // 初めての蛍石。仕組みをここで一度だけ言う
+    S.run.noStone = false; S.tutStone = true; S.run.darkT = 0;
+    log('<i class="pi pi-bulb"></i> 蛍石を拾った — 灯りが灯った');
+    log('蛍石の灯りは時間とともに弱まる。新しい蛍石を拾えば灯り直せる');
+    return;
+  }
   log('<i class="pi pi-bulb"></i> '+(why||'蛍石')+' — 新しい灯りに替えた');
 }
 /* 毎フレーム。暗さの節目で一言だけ言い、明るさ1の時間を数える（巡回者の時計）。 */
 function tickLight(dt){
   if(!S.run) return;
+  if(!lightZone()){ S.run.stoneAt = S.run.elapsed||0; S.run.lightSaid = LIGHT_MAX; return; }   // 明るい層では灯りを使わない
+  if(S.run.noStone) return;                                    // 最初の蛍石を拾うまでは、暗闇の時計も進めない
   const L = lightLevel();
   if(L<=1) S.run.darkT = (S.run.darkT||0) + dt;
   const said = S.run.lightSaid ?? LIGHT_MAX;
@@ -7631,6 +7645,7 @@ function intruderComingIn(){
 function tickIntruder(){
   if(!S.run || !W.fl) return;
   if(S.run.depth < INTRUDER_MIN_DEPTH) return;
+  if(!lightZone()) return;             // 明るい層（根の層から先）には来ない
   /* ボス戦のあいだは割り込ませない（避ける相手が2体になると読めなくなる）。
      ただし「ボス階そのものを安全地帯にしない」。
      階そのもので止めていたら、ボスを倒さずに居座るだけで
@@ -7833,6 +7848,7 @@ function startRun(depth){
            // 帰還は S.run を捨てて次にここを通るので、帰ることだけが解除になる。
            intruder:null, intrNext:INTRUDER_AFTER, intrWarned:false, intrSeen:false,
            stoneAt:0, darkT:0, lightSaid:LIGHT_MAX,   // 灯り。潜るたびに新しい蛍石から
+           noStone: !S.tutStone && d===1,           // 初めての潜りだけ、蛍石を持たずに入る（入口のすぐ近くに落ちている）
            healAds:HEAL_ADS_PER_RUN,    // 穴での全体回復（広告）。探索ごとに戻る
            // 仲間の蘇生。5階ごとの帯で、パーティ共通の回数を持つ
            revBand:reviveBand(d), revLeft:REVIVE_PER_BAND,
@@ -7881,6 +7897,19 @@ function startRun(depth){
    まとめて51階を見に行ってしまった。
    降りられないことは openStairs / st-down / startDepth / unlockedDepths の
    4箇所で閉じてある。 */
+/* 初めての潜りの蛍石。入口から 2.5〜4 マスの床に1つ置く（暗闇の中で光っていて、拾うと灯りが灯る）。 */
+function placeFirstStone(fl){
+  const sx=fl.start.cx+0.5, sy=fl.start.cy+0.5; let best=null;
+  for(let r=3;r<=4 && !best;r+=0.5) for(let a=0;a<16 && !best;a++){
+    const x=sx+Math.cos(a/16*Math.PI*2+0.4)*r, y=sy+Math.sin(a/16*Math.PI*2+0.4)*r;
+    const row=fl.g[Math.floor(y)]; if(!row || row[Math.floor(x)]!==T.FLOOR) continue;
+    if(!standable(x,y)) continue;
+    best={x:Math.floor(x)+0.5, y:Math.floor(y)+0.5};
+  }
+  if(!best){ const p=snapToFloor(fl, sx+2.5, sy); best={x:p.x, y:p.y}; }
+  W.drops.push({x:best.x, y:best.y, stone:true, first:true, _fix:1});
+  log('真っ暗だ。近くで何かが光っている');
+}
 function enterFloor(depth){
   RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
   const fl = genFloor(depth);
@@ -7891,6 +7920,7 @@ function enterFloor(depth){
   P.x = fl.start.cx+0.5; P.y = fl.start.cy+0.5;
   P.vx=P.vy=0; P.dirx=1; P.diry=0; P.atkCd=0; P.swing=0;
   W.fl=fl; W.enemies=spawnEnemies(fl,depth); W.drops=[]; W.fx=[]; W.pops=[];
+  if(S.run.noStone) placeFirstStone(fl);   // 初めての潜り：入口のすぐ近くに蛍石
   resetFeel();   // 階が変わった時点で同期する。次の update() まで遅延させると、
                  // 入った直後に瞬歩を撃った場合に P.dash が消される（syncFeel の
                  // 階変化検知がここより後に走り、直前に発生させた瞬歩を巻き戻してしまう）。
@@ -10389,7 +10419,7 @@ function killEnemy(e, byAlly){
   if(rnd() < CONSUM_DROP_RATE * (e.elite?2.2:1))
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), it:makeConsum()});
   // 蛍石。灯りを帯びた敵だけが稀に落とす
-  if(e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id) && rnd() < STONE_DROP*(e.elite?2:1))
+  if(lightZone() && e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id) && rnd() < STONE_DROP*(e.elite?2:1))
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), stone:true});
 
   /* ---------- 落ちる量を 1/3 に ----------
@@ -11963,7 +11993,7 @@ function spawnMerchant(fl, depth, avoid){
   c.price=Math.round(itemValue(c)*CONSUM_SHOP_MUL*MERCHANT_MARKUP);
   stock.push(c);
   // 蛍石。買うとその場で新しい灯りに替わる
-  stock.push({uid:(genItem._n=(genItem._n||0)+1), stone:true, nm:'蛍石', price:stonePrice(depth)});
+  if(lightZone(depth)) stock.push({uid:(genItem._n=(genItem._n||0)+1), stone:true, nm:'蛍石', price:stonePrice(depth)});
   return {x:spot.x, y:spot.y, seed:rnd()*6.28, stock};
 }
 function stonePrice(depth){ return Math.round((50+depth*8)*MERCHANT_MARKUP); }
@@ -12969,7 +12999,10 @@ addEventListener('resize',resize);
 /* 灯りから見た敵の見え方。'lit'＝普通、'shadow'＝黒い影、'hidden'＝見えない。
    灯りの半径は洞窟版が描いた灯り（CAVE.litTiles）。洞窟版が無いときは全部見える。 */
 function enemyLit(e){
-  if(!S.run || !e || e.dead || e.boss || e.looksBoss) return 'lit';
+  if(!S.run || !e || e.dead || e.boss || e.looksBoss || !lightZone()) return 'lit';
+  /* シルトジェリーなど自分で光る敵は、自分も周りも見える（暗がりの目印になる） */
+  if(glowFoe(e)) return 'lit';
+  if(W.enemies.some(g=>g!==e && glowFoe(g) && Math.hypot(g.x-e.x, g.y-e.y) <= GLOW_R)) return 'lit';
   const r = (window.CAVE && CAVE.on && Number.isFinite(CAVE.litTiles)) ? CAVE.litTiles : null;
   if(r==null) return 'lit';
   if(Math.hypot(e.x-P.x, e.y-P.y) <= r+0.35) return 'lit';

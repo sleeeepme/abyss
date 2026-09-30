@@ -255,7 +255,7 @@ R.intrPathing = await pg.evaluate(()=>{
    足が主人公より遅いこと自体は 5 で見ている。ここでは実際に走らせて、
    「まっすぐ逃げていれば距離が縮まらない」ことを見る。 */
 R.intrOutrun = await pg.evaluate(()=>{
-  TH.run(1, {seed:19}); S.upg={}; TH.floor(21);                       // ボス階（20）を避ける
+  TH.run(1, {seed:19}); S.upg={}; TH.floor(19);                       // ボス階（20）を避ける（根の層＝21階からは明るくて来ない）
   S.hero.party=[];
   W.enemies = [];                       // 逃走そのものだけを見たいので他の敵は退ける
   S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
@@ -279,12 +279,12 @@ R.intrOutrun = await pg.evaluate(()=>{
    ここがこの仕掛けの中心。降りて撒けるなら「帰れ」ではなく「進め」になってしまう。
    降りて買えるのは INTRUDER_GRACE 秒だけで、時計そのものは止まらない。 */
 R.intrNoEscapeByDescent = await pg.evaluate(()=>{
-  TH.run(1, {seed:23}); TH.floor(22);
+  TH.run(1, {seed:23}); TH.floor(17);
   S.hero.party=[];
   S.run.darkT = INTRUDER_AFTER + 0.1; tickIntruder();
   const had = !!liveIntruder();
 
-  enterFloor(23);                                   // 降りる
+  enterFloor(18);                                   // 降りる（暗い層の中で）
   const bodyGone   = !liveIntruder();               // 実体はこの階には持ち込まない
   const stillAwake = intruderAwake();               // だが状態は持ち越す
   const graceLeft  = intruderComingIn();            // 買えたのは猶予ぶんだけ
@@ -306,7 +306,7 @@ R.intrNoEscapeByDescent = await pg.evaluate(()=>{
 /* ---------- 10b. 帰還して潜り直すと消える（唯一の解除） ---------- */
 R.intrClearedByReturn = await pg.evaluate(()=>{
   S.runs=24; S.hero=newHero(); S.gold=0; S.stash=[]; S.ore={}; S.carry=[];
-  TH.run(1, {seed:24}); TH.floor(25);   // 帰還ポータル階
+  TH.run(1, {seed:24}); TH.floor(15);   // 帰還ポータル階
   S.hero.party=[];
   S.run.darkT = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 10; tickIntruder();
   const beforeAwake = intruderAwake();
@@ -327,7 +327,7 @@ R.intrClearedByReturn = await pg.evaluate(()=>{
 
 /* ---------- 10c. 5分ごとに段階が上がり、最後はこちらより速い ---------- */
 R.intrTiers = await pg.evaluate(()=>{
-  TH.run(1, {seed:25}); S.upg={}; TH.floor(28);
+  TH.run(1, {seed:25}); S.upg={}; TH.floor(18);
   S.hero.party=[];
   const pms = stats(S.hero).ms;
   const rows=[];
@@ -358,7 +358,7 @@ R.intrTiers = await pg.evaluate(()=>{
    倒して段階が下がると「倒し続ければ永久に潜れる」になり、
    この仕掛けが言いたかったこと（そろそろ帰れ）が丸ごと消える。 */
 R.intrKill = await pg.evaluate(()=>{
-  TH.run(1, {seed:29}); TH.floor(26);
+  TH.run(1, {seed:29}); TH.floor(16);
   S.hero.party=[];
   S.run.darkT = INTRUDER_AFTER + INTRUDER_TIER_EVERY + 1;   // 段階Ⅰの状態で
   tickIntruder();
@@ -397,7 +397,7 @@ R.intrKill = await pg.evaluate(()=>{
 R.hud = await pg.evaluate(()=>{
   const fails=[];
   try{
-    TH.run(1, {seed:31}); TH.floor(28);
+    TH.run(1, {seed:31}); TH.floor(18);
     S.run.darkT = INTRUDER_AFTER - INTRUDER_WARN_LEAD + 1; tickIntruder();
     updateHUD();
     const warnTxt = el('intruder').textContent;
