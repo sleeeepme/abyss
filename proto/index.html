@@ -7390,7 +7390,7 @@ function makeUnique(fl, depth, fams){
    帰還ポータルは 5 階ごとなので、圧力は「次のポータルまで持たせる」形で着地する。 */
 /* ---------- 灯り（蛍石） ----------
    明るさは 10 段階。10 が今までの明るさで、1 はほとんど何も見えない。
-   ・灯りは蛍石で灯っていて、LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で約13分半）。
+   ・灯りは蛍石で灯っていて、最初の 1 段（10→9）だけ LIGHT_FIRST 秒、そこからは LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で15分）。
    ・新しい蛍石を手に入れると**新しい灯りに替わる**（回復ではなく交換。10 に戻る）。
      商人が売っているほか、灯りを帯びた敵が稀に落とす。
    ・味方1人・眷属1体につき +1（上限 10）。仲間は灯りを持っている——連れているほど暗くなるのが遅い。
@@ -7400,7 +7400,8 @@ function makeUnique(fl, depth, fams){
    3 以下では見えなくなる。明るさ 1 のまま一定時間いると、巡回者が来る。
    潜る時間そのものに配分が要るようにするための仕掛け。 */
 const LIGHT_MAX   = 10;
-const LIGHT_STEP  = 90;     // 1段暗くなるまでの秒数
+const LIGHT_FIRST = 180;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い）
+const LIGHT_STEP  = 90;     // そこから1段暗くなるまでの秒数
 const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見えない
 const STONE_DROP  = 0.07;   // 灯りを帯びた敵が蛍石を落とす率（精鋭は2倍）
 /* 灯りを帯びた敵（系統×形式）。洞窟版で自分で光る敵と同じ顔ぶれ。 */
@@ -7419,8 +7420,12 @@ function lightFuel(){
   if(!S.run) return LIGHT_MAX;
   if(S.run.noStone) return 1;                                  // 初めての潜り：蛍石を持たずに入る
   if(S.run.stoneAt==null) S.run.stoneAt = S.run.elapsed||0;     // 灯りの無い古いセーブは、今から新しい灯り
-  return Math.max(1, LIGHT_MAX - Math.floor(((S.run.elapsed||0) - S.run.stoneAt)/LIGHT_STEP));
+  const age = (S.run.elapsed||0) - S.run.stoneAt;
+  if(age < LIGHT_FIRST) return LIGHT_MAX;
+  return Math.max(1, LIGHT_MAX - 1 - Math.floor((age - LIGHT_FIRST)/LIGHT_STEP));
 }
+/* 蛍石を替えてから、明るさ L になるまでの秒数（テストや調整用） */
+function lightAgeFor(L){ return L>=LIGHT_MAX ? 0 : LIGHT_FIRST + (LIGHT_MAX-1-L)*LIGHT_STEP; }
 function lightBonus(){
   if(!S.hero) return 0;
   const allies = livingParty();

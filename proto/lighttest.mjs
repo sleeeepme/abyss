@@ -1,5 +1,5 @@
 /* 灯り（蛍石）の仕様。
-   ・明るさ 1〜10。10 が今までの明るさ。LIGHT_STEP 秒ごとに 1 段暗くなり、1 より下がらない
+   ・明るさ 1〜10。10 が今までの明るさ。10→9 だけ LIGHT_FIRST 秒、そこから LIGHT_STEP 秒ごとに 1 段暗くなり、1 より下がらない
    ・味方1人・眷属1体につき +1（上限 10）
    ・蛍石を拾う／商人から買うと新しい灯り（10）に替わる
    ・巡回者は「明るさ1で過ごした時間」で来る（潜った時間ではない）
@@ -11,14 +11,16 @@ const R = {};
 R.lightDecays = await pg.evaluate(()=>{
   TH.run(8,{seed:3}); S.hero.party=[];
   const start = lightLevel();
-  S.run.elapsed += LIGHT_STEP*3 + 1; const after3 = lightLevel();
+  S.run.elapsed += LIGHT_FIRST - 1;  const stillFull = lightLevel();   // 3分近くはまだ10
+  S.run.elapsed += 2;                const after1 = lightLevel();      // 3分で9
+  S.run.elapsed += LIGHT_STEP*2;     const after3 = lightLevel();      // そこから90秒ごと
   S.run.elapsed += LIGHT_STEP*20;    const floor = lightLevel();
-  return {start, after3, floor, ok: start===10 && after3===7 && floor===1};
+  return {start, stillFull, after1, after3, floor, ok: start===10 && stillFull===10 && after1===9 && after3===7 && floor===1};
 });
 
 R.alliesAndKinAdd = await pg.evaluate(()=>{
   TH.run(8,{seed:3}); S.hero.party=[];
-  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*5 - 1;          // 灯りそのものは 5
+  S.run.stoneAt = S.run.elapsed - lightAgeFor(5) - 1;          // 灯りそのものは 5
   const alone = lightLevel();
   const a1=TH.ally(8,'knight',10), a2=TH.ally(8,'mage',10); S.hero.party.push(a1,a2);
   const withTwo = lightLevel();
@@ -32,7 +34,7 @@ R.alliesAndKinAdd = await pg.evaluate(()=>{
 
 R.stonePickupResets = await pg.evaluate(()=>{
   TH.run(8,{seed:3}); S.hero.party=[];
-  S.run.elapsed += LIGHT_STEP*8 + 1; const before = lightLevel();
+  S.run.elapsed += lightAgeFor(2) + 1; const before = lightLevel();
   W.drops.push({x:P.x, y:P.y, stone:true});
   autoPickup();
   return {before, after: lightLevel(), ok: before===2 && lightLevel()===10 && !W.drops.some(d=>d.stone)};
@@ -43,7 +45,7 @@ R.merchantSellsStone = await pg.evaluate(()=>{
   let m=null; for(let i=0;i<200 && !m;i++) m=spawnMerchant(W.fl, 12, []);
   W.shop=m;
   const st=m.stock.find(x=>x.stone);
-  S.run.elapsed += LIGHT_STEP*6 + 1; const before=lightLevel();
+  S.run.elapsed += lightAgeFor(4) + 1; const before=lightLevel();
   S.run.gold = st.price + 5;
   const r=buyFromMerchant(st.uid);
   return {price:st.price, before, after:lightLevel(), gold:S.run.gold,
@@ -73,7 +75,7 @@ R.intruderComesOnlyInTheDark = await pg.evaluate(()=>{
   for(let i=0;i<30;i++) stepSim(1);
   const brightNoIntruder = !liveIntruder() && (S.run.darkT||0)===0;
   // 灯りが尽きる（明るさ1）と時計が進み、INTRUDER_AFTER 秒で来る
-  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*12;
+  S.run.stoneAt = S.run.elapsed - lightAgeFor(1) - 60;
   const lv = lightLevel();
   for(let i=0;i<INTRUDER_AFTER-5;i++) stepSim(1);
   const notYet = !liveIntruder();
@@ -85,7 +87,7 @@ R.intruderComesOnlyInTheDark = await pg.evaluate(()=>{
 R.foesOutsideLightAreShadowsThenHidden = await pg.evaluate(()=>{
   TH.run(8,{seed:12}); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true;
   const e=W.enemies.find(x=>!x.boss); W.enemies=[e]; Object.assign(e,{ms:0, atkV:0, lurk:0, dead:false});
-  const at=(L,d)=>{ S.run.stoneAt=S.run.elapsed-(10-L)*LIGHT_STEP-1; e.x=P.x+d; e.y=P.y; draw(); return enemyLit(e); };
+  const at=(L,d)=>{ S.run.stoneAt=S.run.elapsed-lightAgeFor(L)-1; e.x=P.x+d; e.y=P.y; draw(); return enemyLit(e); };
   const r={near10:at(10,2), far10:at(10,9), far6:at(6,6.2), near3:at(3,1.5), far3:at(3,4)};
   CAVE.lightSnap=false;
   return {...r, ok: r.near10==='lit' && r.far10==='shadow' && r.far6==='shadow' && r.near3==='lit' && r.far3==='hidden'};
@@ -93,7 +95,7 @@ R.foesOutsideLightAreShadowsThenHidden = await pg.evaluate(()=>{
 
 R.lightShrinksTheLantern = await pg.evaluate(()=>{
   TH.run(8,{seed:12}); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true; CAVE.noFlicker=true;
-  const at=(L)=>{ S.run.stoneAt=S.run.elapsed-(10-L)*LIGHT_STEP-1; draw(); return {lit:CAVE.litTiles, vis:CAVE.visTiles}; };
+  const at=(L)=>{ S.run.stoneAt=S.run.elapsed-lightAgeFor(L)-1; draw(); return {lit:CAVE.litTiles, vis:CAVE.visTiles}; };
   const a=at(10), m=at(5), z=at(1);
   CAVE.lightSnap=false; CAVE.noFlicker=false;
   return {a, m, z, ok: a.lit>m.lit && m.lit>z.lit && z.lit<1.5 && a.vis>m.vis && m.vis>z.vis && z.vis<3.5};
@@ -121,13 +123,13 @@ R.firstDiveStartsWithoutStone = await pg.evaluate(()=>{
    画面は暗くならず、影も巡回者も無い。明るさ3以下で継続ダメージ。蛍石は瘴気を払う。 */
 R.brightZonesUseMiasma = await pg.evaluate(()=>{
   TH.run(1,{seed:4}); TH.floor(24); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true;
-  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*6 - 1;              // 4
+  S.run.stoneAt = S.run.elapsed - lightAgeFor(4) - 1;              // 4
   draw();
   const lv4 = {lv:lightLevel(), dark:lightDarkLevel(), mia:miasmaLevel(), lit:+CAVE.litTiles.toFixed(2)};
   const hp0 = S.hero.hpNow = stats(S.hero).maxHp;
   for(let i=0;i<4;i++) tickMiasma(1);
   const noHurtAt4 = S.hero.hpNow===hp0;
-  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*7 - 1;              // 3
+  S.run.stoneAt = S.run.elapsed - lightAgeFor(3) - 1;              // 3
   const a=TH.ally(24,'knight',20); S.hero.party=[a];             // 仲間がいると +1 になるので、4 のまま
   const withAlly = lightLevel();
   S.hero.party=[];
@@ -152,7 +154,7 @@ R.brightZonesUseMiasma = await pg.evaluate(()=>{
 /* シルトジェリーなど自分で光る敵は、暗くても見え、そばの敵も照らす。 */
 R.glowingFoesLightTheirSurroundings = await pg.evaluate(()=>{
   TH.run(12,{seed:12}); setScreen('game'); S.hero.party=[]; CAVE.lightSnap=true;
-  S.run.stoneAt = S.run.elapsed - LIGHT_STEP*8 - 1;          // 明るさ2
+  S.run.stoneAt = S.run.elapsed - lightAgeFor(2) - 1;          // 明るさ2
   const slime=FAMILY.find(f=>f.id==='slime'), beast=FAMILY.find(f=>f.id==='beast');
   const turret=ARCH.find(a=>a.id==='turret'), rush=ARCH.find(a=>a.id==='rush');
   const es=W.enemies.filter(x=>!x.boss).slice(0,3); W.enemies=es;
