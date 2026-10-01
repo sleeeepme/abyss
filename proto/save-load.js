@@ -183,7 +183,7 @@
       if(currentRaw)localStorage.setItem(BACKUP,currentRaw);
       localStorage.setItem(KEY,raw);
       currentRaw=raw;lastPayload=payload;revision=envelope.revision;lastSaved=envelope.savedAt;
-      dirty=false;lastWrite=performance.now();status.textContent='自動保存しました';
+      dirty=false;lastWrite=performance.now();status.textContent='';  // 成功は出さない（頻繁に保存するので出し続けに見える。2026-10-01）。失敗だけ出す
       metrics={bytes:raw.length*2,writeMs:performance.now()-t};return true;
     }catch(e){error(e);return false;}
   }
