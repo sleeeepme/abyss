@@ -590,7 +590,7 @@ function castRays(Rm){
 }
 /* 世界の位置（マス単位）の明るさ 0..1。敵の塗りに使う。 */
 CAVE._G=()=>G;
-CAVE._ruinBig=d=>ruinBigFor(d); CAVE._ruinBand=f=>ruinBand(f);
+CAVE._ruinBig=d=>ruinBigFor(d); CAVE._ruinBand=f=>ruinBand(f); CAVE._standBox=o=>standBox(o); CAVE._rockAt=(px,py)=>!!G&&field(G.f,G.L,Math.round(px),Math.round(py))>.5;
 CAVE._sprite=(e)=>{ const r=renderFoe(e,true); return r?SPR.cv.toDataURL():null; };
 CAVE.lightAt=function(xT,yT){
   if(!G) return 1;
@@ -1013,7 +1013,9 @@ function genRuinDressing(f,depth,existing){
     for(let py=ay+sp.fp[1]-2;py<=ay+sp.fp[3]+2;py+=3)for(let px=ax+sp.fp[0]-2;px<=ax+sp.fp[2]+2;px+=3) if(rock(px,py)) return null;
     // 角と壁は、根元が岩の縁から1マス以上離れていること。立ち物の上の方が岩（＝画面では黒）に3ドットより多く掛からないこと
     if(/^(corner|wall)_/.test(name)) for(let px=ax+sp.fp[0];px<=ax+sp.fp[2];px+=4) if(rock(px,ay+sp.fp[1]-Q)) return null;
-    if(sp.tall){ let over=0; for(let py=ay-sp.ay;py<ay+sp.fp[1];py++){ let hit=false; for(let px=ax+sp.fp[0]+2;px<=ax+sp.fp[2]-2&&!hit;px+=3) hit=rock(px,py); if(hit) over++; } if(over>3) return null; }
+    // 絵の全体が床の上に収まること（壁は真上から見た面なので、立ち物の上が壁に乗ると角度が合わない＝standClear と同じ考え）
+    for(let r=0;r<sp.h;r+=2) for(let q=0;q<sp.w;q+=2){ const c=sp.rows[r][q]; if(c==='.'||c==='s') continue;
+      const px=ax-sp.ax+q, py=ay-sp.ay+r; if(rock(px,py)||rock(px,py-2)) return null; }
     // 同じ部品を近くで繰り返さない（柱は列で並ぶ物なので除く）
     if(!/^(col|pave)_/.test(name)&&out.some(o=>o.name===name&&Math.hypot(o.x-ax,o.y-ay)<12*Q)) return null;
     // 塞ぐマス（当たり判定の円がマスの中心に掛かる）
@@ -1176,6 +1178,55 @@ function ruinUnstick(){
     for(let rad=.5;rad<4;rad+=.5) for(let a=0;a<12;a++){ const x=e.x+Math.cos(a*.5236)*rad, y=e.y+Math.sin(a*.5236)*rad; if(free(x,y)){ e.x=x; e.y=y; return; } } };
   (W.enemies||[]).forEach(out); (W.drops||[]).forEach(out);
 }
+/* ---------- 立ち物と壁 ----------
+   ユーザー指摘（2026-10-01）「壁際に置くと、壁は真上から見た形なのに、置いた物は斜めから見た形なので角度がおかしく見える」。
+   壁（岩）は真上から見た面として描いていて、正面（立ち上がり）が無い。そこへ斜め上から見た柱や葦を壁際に立てると、
+   上の方が壁の天面に乗り上げる（＝岩の上に描かれる）か、岩に削られて途中で切れる（dp は岩の上に描かない）。
+   どちらも「角度が合っていない」に見える。だから**高さのある物は、絵の全体が床の上に収まる所にだけ立てる**:
+   壁に掛かるなら壁から離れる向き（北の壁なら南へ、高さのぶん）へずらし、ずらしきれなければ置かない。
+   壁に貼り付く物（苔・貝・蔓・垂れ下がる蔦・根）と、ほぼ平たい物は今まで通り壁際でよい。 */
+function standBox(o){                 // 錨点からの絵の外枠 [左, 上, 右, 下]（ドット）。平たい物は null
+  switch(o.k){
+    case 'reed': return [-10,-23,9,1];
+    case 'weed': return [-6,-17,7,1];
+    case 'crystal': return [-3,-7,3,1];
+    case 'shroom': return [-5,-8,9,1];
+    case 'pillar': return G&&G.Z.id==='sump'?[-5,-18,5,1]:[-7,-30,6,2];
+    case 'wpost': return [-5,-18,5,1];
+    case 'wwall': { const w=wwallW(o); return [-(w>>1)-1,-12,(w>>1)+1,2]; }
+    case 'brokenwall': { const w=24+o.s%14; return [-(w>>1)-1,-14,(w>>1)+1,1]; }
+    case 'arch': return [-12,-26,12,1];
+    case 'lamppost': return [-2,-15,2,1];
+    case 'colonnade': return (o.wdy? [-26,-33,26,1] : [-6,-53,6,22]);
+    case 'boiler': return [-8,-35,8,1];
+    case 'cairn': return [-3,-9,3,1];
+    case 'frame': return [-5,-13,5,1];
+    case 'palegrass': return [-5,-9,5,1];
+  }
+  return null;
+}
+function standClear(f,list){
+  const rock=(x,y)=>field(f,G.L,Math.round(x),Math.round(y))>.5;
+  const wg=(W.haz&&W.haz.kind==='water')?W.haz.g:null, wet=(x,y)=>{ const tx=Math.floor(x/Q), ty=Math.floor(y/Q); return !!(wg&&wg[ty]&&wg[ty][tx]); };
+  const floorAt=(x,y)=>{ const tx=Math.floor(x/Q), ty=Math.floor(y/Q); return f.g[ty]&&f.g[ty][tx]===T.FLOOR; };
+  const hits=(o,bx,x,y)=>{ let n=0, sx=0, sy=0;
+    for(let py=y+bx[1];py<=y+bx[3];py+=2) for(let px=x+bx[0];px<=x+bx[2];px+=2) if(rock(px,py)){ n++; sx+=px-x; sy+=py-y; }
+    return n?[n,sx/n,sy/n]:null; };
+  const out=[];
+  for(const o of list){
+    const bx=standBox(o); if(!bx){ out.push(o); continue; }
+    const h0=hits(o,bx,o.x,o.y); if(!h0){ out.push(o); continue; }
+    // 離れる向き：壁際に置いた物は壁と逆へ、それ以外は岩の重心と逆へ
+    let ux=-(o.wdx||0), uy=-(o.wdy||0); if(!ux&&!uy){ const l=Math.hypot(h0[1],h0[2])||1; ux=-h0[1]/l; uy=-h0[2]/l; }
+    const far=Math.abs(uy)>Math.abs(ux)? (bx[3]-bx[1])+6 : (bx[2]-bx[0])+6, w0=wet(o.x,o.y);
+    let ok=false;
+    for(let d=2;d<=far&&!ok;d+=2){ const x=Math.round(o.x+ux*d), y=Math.round(o.y+uy*d);
+      if(!floorAt(x,y)||wet(x,y)!==w0) break;           // 床が尽きた・水に入った／出た所で諦める
+      if(!hits(o,bx,x,y)){ o.x=x; o.y=y; o.ok=1; o.moved=d; ok=true; } }
+    if(ok) out.push(o);                                  // ずらしきれない物は置かない
+  }
+  return out;
+}
 function genDeco(f,Z){
   const set=DECO_SET[Z.id]||DECO_SET.stone, out=[], depth=(S.run&&S.run.depth)||1;
   const haz=W.haz, water=haz&&haz.kind==='water'?haz.g:null;
@@ -1229,6 +1280,7 @@ function genDeco(f,Z){
   let res=out.filter(o=>o.k!=='pool'||!rocks.some(r=>Math.hypot(r.x-o.x,r.y-o.y)<o.ext*.8+ROCKS[r.k]));
   const pools=res.filter(o=>o.k==='pool');
   res=res.filter(o=>!SMALL[o.k]||!pools.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<p.ext+4));
+  res=standClear(f,res);                                // 立ち物は絵ごと床の上に（壁に掛かる物は床の側へ出す）
   G.pools=pools;
   G.drips=genDrips(f,pools,depth);
   /* 水の層の立った柱は、岩と同じく当たり判定を持つ（すり抜けると柱に見えない）。
