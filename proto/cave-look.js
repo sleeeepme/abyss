@@ -1223,7 +1223,53 @@ const RP_MOSS=[C('#5a5236'),C('#7a6a44'),C('#948448')];
 /* 第3版（講評2回目）：上下を楕円にして円柱に見せる（上面は3行の楕円・根元は端の列が1行上・中央2列が1行下）、
    ハイライトは左から2列目だけ、右は3段で落とす、水際の濡れは列ごとに高さが揺れる、水の中は細め（5〜7）。 */
 const RP_COLS={5:[1,5,3,2,0], 6:[1,5,5,3,2,0], 7:[1,5,5,4,3,2,0], 8:[1,5,5,4,4,3,2,0]};
+/* ---------- 3D から作った石柱のスプライト ----------
+   tools/pillar3d.py が SDF で組んだ柱を、この視点・この光で描いてドット絵に落としたもの。
+   下の RUIN_SPR は**スクリプトが書き換える**（手で直さない）。RUIN_USE_3D=false で手続きの柱に戻る。 */
+const RUIN_USE_3D=true;
+/*RUIN_SPR_BEGIN*/const RUIN_SPR={"tall_a":{"w":8,"h":17,"rows":["..2330..",".215330.","21555330","15555330","15554310","15443210","14433230","14433210","14422110","14443110","14443110","14443110","14433100","14232100","0423210o",".133210.",".00000o."]},"tall_b":{"w":8,"h":16,"rows":["...20...",".261330.","21555330","15555330","15555320","15443210","15432210","15432110","15433210","15433210","12432210","14432210","b4432100","0bbba10o",".bbba10.",".00000o."]},"broken_a":{"w":8,"h":16,"rows":["..20....","2310....","144330..","144330..","1543330.","15433330","15433330","15432110","14432110","14432210","14332110","14432200","bbbba100","0bbaa10o",".bbaa10.",".00000o."]},"broken_b":{"w":8,"h":13,"rows":["....240.","...21330","...14330","..214310",".2143110",".1443110","21443110","15432210","b4432130","0bb3212o",".bbba10.",".b33a00.",".00000o."]},"water_a":{"w":7,"h":12,"rows":[".26330.","2165330","1655320","1543210","1543210","1443210","1333210","1444310","044321o",".13a10.",".1ba10.",".0000o."]},"water_b":{"w":6,"h":12,"rows":["..0...","260...","1330..","15330.","154330","154230","153210","153210","143210","0bba0o",".bba0.",".000o."]},"water_c":{"w":7,"h":11,"rows":["....0..","...2130","..21330",".214320","2144210","1443210","1543210","1543210","0b3310o",".b3210.",".0000o."]},"stub":{"w":8,"h":11,"rows":["..20....",".2130...","214330..","1444330.","15434330","15434330","15432110","14432110","0443221o",".133210.",".00000o."]}};/*RUIN_SPR_END*/
+const RUIN_SPR_PAL={o:RP_OL, a:RP_MOSS[0], b:RP_MOSS[1], c:RP_MOSS[2]};
+function ruinSprKey(d,inW){
+  if(d.flat) return 'stub';
+  const s=d.s;
+  if(inW) return ['water_a','water_b','water_c'][s%3];
+  return (d.broken!=null ? d.broken : s%3===0) ? ['broken_a','broken_b'][(s>>>4)%2] : ['tall_a','tall_b'][(s>>>4)%2];
+}
+function drawRuinSprite(d,t,L,inW,sp){
+  const s=d.s, x=Math.round(d.x), y=Math.round(d.y), Wd=sp.w, Hs=sp.h, x0=x-(Wd>>1), top=y-Hs;
+  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
+  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
+  const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
+  const col=ch=> ch>='0'&&ch<='6' ? RP_T[ch.charCodeAt(0)-48] : RUIN_SPR_PAL[ch];
+  // 列ごとの根元（スプライトの一番下の不透明な行）
+  const bot=[]; for(let q=0;q<Wd;q++){ let b=-1; for(let r=Hs-1;r>=0;r--) if(sp.rows[r][q]!=='.'){ b=r; break; } bot.push(b); }
+  const wetH=[]; { let w=2; for(let q=0;q<Wd;q++){ const hh=hs(s,q+333)%3; w=Math.max(1,Math.min(2,w+(hh===0?-1:hh===1?1:0))); wetH.push(w); } }
+  // 影
+  if(inW){ for(let yy=0;yy<3;yy++) for(let xx=0;xx<Wd+2;xx++){ const ex=(xx-(Wd+1)/2)/((Wd+2)/2), ey=(yy-1)/1.6; if(ex*ex+ey*ey>1) continue; mix(x0+1+xx,y+1+yy,RP_WSH,.6,true); } }
+  else { for(let yy=0;yy<2;yy++) for(let xx=0;xx<Wd+2;xx++){ if(xx===Wd+1&&yy===1) continue; mix(x0+2+xx,y+yy,RP_DARK,.4); } mix(x0-1,y-1,RP_DARK,.3); mix(x0-1,y-2,RP_DARK,.2); }
+  // 水面の下：2行だけ細く溶ける
+  if(inW) for(let yy=1;yy<=2;yy++){ const a=yy===1?.3:.15; for(let q=1;q<Wd-1;q++){ const k=idx(x0+q,y+yy); if(k<0||!wmask[k]) continue; const ch=sp.rows[Math.max(0,bot[q])][q]; if(ch==='.') continue; buf[k]=mixU(buf[k],lit(col(ch)),a); } }
+  // 本体
+  for(let r=0;r<Hs;r++){ const row=sp.rows[r], py=top+r;
+    for(let q=0;q<Wd;q++){ const ch=row[q]; if(ch==='.') continue; let c=col(ch);
+      if(inW && r>bot[q]-wetH[q]) c=mixU(mixU(RP_DARK,c,.8),RP_WET,.15);
+      put(x0+q,py,c); } }
+  if(!inW){
+    for(let yy=0;yy<2;yy++) for(let xx=-3;xx<0;xx++){ const w=yy===0?2:3; if(xx<-w) continue; if(yy===0&&xx===-w) continue; put(x0+xx,y-2+yy,RP_MOSS[yy?0:1]); }
+    if(s%2){ const px=x0+Wd+1, py=y+1; put(px,py,RP_T[3]); put(px+1,py,RP_T[3]); put(px,py+1,RP_T[1]); put(px+1,py+1,RP_T[1]); }
+    return;
+  }
+  for(let q=0;q<Wd;q++){ if(bot[q]<0) continue; const k=idx(x0+q,y); if(k<0) continue; buf[k]=mixU(buf[k],lit(mixU(col(sp.rows[bot[q]][q]),RP_WET,.3)),.5); }
+  if(((t*1.8+s%5)|0)%3){ mix(x0+1,y,RP_WHI,.12,false); mix(x0+2,y,RP_WHI,.12,false); }
+  mix(x0-1,y-1,RP_DARK,.25,true); mix(x0-1,y,RP_DARK,.25,true);
+  const per=3.4, u=((t+(s%97)/30)%per)/1.6;
+  if(u<1){ const rx=Wd/2+1.5+u*7, ry=(1.8+u*4)*.55, a=.3*(1-u), cx=x0+(Wd-1)/2;
+    for(let i2=0;i2<44;i2++){ const an=i2/44*6.2831853, px=Math.round(cx+Math.cos(an)*rx), py=Math.round(y+.5+Math.sin(an)*ry);
+      if(py<=y+1 && px>=x0-1 && px<=x0+Wd) continue; mix(px,py,RP_WHI,a,true); } }
+}
 function drawRuinPost(d,t,L,inW){
+  if(RUIN_USE_3D && RUIN_SPR && !d.proc && !CAVE.ruinProc){ const sp=RUIN_SPR[ruinSprKey(d,inW)]; if(sp) return drawRuinSprite(d,t,L,inW,sp); }
   const s=d.s, x=Math.round(d.x), y=Math.round(d.y);
   const Wd= d.W || (inW ? [5,6,7,6][s%4] : [8,8,7][s%3]), x0=x-(Wd>>1), cols=RP_COLS[Wd];
   const broken=d.broken!=null ? d.broken : s%3===0, H= d.H || (inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5);
