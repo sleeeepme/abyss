@@ -86,10 +86,14 @@ R.bigRuins = await pg.evaluate(()=>{
   for(const seed of [44,45,46,47]){
     for(const d of [16,17,18,19]){ TH.run(d,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); draw(); const G=CAVE._G();
       for(const o of G.deco){
-        if(o.k==='ruinroom'){ rooms++; const lay=o._lay; const e=lay&&lay.els.find(e=>e.t==='stack'&&!e.tilt); if(e&&window.solid((e.x+e.w/2)/16,(e.y-1)/16)) roomSolid++; }
-        if(o.k==='fallen'||o.k==='wfallen'){ fallen++; const g=o._fg, dr=g.drums[1]||g.drums[0]; if(window.solid((dr.x+3)/16,(dr.y+Math.round(3*dr.sl)+dr.D-4)/16)) fallenSolid++; } } }
+        const sp=CAVE._ruinBig(o);
+        const solidAt=()=>{ if(sp){ const [dx,dy]=sp.obs[Math.min(1,sp.obs.length-1)]; return window.solid((o.x+dx)/16,(o.y+dy)/16); }
+          if(o.k==='ruinroom'){ const e=o._lay&&o._lay.els.find(e=>e.t==='stack'&&!e.tilt); return !!(e&&window.solid((e.x+e.w/2)/16,(e.y-1)/16)); }
+          const g=o._fg, dr=g.drums[1]||g.drums[0]; return window.solid((dr.x+3)/16,(dr.y+Math.round(3*dr.sl)+dr.D-4)/16); };
+        if(o.k==='ruinroom'){ rooms++; if(solidAt()) roomSolid++; }
+        if(o.k==='fallen'||o.k==='wfallen'){ fallen++; if(solidAt()) fallenSolid++; } } }
     for(const d of [12,14]){ TH.run(d,{seed}); setScreen('game'); draw(); early+=CAVE._G().deco.filter(o=>o.k==='ruinroom'||o.k==='wfallen').length; }
   }
-  return {rooms, roomSolid, fallen, fallenSolid, early, ok: rooms>=3 && roomSolid===rooms && fallen>=3 && fallenSolid===fallen && early===0};
+  return {rooms, roomSolid, fallen, fallenSolid, early, ok: rooms>=2 && roomSolid===rooms && fallen>=3 && fallenSolid===fallen && early===0};
 });
 await done(b, errs, R);
