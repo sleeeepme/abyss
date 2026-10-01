@@ -21,8 +21,10 @@ R.packRush = await pg.evaluate(()=>{
   TH.run(13,{seed:42}); setScreen('game');
   const pk0=W.enemies.find(e=>e.swarmling), pk=W.enemies.filter(e=>e.pack===pk0.pack);
   // 群れの端の1体だけが見える所に立つ（他は索敵距離の外）
-  const far=pk.reduce((m,e)=>Math.hypot(e.x-pk0.x,e.y-pk0.y)>Math.hypot(m.x-pk0.x,m.y-pk0.y)?e:m, pk0);
-  P.x=pk0.x+(pk0.x-far.x>0?1:-1)*8.0; P.y=pk0.y;
+  const cx=pk.reduce((a,e)=>a+e.x,0)/pk.length, cy=pk.reduce((a,e)=>a+e.y,0)/pk.length;
+  const far=pk.reduce((m,e)=>Math.hypot(e.x-cx,e.y-cy)>Math.hypot(m.x-cx,m.y-cy)?e:m, pk0);
+  const ux=(far.x-cx)||1, uy=far.y-cy, ul=Math.hypot(ux,uy)||1, A=far.arch.aggro-0.6;
+  P.x=far.x+ux/ul*A; P.y=far.y+uy/ul*A;
   const seesOne = pk.filter(e=>Math.hypot(e.x-P.x,e.y-P.y)<e.arch.aggro).length;
   W.enemies.filter(e=>!e.swarmling).forEach(e=>e.dead=true);
   S.hero.hpNow=99999;

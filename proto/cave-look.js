@@ -877,7 +877,10 @@ const DECO_PAL={
 };
 /* 水の層の遺跡の名残（第16〜20階層）。石の色を水に浸かった冷たい色に寄せ、根元に藻を付ける。
    跡の層（第四層／築）の石材と同じ形を使い回す——**同じ造りの物が、ここではもう沈みかけている**。 */
-const DECO_PAL_WET=Object.assign({}, DECO_PAL, {stone:dcR(['#26302e','#62766f','#aac2b8']), stoneDk:C('#0c1212'), algae:dcR(['#0e2a22','#24584a','#4c8a6c'])});
+/* → 2026-10-01：色は拠点（街の広場の石畳・柱）と同じ砂色の石に、オリーブ色の苔（ユーザー要望）。
+   拠点の絵から取った値：明 #c3ad98／中 #9f906e／暗 #5a534f、照り #d6bca6。 */
+const DECO_PAL_WET=Object.assign({}, DECO_PAL, {stone:dcR(['#5a534f','#9f906e','#c3ad98']), stoneDk:C('#2e2a28'), stoneHi:C('#d6bca6'),
+  algae:dcR(['#3e3e18','#6e6c28','#a39a44']), mossBed:dcR(['#2e3014','#55561f','#86823a']), mossBedTip:C('#b0a650'), foam:C('#d8f4f4')});
 // 層ごとの品目：[名前, 置き場所, 出やすさ]
 const DECO_SET={
   /* 4つめは「この深さから出る」最小の階層（省略＝最初から出る）。
@@ -891,7 +894,9 @@ const DECO_SET={
          ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
   sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014],
         /* 第16〜20階層（層の6階目から）：遺跡の名残。立った柱は当たり判定を持つ（genDeco の末尾）。 */
-        ['pillar','wall',.016,6],['colonnade','wall',.004,6],['brokenwall','wall',.008,6],['fallen','open',.005,6],['rubble','floor',.012,6]],
+        ['pillar','wall',.016,6],['colonnade','wall',.004,6],['brokenwall','wall',.008,6],['fallen','open',.005,6],['rubble','floor',.012,6],
+        /* 水の中の遺跡（添付の見本）：水から立つ角柱・水面から出た崩れ壁・浅瀬の飛び石・深みに沈んだ建物の跡 */
+        ['wpost','water',.026,6],['wwall','water',.006,6],['wsteps','water',.010,6],['sunken','water',.012,6],['mossbed','floor',.016,6]],
   root:[['shroom','wall',.024],['tendril','wall',.026],['bulb','floor',.010],['moss','wall',.014]],
   ruin:[['foundation','floor',.010],['colonnade','wall',.012],['pillar','wall',.022],['brokenwall','wall',.018],['arch','wall',.010],['steps','wall',.009],['lamppost','wall',.012],['plaque','floor',.008],['rubble','floor',.010]],
   furnace:[['boiler','wall',.014],['pipe','wall',.024],['slag','floor',.012],['vent','floor',.010],['gear','floor',.008]],
@@ -912,6 +917,10 @@ function genDeco(f,Z){
       const h=hs(tx*92821+ty*68917+depth*31,n+1), r=(h%100000)/100000;
       if(r>=p*(DECO_MUL[Z.id]||1)*(kind==='pool'?poolMore(depth):1)) continue;
       if(where==='water'&&!inW) continue;
+      if(inW){ const tier=water[ty][tx];                          // 1浅瀬／2深み／3淵
+        if(kind==='sunken'&&tier<2) continue;                     // 沈んだ跡は深みにだけ見える
+        if((kind==='wsteps'||kind==='wwall')&&tier!==1) continue; // 飛び石と崩れ壁は浅瀬に
+        if(kind==='wpost'&&tier>2) continue; }
       if(where!=='water'&&(inW||hz)) continue;
       if(where==='wall'&&!nb.length) continue;
       const fl=(x,y)=>f.g[y]&&f.g[y][x]===T.FLOOR, wl=(x,y)=>!f.g[y]||f.g[y][x]===T.WALL;
@@ -949,6 +958,8 @@ function genDeco(f,Z){
   if(Z.id==='sump') for(const o of res){
     // 壁に半分埋まると細い棒にしか見えなかったので、床の側へ寄せて丸ごと見せる
     if(o.k==='pillar'){ o.x=Math.round(o.x-(o.wdx||0)*6); o.y=Math.round(o.y-(o.wdy||0)*5); addObs(o.x, o.y-1, 5); }
+    else if(o.k==='wpost') addObs(o.x, o.y-1, 4.5);
+    else if(o.k==='wwall'){ const w=wwallW(o); for(let q=-w/2+3;q<=w/2-3;q+=5) addObs(o.x+q, o.y-1, 3.5); }
     else if(o.k==='colonnade'){ const ax=-(o.wdy||0), ay=(o.wdx||0), bx=o.x-(o.wdx||0)*2, by=o.y-(o.wdy||0)*2;
       for(let i=0;i<3;i++){ if(i===1&&o.s%3===0) continue; addObs(bx+ax*(i-1)*20, by+ay*(i-1)*20-1, 4); } } }
   return res;
@@ -1060,6 +1071,7 @@ function rockPoly(cx,by,w,H,seed){
   const xf=Math.round(xp+side*-(w*.2)+ (r(15)-.5)*2);      // 稜線が地面に降りる所
   return {pix,top,xp,yp,xf,by,H,xL,xR,seed};
 }
+function wwallW(d){ return 20+d.s%14; }
 function rockShape(d){ const s=d.s; return {w:4+s%4, H:7+(s>>>3)%5, two:s%3===0, w2:2+(s>>>6)%2, H2:3+(s>>>7)%3}; }
 function stampEll(cx,cy,rx,ry){
   const {code,nx,ny,PW,PH}=G;
@@ -1244,6 +1256,37 @@ function drawDeco(bx0,by0,t,blindR){
       for(let j=5;j<H;j++){ const top=j>H-4; for(let q=0;q<8;q++){ if(top&&hs(s,q+j*7)%3===0) continue; const px=bx+q, py=y-j; dp(px,py,(q===2||q===5)?P_.stone[0]:sh3(P_.stone,L*(q<2?1.25:q>6?.6:1),px,py)); } }
       if(s%2){ const fx=x+(s%3?10:-15), fy=y+3; drect(fx,fy-4,fx+7,fy,P_.stone,L,true); dp(fx+2,fy-2,P_.stoneDk); dp(fx+5,fy-2,P_.stoneDk); }
       if(P_.algae) for(let i=0;i<14;i++){ const h=hs(s,i+200), px=bx-2+(h%12), py=y+1-((h>>>5)%(3+(h>>>9)%6)); dp(px,py,sh3(P_.algae,L*1.1,px,py)); }   // 根元の藻
+      break; }
+    /* ---- 水の中の遺跡（水の層・第16〜20階層）----
+       立っている物は wmask を消して描く（dpw の 0）——水面の揺らぎ（屈折）と波の線が乗らない。
+       沈んだ跡だけは水の色に混ぜて、印を残す＝水と一緒に揺れて「水の下にある」に見える。 */
+    case 'wpost': { const H=13+s%10, bx=x-3, broken=s%3===0, sb=P_.stone;
+      for(let j=0;j<H;j++){ const top=j>=H-2, jag=broken&&j>H-5&&hs(s,j)%2;
+        for(let q=0;q<7;q++){ if(jag&&q>3) continue; const px=bx+q, py=y-j;
+          const c= top ? (q<6?P_.stoneHi:sb[1]) : sh3(sb, L*(q<2?1.25:q>4?.55:.95), px,py);
+          dpw(px,py, (q===0||q===6)&&!top ? sb[0] : c, 0); } }
+      if(P_.algae) for(let i=0;i<6;i++){ const h=hs(s,i+90); dpw(bx+(h%7), y-((h>>>4)%4), sh3(P_.algae,L,bx,y), 0); }
+      const ph=(t*1.3+s%7)%2; for(let q=-1;q<=7;q++) if(q<0||q>6||ph<.15) if(((q+((t*3)|0))&3)!==0) dpw(bx+q,y+1,P_.foam,0);   // 根元の白い縁
+      break; }
+    case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone;
+      for(let xx=0;xx<w;xx++){ const eH=H-((hs(s,xx)%3)*(xx>w*.55?1:0))-(xx<2||xx>w-3?1:0);
+        for(let yy=0;yy<eH;yy++){ const px=x0+xx, py=y-yy, mortar=(yy%3===2)||(((xx+((yy/3|0)%2)*3)%6)===0);
+          dpw(px,py, yy===eH-1?P_.stoneHi:mortar?P_.stoneDk:sh3(sb,L*(xx<w/3?1.15:.85),px,py), 0); }
+        if(((xx+((t*4)|0))%5)!==0) dpw(x0+xx,y+1,P_.foam,0); }
+      if(P_.algae) for(let i=0;i<8;i++){ const h=hs(s,i+60); dpw(x0+(h%w), y-((h>>>5)%2), sh3(P_.algae,L,x0,y),0); }
+      break; }
+    case 'wsteps': for(let i=0;i<3;i++){ const h=hs(s,i), px=x-9+i*8+(h%3)-1, py=y+((h>>>3)%5)-2;
+        for(let yy=-2;yy<=1;yy++)for(let xx=-3;xx<=3;xx++){ if(xx*xx/10+yy*yy/2.6>1) continue; dpw(px+xx,py+yy, yy<0?P_.stoneHi:sh3(P_.stone,L*.9,px+xx,py+yy),0); }
+        if(Math.sin(t*2+i+s)>.3) dpw(px+4,py+1,P_.foam,0); }
+      break;
+    case 'sunken': { const w=26+s%20, h=16+(s>>>5)%14, x0=x-(w>>1), y0=y-(h>>1), stc=P_.stone[2], dk=P_.stoneDk;
+      const mixAt=(px,py,c,a)=>{ px=Math.round(px)-DB0x; py=Math.round(py)-DB0y; if(px<0||py<0||px>=bw||py>=bh) return; const k=py*bw+px; if(!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
+      const A=.24+.18*Math.min(1,L*1.4);
+      const seg=(ax,ay,bx2,by2)=>{ const n=Math.max(Math.abs(bx2-ax),Math.abs(by2-ay)); for(let i=0;i<=n;i++){ if(hs(s,(ax*3+ay)*7+i>>2)%9<2) continue;
+          const px=ax+(bx2-ax)*i/n, py=ay+(by2-ay)*i/n; mixAt(px,py,stc,A); mixAt(px,py+1,stc,A*.8); mixAt(px,py+2,dk,A*.9); } };
+      seg(x0,y0,x0+w,y0); seg(x0,y0+h,x0+w,y0+h); seg(x0,y0,x0,y0+h); seg(x0+w,y0,x0+w,y0+h);
+      if(s%2) seg(x0+(w>>1),y0,x0+(w>>1),y0+h);
+      for(let yy=y0+4;yy<y0+h-2;yy+=5)for(let xx=x0+4;xx<x0+w-2;xx+=6) if(hs(s,xx*13+yy)%3) mixAt(xx,yy,stc,A*.55);   // 床の敷石
       break; }
     /* 倒れた柱：横倒しの円柱。太鼓（継ぎ目）ごとに少しずれて、片端は折れて欠けている。跨げる高さなので当たり判定は持たない。 */
     case 'fallen': { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
@@ -1859,7 +1902,7 @@ const BODY={
 const EMIT={slime:{turret:[30,.75]}, arcane:{swarm:[18,.35],range:[14,.25]}, armor:{range:[30,.8]}, flame:{turret:[26,.8],swarm:[22,.5],rush:[14,.3]}, storm:{range:[20,.45]}};
 const FOE_CV=new WeakMap();   // 敵ごとのキャンバス（分裂で複製された敵とも共有しない）
 const MID={5:'toad',15:'leech',25:'spider',35:'serpent',45:'eye'};
-const BODY_SIZE={ beast:{range:.70}, slater:{swarm:.72} };   // 系統×形式 → 絵の倍率（当たり判定は変えない）
+const BODY_SIZE={ beast:{range:.70}, slater:{swarm:.40} };   // 磯虫は半分くらいに（ユーザー要望）   // 系統×形式 → 絵の倍率（当たり判定は変えない）
 
 CAVE.enemy=function(e,sx,sy,R){
   try{ return enemy(e,sx,sy,R); }catch(err){ console.error(err); return false; }

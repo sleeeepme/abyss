@@ -7067,7 +7067,7 @@ function spawnMoss(fl, depth){
    見返りは1体ぶんを薄くし（経験値・金・落とし物を SLATER_REWARD 倍）、SPは群れを散らしたときにまとめて出す。
    10体ぶんの通常の見返りを配ると、群れが一番おいしい相手になってしまう。 */
 const SLATER = {nm:'タイドスレイター', col:'#8a9a94', dt:'pierce', res:{blunt:-25, pierce:15},
-                hp:0.20, atk:0.32, ms:3.1, r:0.24, tele:0.24, range:0.7, aggro:8.5,
+                hp:0.20, atk:0.32, ms:3.1, r:0.18, tele:0.24, range:0.7, aggro:8.5,   // r：絵を半分にしたので当たりも小さく（0.24→0.18）
                 pack:[9, 12], from:11, until:20, packs:d=>d>=16?2:1};
 const SLATER_REWARD = 0.3;
 function slaterFloor(depth){ return zoneAt(depth).id==='sump' && depth>=SLATER.from && depth<=SLATER.until; }
@@ -13629,7 +13629,7 @@ function draw(){
     // ボスだけ半径を大きくしても、描画がここで固定値のままだと
     // 「当たり判定は大きいのに見た目は雑魚」という一番まずい状態になる。
     // looksBoss は門番の幻。大きさまで本体と同じにしないと、輪を消しても一目で分かる。
-    const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:0.32);
+    const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:e.swarmling?0.17:0.32);   // 磯虫は小さい（影・HP帯も合わせる）
     const shadowSize = mossSpriteKey(e) ? R*2.6 : CharacterArt.enemyKey(e) ? (e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1)) : R*2;
     drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?Math.max(0,e.fade/0.3):1);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
@@ -19316,7 +19316,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261001c"></script>
+<script src="cave-look.js?v=20261001d"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
