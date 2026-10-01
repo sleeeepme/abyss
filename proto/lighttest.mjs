@@ -11,7 +11,7 @@ const R = {};
 R.lightDecays = await pg.evaluate(()=>{
   TH.run(8,{seed:3}); S.hero.party=[];
   const start = lightLevel();
-  S.run.elapsed += LIGHT_FIRST - 1;  const stillFull = lightLevel();   // 3分近くはまだ10
+  S.run.elapsed += LIGHT_FIRST - 1;  const stillFull = lightLevel();   // 2分近くはまだ10
   S.run.elapsed += 2;                const after1 = lightLevel();      // 3分で9
   S.run.elapsed += LIGHT_STEP*2;     const after3 = lightLevel();      // そこから90秒ごと
   S.run.elapsed += LIGHT_STEP*20;    const floor = lightLevel();

@@ -7390,7 +7390,7 @@ function makeUnique(fl, depth, fams){
    帰還ポータルは 5 階ごとなので、圧力は「次のポータルまで持たせる」形で着地する。 */
 /* ---------- 灯り（蛍石） ----------
    明るさは 10 段階。10 が今までの明るさで、1 はほとんど何も見えない。
-   ・灯りは蛍石で灯っていて、最初の 1 段（10→9）だけ LIGHT_FIRST 秒、そこからは LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で15分）。
+   ・灯りは蛍石で灯っていて、最初の 1 段（10→9）だけ LIGHT_FIRST 秒、そこからは LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で14分）。
    ・新しい蛍石を手に入れると**新しい灯りに替わる**（回復ではなく交換。10 に戻る）。
      商人が売っているほか、灯りを帯びた敵が稀に落とす。
    ・味方1人・眷属1体につき +1（上限 10）。仲間は灯りを持っている——連れているほど暗くなるのが遅い。
@@ -7400,7 +7400,7 @@ function makeUnique(fl, depth, fams){
    3 以下では見えなくなる。明るさ 1 のまま一定時間いると、巡回者が来る。
    潜る時間そのものに配分が要るようにするための仕掛け。 */
 const LIGHT_MAX   = 10;
-const LIGHT_FIRST = 180;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い）
+const LIGHT_FIRST = 120;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い。3分→2分 2026-10-01）
 const LIGHT_STEP  = 90;     // そこから1段暗くなるまでの秒数
 const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見えない
 const STONE_DROP  = 0.07;   // 灯りを帯びた敵が蛍石を落とす率（精鋭は2倍）
@@ -7926,6 +7926,7 @@ function startRun(depth){
   }
   S.hero.hpNow = stats(S.hero).maxHp;
   enterFloor(d);
+  if(W.dropIn) W.dropIn.t = -DROPIN.hold;   // 街からの落下は黒が明けてから（DROPIN の注記）
   setScreen('game');
   flashFade();                     // 街→アビスの黒暗転
 }
@@ -7977,7 +7978,11 @@ function placeFirstStone(fl){
    （形態変化の演出と同じ扱い。敵も動かないので、着地前に殴られることはない）。
    セーブに相手そのものを入れないよう、落ちる順は「主人公＝−1／仲間＝並び順」で持つ。
    テスト（自動操作中、または DROP_IN=false）と動きを減らす設定では出さない。 */
-const DROPIN = {h:7, fall:0.48, gap:0.13, land:0.18};
+const DROPIN = {h:7, fall:0.48, gap:0.13, land:0.18,
+  /* 街から潜ったときだけ、落ち始めを黒の明けまで待つ。startRun は暗転（flashFade 0.32〜0.36秒）の
+     下で始まるので、そのままだと主人公の落下（0.48秒）がほぼ黒に隠れて「落ちてこない」ように見えた。
+     待つあいだは全員まだ画面の上（hide）。 */
+  hold:0.42};
 function startDropIn(){
   W.dropIn = null;
   /* 自動テスト（navigator.webdriver）では、DROP_IN=true を明示したときだけ出す。
@@ -19248,7 +19253,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261001a"></script>
+<script src="cave-look.js?v=20261001b"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

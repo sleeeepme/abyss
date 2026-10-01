@@ -19,6 +19,21 @@ R.dropIn = await pg.evaluate(()=>{
   return {at0:{heroUp: at0.hero && at0.hero.y<-TS*5, a0Hidden: !!(at0.a0&&at0.a0.hide), a1Hidden: !!(at0.a1&&at0.a1.hide)}, mid, after,
           ok: at0.hero && at0.hero.y<-TS*5 && at0.a0?.hide && at0.a1?.hide && mid.heroFalling && mid.frozen && after.over && after.pose==null && after.moving};
 });
+/* 街から潜ったとき。暗転の下で落ち始めると見えないので、黒が明けるまで全員を画面の上で待たせる */
+R.fromHub = await pg.evaluate(()=>{
+  window.DROP_IN = true;
+  S.run=null; setScreen('town');
+  startRun();
+  const held = W.dropIn && W.dropIn.t<0 && !!(dropInPose(P)||{}).hide;
+  stepSim(DROPIN.hold*0.9);
+  const stillUp = !!(dropInPose(P)||{}).hide;
+  stepSim(0.3);
+  const falling = (dropInPose(P)||{}).k!=null;
+  stepSim(2);
+  const over = W.dropIn==null;
+  window.DROP_IN = false;
+  return {held, stillUp, falling, over, ok: held && stillUp && falling && over};
+});
 R.offInTests = await pg.evaluate(()=>{
   window.DROP_IN = undefined;            // 自動操作中は明示しない限り出さない
   TH.run(3,{seed:7}); enterFloor(3);
