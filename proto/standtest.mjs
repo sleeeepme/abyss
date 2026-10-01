@@ -15,7 +15,7 @@ R.standClear = await pg.evaluate(()=>{
       all++; if(hit) over++; const k=z+':'+(o.k==='rbig'?'rbig':o.k); per[k]=(per[k]||0)+1; }
   }
   // 壁際に出ていた品目が、ずらした結果ひとつも残らない、ということが無いこと
-  const need=['stone:reed','sump:weed','ruin:pillar','ruin:colonnade','ruin:brokenwall','ruin:arch','furnace:boiler','sump:rbig'];
+  const need=['stone:reed','stone:rock','stone:stalagC','sump:weed','ruin:pillar','ruin:colonnade','ruin:brokenwall','ruin:arch','furnace:boiler','sump:rbig'];
   const missing=need.filter(k=>!per[k]);
   return {all, over, missing, per, ok: over===0 && missing.length===0 && all>300};
 });
