@@ -80,4 +80,16 @@ R.soap = await pg.evaluate(()=>{
   TH.run(5,{seed:48}); setScreen('game'); draw(); const none=!CAVE._G().soap;
   return {n, popped, none, ok: n>=5 && n<=60 && popped && none};
 });
+/* 倒れた石柱と部屋の残骸（16〜20階）：出ること、当たり判定を持つこと、描いても落ちないこと */
+R.bigRuins = await pg.evaluate(()=>{
+  let rooms=0, fallen=0, roomSolid=0, fallenSolid=0, early=0;
+  for(const seed of [44,45,46,47]){
+    for(const d of [16,17,18,19]){ TH.run(d,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); draw(); const G=CAVE._G();
+      for(const o of G.deco){
+        if(o.k==='ruinroom'){ rooms++; const lay=o._lay; const e=lay&&lay.els.find(e=>e.t==='stack'&&!e.tilt); if(e&&window.solid((e.x+e.w/2)/16,(e.y-1)/16)) roomSolid++; }
+        if(o.k==='fallen'||o.k==='wfallen'){ fallen++; const g=o._fg, dr=g.drums[1]||g.drums[0]; if(window.solid((dr.x+3)/16,(dr.y+Math.round(3*dr.sl)+dr.D-4)/16)) fallenSolid++; } } }
+    for(const d of [12,14]){ TH.run(d,{seed}); setScreen('game'); draw(); early+=CAVE._G().deco.filter(o=>o.k==='ruinroom'||o.k==='wfallen').length; }
+  }
+  return {rooms, roomSolid, fallen, fallenSolid, early, ok: rooms>=3 && roomSolid===rooms && fallen>=3 && fallenSolid===fallen && early===0};
+});
 await done(b, errs, R);

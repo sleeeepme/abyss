@@ -894,9 +894,9 @@ const DECO_SET={
          ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
   sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014],
         /* 第16〜20階層（層の6階目から）：遺跡の名残。立った柱は当たり判定を持つ（genDeco の末尾）。 */
-        ['pillar','wall',.016,6],['colonnade','wall',.004,6],['brokenwall','wall',.008,6],['fallen','open',.005,6],['rubble','floor',.012,6],
+        ['pillar','wall',.016,6],['colonnade','wall',.004,6],['brokenwall','wall',.008,6],['fallen','open',.004,6],['ruinroom','open',.004,6],['rubble','floor',.012,6],
         /* 水の中の遺跡（添付の見本）：水から立つ角柱・水面から出た崩れ壁・浅瀬の飛び石・深みに沈んだ建物の跡 */
-        ['wpost','water',.026,6],['wwall','water',.006,6],['wsteps','water',.010,6],['sunken','water',.012,6],['mossbed','floor',.016,6]],
+        ['wpost','water',.026,6],['wfallen','water',.0025,6],['wwall','water',.006,6],['wsteps','water',.010,6],['sunken','water',.012,6],['mossbed','floor',.016,6]],
   root:[['shroom','wall',.024],['tendril','wall',.026],['bulb','floor',.010],['moss','wall',.014]],
   ruin:[['foundation','floor',.010],['colonnade','wall',.012],['pillar','wall',.022],['brokenwall','wall',.018],['arch','wall',.010],['steps','wall',.009],['lamppost','wall',.012],['plaque','floor',.008],['rubble','floor',.010]],
   furnace:[['boiler','wall',.014],['pipe','wall',.024],['slag','floor',.012],['vent','floor',.010],['gear','floor',.008]],
@@ -918,6 +918,7 @@ function genDeco(f,Z){
       if(r>=p*(DECO_MUL[Z.id]||1)*(kind==='pool'?poolMore(depth):1)) continue;
       if(where==='water'&&!inW) continue;
       if(inW){ const tier=water[ty][tx];                          // 1浅瀬／2深み／3淵
+        if(kind==='wfallen'&&tier>2) continue;
         if(kind==='sunken'&&tier<2) continue;                     // 沈んだ跡は深みにだけ見える
         if((kind==='wsteps'||kind==='wwall')&&tier!==1) continue; // 飛び石と崩れ壁は浅瀬に
         if(kind==='wpost'&&tier>2) continue; }
@@ -925,7 +926,11 @@ function genDeco(f,Z){
       if(where==='wall'&&!nb.length) continue;
       const fl=(x,y)=>f.g[y]&&f.g[y][x]===T.FLOOR, wl=(x,y)=>!f.g[y]||f.g[y][x]===T.WALL;
       const nearStart=f.start&&Math.hypot(tx-f.start.cx,ty-f.start.cy)<3;
-      if(where==='open'){ if(nearStart) continue; let ok=true; for(let dy=-1;dy<=1&&ok;dy++)for(let dx=-1;dx<=1;dx++) if(!fl(tx+dx,ty+dy)){ok=false;break;} if(!ok) continue; }
+      if(where==='open'){ if(nearStart) continue; let ok=true; for(let dy=-1;dy<=1&&ok;dy++)for(let dx=-1;dx<=1;dx++) if(!fl(tx+dx,ty+dy)){ok=false;break;} if(!ok) continue;
+        if(kind==='ruinroom'){                                         // 部屋の残骸は 5×4 マスの床が要る。入口と穴からは離す
+          for(let dy=-2;dy<=1&&ok;dy++)for(let dx=-2;dx<=2;dx++) if(!fl(tx+dx,ty+dy)){ok=false;break;}
+          if(!ok||Math.hypot(tx-f.start.cx,ty-f.start.cy)<6||(f.stair&&Math.hypot(tx+.5-f.stair.x,ty+.5-f.stair.y)<4)) continue;
+          if(out.some(o=>o.k==='ruinroom'&&Math.hypot(o.x-tx*Q,o.y-ty*Q)<Q*9)) continue; } }
       let cdx=0,cdy=0;
       if(where==='corner'){ if(nearStart) continue; let found=false;
         for(const [dx,dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(wl(tx+dx,ty)&&wl(tx,ty+dy)&&fl(tx-dx,ty)&&fl(tx,ty-dy)&&fl(tx-dx,ty-dy)&&fl(tx-2*dx,ty)&&fl(tx,ty-2*dy)){cdx=dx;cdy=dy;found=true;break;} }
@@ -960,6 +965,12 @@ function genDeco(f,Z){
     if(o.k==='pillar'){ o.x=Math.round(o.x-(o.wdx||0)*6); o.y=Math.round(o.y-(o.wdy||0)*5); addObs(o.x, o.y-1, 5); }
     else if(o.k==='wpost') addObs(o.x, o.y-1, 4.5);
     else if(o.k==='wwall'){ const w=wwallW(o); for(let q=-w/2+3;q<=w/2-3;q+=5) addObs(o.x+q, o.y-1, 3.5); }
+    if(o.k==='fallen'||o.k==='wfallen'||o.k==='ruinroom') o.ext=34;      // 大きいので画面の端で切らない
+    if(o.k==='fallen'||o.k==='wfallen'){ const g=fallenGeo(o); for(const dr of g.drums) for(let x=dr.x+3;x<dr.x+dr.w;x+=5) addObs(x, dr.y+Math.round((x-dr.x)*dr.sl)+dr.D-4, 4.5);
+      const cd=g.capL?g.drums[0]:g.drums[g.drums.length-1]; addObs(g.capL?cd.x-g.capW/2+3:cd.x+cd.w+g.capW/2-3, cd.y+cd.D-3, 6); }
+    else if(o.k==='ruinroom'){ for(const e of ruinRoomLayout(o).els){ if(e.tilt) continue;
+      if(e.t==='side') for(let yy=e.y-e.len+2;yy<=e.y;yy+=4) addObs(e.x+e.w/2, yy-1, 3.2);
+      else for(let q=2;q<e.w;q+=4) addObs(e.x+q, e.y-1, 3); } }
     else if(o.k==='colonnade'){ const ax=-(o.wdy||0), ay=(o.wdx||0), bx=o.x-(o.wdx||0)*2, by=o.y-(o.wdy||0)*2;
       for(let i=0;i<3;i++){ if(i===1&&o.s%3===0) continue; addObs(bx+ax*(i-1)*20, by+ay*(i-1)*20-1, 4); } } }
   return res;
@@ -1214,8 +1225,8 @@ const RP_MOSS=[C('#5a5236'),C('#7a6a44'),C('#948448')];
 const RP_COLS={5:[1,5,3,2,0], 6:[1,5,5,3,2,0], 7:[1,5,5,4,3,2,0], 8:[1,5,5,4,4,3,2,0]};
 function drawRuinPost(d,t,L,inW){
   const s=d.s, x=Math.round(d.x), y=Math.round(d.y);
-  const Wd= inW ? [5,6,7,6][s%4] : [8,8,7][s%3], x0=x-(Wd>>1), cols=RP_COLS[Wd];
-  const broken=s%3===0, H= inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5;
+  const Wd= d.W || (inW ? [5,6,7,6][s%4] : [8,8,7][s%3]), x0=x-(Wd>>1), cols=RP_COLS[Wd];
+  const broken=d.broken!=null ? d.broken : s%3===0, H= d.H || (inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5);
   const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
   const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
@@ -1229,7 +1240,8 @@ function drawRuinPost(d,t,L,inW){
   const c0=Math.max(1,Math.round(Wd*.25));
   const hiR=s%2===0, notch=1+(s>>>5)%Math.max(1,Wd-2);
   const topY=q=>{
-    if(broken){ const sl=Math.round((hiR?(Wd-1-q):q)*2/(Wd-1)); return y-H+sl+(q===notch?1:0)+((q===0||q===Wd-1)?1:0); }
+    if(broken&&d.flat){ const dq=hiR?(Wd-1-q):q, sl=dq<3?0:Math.round((dq-2)*(2+(s>>>16)%2)/Math.max(1,Wd-3)); return y-H+sl; }   // 高い側に3ドットの平らな頂、そこから2〜3ドット落ちる
+    if(broken){ const fall=3+(s>>>16)%3, sl=Math.round((hiR?(Wd-1-q):q)*fall/(Wd-1)); return y-H+sl+((s>>>18)%2&&q===notch&&q>0&&q<Wd-1?1:0); }   // 片側が高く、反対へ3〜5ドット落ちる一つの折れ口
     if(narrow) return (q>=1&&q<=Wd-2) ? y-H : y-H+1;                // 細い柱は2行の楕円
     if(q>=c0 && q<=Wd-1-c0) return y-H; if(q>=1 && q<=Wd-2) return y-H+1; return y-H+2; };
   const band=(q,r,h)=>{ const jit=(hs(s,q+77)%3)-1, rr=r+jit; if(rr<h*.55) return 0; if(rr<h-3) return -1; return -2; };
@@ -1256,7 +1268,7 @@ function drawRuinPost(d,t,L,inW){
       else if(!broken && !narrow && r===0){ i=(q===c0||q===Wd-1-c0)?3:4; }                        // 上面の奥の縁
       else if(!broken && !narrow && r===1){ i= q===1?3 : q===Wd-2?2 : q<=2+(Wd>6?1:0)?6 : q<Wd-3?5:4; }   // 上面
       else if(!broken && !narrow && r===2){ i= edgeL?1 : edgeR?0 : q<=Wd-4?5 : cols[q]; }        // 上面の手前（右2列は胴の色＝首輪に見せない）
-      else if(broken && py===ty){ i= edgeL?1 : edgeR?0 : q<Wd*.6?5:4; }                           // 折れ口：明るい1行だけ
+      else if(broken && py===ty){ const hiQ= hiR? Wd-2 : 1; i= edgeL?1 : edgeR?0 : (Math.abs(q-hiQ)<=0||Math.abs(q-hiQ)===1&&q!==0&&q!==Wd-1&&(s%2))?6 : 3; }   // 折れ口：中間色に、高い側だけ照り2つ
       else {
         i=cols[q]+band(q,py-ty,h);
         if(q===1 && r>=4 && r<=hiEnd && (r%4)!==3) i=6;                                            // ハイライトは左から2列目だけ
@@ -1294,6 +1306,222 @@ function drawRuinPost(d,t,L,inW){
   if(u<1){ const rx=Wd/2+1.5+u*7, ry=(1.8+u*4)*.55, a=.3*(1-u), cx=x0+mid;
     for(let i2=0;i2<44;i2++){ const an=i2/44*6.2831853, px=Math.round(cx+Math.cos(an)*rx), py=Math.round(y+.5+Math.sin(an)*ry);
       if(py<=y+1 && px>=x0-1 && px<=x0+Wd) continue; mix(px,py,RP_WHI,a,true); } }
+}
+/* ---------- 倒れた石柱・部屋の残骸（水の層・第16〜20階層）----------
+   見本（添付の水没した遺跡）の、横倒しの大きな円柱と、石の塊を積んだ部屋の跡。drawRuinPost と同じ色・同じ描き方の規則
+   （左上から光、上の面が一番明るい、右と下にだけ濃い輪郭、2ドットの塊の肌理、オリーブの苔、水に浸かった所は濡れて沈む）。 */
+function rpTools(L){
+  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const idx=(px,py)=>{ px=Math.round(px)-DB0x; py=Math.round(py)-DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
+  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
+  const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
+  const wet=(px,py)=>{ const k=idx(px,py); return k>=0&&wmask[k]===1; };
+  return {lit,idx,put,mix,wet};
+}
+/* ---- 倒れた石柱（第2版：講評を受けて）----
+   太さ12（小さいものは10）。**太鼓（ドラム）を積み重ねた形**にして、太鼓1つ1つはほぼ水平、
+   斜めの向きは継ぎ目ごとの段差（1〜2ドット）で出す——1本の滑らかな円柱を回すとギザギザの丸太に見えた。
+   継ぎ目は全高の暗い隙間、次の太鼓の頭に明るい縁。片端は幅広の柱頭、もう片端は段々に欠けた折れ口と欠片。
+   1か所だけ継ぎ目に立った小さな塊（形の単調さを崩す）。 */
+function fallenGeo(d){
+  if(d._fg) return d._fg;
+  const s=d.s, D0=(s>>>10)%3===0?10:12, len=34+s%14, dir=((s%2)?1:-1), slope=dir*(.30+((s>>>4)%3)*.07);
+  const capL=(s>>>6)%2===0, capW=13;
+  const x0=Math.round(d.x-len/2), drums=[]; let x=x0+(capL?capW-3:0), y=Math.round(d.y)-D0-Math.round(slope*len/2), i=0;
+  const xe=x0+len-(capL?0:capW-3);
+  while(x<xe){ const w=Math.min(8+hs(s,i+20)%4, xe-x); const D=D0+((hs(s,i+90)%3)-1)*(i>0?1:0);
+    drums.push({x,w,y,D,sl:slope*.7}); y=y+Math.round(w*slope*.7)+(i%2?Math.sign(slope):0); x+=w; i++; }
+  const wide=new Set([1+(s>>>12)%Math.max(1,drums.length-1)]);
+  return d._fg={D:D0,len,x0,drums,capL,capW,wide,slope,stub:(s>>>13)%Math.max(1,drums.length-1)+1};
+}
+function drawFallenColumn(d,t,L){
+  const tl=rpTools(L), {put,mix,idx}=tl, g=fallenGeo(d), s=d.s, T=i=>RP_T[i<0?0:i>6?6:i];
+  const rowTone=(r,x,D)=>{ const R=Math.round(r*12/D);
+    if(R<=0) return 2; if(R<=5){ if(R<=2&&((x+R*3+s)%11)<2) return 6; if((R===2||R===4)&&((x+R*7+s)%11)<7) return 4; return 5; }   // 縦溝の筋（4〜8ドット）
+    if(R===6) return 4; if(R<=8) return 3; if(R<=10) return 2; return 0; };
+  const ytop=(dr,x)=>dr.y+Math.round((x-dr.x)*dr.sl);
+  const wAt=(x,y)=>{ const k=idx(x,y); return k>=0&&wmask[k]===1; };
+  const capDr=g.capL?g.drums[0]:g.drums[g.drums.length-1];
+  // 1) 継ぎ目の脇に立つ短い柱（柱の奥＝上の地面に立つ。柱より先に描く）
+  { const dr=g.drums[Math.min(g.stub,g.drums.length-1)], sx=dr.x+(g.slope>0?-2:2), sy=ytop(dr,dr.x)-1;
+    drawRuinPost({x:sx,y:sy,s:(s*7)|1,W:8,H:9+(s>>>14)%3,broken:true,flat:true},t,L,wAt(sx,sy+1)); }
+  // 2) 影・水際（地面：右へ2ずらして2〜3行／水：1〜2ドットの暗い接地帯）
+  for(const dr of g.drums) for(let x=dr.x;x<dr.x+dr.w;x++){ const yb=ytop(dr,x)+dr.D;
+    if(wAt(x,yb+1)){ mix(x,yb+1,RP_WSH,.55,true); mix(x,yb+2,RP_WSH,.3,true); }
+    else for(let yy=0;yy<2;yy++) mix(x+2,yb+yy,RP_DARK,.4); }
+  // 3) 太鼓
+  const brkJag=r=>[0,0,2,2,4,4,3,3,1,1,2,2,1][r%13];
+  for(let di=0;di<g.drums.length;di++){ const dr=g.drums[di], D=dr.D, first=di===0, last=di===g.drums.length-1;
+    const brkSide = g.capL ? last : first;
+    const notch = di>0 && di%3===1 && hs(s,di+150)%2===0;
+    for(let x=dr.x;x<dr.x+dr.w;x++){ const yt=ytop(dr,x), seamX=x===dr.x&&!first, wide2=g.wide.has(di)&&x===dr.x+1;
+      const edgeX = g.capL ? dr.x+dr.w-1-x : x-dr.x;
+      const wetHere=wAt(x,yt+D+1);
+      for(let r=0;r<D;r++){ const py=yt+r;
+        if(brkSide && edgeX<brkJag(r+s)) continue;
+        if(notch && r===0 && x<=dr.x+1) continue;                                    // 上の輪郭の欠け
+        const R12=Math.round(r*12/D);
+        let i=rowTone(r,x,D);
+        if(seamX||wide2){ i= R12<=5 ? (hs(s,x+r*3)%3?3:4) : R12<=10 ? 2 : 0; if(wide2&&R12>5) i=Math.max(0,i-1); }
+        else if(g.wide.has(di)&&x===dr.x+2&&r>=1&&r<=4) i=6;                          // 2ドットの隙間の向こうだけ明るい縁
+        else if(brkSide && edgeX<brkJag(r+s)+2){ i= (r<5&&edgeX===brkJag(r+s))?6 : 3; if(hs(s,x*7+r)%9===0) i=2; }
+        else { const hh=hs(s,((x-dr.x)/3|0)*131+r*17+di*7); if(hh%100<(R12<=5?8:16)) i+=(hh>>>8)%2?1:-1; }
+        let c=i<0?RP_OL:T(i);
+        if(wetHere && r>=D-2) c=mixU(mixU(RP_DARK,c,.8),RP_WET,.15);                  // 水に触れる下の2行だけ濡れる
+        put(x,py,c); }
+      if(wetHere){ const k=idx(x,yt+D); if(k>=0) buf[k]=mixU(buf[k],T(2),.5); }
+    }
+    // 段差：高い側の太鼓の端面を2ドット見せる（中間色、最下は暗）
+    if(di>0){ const pv=g.drums[di-1], step=ytop(dr,dr.x)-ytop(pv,pv.x+pv.w-1);
+      if(step>0){ for(let q=1;q<=1;q++){ const x=pv.x+pv.w-q, yt=ytop(pv,x); for(let r=Math.max(1,(pv.D>>1));r<pv.D;r++) put(x,yt+r,r===pv.D-1?T(1):T(3)); } }
+      else if(step<0){ for(let q=0;q<1;q++){ const x=dr.x+q, yt=ytop(dr,x); for(let r=Math.max(1,(D>>1));r<D;r++) put(x,yt+r,r===D-1?T(1):T(3)); } } }
+  }
+  // 4) 柱頭：軸より左右1〜2広い四角い塊（上の面5行・手前9行）。地面に据わるので根元は胴より下
+  { const dr=capDr, cw=12, x= g.capL ? dr.x-cw+3 : dr.x+dr.w-3, axis=ytop(dr,g.capL?dr.x:dr.x+dr.w-1)+dr.D/2, yb=Math.round(axis+5.5);
+    rpBlock2(tl,x,yb,cw,7,4,s+91,{pits:4,chipSize:2,shadowRows:3});
+    for(let q=0;q<3;q++) for(let r=0;r<2;r++) put(x+3+q+(s%3),yb-7-3+r,RP_MOSS[r?0:1]);              // 上の面の苔
+    for(let q=0;q<2+(s>>>3)%2;q++) put(x+1+q,yb,RP_MOSS[0]);
+    if(!wAt(x+cw,yb+1)) for(let q=0;q<4;q++) for(let r=0;r<2;r++) put(x+(g.capL?cw:-4)+q,yb-r,RP_MOSS[r]); }   // 胴が地面に触れる所の苔
+  // 5) 苔：継ぎ目をまたぐ縦のかたまり（横の面）、下の縁の不揃いな帯
+  for(let di=1;di<g.drums.length;di++){ if(hs(s,di+300)%2) continue; const dr=g.drums[di], yt=ytop(dr,dr.x), D=dr.D;
+    const w=2+hs(s,di+310)%2, h=3+hs(s,di+320)%3, top=yt+Math.round(D*.45);
+    for(let q=0;q<w;q++) for(let r=0;r<h;r++){ if((q===0||q===w-1)&&(r===0||r===h-1)&&hs(s,q+r*5+di)%2) continue; put(dr.x-1+q,top+r,RP_MOSS[r<h/2?1:0]); } }
+  { const dr=g.drums[(s>>>3)%g.drums.length]; const n=Math.max(3,Math.round(dr.w*.8));
+    for(let k=0;k<n;k++){ const x=dr.x+k, yb=ytop(dr,x)+dr.D; put(x,yb-1,RP_MOSS[0]); if(hs(s,x)%3===0) put(x,yb-2,RP_MOSS[1]); } }
+  // 6) 折れ口の脇の欠片
+  { const dr=g.capL?g.drums[g.drums.length-1]:g.drums[0], ex=g.capL?dr.x+dr.w+2:dr.x-6, ey=ytop(dr,g.capL?dr.x+dr.w-1:dr.x)+dr.D;
+    rpChip(tl,ex,ey,3,2); rpChip(tl,ex+(g.capL?4:-3),ey-3,2,2); if(s%2) rpChip(tl,ex+(g.capL?1:-1),ey+3,2,2); }
+  // 7) 水：左上の照り
+  { const dr=g.drums[0], x=dr.x, yb=ytop(dr,x)+dr.D; if(wAt(x-2,yb)&&((t*1.8+s%5)|0)%3) for(let q=2;q<6;q++) mix(x-q,yb-1,RP_WHI,.14,true); }
+}
+function rpChip(tl,x,y,w,h){ for(let q=0;q<w;q++){ for(let r=0;r<h;r++) tl.put(x+q,y-h+1+r, r===0?RP_T[4]:r===h-1?RP_T[1]:RP_T[3]); } tl.put(x+w,y,RP_T[0]); }
+/* 石の塊（第2版）：四角く、角に1〜2ドットの欠け。上の面 dd 行（左2列の上2行だけ最も明るく）、手前の面 h 行（左→右に明→中→中暗、最下行は中暗）。
+   輪郭は左が暗、右と下が最暗、上の縁は中間色。o.noTop で上の面を描かない（下の段）、o.noShadow で影を落とさない。 */
+function rpBlock2(tl,x,y,w,h,dd,s,o){
+  o=o||{}; const {put,mix,idx}=tl, T=i=>RP_T[i<0?0:i>6?6:i];
+  const k0=idx(x+1,y+1), inW=k0>=0&&wmask[k0]===1;
+  if(!o.noShadow){ if(inW){ for(let q=0;q<w;q++) mix(x+q+1,y+1,RP_WSH,.5,true); mix(x+w,y,RP_WSH,.5,true); }
+    else { for(let yy=0;yy<(o.shadowRows||2);yy++) for(let q=0;q<w+1;q++) mix(x+q+2,y+1+yy,RP_DARK,.4); mix(x+w,y,RP_DARK,.4); } }
+  const chip1=o.noChip?9:hs(s,1)%4, chip2=o.noChip?9:hs(s,2)%4, cs=o.chipSize||1;
+  const pits=[]; for(let i=0;i<(o.pits||1);i++) pits.push([1+hs(s,3+i*2)%Math.max(1,w-3), 1+hs(s,4+i*2)%Math.max(1,h-1)]);
+  if(!o.noTop) for(let r=0;r<dd;r++){ const py=y-h-dd+1+r;
+    for(let q=0;q<w;q++){ if(r<cs&&((q<cs&&chip1===0)||(q>=w-cs&&chip1===1))) continue;
+      let i= r===0?3 : q===w-1?2 : (q<=1&&r<=2)?6 : 5; if(q===0&&r>0) i=Math.min(i,4);
+      put(x+q,py,T(i)); } }
+  for(let r=0;r<h;r++){ const py=y-h+1+r;
+    for(let q=0;q<w;q++){ if(r>=h-cs&&((q<cs&&chip2===0)||(q>=w-cs&&chip2===1))) continue;
+      let i= q===0?1 : q===w-1?0 : q<=Math.max(1,w*.35)?4 : q<=w*.7?3 : 2;
+      if(r===h-1&&q>0&&q<w-1) i=Math.min(i,2);
+      if(q>0&&q<w-1){ const hh=hs(s,q*977+(r>>1)*131); if(hh%100<16) i+=(hh>>>8)%2?1:-1; if(pits.some(p=>p[0]===q&&p[1]===r)) i-=1; }
+      if(o.seamTop&&r===0&&q>0&&q<w-1) i=2;
+      let c=T(i); if(inW&&r>=h-2) c=mixU(mixU(RP_DARK,c,.8),RP_WET,.15);
+      put(x+q,py,c); } }
+  if(inW){ for(let q=0;q<w;q++){ const k=idx(x+q,y+1); if(k>=0&&wmask[k]) buf[k]=mixU(buf[k],T(2),.45); } }
+  else if(!o.noBase){ for(let q=0;q<w;q++) put(x+q,y+1,RP_T[0]); }
+}
+/* ---- 部屋の残骸（第2版）----
+   壁は大きさの違う塊（幅 5/7/9/12）を1〜3段に積む。下の段は手前の面だけ、上の段だけ上の面。段の境は1ドットの継ぎ目、段ごとに横に±1〜2ずれる。
+   角と入口の両脇は高い柱（3段）。2〜3割の塊を抜き、抜けた所へ向かって段が下がる。壁の外と内に転げた塊と欠片。
+   左右の壁は塊の長さがまちまちで、2〜3個ごとに±1〜2ドット揺れる。一番手前の塊は1段高く、手前の面を見せる。
+   床は不透明の敷石（6〜10ドット）、継ぎ目、欠け、ひび。2割ほど抜けて地面と苔が出る。水の上では敷石が抜けて水が覗く。
+   壁は床へ短い影を落とす。外の根元と内側の角に苔。 */
+function ruinRoomLayout(d){
+  if(d._lay) return d._lay;
+  const s=d.s, W=52+(s%3)*6, Dp=36+((s>>>3)%3)*4, x0=Math.round(d.x)-(W>>1), y0=Math.round(d.y)-(Dp>>1)-4;
+  const R=i=>hs(s,i), els=[], slabs=[], chips=[];
+  const yb=y0+9, yf=y0+Dp, sideW=7;
+  const noCorner=(s>>>8)%2===0, cornerR=(s>>>9)%2===0;         // 奥の角の柱は1本だけ（もう片方の角は崩れている）
+  // 壁の並びを作る：塊の幅 6〜12 が隙間なく続き、隙間は1〜2か所（幅4〜10）
+  /* 壁の並び：塊は1ドット重ねて置く（間は1ドットの継ぎ目だけ）。隙間は0か、4ドット以上の抜けを ng か所 */
+  const run=(a,b,salt,ng)=>{ const out=[]; let x=a, i=0, gapsLeft=ng, gaps=[], cnt=0;
+    while(x<b-3){ let w=Math.min(6+R(salt+i*3+5)%7, b-x); if(b-x-w>0&&b-x-w<6) w=b-x;
+      if(gapsLeft>0 && cnt>=2 && b-x>14 && R(salt+i*3+6)%3===0){ const gw=Math.min(4+R(salt+i*3+7)%7, b-x-6); gaps.push([x,x+gw]); x+=gw; gapsLeft--; cnt=0; i++; continue; }
+      out.push({x,w,first:cnt===0}); x+=w-1; cnt++; i++; }
+    if(out.length) out[out.length-1].last=true; for(let k=0;k<out.length-1;k++) if(out[k+1].first) out[k].last=true;
+    return {blocks:out,gaps}; };
+  // 奥の壁（1〜2段、隙間の隣は1段）
+  { const a=x0+sideW+(noCorner&&!cornerR?4:0), b=x0+W-sideW-(noCorner&&cornerR?4:0), r=run(a,b,10,1+R(9)%2);
+    r.blocks.forEach((bk,k)=>{ const nextToPost= cornerR ? bk.x+bk.w>=b-1 : bk.x<=a;
+      els.push({t:'stack',x:bk.x,y:yb,w:bk.w,c:nextToPost?2:1,s:R(k+70),wall:'back',edge:bk.first||bk.last}); }); }
+  // 角の柱（1本）
+  els.push({t:'stack',x:cornerR?x0+W-sideW-1:x0,y:yb,w:8,c:3,s:R(200),post:true,wall:'back'});
+  if(!noCorner) els.push({t:'stack',x:cornerR?x0:x0+W-sideW,y:yb,w:sideW,c:1,s:R(201),wall:'back'});
+  // 左右の壁：上の面が見える塊が隙間なく続き、隙間は1か所。一番手前は1段高い
+  for(const side of [0,1]){ const xs= side? x0+W-sideW : x0, ys=yb+2, ye=yf-3; let y=ys, i=0, drift=0;
+    const gy=ys+6+R(side*31+300)%Math.max(1,ye-ys-16), gh=4+R(side*31+301)%5;
+    while(y<ye){ const len=Math.min(5+R(i*3+side*97+310)%5, ye-y); if(len<3) break; if(i%3===2) drift=(R(i+side*50+330)%3)-1;
+      const front=y+len>=ye-1, inGap=y<gy+gh&&y+len>gy; if(i%3===2&&!inGap) drift=0;
+      if(!inGap) els.push({t:'side',x:xs+drift,y:y+len,w:sideW,len,h:front?5:3,s:R(i+side*13+390)});
+      y+=len; i++; } }
+  // 手前：入口の両脇に柱、外側は低い壁の並び（1段）
+  const dl=x0+Math.round(W*.38), dr=x0+Math.round(W*.62);
+  els.push({t:'stack',x:dl-7,y:yf,w:7,c:2,s:R(400),post:true});
+  els.push({t:'stack',x:dr,y:yf,w:7,c:2,s:R(401),post:true});
+  for(const [a,b,o] of [[x0+sideW,dl-7,0],[dr+7,x0+W-sideW,40]]){ if(b-a<6) continue; const r=run(a,b+1,420+o,0); r.blocks.forEach((bk,k)=>els.push({t:'stack',x:bk.x,y:yf,w:bk.w,c:1,s:R(k+430+o),edge:bk.first||bk.last})); }
+  // 仕切りの名残（壁から内へ1つ）
+  { const left=(s>>>11)%2===0, py=yb+Math.round((yf-yb)*.55); els.push({t:'stack',x:left?x0+sideW:x0+W-sideW-8,y:py,w:8,c:1,s:R(470)}); }
+  // 転げた塊は壁の線の外へ（2〜6ドット離す）
+  for(let i=0;i<2+R(480)%2;i++){ const k=R(i+505)%3;
+    const px= k===0? x0-5-R(i+500)%4 : k===1? x0+W+2+R(i+500)%4 : x0+8+R(i+500)%(W-16);
+    const py= k===2? yf+4+R(i+510)%3 : yb+4+R(i+510)%Math.max(1,yf-yb-8);
+    els.push({t:'stack',x:px,y:py,w:4+R(i+530)%3,c:1,s:R(i+540),tilt:true}); }
+  // 敷石：縁から欠ける（内側の穴は水の上だけ）
+  { let y=yb+1, row=0; const nRow=Math.ceil((yf-yb)/7);
+    while(y<yf-1){ const h=Math.min(6+R(row+600)%3, yf-1-y); let x=x0+sideW+(row%2?2:0), i=0;
+      while(x<x0+W-sideW){ const w=Math.min(6+R(row*31+i+620)%5, x0+W-sideW-x);
+        const edgeDist=Math.min(x-(x0+sideW), x0+W-sideW-(x+w), yf-1-(y+h));
+        const miss= edgeDist<6 && R(row*31+i+640)%100<40;
+        slabs.push({x,y,w,h,shift:R(row*31+i+660)%100<20?((R(row*31+i+661)%2)?1:-1):0,blot:(row+i)%3===0,s:R(row*31+i+680),miss});
+        x+=w; i++; } y+=h; row++; } }
+  // 欠片（壁の外の根元に3〜5）
+  for(let i=0;i<3+R(700)%3;i++){ const e=els.filter(e=>!e.tilt)[R(i+710)%els.length%Math.max(1,els.filter(e=>!e.tilt).length)];
+    const outL=e.x<=x0+1, outR=e.x>=x0+W-sideW-1;
+    chips.push({x: outL? e.x-3-R(i+720)%3 : outR? e.x+e.w+1+R(i+720)%3 : e.x+R(i+720)%Math.max(1,e.w), y: (outL||outR)? e.y-R(i+740)%6 : e.y+3+R(i+740)%2, w:2+R(i+750)%2, h:2}); }
+  els.sort((a,b)=>a.y-b.y);
+  return d._lay={x0,y0,W,D:Dp,yb,yf,els,slabs,chips,sideW};
+}
+function drawRuinRoom(d,t,L){
+  const tl=rpTools(L), {put,mix,idx}=tl, lay=ruinRoomLayout(d), s=d.s, T=i=>RP_T[i<0?0:i>6?6:i];
+  const {x0,W,yb,yf,sideW}=lay;
+  // 0) 足もとのオリーブの土台＋1) 床の敷石。どちらも形は変わらないので、色の並びは初回に作って覚えておく
+  //    （毎フレーム数千ドットぶん hs() を回していた。描くたびに要るのは灯りと水の判定だけ）
+  if(!lay.px){ const out=[];
+    const ext=(k)=>2+(hs(s,k)%3); const top=yb-4, bot=yf+2;
+    for(let yy=top-4;yy<=bot+4;yy++){ const eL=ext(((yy>>1)*7)+11), eR=ext(((yy>>1)*7)+13);
+      for(let xx=x0-eL;xx<=x0+W-1+eR;xx++){ const eT=ext(((xx>>1)*5)+17), eB=ext(((xx>>1)*5)+19);
+        if(yy<top-eT||yy>bot+eB) continue;
+        const outer= xx===x0-eL||xx===x0+W-1+eR||yy===top-eT||yy===bot+eB;
+        out.push(xx,yy,RP_MOSS[outer?0:(hs(s,xx*3+yy*7)%10===0?0:1)],0); } }
+    for(const sl of lay.slabs){ if(sl.miss) continue;
+      for(let yy=sl.y;yy<sl.y+sl.h;yy++) for(let xx=sl.x;xx<sl.x+sl.w;xx++){
+        const onL=xx===sl.x, onT=yy===sl.y, drawL=hs(sl.s,1)%3!==0, drawT=hs(sl.s,2)%3!==0;
+        const seam=(onL&&drawL&&((yy+sl.s)%8)<5)||(onT&&drawT&&((xx+(sl.s>>>3))%8)<6);
+        let i2= seam?3 : 4+sl.shift;
+        if(!seam&&sl.blot&&(xx-sl.x)>=2&&(xx-sl.x)<=3&&(yy-sl.y)>=2&&(yy-sl.y)<=3) i2=5;
+        out.push(xx,yy,T(i2),1); }
+      if(sl.s%5===0&&sl.w>6){ const cx=sl.x+2+sl.s%Math.max(1,sl.w-4), cy=sl.y+1; for(let r=0;r<3;r++) out.push(cx+(r>>1),cy+r,T(2),2); } }
+    lay.px=out; }
+  { const P_=lay.px, f=.5+.5*Math.min(1,L*1.4);
+    for(let n=0;n<P_.length;n+=4){ const k=idx(P_[n],P_[n+1]); if(k<0) continue; const m=P_[n+3], c=mixU(RP_DARK,P_[n+2],f);
+      if(wmask[k]){ if(m===1) buf[k]=mixU(buf[k],c,.4); continue; }   // 水の上：土台とひびは敷かず、敷石は水に透ける
+      buf[k]=c; } }
+  // 苔：壁際の床の継ぎ目と内側の角に2〜4ドットのかたまり
+  for(const [cx,cy] of [[x0+sideW,yb+1],[x0+W-sideW-3,yb+1],[x0+sideW,yf-4],[x0+W-sideW-3,yf-4]]) for(let q=0;q<3;q++) for(let r=0;r<3;r++){ if(q+r>3||hs(s,cx+q*3+r)%5===0) continue; const k=idx(cx+q,cy+r); if(k>=0&&!wmask[k]) put(cx+q,cy+r,RP_MOSS[(q+r)%2]); }
+  // 2) 壁の影（床へ2行）
+  for(const e of lay.els){
+    if(e.t==='stack'&&!e.tilt) for(let yy=2;yy<=3;yy++) for(let q=0;q<e.w;q++) mix(e.x+q+1,e.y+yy-1,RP_DARK,yy===2?.4:.28);
+    if(e.t==='side'){ const right=e.x<x0+W/2; for(let yy=-e.len;yy<=0;yy++){ mix(right?e.x+e.w:e.x-1,e.y+yy,RP_DARK,.35); mix(right?e.x+e.w+1:e.x-2,e.y+yy,RP_DARK,.2); } } }
+  // 3) 壁・柱・塊を奥から手前へ
+  for(const e of lay.els){
+    if(e.t==='side'){ rpBlock2(tl,e.x,e.y,e.w,e.h,e.len,e.s,{noShadow:true}); continue; }
+    const ch=e.post?6:5; let ox=0;
+    for(let k=0;k<e.c;k++){ const top=k===e.c-1; if(k>0) ox=((hs(e.s,k)%3)-1);
+      const bx=e.x+(e.tilt&&top?1:0)+ox, by=e.y-k*ch;
+      rpBlock2(tl,bx,by,e.w,ch,top?3:0,e.s+k*7,{noTop:!top,noShadow:k>0||!e.tilt&&!e.post,noBase:k>0,seamTop:!top,noChip:!e.post&&!e.tilt&&!e.edge}); }
+    if(e.s%10<3&&!e.tilt){ const q=e.s%Math.max(1,e.w-2), n=2+(e.s>>>4)%3; for(let r=0;r<n;r++){ put(e.x+q,e.y-r,RP_MOSS[r?1:0]); if(r<2) put(e.x+q+1,e.y-r,RP_MOSS[0]); } }
+  }
+  // 4) 欠片
+  for(const c of lay.chips) rpChip(tl,c.x,c.y,c.w,c.h);
 }
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=G.Z.id==='sump'?DECO_PAL_WET:DECO_PAL, code=G.code, PW=G.PW;
@@ -1388,7 +1616,9 @@ function drawDeco(bx0,by0,t,blindR){
       for(let yy=y0+4;yy<y0+h-2;yy+=5)for(let xx=x0+4;xx<x0+w-2;xx+=6) if(hs(s,xx*13+yy)%3) mixAt(xx,yy,stc,A*.55);   // 床の敷石
       break; }
     /* 倒れた柱：横倒しの円柱。太鼓（継ぎ目）ごとに少しずれて、片端は折れて欠けている。跨げる高さなので当たり判定は持たない。 */
-    case 'fallen': { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
+    case 'wfallen': drawFallenColumn(d,t,L); break;
+    case 'ruinroom': drawRuinRoom(d,t,L); break;
+    case 'fallen': if(G.Z.id==='sump'){ drawFallenColumn(d,t,L); break; } { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
       for(let xx=0;xx<len;xx++){ const drum=(xx/8|0), off=(hs(s,drum)%3)-1, seam=xx%8===0;
         const brk=(dir>0?len-1-xx:xx); const top=brk<3?(hs(s,xx+40)%3):0;
         for(let yy=-R+top;yy<=R;yy++){ const px=x0+xx, py=y-R-1+yy+off*(yy<0?0:0);
