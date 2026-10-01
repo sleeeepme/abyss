@@ -108,14 +108,21 @@ R.firstDiveStartsWithoutStone = await pg.evaluate(()=>{
   const dark = lightLevel(), noStone = S.run.noStone;
   const st = W.drops.find(d=>d.stone);
   const dist = st ? Math.hypot(st.x-P.x, st.y-P.y) : null;
+  // 入口の部屋ではなく次の部屋に置き、周りは最初から見えている（遠くの灯りとして見える）
+  const inStartRoom = st && (()=>{ const r=W.fl.start; return st.x>=r.x && st.x<r.x+r.w && st.y>=r.y && st.y<r.y+r.h; })();
+  const seenAround = st && W.seen[Math.floor(st.y)][Math.floor(st.x)]===1 && W.seen[Math.floor(st.y)][Math.floor(st.x)+2]===1;
+  setScreen('game'); CAVE.lightSnap=true; draw();
+  const lightUp = (()=>{ /* 蛍石の灯りの中の敵は見える */ const e=W.enemies.find(x=>!x.boss); if(!e) return true;
+    const ox=e.x, oy=e.y; e.x=st.x+1.2; e.y=st.y; const r=enemyLit(e); e.x=ox; e.y=oy; return r==='lit'; })();
+  CAVE.lightSnap=false;
   for(let i=0;i<20;i++) stepSim(1);                 // 拾う前は暗闇の時計も進まない
   const darkT = S.run.darkT||0;
   P.x=st.x; P.y=st.y; autoPickup();
   const lit = lightLevel(), learned = S.tutStone;
   TH.run(1,{seed:3}); S.hero.party=[];
   const second = {noStone: S.run.noStone, lv: lightLevel(), stone: W.drops.some(d=>d.stone)};
-  return {dark, noStone, dist, darkT, lit, learned, second,
-          ok: dark===1 && noStone && dist!=null && dist>=2 && dist<=4.6 && darkT===0 && lit===10 && learned
+  return {dark, noStone, dist, inStartRoom, seenAround, lightUp, darkT, lit, learned, second,
+          ok: dark===1 && noStone && dist!=null && dist>=4 && dist<=12.5 && !inStartRoom && seenAround && lightUp && darkT===0 && lit===10 && learned
               && !second.noStone && second.lv===10 && !second.stone};
 });
 

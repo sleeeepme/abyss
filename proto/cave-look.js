@@ -202,7 +202,10 @@ function extraTilt(){
       let a=Math.max(0,Math.min(H0,y0)), b=Math.max(0,Math.min(H0,y1));
       const outer = (k===n-1);
       if(outer){ if(side<0) a=0; else b=H0; }
-      const h=Math.round(b-a); if(h<=0) continue;
+      /* 帯の上下は整数の行で決め、隣の帯と同じ境目を共有する。a と b-a を別々に丸めていたので、
+         境目に1行の塗り残し（明るい筋）や二重塗り（暗い筋）が出た（報告「画面の上下に1ドットの切れ目」）。 */
+      a=Math.round(a); b=Math.round(b);
+      const h=b-a; if(h<=0) continue;
       const t=(k+.5)/n, dark=V.max*Math.pow(t,V.pow);
       // 伏せてしまう一番外の帯はぼかさない（ぼけているかどうか読めないので）
       if(T0_.blur && !(outer && dark>=V.skipBlur)){
@@ -223,7 +226,7 @@ function extraTilt(){
           // side<0（上側）は a が画面の上端なので、外へ行くほど j が小さい側になる
           const p0=side<0? 1-u1 : u0, p1=side<0? 1-u0 : u1;
           const tt=t+(1-t)*((p0+p1)/2);
-          const yy=Math.round(a+h*Math.min(p0,p1)), hh=Math.max(1,Math.round(h*(u1-u0)));
+          const yy=Math.round(a+h*Math.min(p0,p1)), hh=Math.round(a+h*Math.max(p0,p1))-yy; if(hh<=0) continue;
           ctx.globalAlpha=Math.min(1, V.max*Math.pow(tt,V.pow));
           ctx.fillRect(0,yy,W0,hh);
         }
@@ -677,6 +680,13 @@ function terrain(f,Z,camX,camY,blinded){
      ここは画面のドットを1つずつ回す一番重い所なので、削った帯がそのまま効く。 */
   const blackPx=Math.round(bh*CAVE_VIG.black), skipBot=bh-blackPx;
   const blindR2=blindR*blindR, visInR=Math.max(0,blindR-24), visIn2=visInR*visInR, visInv=1/Math.max(1,blindR-visInR);
+  /* 落ちている蛍石は周りを照らす（影は落とさない柔らかい灯り）。暗闇の中の目印になる。
+     視界の輪の外でも、この灯りの中は見える。 */
+  const LSx=[], LSy=[], LSr=[];
+  if(typeof W!=='undefined'&&W.drops) for(const d of W.drops){ if(!d.stone) continue;
+    const r=((typeof STONE_LIGHT_R!=='undefined')?STONE_LIGHT_R:2.8)*Q, x=d.x*Q, y=d.y*Q;
+    if(x+r<bx0||x-r>bx0+bw||y+r<by0||y-r>by0+bh) continue; LSx.push(x); LSy.push(y); LSr.push(r); }
+  const LSn=LSx.length;
 
   /* ---------- マス単位でまとめて片付ける ----------
      seenV と hazAt は**画面のドット1つずつ**呼ばれていた（1フレームで数十万回）。
@@ -719,7 +729,10 @@ function terrain(f,Z,camX,camY,blinded){
       if((cv2&3)===1){                                          // 境目のマスだけ混ぜる
         const sv=seenV(wx,wy); if(sv<SEEN_HI){ if(sv<=SEEN_LO||(sv-SEEN_LO)/(SEEN_HI-SEEN_LO)<BAYER[((wy&3)<<2)|(wx&3)]){buf[k]=VOID;continue;} } }
       const i=wy*PW+wx, c=code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;
-      if(d2>visIn2){ if(d2>=blindR2||(Math.sqrt(d2)-visInR)*visInv>b){buf[k]=VOID;continue;} }   // 視界の輪の外は闇。縁は網点で溶かす
+      let sl=0;                                                  // 蛍石の灯り
+      if(LSn) for(let li=0;li<LSn;li++){ const ex=wx-LSx[li], ey=wy-LSy[li], e2=ex*ex+ey*ey, r=LSr[li];
+        if(e2<r*r){ const q=1-Math.sqrt(e2)/r, v=q*q*(3-2*q)*.85; if(v>sl) sl=v; } }
+      if(d2>visIn2 && sl<.04+b*.1){ if(d2>=blindR2||(Math.sqrt(d2)-visInR)*visInv>b){buf[k]=VOID;continue;} }   // 視界の輪の外は闇（蛍石の灯りの中は除く）。縁は網点で溶かす
       let Lv=0, fc=1;
       if(flat){ Lv=flatL+(d2<1600?.12:0); }
       else if(d2<R2&&(c===0||c<5)){
@@ -729,6 +742,7 @@ function terrain(f,Z,camX,camY,blinded){
         const rl=ray[a], qi=(d*invR*1023)|0;
         if(c===0){ if(d<=rl) Lv=LV0[qi]; }
         else if(d<=rl+c+.5){ Lv=LV1[qi]; fc=Math.max(0,-(nx[i]*dx+ny[i]*dy)/(127*(d||1))); }}
+      if(sl>Lv){ Lv=sl; fc=1; }
       if(blinded&&Lv>0){ const dt_=Math.sqrt(d2)/Q; if(dt_>BLIND_CLEAR) { const q_=Math.max(0,1-(dt_-BLIND_CLEAR)/(BLIND_DARK-BLIND_CLEAR)); Lv*=q_*q_; } }   // 盲目：3マスを越えると暗くなっていく（本編と同じ）
       const Cv=cool[k];
       if(c===0){

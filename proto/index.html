@@ -7935,18 +7935,41 @@ function startRun(depth){
    まとめて51階を見に行ってしまった。
    降りられないことは openStairs / st-down / startDepth / unlockedDepths の
    4箇所で閉じてある。 */
-/* 初めての潜りの蛍石。入口から 2.5〜4 マスの床に1つ置く（暗闇の中で光っていて、拾うと灯りが灯る）。 */
+/* 初めての潜りの蛍石。**入口の部屋の次の部屋**の真ん中に1つ置く。
+   蛍石は周りを照らすので、真っ暗な入口から、遠くに見える灯りを目指して歩くことになる（チュートリアル代わり）。
+   「次の部屋」は入口から床を歩いて一番近い部屋。周りのマスは最初から見えている扱いにする（灯りが遠くから見える）。 */
+const STONE_LIGHT_R = 2.8;   // 落ちている蛍石が照らす半径（マス）
 function placeFirstStone(fl){
-  const sx=fl.start.cx+0.5, sy=fl.start.cy+0.5; let best=null;
-  for(let r=3;r<=4 && !best;r+=0.5) for(let a=0;a<16 && !best;a++){
-    const x=sx+Math.cos(a/16*Math.PI*2+0.4)*r, y=sy+Math.sin(a/16*Math.PI*2+0.4)*r;
-    const row=fl.g[Math.floor(y)]; if(!row || row[Math.floor(x)]!==T.FLOOR) continue;
-    if(!standable(x,y)) continue;
-    best={x:Math.floor(x)+0.5, y:Math.floor(y)+0.5};
+  const W_=fl.W, H_=fl.H, dist=new Int32Array(W_*H_).fill(-1), q=[];
+  const s0=fl.start.cy*W_+fl.start.cx; dist[s0]=0; q.push(s0);
+  for(let h=0;h<q.length;h++){ const k=q[h], x=k%W_, y=(k/W_)|0;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+dx, ny=y+dy; if(nx<0||ny<0||nx>=W_||ny>=H_) continue;
+      const t=fl.g[ny][nx], nk=ny*W_+nx; if(dist[nk]>=0||t===T.WALL||t===T.PIT) continue; dist[nk]=dist[k]+1; q.push(nk); } }
+  /* 入口から画面に収まる範囲（横5.5・縦8マス、入口の部屋の外）にある部屋を優先し、その中で歩いて一番近いもの。
+     無ければ一番近い部屋への道のりの上で、画面に収まる一番遠い所に置く（灯りが見えないと目指せない）。 */
+  const sr=fl.start, inStart=(x,y)=>x>=sr.x && x<sr.x+sr.w && y>=sr.y && y<sr.y+sr.h;
+  // 上下は画面の端ほど暗く沈むので、まず縦6マス以内、無ければ8マス以内で探す
+  let vy=6; const inView=(x,y)=>Math.abs(x-fl.start.cx)<=5.5 && Math.abs(y-fl.start.cy)<=vy && !inStart(x,y);
+  let best=null, bd=1e9, near=null, nd=1e9;
+  for(const pass of [6,8]){ vy=pass; if(best) break;
+    for(const r of fl.rooms){ if(r===fl.start) continue; const d=dist[r.cy*W_+r.cx]; if(d<=0) continue;
+      if(d<nd){ nd=d; near=r; }
+      if(inView(r.cx,r.cy) && d<bd){ bd=d; best=r; } } }
+  let p = best ? {x:best.cx+0.5, y:best.cy+0.5} : null;
+  if(!p && near){                                   // 道のりを入口側へ戻りながら、画面に収まる所を探す
+    vy=6;
+    let k=near.cy*W_+near.cx;
+    while(dist[k]>0){ const x=k%W_, y=(k/W_)|0; if(inView(x,y) && dist[k]>=5){ p={x:x+0.5,y:y+0.5}; break; }
+      let nk=-1; for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const j=(y+dy)*W_+(x+dx); if(dist[j]===dist[k]-1){ nk=j; break; } }
+      if(nk<0) break; k=nk; }
   }
-  if(!best){ const p=snapToFloor(fl, sx+2.5, sy); best={x:p.x, y:p.y}; }
-  W.drops.push({x:best.x, y:best.y, stone:true, first:true, _fix:1});
-  log('真っ暗だ。近くで何かが光っている');
+  if(!p) p={x:fl.start.cx+3.5, y:fl.start.cy+0.5};
+  if(!standable(p.x,p.y)) p=snapToFloor(fl, p.x, p.y);
+  W.drops.push({x:p.x, y:p.y, stone:true, first:true, _fix:1});
+  const R=Math.ceil(STONE_LIGHT_R)+1;
+  for(let y=Math.floor(p.y)-R;y<=Math.floor(p.y)+R;y++) for(let x=Math.floor(p.x)-R;x<=Math.floor(p.x)+R;x++)
+    if(W.seen[y] && x>=0 && x<W_ && Math.hypot(x+0.5-p.x,y+0.5-p.y)<=R) W.seen[y][x]=1;
+  log('真っ暗だ。暗がりの向こうに、何かが光っている');
 }
 function enterFloor(depth){
   RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
@@ -7958,7 +7981,6 @@ function enterFloor(depth){
   P.x = fl.start.cx+0.5; P.y = fl.start.cy+0.5;
   P.vx=P.vy=0; P.dirx=1; P.diry=0; P.atkCd=0; P.swing=0;
   W.fl=fl; W.enemies=spawnEnemies(fl,depth); W.drops=[]; W.fx=[]; W.pops=[];
-  if(S.run.noStone) placeFirstStone(fl);   // 初めての潜り：入口のすぐ近くに蛍石
   resetFeel();   // 階が変わった時点で同期する。次の update() まで遅延させると、
                  // 入った直後に瞬歩を撃った場合に P.dash が消される（syncFeel の
                  // 階変化検知がここより後に走り、直前に発生させた瞬歩を巻き戻してしまう）。
@@ -7987,6 +8009,7 @@ function enterFloor(depth){
     W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it, chest:true});
   }
   W.seen = Array.from({length:fl.H},()=>new Uint8Array(fl.W));
+  if(S.run.noStone) placeFirstStone(fl);   // 初めての潜り：入口の次の部屋に蛍石（周りは見えている扱い）
   W.seenKey = null;                 // 階が変わったら塗り直しの記憶も捨てる
 
   // 遺体はその階層に来たときだけ出現する。マップは毎回生成し直されるので、
@@ -13041,6 +13064,7 @@ function enemyLit(e){
   if(!S.run || !e || e.dead || e.boss || e.looksBoss || !lightZone()) return 'lit';
   /* シルトジェリーなど自分で光る敵は、自分も周りも見える（暗がりの目印になる） */
   if(glowFoe(e)) return 'lit';
+  if(W.drops.some(d=>d.stone && Math.hypot(d.x-e.x, d.y-e.y) <= STONE_LIGHT_R)) return 'lit';   // 落ちている蛍石の灯りの中
   if(W.enemies.some(g=>g!==e && glowFoe(g) && Math.hypot(g.x-e.x, g.y-e.y) <= GLOW_R)) return 'lit';
   const r = (window.CAVE && CAVE.on && Number.isFinite(CAVE.litTiles)) ? CAVE.litTiles : null;
   if(r==null) return 'lit';
@@ -19083,7 +19107,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20260930e"></script>
+<script src="cave-look.js?v=20261001a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
