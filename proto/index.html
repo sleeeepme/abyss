@@ -5312,7 +5312,7 @@ function tileSeen(x, y){
   if(!W.fl || !W.seen) return false;
   const gx=Math.floor(x), gy=Math.floor(y);
   if(gy<0 || gx<0 || gy>=W.fl.H || gx>=W.fl.W) return false;
-  return !!(W.seen[gy] && W.seen[gy][gx]);
+  return !!(W.seen[gy] && W.seen[gy][gx]===1);   // 記憶（2）の上の物は出さない
 }
 function stairSeen(){
   const f=W.fl; if(!f || !W.seen) return false;
@@ -8027,9 +8027,68 @@ function applyDropPose(dp, cx, cy){
   ctx.translate(0, dp.y);
   if(dp.sq!==1){ const fy=cy+TS*0.4; ctx.translate(cx,fy); ctx.scale(1+(1-dp.sq)*0.7, dp.sq); ctx.translate(-cx,-fy); }
 }
+/* ---------- 間取りはキャラごと ----------
+   以前は潜るたびに間取りを引き直していた（種＝S.runs）。それだと
+   一度抜けた階の知識が次の潜りで何の役にも立たず、浅い階の往復が
+   ただの作業になる。**間取りはキャラ（S.hero）に結びつける。**
+   同じキャラで潜り直す限り、第N階層はいつも同じ形をしている。
+   死んで新しいキャラが生まれたときだけ、全部の階が引き直される。
+
+   変わらないのは「地形」——部屋と通路、入口と穴、層の床（縁・水場・沼）。
+   中身（敵・宝箱・商人・鉱脈・鍛冶場・試練・仲間候補・出来事）は
+   これまで通り潜るたびに変わる。覚えるのは道で、答えではない。
+
+   種は最初に階へ入った瞬間の S.runs をそのキャラの mapSeed として控える。
+   その潜りの間は旧来と同じ種・同じ乱数の流れになる（回帰テストの
+   地形がそのまま残る）。保存に mapSeed が無い古いキャラは、
+   次に潜ったときに一度だけ控えて、以後は固定になる。 */
+function heroMapSeed(){
+  const h=S.hero; if(!h) return S.runs|0;
+  if(h.mapSeed==null){ h.mapSeed = S.runs|0; h.mapMem = {}; }   // 記憶は間取りと一緒に捨てる
+  return h.mapSeed;
+}
+function layoutSeed(depth){ return (((S.salt|0) + heroMapSeed()*7919 + depth*104729)>>>0); }
+/* ---------- 踏破の記憶 ----------
+   間取りが変わらないなら、**一度見た所は次も見えていてよい。**
+   階を離れるとき（降りる・帰る）に W.seen をキャラに控え、
+   次に同じ階へ入ったとき、記憶として戻す。
+   記憶は 2、この潜りで実際に見た所は 1。地形と地図は両方を描くが、
+   敵や落ちている物は 1 のマスでしか出さない（tileSeen）——
+   中身は潜るたびに違うので、記憶の上に今回の敵が浮かんで見えてはおかしい。
+   形式は「幅,高さ,連長」——0 と 1 の交互の長さを 36 進で並べたもの。 */
+function packSeen(seen, Wd, Hd){
+  const runs=[]; let cur=0, n=0;
+  for(let y=0;y<Hd;y++){ const r=seen[y];
+    for(let x=0;x<Wd;x++){ const v=r[x]?1:0; if(v===cur) n++; else { runs.push(n); cur=v; n=1; } } }
+  runs.push(n);
+  return Wd+','+Hd+','+runs.map(v=>v.toString(36)).join('.');
+}
+function unpackSeen(str, seen, Wd, Hd){
+  if(typeof str!=='string') return 0;
+  const parts=str.split(','); if(+parts[0]!==Wd || +parts[1]!==Hd || !parts[2]) return 0;
+  let i=0, cur=0, got=0;
+  for(const t of parts[2].split('.')){
+    const n=parseInt(t,36)|0;
+    for(let k=0;k<n && i<Wd*Hd;k++,i++){ if(cur){ const y=(i/Wd)|0, x=i-y*Wd; if(!seen[y][x]) seen[y][x]=2; got++; } }
+    cur^=1;
+  }
+  return got;
+}
+function rememberFloor(){
+  const h=S.hero;
+  if(!h || !W.fl || !W.seen || W.memDepth==null || W.memSeed!==h.mapSeed) return;
+  if(!h.mapMem) h.mapMem={};
+  h.mapMem[W.memDepth] = packSeen(W.seen, W.fl.W, W.fl.H);
+}
 function enterFloor(depth){
-  RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
+  rememberFloor();                    // 離れる階の記憶を先に控える（上の注記）
+  const lseed = layoutSeed(depth);
+  RNG = mulberry32(lseed);
   const fl = genFloor(depth);
+  /* 中身は潜りごと。キャラが初めてこの種で潜っている間は流れを切らない
+     （旧来と同じ乱数列になる）。2回目以降の潜りは別の種で引き直す。 */
+  if(S.runs !== heroMapSeed())
+    RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729 + 0x6a09e667)>>>0));
   const st = stats(S.hero);
   S.run.depth = depth;
   S.deepest = Math.max(S.deepest, depth);
@@ -8065,11 +8124,15 @@ function enterFloor(depth){
     W.drops.push({x:r.cx+rf(-1,1),y:r.cy+rf(-1,1),it, chest:true});
   }
   W.seen = Array.from({length:fl.H},()=>new Uint8Array(fl.W));
+  const remembered = unpackSeen(S.hero && S.hero.mapMem && S.hero.mapMem[depth], W.seen, fl.W, fl.H);
+  W.memDepth = depth; W.memSeed = S.hero ? heroMapSeed() : null;
+  if(remembered) log('見覚えのある階だ');
   if(S.run.noStone) placeFirstStone(fl);   // 初めての潜り：入口の次の部屋に蛍石（周りは見えている扱い）
   W.seenKey = null;                 // 階が変わったら塗り直しの記憶も捨てる
 
-  // 遺体はその階層に来たときだけ出現する。マップは毎回生成し直されるので、
-  // 死んだ座標に一番近い床タイルへスナップして「だいたい同じあたり」に置く。
+  // 遺体はその階層に来たときだけ出現する。間取りはキャラごとなので、
+  // 死んだのは前のキャラ＝別の間取り。死んだ座標に一番近い床タイルへ
+  // スナップして「だいたい同じあたり」に置く。
   pruneGrave();
   W.grave = (S.grave && S.grave.depth===depth) ? snapToFloor(fl, S.grave.x, S.grave.y) : null;
 
@@ -8079,7 +8142,11 @@ function enterFloor(depth){
   const arena = !!fl.arena;
   W.npc = (bossTierAt(depth) || arena) ? null : spawnNpc(fl, depth);
   W.ev  = arena ? null : spawnEvent(fl, depth);      // 道中の判断を1つ置く
-  W.haz  = spawnHazards(fl, depth);   // 層のテーマに合わせた「踏むと痛い床」
+  { /* 床の水場・沼は地形の側。間取りと同じ種から引き、潜りで変えない
+       （中身の乱数の流れは止めずに、ここだけ別の列で引く） */
+    const keep=RNG; RNG=mulberry32((lseed ^ 0x9e3779b9)>>>0);
+    W.haz = spawnHazards(fl, depth);   // 層のテーマに合わせた「踏むと痛い床」
+    RNG=keep; }
   W.ores = arena ? [] : spawnOres(fl, depth);        // 鉱脈。掘ると黒鉄になる
   W.forge = arena ? null : spawnForge(fl, depth, W.ores);   // 鍛冶場は別の場所
   W.shop  = arena ? null : spawnMerchant(fl, depth, [W.forge, ...(W.ores||[])]);
@@ -11607,6 +11674,7 @@ bindTap(el('keep-ok'), ()=>{
 
 function returnToTown(){
   if(!S.run) return;
+  rememberFloor();   // 帰る階の記憶も控える（戻れなかった場合も控えて害はない）
   /* 入口は一箇所にまとめる。画面のボタンを消すだけだと、
      別の場所から呼ばれたときに静かにポータル階以外から帰れてしまう。 */
   if(!returnPortalAt(S.run.depth)){
@@ -14967,7 +15035,12 @@ function drawMinimap(){
   ctx.strokeRect(ox-8.5,oy-8.5,mw+17,mh+17); ctx.globalAlpha=1;
   // ミニマップも層の色で塗る（開いた瞬間にどこにいるか分かる）
   ctx.fillStyle = f.zone ? shade(f.zone.dot, 1.15) : '#5a6685';
-  for(let y=0;y<f.H;y++)for(let x=0;x<f.W;x++) if(W.seen[y][x]&&tileWalk(f,x,y)) ctx.fillRect(ox+x*s,oy+y*s,s,s);
+  // 記憶（前の潜りで見た所＝2）は少し沈める。今回見た所と区別できるように
+  for(let pass=2;pass>=1;pass--){
+    ctx.globalAlpha = pass===2 ? 0.5 : 1;
+    for(let y=0;y<f.H;y++)for(let x=0;x<f.W;x++) if(W.seen[y][x]===pass&&tileWalk(f,x,y)) ctx.fillRect(ox+x*s,oy+y*s,s,s);
+  }
+  ctx.globalAlpha=1;
   /* ---------- 印は1マス ----------
      以前は「旧ミニマップでの px」を s/1.15 倍して描いていた。
      地図を大きく出すようにしたので倍率もそのまま伸び、

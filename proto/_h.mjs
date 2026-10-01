@@ -60,7 +60,7 @@ export async function install(pg){
       run(depth, opt){
         const o = opt || {};
         if(!S.hero) S.hero = newHero();
-        if(o.seed != null) S.runs = o.seed - 1;
+        if(o.seed != null){ S.runs = o.seed - 1; S.hero.mapSeed = null; }   // 種を渡したら間取りも引き直す（キャラ固定の間取りを外す）
         S.carry = [];                       // ガチャの持ち込みは既定で無し（狙う時だけ入れる）
         S.shardsRun = 0;
         startRun(depth);
