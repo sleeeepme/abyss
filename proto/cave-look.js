@@ -875,6 +875,9 @@ const DECO_PAL={
   pool:dcR(['#050a13','#0a1422','#122238']), poolLip:C('#5a7ea2'), poolGleam:C('#d6ecf8'),
   poolW:cs(['#0c1a2c','#16304a','#22486a','#335f86','#5a8ab0','#8ab4d4']), poolShade:C('#0a121e'),
 };
+/* 水の層の遺跡の名残（第16〜20階層）。石の色を水に浸かった冷たい色に寄せ、根元に藻を付ける。
+   跡の層（第四層／築）の石材と同じ形を使い回す——**同じ造りの物が、ここではもう沈みかけている**。 */
+const DECO_PAL_WET=Object.assign({}, DECO_PAL, {stone:dcR(['#26302e','#62766f','#aac2b8']), stoneDk:C('#0c1212'), algae:dcR(['#0e2a22','#24584a','#4c8a6c'])});
 // 層ごとの品目：[名前, 置き場所, 出やすさ]
 const DECO_SET={
   /* 4つめは「この深さから出る」最小の階層（省略＝最初から出る）。
@@ -886,7 +889,9 @@ const DECO_SET={
   stone:[['pool','corner',.24,6],['stalagC','corner',.35],['pool','wall',.005,6],['rock','open',.006],['vine','north',.05],['skel','floor',.006],
          ['mossbed','floor',.020,6],
          ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
-  sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014]],
+  sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014],
+        /* 第16〜20階層（層の6階目から）：遺跡の名残。立った柱は当たり判定を持つ（genDeco の末尾）。 */
+        ['pillar','wall',.016,6],['colonnade','wall',.004,6],['brokenwall','wall',.008,6],['fallen','open',.005,6],['rubble','floor',.012,6]],
   root:[['shroom','wall',.024],['tendril','wall',.026],['bulb','floor',.010],['moss','wall',.014]],
   ruin:[['foundation','floor',.010],['colonnade','wall',.012],['pillar','wall',.022],['brokenwall','wall',.018],['arch','wall',.010],['steps','wall',.009],['lamppost','wall',.012],['plaque','floor',.008],['rubble','floor',.010]],
   furnace:[['boiler','wall',.014],['pipe','wall',.024],['slag','floor',.012],['vent','floor',.010],['gear','floor',.008]],
@@ -903,7 +908,7 @@ function genDeco(f,Z){
     const nb=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>f.g[ty+dy][tx+dx]===T.WALL||f.g[ty+dy][tx+dx]===T.PIT);
     const hz=haz&&!water&&haz.g[ty]&&haz.g[ty][tx];
     for(let n=0;n<set.length;n++){const [kind,where,p,minDep]=set[n];
-      if(minDep && depth<minDep) continue;      // その層の中でも、深い側にだけ出る品目
+      if(minDep && zoneFloor(depth)<minDep) continue;   // その層の中でも、深い側にだけ出る品目（層の何階目かで見る＝二周目も同じ）
       const h=hs(tx*92821+ty*68917+depth*31,n+1), r=(h%100000)/100000;
       if(r>=p*(DECO_MUL[Z.id]||1)*(kind==='pool'?poolMore(depth):1)) continue;
       if(where==='water'&&!inW) continue;
@@ -939,6 +944,13 @@ function genDeco(f,Z){
   res=res.filter(o=>!SMALL[o.k]||!pools.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<p.ext+4));
   G.pools=pools;
   G.drips=genDrips(f,pools,depth);
+  /* 水の層の立った柱は、岩と同じく当たり判定を持つ（すり抜けると柱に見えない）。
+     壁際にしか立たないので、通路を塞ぐことは無い。倒れた柱（fallen）は跨げる高さなので持たない。 */
+  if(Z.id==='sump') for(const o of res){
+    // 壁に半分埋まると細い棒にしか見えなかったので、床の側へ寄せて丸ごと見せる
+    if(o.k==='pillar'){ o.x=Math.round(o.x-(o.wdx||0)*6); o.y=Math.round(o.y-(o.wdy||0)*5); addObs(o.x, o.y-1, 5); }
+    else if(o.k==='colonnade'){ const ax=-(o.wdy||0), ay=(o.wdx||0), bx=o.x-(o.wdx||0)*2, by=o.y-(o.wdy||0)*2;
+      for(let i=0;i<3;i++){ if(i===1&&o.s%3===0) continue; addObs(bx+ax*(i-1)*20, by+ay*(i-1)*20-1, 4); } } }
   return res;
 }
 /* 水溜りの形。楕円1つだと、並んだときに全部同じ判子に見える（報告「楕円ばかりで不自然」）。
@@ -1088,7 +1100,20 @@ function rockPx(x,y,nx,ny,edge){ // nx,ny：外向きの法線、edge：縁か�
    水は漏れる所の下に溜まるので、**滴る場所は水溜りの中**を基本にし、床に落ちる物を少しだけ混ぜる。
    量は控えめ：水溜り2つに1つ前後と、床のおよそ60マスに1つ（床には濡れた染みを残す）。間隔は1滴ごとに1.6〜3.8秒。
    （「水溜り以外のところにも落ちてほしい」で床の分を4倍に増やした） */
+/* 水の層（第11〜20階層）にも滴る（ユーザー要望）。天井から水面へ落ちるのを主に、床にも少し。
+   水面に落ちる滴は染みを残さない（wet）。量：水面のおよそ45マスに1つ、床のおよそ110マスに1つ。 */
+function genSumpDrips(f,depth){
+  const out=[], wg=(W.haz&&W.haz.kind==='water')?W.haz.g:null;
+  for(let ty=1;ty<f.H-1;ty++)for(let tx=1;tx<f.W-1;tx++){
+    if(f.g[ty][tx]!==T.FLOOR) continue; const h=hs(tx*7919+ty*104729+depth*13,781);
+    const inW=wg&&wg[ty]&&wg[ty][tx];
+    if(h%1000>=(inW?22:9)) continue;
+    out.push({x:tx*Q+4+(h>>>10)%9, y:ty*Q+4+(h>>>14)%9, s:h, pool:null, wet:!!inW, per:1.7+(h%997)/997*2.4, last:-1});
+  }
+  return out;
+}
 function genDrips(f,pools,depth){
+  if(G&&G.Z.id==='sump') return genSumpDrips(f,depth);
   const z=zoneFloor(depth); if(!G||G.Z.id!=='stone'||z<6||z>9) return [];
   const out=[];
   for(const p of pools){ const h=hs(p.s,777); if(h%2) continue;
@@ -1109,7 +1134,7 @@ function drawDrips(bx0,by0,t,blindR){
     if(d.x<bx0-4||d.y<by0-DRIP_H-4||d.x>bx0+bw+4||d.y>by0+bh+8) continue;
     if(!seenAt(G.f,G.L,d.x|0,d.y|0)) continue;
     if(Math.hypot(d.x-lampX,d.y-lampY)>blindR) continue;
-    if(!d.pool){                                                 // 床の滴り跡：濡れて少し暗い小さな染み
+    if(!d.pool&&!d.wet){                                         // 床の滴り跡：濡れて少し暗い小さな染み
       const L=Math.max(.15,pxLight(d.x,d.y)); for(let dy=-1;dy<=1;dy++)for(let dx=-2;dx<=2;dx++){ if(Math.abs(dx)===2&&dy) continue;
         if(ihash(d.x+dx,d.y+dy)%3===0) continue; dp(d.x+dx,d.y+dy,sh3(DECO_PAL.pool,L*.9,d.x+dx,d.y+dy)); } }
     const ph=(d.s%1000)/1000*d.per, u=(t+ph)%d.per;
@@ -1153,7 +1178,7 @@ function drawPools(bx0,by0,t,blindR){
     } }
 }
 function drawDeco(bx0,by0,t,blindR){
-  DB0x=bx0; DB0y=by0; const P_=DECO_PAL, code=G.code, PW=G.PW;
+  DB0x=bx0; DB0y=by0; const P_=G.Z.id==='sump'?DECO_PAL_WET:DECO_PAL, code=G.code, PW=G.PW;
   drawPools(bx0,by0,t,blindR);
   drawDrips(bx0,by0,t,blindR);
   for(const d of G.deco){
@@ -1218,6 +1243,16 @@ function drawDeco(bx0,by0,t,blindR){
       drect(bx-2,y-2,bx+9,y+1,P_.stone,L*.9,true); drect(bx-1,y-4,bx+8,y-3,P_.stone,L,true);
       for(let j=5;j<H;j++){ const top=j>H-4; for(let q=0;q<8;q++){ if(top&&hs(s,q+j*7)%3===0) continue; const px=bx+q, py=y-j; dp(px,py,(q===2||q===5)?P_.stone[0]:sh3(P_.stone,L*(q<2?1.25:q>6?.6:1),px,py)); } }
       if(s%2){ const fx=x+(s%3?10:-15), fy=y+3; drect(fx,fy-4,fx+7,fy,P_.stone,L,true); dp(fx+2,fy-2,P_.stoneDk); dp(fx+5,fy-2,P_.stoneDk); }
+      if(P_.algae) for(let i=0;i<14;i++){ const h=hs(s,i+200), px=bx-2+(h%12), py=y+1-((h>>>5)%(3+(h>>>9)%6)); dp(px,py,sh3(P_.algae,L*1.1,px,py)); }   // 根元の藻
+      break; }
+    /* 倒れた柱：横倒しの円柱。太鼓（継ぎ目）ごとに少しずれて、片端は折れて欠けている。跨げる高さなので当たり判定は持たない。 */
+    case 'fallen': { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
+      for(let xx=0;xx<len;xx++){ const drum=(xx/8|0), off=(hs(s,drum)%3)-1, seam=xx%8===0;
+        const brk=(dir>0?len-1-xx:xx); const top=brk<3?(hs(s,xx+40)%3):0;
+        for(let yy=-R+top;yy<=R;yy++){ const px=x0+xx, py=y-R-1+yy+off*(yy<0?0:0);
+          const sh=yy<-1?1.35:yy<1?1:.6; dp(px,py,seam?P_.stoneDk:sh3(P_.stone,L*sh,px,py)); }
+        dp(x0+xx,y+1,P_.stoneDk); }
+      if(P_.algae) for(let i=0;i<10;i++){ const h=hs(s,i+300), px=x0+(h%len), py=y-((h>>>6)%3); dp(px,py,sh3(P_.algae,L,px,py)); }
       break; }
     case 'brokenwall': { const w=24+s%14, H=9+s%5;
       for(let yy=0;yy<H;yy++)for(let xx=0;xx<w;xx++){ const px=x-w/2+xx|0, py=y-yy; const edgeH=H-((hs(s,xx)%4)*(xx>w*.6?1:0)); if(yy>=edgeH) continue;
@@ -1372,9 +1407,55 @@ function batStep(dt){
   }
   ctx.restore();
 }
+/* ---------- シャボン玉（水の層）----------
+   空中に少しだけ浮かぶ、虹色の縁の泡（ユーザー要望「新しい層に到着した感じを出したい」）。
+   床のおよそ70マスに1つ。生まれた所からゆっくり昇りながら左右に揺れ、8〜14秒で弾けて、また同じあたりに生まれる。
+   主人公が触れても弾ける。地形のバッファではなく、粒と同じく**キャラの上**に描く（宙に浮いて見えるように）。 */
+const SOAP_IRI=['#a8e4ff','#e8b8ff','#fff0a8','#b8ffd8'], SOAP_RIM={};
+function soapRim(r){ if(SOAP_RIM[r]) return SOAP_RIM[r]; const pts=[], seen=new Set();
+  for(let i=0;i<64;i++){ const a=i/64*6.2831853, x=Math.round(Math.cos(a)*r), y=Math.round(Math.sin(a)*r), k=x+','+y; if(seen.has(k)) continue; seen.add(k); pts.push([x,y,a]); }
+  return SOAP_RIM[r]=pts; }
+function genSoap(f){
+  const out=[], depth=(S.run&&S.run.depth)||1;
+  for(let ty=1;ty<f.H-1;ty++)for(let tx=1;tx<f.W-1;tx++){
+    if(f.g[ty][tx]!==T.FLOOR) continue; const h=hs(tx*92821+ty*68917+depth*7,911);
+    if(h%1000>=14) continue;
+    out.push({hx:tx*Q+8, hy:ty*Q+8, s:h, r:[2,3,3,4][(h>>>4)&3], life:8+((h>>>8)%600)/100, age:((h>>>12)%1000)/1000*8, ox:0, oy:0});
+    if(out.length>=60) break; }
+  return out;
+}
+function soapStep(dt){
+  if(!G.soap) G.soap=genSoap(G.f);
+  const ps=TS/Q, t=(performance.now()-T0)/1000, camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
+  const px=P.x*Q, py=P.y*Q-8, hw=innerWidth/ps/2+16, hh=innerHeight/ps/2+16, q=Math.ceil(ps);
+  ctx.save();
+  for(const b of G.soap){
+    b.age+=dt;
+    if(b.age>b.life+.3){ b.age=0; const h=hs(b.s,(t*10)|0); b.ox=(h%17)-8; b.oy=((h>>>5)%11)-5; }
+    const u=Math.min(b.age,b.life), k=u/b.life;
+    const x=b.hx+b.ox+Math.sin(u*1.1+b.s%7)*5, y=b.hy+b.oy-6-22*k;
+    if(Math.abs(x-px)>hw||Math.abs(y-py)>hh) continue;
+    if(b.age<b.life && Math.hypot(x-px,y-py)<b.r+5) b.age=b.life;          // 触れると弾ける
+    if(!tileSeen(x/Q,(y+6)/Q)) continue;
+    if(Number.isFinite(CAVE.visTiles)&&Math.hypot(x-px,y-py+4)>CAVE.visTiles*Q) continue;
+    const lit=CAVE.lightAt(x/Q,(y+6)/Q), sx=Math.round(x*ps-camX), sy=Math.round(y*ps-camY);
+    if(b.age>=b.life){                                                        // 弾けた：4つの飛沫が外へ
+      const e=(b.age-b.life)/.3; ctx.globalAlpha=(1-e)*(.4+.5*lit); ctx.fillStyle=SOAP_IRI[0];
+      for(const [ax,ay] of [[-1,-1],[1,-1],[-1,1],[1,1]]) ctx.fillRect(sx+Math.round(ax*(b.r+1+e*3)*ps),sy+Math.round(ay*(b.r+1+e*3)*ps),q,q);
+      continue; }
+    const fade=Math.min(1,b.age/.6)*(k>.92?1-(k-.92)/.08*.5:1), A=(.22+.5*lit)*fade;
+    for(const [rx,ry,a] of soapRim(b.r)){
+      ctx.globalAlpha=A*(ry<0?1:.7); ctx.fillStyle=SOAP_IRI[((a/6.2831853+t*.12+(b.s%100)/100)*4|0)&3];
+      ctx.fillRect(sx+rx*ps|0, sy+ry*ps|0, q, q); }
+    ctx.globalAlpha=Math.min(1,A*1.8); ctx.fillStyle='#ffffff';
+    ctx.fillRect(sx+Math.round(-b.r*.5)*ps|0, sy+Math.round(-b.r*.5)*ps|0, q, q);   // 照り
+  }
+  ctx.restore();
+}
 function airStep(Z,dt){
   batStep(dt||0.016);
   if(!G) return;
+  if(Z&&Z.id==='sump') soapStep(dt||0.016);
   const L=lookOf(Z), Pp=G.P, ps=TS/Q, t=(performance.now()-T0)/1000;
   const cx=P.x*Q, cy=P.y*Q, hw=innerWidth/ps/2+12, hh=innerHeight/ps/2+12;
   while(motes.length<90) motes.push({x:cx+(Math.random()*2-1)*hw, y:cy+(Math.random()*2-1)*hh, ph:Math.random()*9, sp:.5+Math.random()});
@@ -1416,6 +1497,8 @@ const FAM_PAL={
   frost: {o:'#6a6a76',d:'#9a9aa2',b:'#cfcfd4',h:'#f4f4f6',ld:'#8a8a94',l:'#a8a8b0',lh:'#c8c8d0',e:'#2a2a38',g:'#ffffff',w:'#ffffff',soft:true},
   storm: {o:'#0e0e14',d:'#2a2a34',b:'#6a6e80',h:'#c0c8dc',ld:'#22222c',l:'#44485a',lh:'#6a7088',e:'#ffe860',g:'#fff080',w:'#e0e4f0'},
   undead:{o:'#100e0e',d:'#2e2a28',b:'#8a8070',h:'#c8bca4',ld:'#26221e',l:'#5a5048',lh:'#8a8070',e:'#9fe0ff',g:'#7fd0e0',w:'#e0d8c8'},
+  /* 水の層の磯虫（タイドスレイター）。濡れた灰褐色に、甲の縁だけ青緑の照り */
+  slater:{o:'#08090b',d:'#262a2c',b:'#5c6460',h:'#a8b4aa',ld:'#181c1e',l:'#363e3c',lh:'#5e6a64',e:'#d8fff0',g:'#8fe0c8',w:'#c4d2c8'},
 };
 const palCache=new Map();
 function palOf(fam,uniq){
@@ -1555,6 +1638,19 @@ function boar(p,g){  // ずんぐりした岩の猪：首が無く、頭が低�
   for(const [x,o] of [[-6,-s],[1,s]]) line(x,-2.6,x+o*.7,0,p.L[1],1.3);
   for(const [x,y] of [[-4,-7],[-2,-5.5],[0,-8],[-5,-5],[1.5,-6]]) dot(x,y,p.B[0]);
   glow(5.8,-5.6,p.e);
+}
+/* 磯虫（フナムシのような群れの虫）。低く平たい甲を節で区切り、前に長い触角、後ろに二股の尾。
+   脚は7対を細かく回す——**速く走って見えること**がこの虫の全部なので、脚の位相は歩きの倍で回す。 */
+function slater(p,g,t,e){
+  const run=Math.sin(t*9+(e._sl||(e._sl=Math.random()*6)));
+  for(let i=0;i<7;i++){ const x=-4.6+i*1.5, ph=g*2.2+i*1.3, f=Math.sin(ph)*.9; line(x,-1.4,x+f,0,i%2?p.L[0]:p.L[1]); }
+  ell(-.4,-2.7,5.8,2.1,p.B);
+  for(let x=-3.8;x<=3.6;x+=1.5) line(x,-4.5,x+.25,-1.6,p.B[0]);              // 甲の節
+  for(let x=-4.4;x<=3.8;x+=1.5) dot(x,-4.3,p.W[1]);                          // 節の照り
+  ell(5.1,-2.3,1.5,1.3,p.B);                                                  // 頭
+  line(5.9,-3.1,9.0,-5.4+run*.5,p.L[1]); line(5.7,-3.3,8.2,-6.6-run*.4,p.L[0]);   // 触角
+  line(-6.0,-2.6,-8.4,-3.6,p.L[1]); line(-6.0,-2.1,-8.2,-1.0,p.L[0]);         // 二股の尾
+  glow(5.8,-2.8,p.e);
 }
 function crawler(p,g){
   const s=Math.sin(g);
@@ -1756,13 +1852,14 @@ const BODY={
   flame:{rush:(p,e,g,t)=>{quad(p,g); for(const [x,y] of [[-3,-6],[-1,-5],[1,-7],[3,-6]]) glow(x,y,Math.sin(t*5+x)>0?p.g:p.G[0]);}, range:(p,e,g,t)=>bat(p,t), turret:(p,e,g,t)=>moth(p,t), swarm:(p,e,g,t)=>ram(p,g,t)},
   frost:{rush:(p,e,g,t)=>humanoid(p,g,'stand'), range:(p,e,g,t)=>quad(p,g), turret:(p,e,g,t)=>paleWraith(p,t), swarm:(p,e,g,t)=>hueEater(p,t,e)},
   storm:{rush:(p,e,g,t)=>armour(p,g), range:(p,e,g,t)=>blades(p,t), turret:(p,e,g,t)=>spear(p,t), swarm:(p,e,g,t)=>armour(p,g,{stake:true})},
+  slater:{swarm:(p,e,g,t)=>slater(p,g,t,e)},
   undead:{rush:(p,e,g,t)=>humanoid(p,g,'prone'), range:(p,e,g,t)=>company(p,g,t), turret:(p,e,g,t)=>humanoid(p,g,'kneel'), swarm:(p,e,g,t)=>humanoid(p,g,'run',{skull:true})},
 };
 /* 自分で光るもの（地形に光を落とす） */
 const EMIT={slime:{turret:[30,.75]}, arcane:{swarm:[18,.35],range:[14,.25]}, armor:{range:[30,.8]}, flame:{turret:[26,.8],swarm:[22,.5],rush:[14,.3]}, storm:{range:[20,.45]}};
 const FOE_CV=new WeakMap();   // 敵ごとのキャンバス（分裂で複製された敵とも共有しない）
 const MID={5:'toad',15:'leech',25:'spider',35:'serpent',45:'eye'};
-const BODY_SIZE={ beast:{range:.70} };   // 系統×形式 → 絵の倍率（当たり判定は変えない）
+const BODY_SIZE={ beast:{range:.70}, slater:{swarm:.72} };   // 系統×形式 → 絵の倍率（当たり判定は変えない）
 
 CAVE.enemy=function(e,sx,sy,R){
   try{ return enemy(e,sx,sy,R); }catch(err){ console.error(err); return false; }

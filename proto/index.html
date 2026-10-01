@@ -3084,6 +3084,8 @@ function shardDrop(e, depth){
      ここで返さないと「基本分＋侵入者分」で二重に入る。
      **この敵が何SPか**を答える場所は、ここ1ヶ所に保つ。 */
   if(e.intruder) return INTRUDER_SHARDS;
+  /* 磯虫は1体ずつは出さず、群れを散らした最後の1体で群れの頭数の3割ぶんをまとめて出す */
+  if(e.swarmling) return (typeof packCleared==='function' && packCleared(e)) ? Math.max(SP_MOB, Math.round(SP_MOB*(e._packN||10)*SLATER_REWARD)) : 0;
   if(e.boss) return e.tier==='final' ? SP_FINAL
            : e.tier==='great' ? SP_GREAT : SP_MID;
   if(e.uniq)  return SP_UNIQ;
@@ -7057,6 +7059,63 @@ function spawnMoss(fl, depth){
   }
   return out;
 }
+/* ---------- 磯虫の群れ（水の層）----------
+   1体1体は弱い。**一度に10体ほどが同時に押し寄せてくる**のが全部（ユーザー要望「フナムシのような」）。
+   群れ（pack）で湧き、1体が気づくと群れ全員が一斉に走り出す（enemyUpdate）。
+   立ち位置だけで戦う設計なので、囲まれる前に下がる・壁を背にする・まとめて薙ぐ、の練習台になる。
+
+   見返りは1体ぶんを薄くし（経験値・金・落とし物を SLATER_REWARD 倍）、SPは群れを散らしたときにまとめて出す。
+   10体ぶんの通常の見返りを配ると、群れが一番おいしい相手になってしまう。 */
+const SLATER = {nm:'タイドスレイター', col:'#8a9a94', dt:'pierce', res:{blunt:-25, pierce:15},
+                hp:0.20, atk:0.32, ms:3.1, r:0.24, tele:0.24, range:0.7, aggro:8.5,
+                pack:[9, 12], from:11, until:20, packs:d=>d>=16?2:1};
+const SLATER_REWARD = 0.3;
+function slaterFloor(depth){ return zoneAt(depth).id==='sump' && depth>=SLATER.from && depth<=SLATER.until; }
+function spawnSlaters(fl, depth){
+  const out=[];
+  if(!slaterFloor(depth) || fl.arena || bossTierAt(depth)) return out;
+  const lv = enemyLevelAt(depth);
+  const base = ARCH.find(a=>a.id==='swarm');
+  const arch = Object.assign({}, base, {hp:SLATER.hp, atk:SLATER.atk, ms:SLATER.ms, tele:SLATER.tele, range:SLATER.range, aggro:SLATER.aggro});
+  const fam = {id:'slater', nm:'磯虫', reg:'潮', col:SLATER.col, atk:SLATER.dt, res:SLATER.res};
+  const rooms = fl.rooms.filter(r=>r!==fl.start && Math.hypot(r.cx-fl.start.cx, r.cy-fl.start.cy)>8);
+  for(let k=0;k<SLATER.packs(depth);k++){
+    const r = pick(rooms.length?rooms:fl.rooms.filter(r=>r!==fl.start)) || fl.rooms[0];
+    const id = 'p'+depth+'_'+k+'_'+Math.floor(rnd()*1e6);
+    const n = ri(SLATER.pack[0], SLATER.pack[1]);
+    for(let i=0;i<n;i++){
+      const a=rnd()*Math.PI*2, d=0.3+rnd()*1.3;
+      const e={
+        x:r.cx+0.5+Math.cos(a)*d, y:r.cy+0.5+Math.sin(a)*d*0.8,
+        arch, fam, lv, elite:false, aff:[], pack:id, swarmling:true, _packN:n,
+        maxHp: Math.max(4, Math.round((26+lv*11)*arch.hp)),
+        atkV:  (5+lv*2.6)*arch.atk,
+        def:   lv*0.8,
+        res:   fam.res, dt: fam.atk,
+        st:{}, bu:{},
+        state:'idle', t:0, cd:rf(0,0.8), vx:0, vy:0, hit:0, tele:0, dead:false,
+        r:SLATER.r, ms:arch.ms*rf(0.88,1.12), teleMul:1, col:fam.col,
+        name:SLATER.nm, reg:fam.reg+'・溜',
+      };
+      e.hp=e.maxHp;
+      if(!standable(e.x, e.y)){ const p=snapToFloor(fl,e.x,e.y); e.x=p.x; e.y=p.y; }
+      out.push(e);
+    }
+  }
+  return out;
+}
+/* 群れの1体が気づいたら、群れ全員を走らせる */
+function wakePack(e){
+  if(!e.pack) return;
+  let woke=0;
+  W.enemies.forEach(o=>{ if(o.pack===e.pack && !o.dead && o.state==='idle'){ o.state='chase'; o.cd=Math.min(o.cd, rf(0.1,0.5)); woke++; } });
+  if(woke>=3 && !e._packSaid){ e._packSaid=true; log('ざわざわと、足音が押し寄せてくる'); }
+}
+/* 群れを散らした（最後の1体を倒した）ときに、まとめて SP を出す */
+function packCleared(e){
+  if(!e.pack) return false;
+  return !W.enemies.some(o=>o!==e && o.pack===e.pack && !o.dead);
+}
 /* 倒した数を層ごとに数える。**口座側**（S.moss）なので死んでも消えない——
    6層ぶん通う話なので、1回の探索で完結させる筋にはできない。 */
 function countMossKill(e){
@@ -8107,6 +8166,7 @@ function enterFloor(depth){
   W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
+  W.enemies.push(...spawnSlaters(fl, depth));   // 水の層：磯虫の群れ
   /* 湧いた先が壁の中だと、動けもしないし殴りにも行けない置物になる。
      moveEnt は壁を越えないので、**一度入ってしまうと出られない。** 入口で均す。 */
   W.enemies.forEach(e=>{
@@ -10490,10 +10550,11 @@ function killEnemy(e, byAlly){
      対象は主が最初から連れてくる眷属（escort）と、招来で呼んだ分（summoned）
      ——どちらも「主が呼んだ」もので、道中の自然湧きとは区別する。 */
   const offeringTrashMul = (!e.boss && S.run.depth===OFFERING_BOSS_DEPTH && (e.escort || e.summoned)) ? 3 : 1;
-  const xp = Math.round((6+e.lv*4.2)*(e.elite?3.2:1)*(cfg?cfg.xp:1)*offeringTrashMul);
+  const swarmMul = e.swarmling ? SLATER_REWARD : 1;   // 磯虫は1体ぶんを薄く（群れで10体来るので）
+  const xp = Math.max(1, Math.round((6+e.lv*4.2)*(e.elite?3.2:1)*(cfg?cfg.xp:1)*offeringTrashMul*swarmMul));
   const receivedXp = grantXp(xp) * (1 + boonSum(S.hero,'xp')/100);
   const g = Math.round((3+e.lv*2)*rf(0.7,1.4)*(cfg?cfg.gold:1)*curseBonus().gold
-                       *(1 + boonSum(S.hero,'gold')/100));   // 蓄財の恩寵
+                       *(1 + boonSum(S.hero,'gold')/100)*swarmMul);   // 蓄財の恩寵
   S.run.gold+=g;
   /* SPも経験値・金と同じ扱いにする。床に落として拾わせるのをやめた——
      倒した数とSPがずれる（逃げ撃ちした分・近寄れなかった分が消える）ので、
@@ -10606,7 +10667,8 @@ function killEnemy(e, byAlly){
   }
 
   // 消耗品。頻度は低く、回復連打で緊張が消えない量に抑える。
-  if(rnd() < CONSUM_DROP_RATE * (e.elite?2.2:1))
+  if(e.swarmling && packCleared(e)) log('磯虫の群れを散らした');
+  if(rnd() < CONSUM_DROP_RATE * (e.elite?2.2:1) * (e.swarmling?SLATER_REWARD:1))
     W.drops.push({x:e.x+rf(-0.4,0.4), y:e.y+rf(-0.4,0.4), it:makeConsum()});
   // 蛍石。灯りを帯びた敵だけが稀に落とす
   if(e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id) && rnd() < STONE_DROP*(e.elite?2:1))
@@ -10616,7 +10678,7 @@ function killEnemy(e, byAlly){
      床が拾い物で埋まっていて、**1つ1つを見なくなっていた。**
      数が減れば1つあたりを見る。高レア度が深さで効くようにした
      （5.5.57 の rollRarity）ぶん、拾った物の当たり外れも読みやすくなる。 */
-  let rate = 0.075 + (e.elite?0.12:0);
+  let rate = (0.075 + (e.elite?0.12:0)) * (e.swarmling?SLATER_REWARD:1);
   // 盗賊の「物色」: 仲間がとどめを刺したときに追加のドロップ
   if(byAlly && jobDef(byAlly.job).sk.id==='scavenge' && rnd()<0.18)
     W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40, S.run.depth)});
@@ -10730,6 +10792,7 @@ function enemyUpdate(e,dt){
   const vis = e.intruder || d < a.aggro || (e.boss && W.fl && W.fl.arena);
   e.hit=Math.max(0,e.hit-dt);
   if(!vis && e.state==='idle'){ e.cd-=dt*slow; return; }
+  if(vis && e.state==='idle' && e.pack){ e.state='chase'; wakePack(e); }   // 群れは一斉に
   if(vis) e.state='chase';
   e.cd-=dt*slow;
 
@@ -19253,7 +19316,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261001b"></script>
+<script src="cave-look.js?v=20261001c"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
