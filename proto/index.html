@@ -7971,6 +7971,62 @@ function placeFirstStone(fl){
     if(W.seen[y] && x>=0 && x<W_ && Math.hypot(x+0.5-p.x,y+0.5-p.y)<=R) W.seen[y][x]=1;
   log('真っ暗だ。暗がりの向こうに、何かが光っている');
 }
+/* ---------- 階に入ったときの落下 ----------
+   穴から落ちてきたことが分かるように、主人公→仲間の順に少しずつずらして上から落とし、
+   着地で土煙・小さな揺れ・つぶれを出す。落ちているあいだ（約1秒）は盤面を止める
+   （形態変化の演出と同じ扱い。敵も動かないので、着地前に殴られることはない）。
+   セーブに相手そのものを入れないよう、落ちる順は「主人公＝−1／仲間＝並び順」で持つ。
+   テスト（自動操作中、または DROP_IN=false）と動きを減らす設定では出さない。 */
+const DROPIN = {h:7, fall:0.48, gap:0.13, land:0.18};
+function startDropIn(){
+  W.dropIn = null;
+  /* 自動テスト（navigator.webdriver）では、DROP_IN=true を明示したときだけ出す。
+     盤面が1秒止まるので、入った直後に動きを見るスイートが軒並み狂う。 */
+  if(window.DROP_IN===false || (navigator.webdriver && window.DROP_IN!==true)
+     || (typeof FEEL_REDUCED!=='undefined' && FEEL_REDUCED.matches)) return;
+  const idx=[-1, ...party().map((a,i)=>a.dead?null:i).filter(i=>i!=null)];
+  W.dropIn = {t:0, list:idx.map((pi,n)=>({pi, at:n*DROPIN.gap, landed:false}))};
+  W.dropIn.end = (idx.length-1)*DROPIN.gap + DROPIN.fall + DROPIN.land;
+}
+function tickDropIn(dt){
+  const d=W.dropIn; if(!d) return false;
+  d.t += dt;
+  markSeen();
+  for(const m of d.list){
+    if(m.landed || d.t < m.at+DROPIN.fall) continue;
+    m.landed = true;
+    const e = m.pi<0 ? P : party()[m.pi];
+    if(e && typeof feelSpray==='function') feelSpray(e.x, e.y+0.2, '#a89c88', 8, 0.9, 'dust');
+    if(m.pi<0 && typeof feelKick==='function') feelKick(1.8, 0.14);
+  }
+  W.fx = W.fx.filter(x=>{ x.life-=dt; return x.life>0; });
+  if(typeof updateFeel==='function') updateFeel(dt);
+  if(d.t >= d.end) W.dropIn = null;
+  return true;
+}
+/* 落ちている最中の見た目。null＝普通。hide＝まだ画面の上。y＝持ち上げる量（px）、shadow＝影の大きさ、sq＝縦のつぶれ */
+function dropInPose(e){
+  const d=W.dropIn; if(!d) return null;
+  const pi = e===P ? -1 : party().indexOf(e);
+  const m = d.list.find(x=>x.pi===pi); if(!m) return null;
+  const k = (d.t-m.at)/DROPIN.fall;
+  if(k<0) return {hide:true};
+  if(k<1) return {y:-DROPIN.h*TS*(1-k*k), shadow:0.25+0.75*k*k, sq:1, k};
+  const l = (d.t-m.at-DROPIN.fall)/DROPIN.land;
+  return {y:0, shadow:1, sq: l<1 ? 1-0.28*Math.sin(l*Math.PI) : 1};
+}
+/* 姿勢を掛ける（足元を軸に縦につぶす）。落ちている間は上に短い筋を引く */
+function applyDropPose(dp, cx, cy){
+  if(!dp) return;
+  if(dp.k!=null && dp.k<1){
+    ctx.save(); ctx.globalAlpha*=0.35*(1-dp.k*0.5); ctx.fillStyle='#e8eef8';
+    const q=Math.max(1,Math.round(TS/16));
+    for(const ox of [-0.22,0.18]) ctx.fillRect(Math.round(cx+ox*TS), Math.round(cy+dp.y-TS*(1.3+Math.abs(ox))), q, Math.round(TS*0.7));
+    ctx.restore();
+  }
+  ctx.translate(0, dp.y);
+  if(dp.sq!==1){ const fy=cy+TS*0.4; ctx.translate(cx,fy); ctx.scale(1+(1-dp.sq)*0.7, dp.sq); ctx.translate(-cx,-fy); }
+}
 function enterFloor(depth){
   RNG = mulberry32((((S.salt|0) + S.runs*7919 + depth*104729)>>>0));
   const fl = genFloor(depth);
@@ -8037,6 +8093,7 @@ function enterFloor(depth){
   livingParty().forEach(a=>{ a.artCd=undefined; a.iframe=0; a.graceT=0; });
   [S.hero, ...party()].forEach(h=>{ if(h) h.barrier=0; });
   S.run.ft = 0;                       // 階層に入ってからの秒数（穴の気配と侵入者に使う）
+  startDropIn();                      // 全員が上から落ちてくる（穴から降りてきたのが分かるように）
   /* 侵入者。実体はこの階には持ち込まないが、**目を付けられた状態は持ち越す**。
      降りても撒けないのがこの仕掛けの中心で、撒けるなら「帰れ」ではなく
      「進め」という意味になってしまう。降りて買えるのは 10 秒だけ。 */
@@ -12509,11 +12566,23 @@ function tickFallWatchdog(dt){
   party().forEach(watch);
   if(W.npc) watch(W.npc);
 }
+/* 探索済み記録（立っているマスが変わったときだけ塗る）。落下演出の間も呼ぶ（降り立つ所が見えるように）。 */
+function markSeen(){
+  if(!W.fl || !W.seen) return;
+  const gx=Math.floor(P.x), gy=Math.floor(P.y), R=Math.round(9*baneMul('sight',1));
+  const seenKey = gx+','+gy+','+R;
+  if(W.seenKey !== seenKey){
+    W.seenKey = seenKey;
+    for(let y=gy-R;y<=gy+R;y++) for(let x=gx-R;x<=gx+R;x++)
+      if(y>=0&&x>=0&&y<W.fl.H&&x<W.fl.W && (x-gx)**2+(y-gy)**2<R*R) W.seen[y][x]=1;
+  }
+}
 function update(dt){
   _drawStage='更新';
   /* 形態変化の見せ場のあいだは、盤面を止めて演出だけ進める。
      （tickBossFormFx の中で W.fx と演出時間だけを送っている） */
   if(tickBossFormFx(dt)) return;
+  if(tickDropIn(dt)) return;          // 階に入ったときの落下のあいだは盤面を止める
   updateFeel(dt);
   tickArtRename(dt);      // 閃きの演出が出切ったら名前の窓を開く
   tickFallWatchdog(dt);
@@ -12785,13 +12854,7 @@ function update(dt){
      **立っているマスが変わったときだけ**塗る。半径9なら 19×19＝361 マスを
      毎フレーム舐めていたが、結果は同じマスの上にいるかぎり1ビットも変わらない。
      マスをまたいだ回（歩いていても毎秒数回）だけで足りる。 */
-  const gx=Math.floor(P.x), gy=Math.floor(P.y), R=Math.round(9*baneMul('sight',1));
-  const seenKey = gx+','+gy+','+R;
-  if(W.seenKey !== seenKey){
-    W.seenKey = seenKey;
-    for(let y=gy-R;y<=gy+R;y++) for(let x=gx-R;x<=gx+R;x++)
-      if(y>=0&&x>=0&&y<W.fl.H&&x<W.fl.W && (x-gx)**2+(y-gy)**2<R*R) W.seen[y][x]=1;
-  }
+  markSeen();
 
   updateHUD();
 }
@@ -13606,8 +13669,11 @@ function draw(){
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
        同じ絵でも敵と混ざらない。 */
     const mspr = isDurantree(a) ? 'moss-ball' : null;
-    drawFeelGroundShadow(sx,sy,mspr?R*2.6:TS,aScale);
+    const aDrop = isNpc ? null : dropInPose(a);
+    if(aDrop && aDrop.hide) return;                 // まだ画面の上（落ちてくる順番待ち）
+    drawFeelGroundShadow(sx,sy,mspr?R*2.6:TS,aScale*(aDrop?aDrop.shadow:1));
     ctx.save(); ctx.globalAlpha*=feelBlink(a);
+    applyDropPose(aDrop, sx, sy);
     if(mspr && sprite(mspr)){
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
       if(!(drawSpriteArt && safeFeelDraw(drawSpriteArt,[sprite(mspr),sx,sy,R*2.6,a,a.dirx,a.diry,1,aScale,aRot,true])))
@@ -13659,7 +13725,7 @@ function draw(){
     }else{
       const mx=allyStats(a).maxHp;
       // 描くのは後回し（誰のキャラ絵にも踏まれない位置＝全員描き終えたあと）
-      allyBars.push({sx, sy, R, col:j.col, pct:clamp(a.hpNow/mx,0,1)});
+      if(!(aDrop && aDrop.k!=null)) allyBars.push({sx, sy, R, col:j.col, pct:clamp(a.hpNow/mx,0,1)});   // 落ちている間は帯を出さない
       /* **加入済みの名前は出さない。**
          上のパーティ帯とステータス画面に同じ物が出ているので、
          足元の文字は情報を増やさずに盤面だけを埋めていた。
@@ -14161,7 +14227,8 @@ function draw(){
      ここで有限に丸めておかないと「主人公だけ消える」が起きる。 */
   const heroBob=finiteXY(feelHeroOffset());
   P._drawn=_drawSerial; P._dwx=(px+heroBob.x+camX)/TS; P._dwy=(py+heroBob.y+camY)/TS;
-  if(!heroBlinkOff) drawFeelGroundShadow(px+heroBob.x,py+heroBob.y,TS,heroScale);
+  const heroDrop = dropInPose(P);
+  if(!heroBlinkOff && !(heroDrop&&heroDrop.hide)) drawFeelGroundShadow(px+heroBob.x,py+heroBob.y,TS,heroScale*(heroDrop?heroDrop.shadow:1));
   // 攻撃範囲リング。自動攻撃なので「どこまで届くか」が見えないと立ち回れない
   const pst=stats(S.hero);
   ctx.strokeStyle = P.target ? 'rgba(127,224,192,.45)' : 'rgba(127,224,192,.16)';
@@ -14222,7 +14289,8 @@ function draw(){
   }
   ctx.save(); ctx.translate(heroBob.x,heroBob.y);
   ctx.globalAlpha*=feelBlink(P);
-  if(!heroBlinkOff){
+  applyDropPose(heroDrop, px, py);
+  if(!heroBlinkOff && !(heroDrop&&heroDrop.hide)){
     const drawHero=typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : CharacterArt.put;
     const heroKey=CharacterArt.heroKey(S.hero);
     if(!safeFeelDraw(drawHero,[heroKey,px,py,TS,P,P.dirx,P.diry,1,heroScale,heroRot])
