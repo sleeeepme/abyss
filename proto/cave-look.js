@@ -1189,6 +1189,112 @@ function drawPools(bx0,by0,t,blindR){
       buf[k]=waterSurface(P_.poolW,P_.poolGleam,lv,px,py,t,L,1,Math.sin(py*.22+t*1.7)*2,Math.sin(px*.056+t)*1.5); wmask[k]=2;
     } }
 }
+/* ---------- 遺跡の柱（水の層・第16〜20階層）----------
+   見本（ユーザー添付の水没した遺跡の絵）に合わせた角の丸い石柱。色は拠点の広場の石。
+     ・上面は角を落とした明るい面（キャップ）。その下に1ドットの縁の影
+     ・光は左上から：左寄りが明るく、右へ行くほど暗く、右と下にだけ濃い輪郭
+     ・数段の石積みの継ぎ目、欠け、オリーブ色の苔。三本に一本は上が折れてギザギザ
+     ・水に立つ物は、水面の下も描く：水の色に混ぜて沈め、下ほど水に溶かす（屈折で一緒に揺れる）。
+       水際に白い縁、右下へ水の影、根元から時々ゆっくり輪が広がる
+     ・陸に立つ物は、右下へ落ちる影と、根元の小石・苔
+   立っている部分は wmask を消して描く（水面の揺らぎ・波の線を乗せない）。 */
+/* → 2026-10-01 第2版：上位モデルの講評（添付の見本との比較）を受けて作り直した。
+     ・縦の明暗：上から2〜5行目が一番明るく、下へ行くほど暗い（根元は輪郭に近い暗さ）。帯の境は列ごとに±1ずらす
+     ・横は4つの帯（左の輪郭／光の側／中間／右の輪郭）。ハイライトは中央より左。継ぎ目の縞はやめ、
+       2ドット縦の塊で隣の色と入れ替えて石の肌にする（単独のドットや市松は使わない）
+     ・上：0行目は中間色（暗い輪郭を上に引かない）、1行目が一番明るい面。角を落とすだけで丸く見せる
+     ・水：白い泡の線はやめた。水際の2行は濡れて暗く青みがかり、水面の行は水の色と半々、
+       その下は2行だけ細くなって水に溶ける。影は光と反対の右下に水の色の濃い楕円、左には細い接地の縁
+     ・陸：台座の段はやめ、胴がそのまま地面に刺さる。影は地面を暗くした色で右へ。苔が根元を巻く */
+const RP_T=['#3e3a3c','#5a534f','#7a6f5e','#9f906e','#c3ad98','#d6bca6','#e8d6c0'].map(C);   // 0輪郭(右) 1暗 2中暗 3中 4明 5照 6最照
+const RP_OL=C('#2b2420'), RP_DARK=C('#0b0d10'), RP_WET=C('#3f4a4c'), RP_WSH=C('#174f5a'), RP_WRIM=C('#235067'), RP_WHI=C('#ffffff');
+const RP_MOSS=[C('#5a5236'),C('#7a6a44'),C('#948448')];
+/* 第3版（講評2回目）：上下を楕円にして円柱に見せる（上面は3行の楕円・根元は端の列が1行上・中央2列が1行下）、
+   ハイライトは左から2列目だけ、右は3段で落とす、水際の濡れは列ごとに高さが揺れる、水の中は細め（5〜7）。 */
+const RP_COLS={5:[1,5,3,2,0], 6:[1,5,5,3,2,0], 7:[1,5,5,4,3,2,0], 8:[1,5,5,4,4,3,2,0]};
+function drawRuinPost(d,t,L,inW){
+  const s=d.s, x=Math.round(d.x), y=Math.round(d.y);
+  const Wd= inW ? [5,6,7,6][s%4] : [8,8,7][s%3], x0=x-(Wd>>1), cols=RP_COLS[Wd];
+  const broken=s%3===0, H= inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5;
+  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
+  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
+  const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
+  const T=i=>RP_T[i<0?0:i>6?6:i];
+  const mid=(Wd-1)/2;
+  // 根元の楕円：端の列は1行上、中央の2列は1行下
+  const narrow=Wd<=6;
+  const yb=q=> (q===0||(q===Wd-1&&!narrow)) ? y-1 : y;             // 端の輪郭の列だけ1行早く終わる（細い柱の右は真っ直ぐ水面まで）
+  // 上端：折れていなければ3行の楕円（0行目は内側だけ、1行目は端を除く、2行目から全幅）
+  const c0=Math.max(1,Math.round(Wd*.25));
+  const hiR=s%2===0, notch=1+(s>>>5)%Math.max(1,Wd-2);
+  const topY=q=>{
+    if(broken){ const sl=Math.round((hiR?(Wd-1-q):q)*2/(Wd-1)); return y-H+sl+(q===notch?1:0)+((q===0||q===Wd-1)?1:0); }
+    if(narrow) return (q>=1&&q<=Wd-2) ? y-H : y-H+1;                // 細い柱は2行の楕円
+    if(q>=c0 && q<=Wd-1-c0) return y-H; if(q>=1 && q<=Wd-2) return y-H+1; return y-H+2; };
+  const band=(q,r,h)=>{ const jit=(hs(s,q+77)%3)-1, rr=r+jit; if(rr<h*.55) return 0; if(rr<h-3) return -1; return -2; };
+  // 濡れた帯の高さ（列ごとに1〜3行、隣と±1）
+  const wetH=[], wetMax=narrow?2:3, wetK=narrow?.8:.72; { let w=2; for(let q=0;q<Wd;q++){ const hh=hs(s,q+333)%3; w=Math.max(1,Math.min(wetMax,w+(hh===0?-1:hh===1?1:0))); wetH.push(w); } }
+  // ---- 影 ----
+  if(inW){
+    for(let yy=0;yy<3;yy++) for(let xx=0;xx<Wd+2;xx++){ const ex=(xx-(Wd+1)/2)/((Wd+2)/2), ey=(yy-1)/1.6; if(ex*ex+ey*ey>1) continue; mix(x0+1+xx,y+1+yy,RP_WSH,.6,true); }
+  } else {
+    for(let yy=0;yy<2;yy++) for(let xx=0;xx<Wd+2;xx++){ if(xx===Wd+1&&yy===1) continue; mix(x0+2+xx,y+yy,RP_DARK,.4); }
+    mix(x0-1,y-1,RP_DARK,.3); mix(x0-1,y-2,RP_DARK,.2);                                            // 左の接地の陰り
+  }
+  // ---- 水面の下：2行だけ細く溶ける（根元の楕円に沿う）----
+  if(inW) for(let yy=1;yy<=2;yy++){ const a=yy===1?.3:.15; for(let q=1;q<Wd-1;q++){ const k=idx(x0+q,y+yy); if(k<0||!wmask[k]) continue; buf[k]=mixU(buf[k],lit(T(cols[q]-2)),a); } }
+  // ---- 胴 ----
+  const hiEnd=Math.round(H*.35);
+  const pits=[[1+s%3, 4+(s>>>4)%Math.max(1,H-7)],[1+(s>>>2)%3, 4+(s>>>8)%Math.max(1,H-7)]].slice(0,1+(s>>>12)%2);
+  const blot=Math.round(H*.45)+((s>>>14)%3)-1;
+  for(let q=0;q<Wd;q++){ const ty=topY(q), yend=inW?yb(q):yb(q), h=yend-ty;
+    for(let py=ty;py<yend;py++){ const r=py-(y-H); let i;
+      const edgeL=q===0, edgeR=q===Wd-1;
+      if(!broken && narrow && r===0){ i=(q===1||q===Wd-2)?3:4; }                                    // 細い柱：奥の縁
+      else if(!broken && narrow && r===1){ i= edgeL?1 : edgeR?0 : q===1?6 : 5; }                   // 細い柱：上面（全幅）
+      else if(!broken && !narrow && r===0){ i=(q===c0||q===Wd-1-c0)?3:4; }                        // 上面の奥の縁
+      else if(!broken && !narrow && r===1){ i= q===1?3 : q===Wd-2?2 : q<=2+(Wd>6?1:0)?6 : q<Wd-3?5:4; }   // 上面
+      else if(!broken && !narrow && r===2){ i= edgeL?1 : edgeR?0 : q<=Wd-4?5 : cols[q]; }        // 上面の手前（右2列は胴の色＝首輪に見せない）
+      else if(broken && py===ty){ i= edgeL?1 : edgeR?0 : q<Wd*.6?5:4; }                           // 折れ口：明るい1行だけ
+      else {
+        i=cols[q]+band(q,py-ty,h);
+        if(q===1 && r>=4 && r<=hiEnd && (r%4)!==3) i=6;                                            // ハイライトは左から2列目だけ
+        if(!edgeL&&!edgeR){ const hh=hs(s,q*977+(r>>1)*131); if(hh%100<22 && !(q===1&&i===6)) i+= (hh>>>8)%2?1:-1; }
+        if(q>=1&&q<=3&&pits.some(p=>p[0]===q&&p[1]===r)) i-=1;                                     // 小さな窪み（2つまで、1段だけ暗く）
+        if(q>=1&&q<=2&&r>=blot&&r<blot+3) i=Math.min(i,3);                                         // 擦れた斑（2×3）
+        if(edgeL) i=Math.min(i,1); if(edgeR) i= py>=yend-2?-1:0;
+      }
+      let c=i<0?RP_OL:T(i);
+      if(inW && py>=yend-wetH[q]) c=mixU(mixU(RP_DARK,c,wetK),RP_WET,.15);                        // 濡れた帯
+      put(x0+q,py,c); }
+  }
+  if(!inW) for(let q=0;q<Wd;q++) put(x0+q,yb(q)-1,q===Wd-1?RP_OL:RP_T[0]);                         // 陸：根元の輪郭（楕円）
+  // 割れ目と短い継ぎ目
+  if(s%2){ const cq=1+(s>>>4)%Math.max(1,Wd-3), cy=y-H+5+(s>>>6)%Math.max(1,H-9), n=3+(s>>>9)%2;
+    for(let k=0;k<n;k++) put(x0+cq+(k>>1),cy+k,RP_T[2]); put(x0+cq-1,cy-1,RP_T[6]); }
+  if(s%3===1 && Wd>5){ const sy=y-Math.round(H*.45), n=2+(s>>>11)%2; for(let k=0;k<n;k++) put(x0+Wd-2-k,sy,RP_T[2]); }
+  // 苔：左下を這い上がる縦の房（1〜2列×1〜4行、下ほど暗い）。上面は1ドットだけ
+  { const n=inW?2:3; for(let i2=0;i2<n;i2++){ const hh=hs(s,i2+500), q=Math.min(Wd-3,(hh%3)+(i2>0?1:0)), len=1+(hh>>>4)%(inW?2:4), base=yb(q)-1-(inW?wetH[q]:0);
+      for(let k=0;k<len;k++){ put(x0+q,base-k,RP_MOSS[k===0?0:1]); if((hh>>>8)%2&&k<len-1) put(x0+q+1,base-k,RP_MOSS[k===0?0:1]); } } }
+  if(!broken && !narrow && s%2===0) put(x0+Wd-3,y-H+2,RP_MOSS[1]);
+  if(!inW){
+    // 地面の苔が左の根元に取り付く（2行のかたまり）、小石は影の側に1つ
+    for(let yy=0;yy<2;yy++) for(let xx=-3;xx<0;xx++){ const w=yy===0?2:3; if(xx<-w) continue; if(yy===0&&xx===-w) continue; put(x0+xx,y-2+yy,RP_MOSS[yy?0:1]); }
+    if(s%2){ const px=x0+Wd+1, py=y+1; put(px,py,RP_T[3]); put(px+1,py,RP_T[3]); put(px,py+1,RP_T[1]); put(px+1,py+1,RP_T[1]); }
+    return;
+  }
+  // ---- 水面の行（根元の楕円に沿う）：石と水を半々 ----
+  for(let q=0;q<Wd;q++){ const k=idx(x0+q,y); if(k<0) continue; buf[k]=mixU(buf[k],lit(mixU(q===Wd-1?RP_OL:T(cols[q]-1),RP_WET,.3)),.5); }
+  // 照り（左の2列の水際）と、左の接地の縁（水×0.75）
+  if(((t*1.8+s%5)|0)%3) { mix(x0+1,yb(1),RP_WHI,.12,false); mix(x0+2,yb(2),RP_WHI,.12,false); }
+  mix(x0-1,y-1,RP_DARK,.25,true); mix(x0-1,y,RP_DARK,.25,true);
+  // 根元から広がる輪（3.4秒に1回）
+  const per=3.4, u=((t+(s%97)/30)%per)/1.6;
+  if(u<1){ const rx=Wd/2+1.5+u*7, ry=(1.8+u*4)*.55, a=.3*(1-u), cx=x0+mid;
+    for(let i2=0;i2<44;i2++){ const an=i2/44*6.2831853, px=Math.round(cx+Math.cos(an)*rx), py=Math.round(y+.5+Math.sin(an)*ry);
+      if(py<=y+1 && px>=x0-1 && px<=x0+Wd) continue; mix(px,py,RP_WHI,a,true); } }
+}
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=G.Z.id==='sump'?DECO_PAL_WET:DECO_PAL, code=G.code, PW=G.PW;
   drawPools(bx0,by0,t,blindR);
@@ -1251,7 +1357,7 @@ function drawDeco(bx0,by0,t,blindR){
       for(let j=0;j<len;j++){const q=j/len; px+=dx*1+(dy?sw*.25:0); py+=dy*1+(dx?sw*.25:0)+(dx?.25:0); dp(px,py,sh3(P_.tendril,L*(1.1-q*.5),px|0,py|0)); if(j%4===2) dp(px+1,py,P_.tendril[0]);}
       break; }
     case 'bulb': { const p=1+Math.sin(t*2+s)*.15; for(let yy=-3;yy<=0;yy++)for(let xx=-2;xx<=2;xx++){ if((xx*xx)/(4*p)+((yy+1.5)**2)/(2.8*p)>1) continue; dp(x+xx,y+yy,xx===0&&yy===-2?P_.bulb[2]:sh3(P_.bulb,L+.25,x+xx,y+yy)); } break; }
-    case 'pillar': { const H=18+s%12, bx=x-4;
+    case 'pillar': if(G.Z.id==='sump'){ drawRuinPost(d,t,L,false); break; } { const H=18+s%12, bx=x-4;
       drect(bx-2,y-2,bx+9,y+1,P_.stone,L*.9,true); drect(bx-1,y-4,bx+8,y-3,P_.stone,L,true);
       for(let j=5;j<H;j++){ const top=j>H-4; for(let q=0;q<8;q++){ if(top&&hs(s,q+j*7)%3===0) continue; const px=bx+q, py=y-j; dp(px,py,(q===2||q===5)?P_.stone[0]:sh3(P_.stone,L*(q<2?1.25:q>6?.6:1),px,py)); } }
       if(s%2){ const fx=x+(s%3?10:-15), fy=y+3; drect(fx,fy-4,fx+7,fy,P_.stone,L,true); dp(fx+2,fy-2,P_.stoneDk); dp(fx+5,fy-2,P_.stoneDk); }
@@ -1260,14 +1366,7 @@ function drawDeco(bx0,by0,t,blindR){
     /* ---- 水の中の遺跡（水の層・第16〜20階層）----
        立っている物は wmask を消して描く（dpw の 0）——水面の揺らぎ（屈折）と波の線が乗らない。
        沈んだ跡だけは水の色に混ぜて、印を残す＝水と一緒に揺れて「水の下にある」に見える。 */
-    case 'wpost': { const H=13+s%10, bx=x-3, broken=s%3===0, sb=P_.stone;
-      for(let j=0;j<H;j++){ const top=j>=H-2, jag=broken&&j>H-5&&hs(s,j)%2;
-        for(let q=0;q<7;q++){ if(jag&&q>3) continue; const px=bx+q, py=y-j;
-          const c= top ? (q<6?P_.stoneHi:sb[1]) : sh3(sb, L*(q<2?1.25:q>4?.55:.95), px,py);
-          dpw(px,py, (q===0||q===6)&&!top ? sb[0] : c, 0); } }
-      if(P_.algae) for(let i=0;i<6;i++){ const h=hs(s,i+90); dpw(bx+(h%7), y-((h>>>4)%4), sh3(P_.algae,L,bx,y), 0); }
-      const ph=(t*1.3+s%7)%2; for(let q=-1;q<=7;q++) if(q<0||q>6||ph<.15) if(((q+((t*3)|0))&3)!==0) dpw(bx+q,y+1,P_.foam,0);   // 根元の白い縁
-      break; }
+    case 'wpost': drawRuinPost(d,t,L,true); break;
     case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone;
       for(let xx=0;xx<w;xx++){ const eH=H-((hs(s,xx)%3)*(xx>w*.55?1:0))-(xx<2||xx>w-3?1:0);
         for(let yy=0;yy<eH;yy++){ const px=x0+xx, py=y-yy, mortar=(yy%3===2)||(((xx+((yy/3|0)%2)*3)%6)===0);
