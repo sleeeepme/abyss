@@ -1142,7 +1142,7 @@
     <button class="sw ghost" id="dbg-god">OFF</button>
   </div>
   <div class="row">
-    <div><b>階層全開放</b><s>中継地点を無視して、5階ごとにどこからでも潜れる</s></div>
+    <div><b>階層全開放</b><s>ボス階とその次の階から潜れる。レベル相応の潜在も支給</s></div>
     <button class="sw ghost" id="dbg-depth">OFF</button>
   </div>
   <div class="row">
@@ -5901,15 +5901,15 @@ function stashCap(){ return 20 + bldLv('stash')*6; }
    踏破が地図に残る形になり、ボスを倒す意味が1つ増える。 */
 function beacons(){ return (S.beacons||[]).slice().sort((a,b)=>a-b); }
 function unlockedDepths(){
-  /* デバッグの「階層全開放」。中継地点を無視して5階ごとに並べる。
-     全階を並べると横に50個のボタンが出て選べなくなるので、刻みは5。
-     ラストボス（51階）は5刻みに乗らない特別な1階なので、別途1つだけ足す
-     ——検証で「最後まで直接跳べる」を保証したい。 */
+  /* デバッグではボス階とその次の階を選べる（1・5・6・10・11…）。
+     最終階より先は出さず、ラストボスの階も必ず含める。 */
   if(dbg('allDepths')){
-    const out=[1];
-    for(let d=5; d<=FINAL_DEPTH; d+=5) out.push(d);
-    if(!out.includes(FINAL_DEPTH)) out.push(FINAL_DEPTH);
-    return out.sort((a,b)=>a-b);
+    const out=new Set([1, FINAL_DEPTH]);
+    for(let d=5; d<=FINAL_DEPTH; d+=5){
+      out.add(d);
+      if(d+1<=FINAL_DEPTH) out.add(d+1);
+    }
+    return [...out].sort((a,b)=>a-b);
   }
   // 51階の中継地点は「52階から」にはならない。最深部が終点。
   return [...new Set([1, ...beacons().map(d=>d+1)])]
@@ -5930,9 +5930,9 @@ function godMode(){ return dbg('god'); }
    レベルが下がったり装備が上書きされたりはしない。 */
 function beaconLevel(depth){ return depth<=1 ? 1 : clamp(Math.round(depth*1.1), 1, 60); }
 function outfitForBeacon(h, depth){
-  if(!h || depth<=1) return null;
+  if(!h || (depth<=1 && !dbg('allDepths'))) return null;
   const want=beaconLevel(depth);
-  const given={lv:0, gear:[]};
+  const given={lv:0, gear:[], potentials:0};
   if(h.lv < want){
     given.lv = want - h.lv;
     // 能力値もレベル相応まで引き上げる（レベルだけ上げても紙のままなので）
@@ -5940,8 +5940,18 @@ function outfitForBeacon(h, depth){
     h.lv = want; h.xp = 0;
     h.str += gain; h.dex += gain; h.vit += gain;
   }
+  // デバッグの引き上げで飛ばしたレベルアップ分を補完する。
+  // 既存の潜在は残し、通常と同じくLv.2から1個ずつ、その到達レベルで抽選。
+  // 個数で不足分だけ埋めるので、以前の引き上げ済みキャラにも効き、再入場で増殖しない。
+  if(dbg('allDepths')){
+    h.charPot=h.charPot||[];
+    while(h.charPot.length < h.lv-1){
+      h.charPot.push(rollCharPotential({lv:h.charPot.length+2}));
+      given.potentials++;
+    }
+  }
   const ilvl = clamp(depth-2, 1, 60);
-  [['weapon','sword'], ['armor','chain']].forEach(([slot, base])=>{
+  (depth>1 ? [['weapon','sword'], ['armor','chain']] : []).forEach(([slot, base])=>{
     if(h.equip[slot]) return;               // 自前の物があれば触らない
     const it=genBaseItem(base, ilvl, 1);    // 支給品なので Common 止まり
     it.ident=true;
@@ -5949,7 +5959,7 @@ function outfitForBeacon(h, depth){
     given.gear.push(itemName(it));
   });
   h.hpNow = stats(h).maxHp;
-  return (given.lv || given.gear.length) ? given : null;
+  return (given.lv || given.gear.length || given.potentials) ? given : null;
 }
 /* ---------- 名前と、その先の代 ----------
    名前を1回だけ聞くのは、そこが愛着の入口だから。
@@ -7981,6 +7991,7 @@ function startRun(depth){
     const parts=[];
     if(kit.lv) parts.push('Lv.'+S.hero.lv+' まで引き上げ');
     if(kit.gear.length) parts.push(kit.gear.join('・')+' を支給');
+    if(kit.potentials) parts.push('潜在 '+kit.potentials+'個を支給');
     log('<i class="pi pi-tent"></i> 中継地点の支給：'+parts.join(' / '));
   }
   S.hero.hpNow = stats(S.hero).maxHp;
@@ -16264,7 +16275,7 @@ const uds=unlockedDepths();
     + (S.startDepth>1
     ? `<div class="empty" style="width:100%;color:#7fc3e0">
          中継地点から始めると <b>Lv.${beaconLevel(S.startDepth)}</b> まで引き上げ、
-         足りない装備を支給する<br>
+         足りない装備を支給する${dbg('allDepths')?'。潜在もレベルアップ回数ぶんまでランダムに補う':''}<br>
          <span style="font-size:12px">自前のレベルと装備がそれを上回っていれば、そのまま使う</span></div>`
     /* 中継地点がまだ1つも無いときは何も書かない。
        選べる階層が「第1階層」1つだけという事実が、そのまま「まだ無い」を伝えている。 */

@@ -115,18 +115,38 @@ R.depthsGatedByDefault = await pg.evaluate(()=>{
   return {list:u, ok: u.length===1 && u[0]===1};
 });
 
-/* 3-b. 開放すると5階刻みで並ぶ。全階並べると横に50個出て選べない。
-   ラストボス（51階）だけは5刻みに乗らない特別な1階なので、
-   その前後の2ヶ所だけ5以外の間隔になる（50→51→55）。それ以外は全部5刻み。 */
+/* 3-b. ボス階とその次の階を選べる。終点を越えず、重複しない。 */
 R.allDepthsOpens = await pg.evaluate(()=>{
   S.debug.allDepths=true;
   const u=unlockedDepths();
-  const gaps=u.slice(2).map((d,i)=>d-u[i+1]);
-  const nonFive=gaps.filter(g=>g!==5);
-  return {count:u.length, first:u.slice(0,4), last:u[u.length-1],
-          mostlyFive: nonFive.length<=2,
-          reachesFinal: u.includes(FINAL_DEPTH),
-          ok: u.length>5 && nonFive.length<=2 && u.includes(FINAL_DEPTH)};
+  const expected=Array.from({length:FINAL_DEPTH},(_,i)=>i+1)
+    .filter(d=>d===1 || d===FINAL_DEPTH || d%5===0 || d%5===1);
+  renderTown();
+  const buttons=[...document.querySelectorAll('#startdepth [data-depth]')].map(n=>+n.dataset.depth);
+  return {list:u, buttons, ok: JSON.stringify(u)===JSON.stringify(expected) && JSON.stringify(buttons)===JSON.stringify(expected)};
+});
+
+// 潜在は通常と同じ到達レベルで抽選し、引き上げ済みの不足も埋める。
+R.debugPotentials = await pg.evaluate(()=>{
+  S.hero=newHero(); S.debug={on:true,allDepths:true};
+  const levels=[], original=rollCharPotential, pending=_charPotPend.length;
+  rollCharPotential=h=>{ levels.push(h.lv); return original(h); };
+  try{
+    startRun(6);
+    const h=S.hero, firstLv=h.lv, first=h.charPot.slice();
+    const valid=first.every(p=>POTENTIALS.some(d=>d.id===p.id && d.stat===p.stat) && p.v>0 && p.tier>=0 && p.tier<5);
+    startRun(6);
+    const noRepeat=h.charPot.length===first.length && first.every((p,i)=>h.charPot[i]===p);
+    startRun(11);
+    const target=h.lv, raised=h.charPot.length===target-1;
+    h.charPot.splice(-2); // 以前レベルだけ引き上げたキャラも補完
+    startRun(1);
+    const repaired=h.charPot.length===target-1;
+    S.debug.allDepths=false; S.hero=newHero(); startRun(11);
+    const normalUnchanged=S.hero.charPot.length===0;
+    return {firstLv, count:first.length, levels, valid, noRepeat, raised, repaired, normalUnchanged,
+      ok:first.length===firstLv-1 && levels.slice(0,target-1).every((lv,i)=>lv===i+2) && valid && noRepeat && raised && repaired && normalUnchanged && _charPotPend.length===pending};
+  }finally{ rollCharPotential=original; S.debug.allDepths=true; }
 });
 
 // 3-c. 開放した階から実際に潜れる
