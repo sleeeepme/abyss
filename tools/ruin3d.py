@@ -384,6 +384,8 @@ def fallen_scene(name, seed, yaw, length=10.0, R=1.25):
         obs.append([round(pt[0] * PX, 1), round(pt[2] * math.sin(THETA) * PX, 1), round(R * PX * 0.95, 1)])
     sc = Scene(name, parts, None, obs)
     sc.sink = int(round(0.35 * D * math.cos(THETA) * PX))     # 水の中では直径の35%が沈む（ドット）
+    cap = start - axis * 1.5; brk = start + axis * length
+    sc.meta = {'cap': upx(cap[0], cap[2]), 'brk': upx(brk[0], brk[2])}   # 柱頭の側と折れ口の側（ドット）
     return sc
 
 def room_scene(name, seed, W=16.0, D=22.0):
@@ -496,13 +498,142 @@ def room_scene(name, seed, W=16.0, D=22.0):
     sc.sink = 0
     return sc
 
+# ---------------- 部品の詰め合わせ（部屋に散らして置く用）----------------
+# 部屋の残骸を1つの塊で置くと、迷宮の部屋の形と食い違って不自然だった（ユーザー指摘）。
+# 壁の切れ端・角・柱・石碑・敷石・段・転げた塊を別々のスプライトにして、ゲーム側で
+# 迷宮の部屋の壁際や角に沿って散らす。1マス＝x 4単位・z 8単位（z は画面で半分に縮むので2倍）。
+CH = 1.8
+class Kit:
+    def __init__(self, seed):
+        self.rng = np.random.default_rng(seed); self.parts = []; self.obs = []
+    def ob(self, x, z, r):
+        self.obs.append([round(x * PX, 1), round(z * math.sin(THETA) * PX, 1), round(r, 1)])
+    def stack(self, x, z, w, dz, c, panel=False, cornice=True, solid=True):
+        rng = self.rng; sd = int(rng.integers(1, 1 << 30)); k0 = 0
+        if panel and c >= 2:
+            h = CH * 2
+            self.parts.append(Part('box', (x, h / 2, z), rot_y(rng.normal(0, 0.02)), half=(w / 2, h / 2, dz / 2), bev=0.12, panel='glyph', seed=sd, moss=0.6)); k0 = 2
+        for k in range(k0, c):
+            h = CH * (0.94 + rng.uniform(0, 0.08)); top = k == c - 1
+            ez = 0.25 if (top and cornice and c >= 2) else 0.0
+            off = np.array([rng.normal(0, 0.04), 0, rng.normal(0, 0.04)])
+            self.parts.append(Part('box', np.array([x, CH * k + h / 2, z + ez / 2]) + off, rot_y(rng.normal(0, 0.015)), half=(w / 2, h / 2, dz / 2 + ez / 2), bev=0.12, seed=sd + k, moss=0.6))
+        if solid:
+            if dz > w * 1.5:
+                for q in np.arange(-dz / 2 + 1.2, dz / 2, 2.4): self.ob(x, z + q, w * PX * 0.5 + 0.5)
+            else:
+                for q in np.arange(-w / 2 + 0.8, w / 2, 1.4): self.ob(x + q, z, min(w, dz * math.sin(THETA)) * PX * 0.45 + 1)
+    def run_x(self, x0, x1, z, cmin, cmax, dz=2.4, panels=1, broken_end=True, broken_left=False):
+        """x 方向の壁の切れ端（北の壁沿い）。段は cmin〜cmax を±1で揺らし、端は崩れて低い"""
+        rng = self.rng; x = x0; c = cmax; pl = panels; xs = []
+        while x < x1 - 1.0:
+            w = min(rng.choice([2.5, 3.0, 3.5]), x1 - x)
+            if x1 - x - w < 1.2: w = x1 - x
+            xs.append((x, w)); x += w
+        for i, (x, w) in enumerate(xs):
+            c = int(np.clip(c + rng.integers(-1, 2), cmin, cmax))
+            if broken_end and i == (0 if broken_left else len(xs) - 1): c = max(1, c - 1)
+            pan = pl > 0 and c >= 2 and w >= 3.0 and rng.random() < 0.6
+            if pan: pl -= 1
+            self.stack(x + w / 2, z, w - 0.04, dz, c, panel=pan)
+    def run_z(self, x, z0, z1, c, w=1.8):
+        """z 方向の壁の切れ端（東西の壁沿い）"""
+        rng = self.rng; z = z0
+        while z < z1 - 2.0:
+            dl = min(rng.choice([6.5, 8.0, 9.5]), z1 - z)
+            if z1 - z - dl < 2.5: dl = z1 - z
+            self.stack(x, z + dl / 2, w, dl - 0.1, c, cornice=False); z += dl
+    def column(self, x, z, R, L, broken=None, capital=True):
+        self.parts += egypt_column((x, 0, z), R, L, int(self.rng.integers(1, 1 << 30)), broken=broken, capital=capital)
+        self.ob(x, z, R * PX * 1.1)
+    def tumbled(self, x, z, n=2, solid=True):
+        rng = self.rng
+        for k in range(n):
+            s_ = rng.uniform(0.5, 0.8); px_ = x + rng.uniform(-1.2, 1.2); pz = z + rng.uniform(-2, 2)
+            self.parts.append(Part('box', (px_, s_ * 0.9, pz), rot_y(rng.uniform(0, 3)) @ rot_z(rng.normal(0, 0.22)), half=(s_ * 1.5, s_, s_ * 1.2), bev=0.12, seed=int(rng.integers(1, 1 << 30)), moss=0.5))
+            if solid: self.ob(px_, pz, s_ * PX * 1.2)
+    def paving(self, cols, rows, miss=0.25):
+        rng = self.rng; x0 = -cols * 3.0 / 2; z0 = -rows * 3.5 / 2
+        for j in range(rows):
+            for i in range(cols):
+                edge = i in (0, cols - 1) or j in (0, rows - 1)
+                if edge and rng.random() < miss: continue
+                w, dz = 3.0, 3.5
+                self.parts.append(Part('box', (x0 + i * w + w / 2 + rng.normal(0, .04), 0.09, z0 + j * dz + dz / 2 + rng.normal(0, .04)), rot_y(rng.normal(0, .015)),
+                                       half=(w / 2 - 0.02, 0.1, dz / 2 - 0.03), bev=0.03, seed=int(rng.integers(1, 1 << 30)), moss=0.15, tone=0.86, slab=True, crack=rng.random() < 0.2))
+    def scene(self, name, sink=0, ground=None, meta=None):
+        sc = Scene(name, self.parts, ground, self.obs); sc.sink = sink; sc.meta = meta or {}; return sc
+def upx(x, z): return [round(x * PX), round(z * math.sin(THETA) * PX)]
+
+def kit_wallrun(name, seed, length, cmin, cmax, panels, left=False):
+    """left=True なら左端が崩れている。meta.brk に崩れた端の位置（ドット）"""
+    k = Kit(seed); k.run_x(-length / 2, length / 2, 0, cmin, cmax, panels=panels, broken_left=left)
+    ex = (-length / 2 - 1.2) if left else (length / 2 + 1.2)
+    k.tumbled(ex, 2.2, 1, solid=False)
+    return k.scene(name, meta={'brk': upx(-length / 2 if left else length / 2, 0), 'tall': cmax >= 2})
+def kit_siderun(name, seed, length, c):
+    k = Kit(seed); k.run_z(0, -length / 2, length / 2, c); return k.scene(name, meta={'tall': c >= 2})
+def kit_corner(name, seed, east):
+    """北の壁と東西の壁の角。east=True なら北東の角（北の壁は左へ、横の壁は角から下へ）"""
+    k = Kit(seed); sx = 1 if east else -1
+    k.column(sx * 0.0, 0.0, 0.95, 3 * CH, capital=bool(seed % 2))
+    xa, xb = (-9.0, -1.2) if east else (1.2, 9.0)
+    k.run_x(xa, xb, 0.0, 1, 2, panels=1 if seed % 3 == 0 else 0)
+    k.run_z(0.0, 2.2, 14.0, 1)
+    return k.scene(name, meta={'tall': True})
+def kit_column(name, seed, L, broken=False, capital=True, R=1.0):
+    k = Kit(seed)
+    brk = None
+    if broken:
+        nrm = np.array([0.45, 1, 0.15]); nrm /= np.linalg.norm(nrm); brk = (nrm, np.array([0, L * 0.55, 0]), 0.3)
+    k.column(0, 0, R, L, broken=brk, capital=capital and not broken)
+    if broken: k.tumbled(2.2, 3.0, 1, solid=False)
+    return k.scene(name, meta={'tall': L > 3})
+def kit_stele(name, seed, lean=0.0):
+    k = Kit(seed); rng = k.rng
+    w, h, dz = 3.2, 3.8, 1.3
+    M = rot_z(lean)
+    k.parts.append(Part('box', (math.sin(-lean) * h / 2, h / 2 * math.cos(lean), 0), M, half=(w / 2, h / 2, dz / 2), bev=0.12, panel='glyph', seed=int(rng.integers(1, 1 << 30)), moss=0.6))
+    k.parts.append(Part('box', (0, 0.25, 0), rot_y(0.05), half=(w / 2 + 0.4, 0.25, dz / 2 + 0.4), bev=0.08, seed=int(rng.integers(1, 1 << 30)), moss=0.7))   # 台
+    k.ob(0, 0, w * PX * 0.45)
+    return k.scene(name, meta={'tall': True})
+def kit_paving(name, seed, cols, rows):
+    k = Kit(seed); k.paving(cols, rows); return k.scene(name)
+def kit_steps(name, seed):
+    k = Kit(seed); rng = k.rng
+    for j in range(3):
+        k.parts.append(Part('box', (0, 0.29 * (3 - j) / 2, -1.5 + j * 1.6), rot_y(rng.normal(0, 0.015)), half=(2.2 - j * 0.15, 0.29 * (3 - j) / 2, 0.85), bev=0.05, seed=int(rng.integers(1, 1 << 30)), moss=0.35))
+    return k.scene(name)
+def kit_blocks(name, seed, n):
+    k = Kit(seed); k.tumbled(0, 0, n); return k.scene(name)
+
 SCENES = [
     lambda: fallen_scene('fallen_a', 101, math.radians(32), 10.0),
     lambda: fallen_scene('fallen_b', 202, math.radians(-28), 9.0, 1.15),
     lambda: fallen_scene('fallen_c', 303, math.radians(18), 8.0, 1.05),
-    lambda: room_scene('room_a', 11, 16.0, 22.0),
-    lambda: room_scene('room_b', 23, 17.0, 24.0),
-    lambda: room_scene('room_c', 37, 15.0, 21.0),
+    lambda: kit_wallrun('wall_a', 501, 10.0, 2, 3, 1),
+    lambda: kit_wallrun('wall_b', 502, 6.5, 1, 2, 1),
+    lambda: kit_wallrun('wall_c', 503, 13.0, 1, 2, 0),
+    lambda: kit_wallrun('wall_d', 504, 7.0, 1, 2, 0, left=True),
+    lambda: kit_wallrun('wall_e', 505, 10.5, 2, 3, 1, left=True),
+    lambda: kit_wallrun('wall_f', 506, 5.0, 1, 1, 0),
+    lambda: kit_siderun('side_a', 511, 14.0, 1),
+    lambda: kit_siderun('side_b', 512, 20.0, 2),
+    lambda: kit_siderun('side_c', 513, 10.0, 2),
+    lambda: kit_corner('corner_nw', 521, False),
+    lambda: kit_corner('corner_ne', 522, True),
+    lambda: kit_column('col_a', 531, 4 * CH),
+    lambda: kit_column('col_b', 532, 4 * CH, broken=True),
+    lambda: kit_column('col_c', 533, 1.4, capital=False),
+    lambda: kit_column('col_d', 534, 3 * CH),
+    lambda: kit_stele('stele_a', 541),
+    lambda: kit_stele('stele_b', 542, lean=0.22),
+    lambda: kit_paving('pave_a', 551, 3, 2),
+    lambda: kit_paving('pave_b', 552, 4, 3),
+    lambda: kit_paving('pave_c', 553, 2, 2),
+    lambda: kit_steps('steps_a', 561),
+    lambda: kit_blocks('blocks_a', 571, 2),
+    lambda: kit_blocks('blocks_b', 572, 3),
 ]
 
 def main():
@@ -516,7 +647,9 @@ def main():
         if only and sc.name not in only[0].split(','): continue
         r = render_scene(sc)
         rows, hts = quantize_scene(r)
-        big[sc.name] = {'w': r['W'], 'h': r['H'], 'ax': int(r['ax']), 'ay': int(r['ay']), 'sink': getattr(sc, 'sink', 0), 'rows': rows, 'hts': hts, 'obs': sc.obs}
+        lo = np.min([p_.aabb()[0] for p_ in sc.parts], axis=0); hi_ = np.max([p_.aabb()[1] for p_ in sc.parts], axis=0)
+        fp = [round(lo[0] * PX), round(lo[2] * math.sin(THETA) * PX), round(hi_[0] * PX), round(hi_[2] * math.sin(THETA) * PX)]   # 床の上の広がり（ドット）
+        big[sc.name] = {'w': r['W'], 'h': r['H'], 'ax': int(r['ax']), 'ay': int(r['ay']), 'sink': getattr(sc, 'sink', 0), 'fp': fp, 'rows': rows, 'hts': hts, 'obs': sc.obs, **getattr(sc, 'meta', {})}
         pal_rows = [row.replace('s', '.').replace('G', '.').replace('H', '.').replace('S', '.') for row in rows]
         img = to_rgb(pal_rows)
         for y, row in enumerate(rows):

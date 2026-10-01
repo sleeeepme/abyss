@@ -52,13 +52,13 @@ R.draw = await pg.evaluate(()=>{
 });
 R.ruins = await pg.evaluate(()=>{
   const kinds=d=>{ TH.run(d,{seed:45}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); draw(); const G=CAVE._G(); return G.deco.map(o=>o.k); };
-  const RUIN=['pillar','colonnade','brokenwall','fallen','rubble'];
+  const RUIN=['wpost','wwall','wsteps','sunken','rubble','rbig'];   // 陸の柱・壁は rbig（置き方は ruinPlacement で見る）
   let early=0, late=0, solidN=0, pillars=0;
   for(const seed of [45,46]){
     for(const d of [12,14]){ TH.run(d,{seed}); setScreen('game'); draw(); early+=CAVE._G().deco.filter(o=>RUIN.includes(o.k)).length; }
     for(const d of [16,18]){ TH.run(d,{seed}); setScreen('game'); draw(); const G=CAVE._G();
       const rs=G.deco.filter(o=>RUIN.includes(o.k)); late+=rs.length;
-      for(const o of rs.filter(o=>o.k==='pillar')){ pillars++; if(window.solid(o.x/16, (o.y-1)/16)) solidN++; } }
+      for(const o of rs.filter(o=>o.k==='wpost')){ pillars++; if(window.solid(o.x/16, (o.y-1)/16)) solidN++; } }
   }
   return {early, late, pillars, solidN, ok: early===0 && late>=6 && pillars>0 && solidN===pillars};
 });
@@ -80,20 +80,34 @@ R.soap = await pg.evaluate(()=>{
   TH.run(5,{seed:48}); setScreen('game'); draw(); const none=!CAVE._G().soap;
   return {n, popped, none, ok: n>=5 && n<=60 && popped && none};
 });
-/* 倒れた石柱と部屋の残骸（16〜20階）：出ること、当たり判定を持つこと、描いても落ちないこと */
-R.bigRuins = await pg.evaluate(()=>{
-  let rooms=0, fallen=0, roomSolid=0, fallenSolid=0, early=0;
-  for(const seed of [44,45,46,47]){
-    for(const d of [16,17,18,19]){ TH.run(d,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); draw(); const G=CAVE._G();
-      for(const o of G.deco){
-        const sp=CAVE._ruinBig(o);
-        const solidAt=()=>{ if(sp){ const [dx,dy]=sp.obs[Math.min(1,sp.obs.length-1)]; return window.solid((o.x+dx)/16,(o.y+dy)/16); }
-          if(o.k==='ruinroom'){ const e=o._lay&&o._lay.els.find(e=>e.t==='stack'&&!e.tilt); return !!(e&&window.solid((e.x+e.w/2)/16,(e.y-1)/16)); }
-          const g=o._fg, dr=g.drums[1]||g.drums[0]; return window.solid((dr.x+3)/16,(dr.y+Math.round(3*dr.sl)+dr.D-4)/16); };
-        if(o.k==='ruinroom'){ rooms++; if(solidAt()) roomSolid++; }
-        if(o.k==='fallen'||o.k==='wfallen'){ fallen++; if(solidAt()) fallenSolid++; } } }
-    for(const d of [12,14]){ TH.run(d,{seed}); setScreen('game'); draw(); early+=CAVE._G().deco.filter(o=>o.k==='ruinroom'||o.k==='wfallen').length; }
+/* 遺跡の置き方（16〜20階）：部品は部屋の中だけ・入口から2マス・穴から3マス離れ、置いても入口から穴まで歩けて、
+   全部の部屋に入れること。当たり判定を持ち、12・14階には出ないこと */
+R.ruinPlacement = await pg.evaluate(()=>{
+  let pieces=0, outside=0, nearOpen=0, nearStair=0, solidOk=0, solidN=0, cutOff=0, early=0, onBand=0, cols=0, postNear=0, remnants=0;
+  for(const seed of [44,45,46,47]) for(const d of [16,17,18,19]){
+    TH.run(d,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); draw();
+    const G=CAVE._G(), f=W.fl, rb=G.deco.filter(o=>o.k==='rbig');
+    cols+=rb.filter(o=>/^col_/.test(o.name)).length;
+    if(rb.some(o=>/^(wall|corner|side)_/.test(o.name))&&rb.some(o=>/^pave_/.test(o.name))) remnants++;
+    postNear+=G.deco.filter(o=>o.k==='wpost'&&rb.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<6*16)).length;
+    for(const o of rb){ pieces++;
+      const tx=Math.floor(o.x/16), ty=Math.floor(o.y/16);
+      const rm=f.rooms.find(r=>tx>=r.x&&tx<r.x+r.w&&ty>=r.y&&ty<r.y+r.h); if(!rm){ outside++; continue; }
+      if(Math.hypot(tx+.5-f.stair.x,ty+.5-f.stair.y)<3) nearStair++;
+      const sp=CAVE._ruinBig(o);
+      if(sp.obs.length){ const B=CAVE._ruinBand(f); for(const [dx,dy,rr] of sp.obs){ const cx=Math.floor((o.x+dx)/16), cy=Math.floor((o.y+dy)/16); if(B.at(cx,cy)&&B.path[cy*f.W+cx]) onBand++; } }
+      if(sp.obs.length){ solidN++; const [dx,dy]=sp.obs[0]; if(window.solid((o.x+dx)/16,(o.y+dy)/16)) solidOk++; }
+    }
+    const H=f.H, Wd=f.W, seen=new Uint8Array(H*Wd), q=[[f.start.cx,f.start.cy]]; seen[f.start.cy*Wd+f.start.cx]=1;
+    const pass=(x,y)=>x>0&&y>0&&x<Wd&&y<H&&!window.solid(x+.5,y+.5);
+    while(q.length){ const [x,y]=q.pop(); for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+dx, ny=y+dy; if(seen[ny*Wd+nx]||!pass(nx,ny)) continue; seen[ny*Wd+nx]=1; q.push([nx,ny]); } }
+    if(!seen[Math.floor(f.stair.y)*Wd+Math.floor(f.stair.x)]) cutOff++;
+    cutOff+=f.rooms.filter(r=>{ for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++) if(seen[y*Wd+x]) return false; return true; }).length;
   }
-  return {rooms, roomSolid, fallen, fallenSolid, early, ok: rooms>=2 && roomSolid===rooms && fallen>=3 && fallenSolid===fallen && early===0};
+  for(const seed of [44,45]) for(const d of [12,14]){ TH.run(d,{seed}); setScreen('game'); draw(); early+=CAVE._G().deco.filter(o=>o.k==='rbig').length; }
+  /* 2026-10-01 置き方の見直し：通り道（帯の芯）に当たりを置かない／柱は4割まで／遺跡の6マス以内に水の角柱を置かない／
+     建物の跡（壁か角＋敷石）がだいたいの階にある */
+  return {pieces, outside, nearStair, solidN, solidOk, cutOff, early, onBand, colShare:+(cols/pieces).toFixed(2), postNear, remnants,
+    ok: pieces>=40 && outside===0 && nearStair===0 && solidOk===solidN && cutOff===0 && early===0 && onBand===0 && cols<=pieces*.4 && postNear===0 && remnants>=12};
 });
 await done(b, errs, R);
