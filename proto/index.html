@@ -8021,12 +8021,27 @@ function placeFirstStone(fl){
   const sr=fl.start, inStart=(x,y)=>x>=sr.x && x<sr.x+sr.w && y>=sr.y && y<sr.y+sr.h;
   // 上下は画面の端ほど暗く沈むので、まず縦6マス以内、無ければ8マス以内で探す
   let vy=6; const inView=(x,y)=>Math.abs(x-fl.start.cx)<=5.5 && Math.abs(y-fl.start.cy)<=vy && !inStart(x,y);
+  /* → 2026-10-02 ユーザー指摘「最初の蛍石が壁の向こうの、回り込まないと行けない部屋にあって直ぐ取りに行けない」。
+     入口からは灯りしか見えない（通路は暗い）ので、灯りへまっすぐ歩くと壁に当たる。
+     **入口からまっすぐ歩いて届く所**（間に壁の無い線が引ける。体の幅ぶん左右にもずらして見る）にだけ置く。 */
+  const sx0=fl.start.cx+0.5, sy0=fl.start.cy+0.5;
+  const straight=(x1,y1)=>{ const L=Math.hypot(x1-sx0,y1-sy0); if(L<0.01) return true; const nx=-(y1-sy0)/L, ny=(x1-sx0)/L, n=Math.ceil(L*4);
+    for(const o of [-0.3,0,0.3]) for(let i=0;i<=n;i++){ const x=sx0+(x1-sx0)*i/n+nx*o, y=sy0+(y1-sy0)*i/n+ny*o; const gx=Math.floor(x), gy=Math.floor(y);
+      if(gx<0||gy<0||gx>=W_||gy>=H_) return false; const t=fl.g[gy][gx]; if(t===T.WALL||t===T.PIT) return false; } return true; };
   let best=null, bd=1e9, near=null, nd=1e9;
   for(const pass of [6,8]){ vy=pass; if(best) break;
     for(const r of fl.rooms){ if(r===fl.start) continue; const d=dist[r.cy*W_+r.cx]; if(d<=0) continue;
       if(d<nd){ nd=d; near=r; }
-      if(inView(r.cx,r.cy) && d<bd){ bd=d; best=r; } } }
+      if(inView(r.cx,r.cy) && straight(r.cx+0.5,r.cy+0.5) && d<bd){ bd=d; best=r; } } }
   let p = best ? {x:best.cx+0.5, y:best.cy+0.5} : null;
+  if(!p){                                           // 部屋の真ん中が見通せないなら、見通せる床のうち、次の部屋へ向かう口に近い所
+    let bs=-1e9;
+    for(let y=0;y<H_;y++) for(let x=0;x<W_;x++){ const d=dist[y*W_+x]; if(d<4||d>10) continue; vy=6; if(!inView(x,y)) continue;
+      if(!straight(x+0.5,y+0.5)) continue;
+      const room=fl.rooms.find(r=>r!==fl.start && x>=r.x && x<r.x+r.w && y>=r.y && y<r.y+r.h);
+      const sc=(room?6:0) + d - (near? Math.hypot(x-near.cx,y-near.cy)*0.35 : 0);
+      if(sc>bs){ bs=sc; p={x:x+0.5,y:y+0.5}; } }
+  }
   if(!p && near){                                   // 道のりを入口側へ戻りながら、画面に収まる所を探す
     vy=6;
     let k=near.cy*W_+near.cx;
@@ -19171,6 +19186,11 @@ bindTap(el('t-help'), openHelp);
    タイトルの版番号を5回叩くと出る。
    「隠しコマンド」にしたいのではなく、**普通に遊んでいる人の指が届かない**
    場所に置きたいだけ。押せるボタンとして置くと、必ず押される。 */
+/* 版の目印（2026-10-02）：cave-look.js の ?v= の末尾をタイトルの版番号の後ろに小さく出す。
+   push したのに「反映されていない？」となったとき、画面で届いた版を確かめられるように（GitHub Pages は10分ほど古い物を返すことがある）。 */
+{ const verTag=()=>{ const s=document.querySelector('script[src*="cave-look.js"]'), m=s&&/v=(\w+)/.exec(s.getAttribute('src')), el=document.querySelector('#scr-title .ver');
+    if(m&&el&&!el.querySelector('.vtag')) el.insertAdjacentHTML('beforeend',' <span class="vtag" style="opacity:.55">· '+m[1].slice(4)+'</span>'); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',verTag); else verTag(); }   // cave-look.js の script はこの後ろにある
 let _dbgTaps=0;
 bindTap(document.querySelector('#scr-title .ver'), ()=>{
   _dbgTaps++;
@@ -19327,7 +19347,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261001k"></script>
+<script src="cave-look.js?v=20261002a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

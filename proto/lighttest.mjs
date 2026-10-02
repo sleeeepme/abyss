@@ -101,6 +101,21 @@ R.lightShrinksTheLantern = await pg.evaluate(()=>{
   return {a, m, z, ok: a.lit>m.lit && m.lit>z.lit && z.lit<1.5 && a.vis>m.vis && m.vis>z.vis && z.vis<3.5};
 });
 
+/* 2026-10-02：最初の蛍石は、入口から**まっすぐ歩いて届く**所に置く（壁の向こうの部屋だと、灯りへ歩いて壁に当たる）。
+   入口の真ん中から蛍石まで、体の幅ぶん左右にずらした線にも壁が無いこと。歩いた道のりが遠回りでないこと。 */
+R.firstStoneStraight = await pg.evaluate(()=>{
+  let bad=[], n=0;
+  for(let seed=1;seed<=60;seed++){
+    S.tutStone=false; TH.run(1,{seed}); const f=W.fl, st=W.drops.find(d=>d.stone); n++;
+    if(!st){ bad.push(seed); continue; }
+    const x0=f.start.cx+.5, y0=f.start.cy+.5, L=Math.hypot(st.x-x0,st.y-y0), nx=-(st.y-y0)/L, ny=(st.x-x0)/L;
+    let ok=true; for(const o of [-0.3,0,0.3]) for(let i=0;i<=Math.ceil(L*4);i++){ const t=i/Math.ceil(L*4), x=x0+(st.x-x0)*t+nx*o, y=y0+(st.y-y0)*t+ny*o; if(!tileWalk(f,Math.floor(x),Math.floor(y))) ok=false; }
+    if(!ok) bad.push(seed);
+  }
+  S.tutStone=true;
+  return {n, bad, ok: bad.length===0};
+});
+
 /* 初めての潜りだけ、蛍石を持たずに入る。入口のそばに1つ落ちていて、拾うと灯りが灯る。 */
 R.firstDiveStartsWithoutStone = await pg.evaluate(()=>{
   S.tutStone = false;

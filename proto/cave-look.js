@@ -640,7 +640,9 @@ function terrain(f,Z,camX,camY,blinded){
   wmask.fill(0);
   const bx0=Math.floor(camX/ps)-2, by0=Math.floor(camY/ps)-2;
   // ランタン
-  lampX=Math.round(P.x*Q); lampY=Math.round(P.y*Q-4);         // ドット単位（影の光線と明るさの表を使い回せる）
+  /* → 2026-10-02 ユーザー指摘「灯りが主人公の中心から少し上にズレている」。主人公の絵は P を中心に描く（足元は P の 0.3 マス下）ので、
+     灯りの中心も P に置く（以前は 4 ドット上にずらしていた）。 */
+  lampX=Math.round(P.x*Q); lampY=Math.round(P.y*Q);           // ドット単位（影の光線と明るさの表を使い回せる）
   cache(f,Z); ensure((lampX|0)-16,(lampY|0)-16,(lampX|0)+16,(lampY|0)+16);
   if(G.code[(lampY|0)*G.PW+(lampX|0)]){ outer: for(let r=1;r<14;r++) for(let a=0;a<16;a++){ const x=(lampX+Math.cos(a*.3927)*r)|0, y=(lampY+Math.sin(a*.3927)*r)|0; if(x>=0&&y>=0&&x<G.PW&&y<G.PH&&!G.code[y*G.PW+x]){ lampX=x; lampY=y; break outer; } } }
   shadowOn=!!L.shadow;
