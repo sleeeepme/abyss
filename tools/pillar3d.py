@@ -158,6 +158,14 @@ def render(obj, out_w, out_h, base_row):
     M = pool(moss.astype(float)) / np.maximum(cov, 1e-6)
     B = pool(brk.astype(float)) / np.maximum(cov, 1e-6)
     hi = np.where(hit, np.clip(lum, 0, 1), np.nan)
+    # ゲームでランタンの光を当て直すための、面の向き（ドットの真ん中。外れたら平均）と焼いた光の強さ
+    c_ = SS // 2
+    def mid(a): return a.reshape(out_h, SS, out_w, SS, *a.shape[2:])[:, c_, :, c_]
+    hc = mid(hit); NC = mid(n)
+    nav = np.stack([pool(np.where(hit, n[..., i], 0)) for i in range(3)], -1)
+    NC = np.where(hc[..., None], NC, nav); NC = NC / (np.linalg.norm(NC, axis=-1, keepdims=True) + 1e-9)
+    DC = np.where(hc, mid(dif), pool(np.where(hit, dif, 0)) / np.maximum(cov, 1e-6))
+    render.last = (NC, DC)
     return cov, L, M, B, hi
 
 TONES = ['#3e3a3c', '#5a534f', '#7a6f5e', '#9f906e', '#c3ad98', '#d6bca6', '#e8d6c0']   # 0..6
@@ -293,13 +301,17 @@ def main():
         base = out_h - 2
         cov, L, M, B, hi = render(v, out_w, out_h, base)
         rows = quantize(cov, L, M, B, not v.flip)
+        NC, DC = render.last
         # 空の行・列を詰める（根元の行＝ base は残す）
         keep_c = [x for x in range(out_w) if any(r[x] != '.' for r in rows)]
-        rows = [''.join(r[x] for x in range(keep_c[0], keep_c[-1] + 1)) for r in rows]
         first = next(i for i, r in enumerate(rows) if r.strip('.'))
         last = max(i for i, r in enumerate(rows) if r.strip('.'))
-        rows = rows[first:last + 1]
-        sprites[v.name] = {'w': len(rows[0]), 'h': len(rows), 'rows': rows}
+        x0_, x1_ = keep_c[0], keep_c[-1] + 1
+        rows = [r[x0_:x1_] for r in rows[first:last + 1]]
+        NC, DC = NC[first:last + 1, x0_:x1_], DC[first:last + 1, x0_:x1_]
+        from ruin3d import relight_rows
+        nrows, krows = relight_rows(rows, NC, DC)
+        sprites[v.name] = {'w': len(rows[0]), 'h': len(rows), 'rows': rows, 'n': nrows, 'k': krows}
         # 確認用：高解像度の陰影（灰）と、ドット絵の8倍
         g = np.nan_to_num(hi, nan=0.12)
         hi_img = Image.fromarray((np.clip(g, 0, 1) * 255).astype(np.uint8)).convert('RGB')

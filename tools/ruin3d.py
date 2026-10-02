@@ -257,7 +257,14 @@ def render_scene(sc):
     SA = pool(sand.astype(float)); BR = pool(brk.astype(float)) / np.maximum(cov, 1e-6)
     ax, ay = -x0, -y0
     hi_img = np.where(hit, np.clip(lum, 0, 1), np.where(foot, 0.35, np.where(gsh, 0.08, 0.15)))
-    return dict(PIDc=PIDc, JNT=JNT, W=W, H=H, cov=cov, L=L, M=M, DEP=DEP, HT=HT, FO=FO, SH=SH, GL=GL, SA=SA, BR=BR, ax=ax, ay=ay, hi=hi_img)
+    # ゲームでランタンの光を当て直すための、面の向き（ドットの真ん中の標本。外れたら当たった標本の平均）と、焼いた光の強さ
+    c_ = SS // 2
+    def mid(a): return a.reshape(H, SS, W, SS, *a.shape[2:])[:, c_, :, c_]
+    hc = mid(hit); NC = mid(n)
+    nav = np.stack([pool(np.where(hit, n[..., i], 0)) for i in range(3)], -1)
+    NC = np.where(hc[..., None], NC, nav); NC = NC / (np.linalg.norm(NC, axis=-1, keepdims=True) + 1e-9)
+    DC = np.where(hc, mid(dif), pool(np.where(hit, dif, 0)) / np.maximum(cov, 1e-6))
+    return dict(NC=NC, DC=DC, PIDc=PIDc, JNT=JNT, W=W, H=H, cov=cov, L=L, M=M, DEP=DEP, HT=HT, FO=FO, SH=SH, GL=GL, SA=SA, BR=BR, ax=ax, ay=ay, hi=hi_img)
 
 def quantize_scene(r):
     W, H = r['W'], r['H']
@@ -607,6 +614,25 @@ def kit_steps(name, seed):
 def kit_blocks(name, seed, n):
     k = Kit(seed); k.tumbled(0, 0, n); return k.scene(name)
 
+# ---------------- ランタンの光を当て直すための書き出し ----------------
+NRM_ALPHA = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/'
+def nrm_table(n=64):
+    """面の向きの表（ゲーム側 NRM・cave3d.py と同じ作り方）"""
+    ga = math.pi * (3 - math.sqrt(5)); out = []
+    for i in range(n):
+        y = 1 - (i + 0.5) / n * 2; r = math.sqrt(max(0, 1 - y * y)); ph = i * ga
+        out.append((math.cos(ph) * r, y, math.sin(ph) * r))
+    return np.array(out)
+NRM = nrm_table()
+def relight_rows(rows, NC, DC):
+    """石・苔・輪郭のドットごとに、面の向き（NRM の番号）と焼いた光の強さ（0〜9）。ゲームは
+       「今のランタンで当てた強さ − 焼いた強さ」だけ段を上げ下げする（象形・溝・継ぎ目の描き分けは残る）"""
+    H, W = len(rows), len(rows[0])
+    idx = np.argmax(NC @ NRM.T, axis=-1)
+    nr = [''.join(NRM_ALPHA[idx[y, x]] if rows[y][x] in '0123456abco' else '.' for x in range(W)) for y in range(H)]
+    kr = [''.join(str(int(np.clip(round(DC[y, x] * 9), 0, 9))) if rows[y][x] in '0123456abco' else '.' for x in range(W)) for y in range(H)]
+    return nr, kr
+
 SCENES = [
     lambda: fallen_scene('fallen_a', 101, math.radians(32), 10.0),
     lambda: fallen_scene('fallen_b', 202, math.radians(-28), 9.0, 1.15),
@@ -649,7 +675,8 @@ def main():
         rows, hts = quantize_scene(r)
         lo = np.min([p_.aabb()[0] for p_ in sc.parts], axis=0); hi_ = np.max([p_.aabb()[1] for p_ in sc.parts], axis=0)
         fp = [round(lo[0] * PX), round(lo[2] * math.sin(THETA) * PX), round(hi_[0] * PX), round(hi_[2] * math.sin(THETA) * PX)]   # 床の上の広がり（ドット）
-        big[sc.name] = {'w': r['W'], 'h': r['H'], 'ax': int(r['ax']), 'ay': int(r['ay']), 'sink': getattr(sc, 'sink', 0), 'fp': fp, 'rows': rows, 'hts': hts, 'obs': sc.obs, **getattr(sc, 'meta', {})}
+        nrows, krows = relight_rows(rows, r['NC'], r['DC'])
+        big[sc.name] = {'w': r['W'], 'h': r['H'], 'ax': int(r['ax']), 'ay': int(r['ay']), 'sink': getattr(sc, 'sink', 0), 'fp': fp, 'rows': rows, 'hts': hts, 'n': nrows, 'k': krows, 'obs': sc.obs, **getattr(sc, 'meta', {})}
         pal_rows = [row.replace('s', '.').replace('G', '.').replace('H', '.').replace('S', '.') for row in rows]
         img = to_rgb(pal_rows)
         for y, row in enumerate(rows):

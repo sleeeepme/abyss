@@ -110,4 +110,19 @@ R.ruinPlacement = await pg.evaluate(()=>{
   return {pieces, outside, nearStair, solidN, solidOk, cutOff, early, onBand, colShare:+(cols/pieces).toFixed(2), postNear, remnants,
     ok: pieces>=40 && outside===0 && nearStair===0 && solidOk===solidN && cutOff===0 && early===0 && onBand===0 && cols<=pieces*.4 && postNear===0 && remnants>=12};
 });
+/* 2026-10-02 遺跡もランタンの光を受ける：どの遺跡の絵にも、面の向き（n）と焼いた光（k）が同じ大きさで付いている。
+   主人公を遺跡の左と右に立たせると、同じ遺跡の色が変わる */
+R.ruinRelight = await pg.evaluate(async ()=>{
+  const {big,spr}=CAVE._ruinSprAll(); let missing=[];
+  for(const [k,v] of [...Object.entries(big),...Object.entries(spr)]) if(!v.n||!v.k||v.n.length!==v.rows.length||v.n[0].length!==v.rows[0].length) missing.push(k);
+  TH.run(17,{seed:44}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; S.hero.party=[]; CAVE.lightSnap=true; CAVE.noFlicker=true; draw();
+  const o=CAVE._G().deco.find(o=>o.k==='rbig'&&/^(wall|corner|col)_/.test(o.name));
+  const grab=async(dx)=>{ P.x=o.x/16+dx; P.y=o.y/16+0.6; for(let i=0;i<2;i++) draw();
+    const cv=document.querySelector('canvas'), sc=cv.width/innerWidth, T=TS*sc, x=cv.width/2+(o.x/16-P.x)*T, y=cv.height/2+(o.y/16-P.y)*T;
+    const c=document.createElement('canvas'); c.width=Math.round(T*2); c.height=Math.round(T*2); c.getContext('2d').drawImage(cv,x-T,y-T*1.6,c.width,c.height,0,0,c.width,c.height);
+    return Array.from(c.getContext('2d').getImageData(0,0,c.width,c.height).data); };
+  const a=await grab(-2.2), b2=await grab(2.2); let diff=0; for(let i=0;i<a.length;i+=4) if(Math.abs(a[i]-b2[i])+Math.abs(a[i+1]-b2[i+1])>30) diff++;
+  CAVE.lightSnap=false; CAVE.noFlicker=false;
+  return {missing, piece:o&&o.name, diff, ok: missing.length===0 && !!o && diff>40};
+});
 await done(b, errs, R);
