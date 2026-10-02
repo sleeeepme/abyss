@@ -636,7 +636,7 @@ function terrain(f,Z,camX,camY,blinded){
   const L=G.L, Pp=G.P, t=(performance.now()-T0)/1000;
   const ps=TS/Q;
   const nbw=Math.ceil(innerWidth/ps)+5, nbh=Math.ceil(innerHeight/ps)+5;   // 前後2ドットずつ余分に（間のフレームの貼り直し用）
-  if(nbw!==bw||nbh!==bh){bw=nbw;bh=nbh;bufC.width=bw;bufC.height=bh;img=bufX.createImageData(bw,bh);buf=new Uint32Array(img.data.buffer);cool=new Float32Array(bw*bh);wmask=new Uint8Array(bw*bh);wrow=new Uint32Array(bw);wcolX=new Float32Array(bw);}
+  if(nbw!==bw||nbh!==bh){bw=nbw;bh=nbh;bufC.width=bw;bufC.height=bh;img=bufX.createImageData(bw,bh);buf=new Uint32Array(img.data.buffer);cool=new Float32Array(bw*bh);wmask=new Uint8Array(bw*bh);occD=new Int16Array(bw*bh);wrow=new Uint32Array(bw);wcolX=new Float32Array(bw);}
   wmask.fill(0);
   const bx0=Math.floor(camX/ps)-2, by0=Math.floor(camY/ps)-2;
   // ランタン
@@ -1383,10 +1383,47 @@ function decoEmit(bx0,by0){
     CAVE.emit.push({x:d.x,y:d.y-4,r:em[0],it:em[1]*(d.k==='lamppost'?(.9+.1*Math.sin(performance.now()/90+d.s)):1)}); }
 }
 let DB0x=0,DB0y=0;
-function dpf(x,y,c){ x=Math.round(x)-DB0x; y=Math.round(y)-DB0y; if(x>=0&&y>=0&&x<bw&&y<bh) buf[y*bw+x]=c; }
+/* ---------- 立ち物の前後（2026-10-02 ユーザー要望「鍾乳石や柱の根元より手前ではキャラが上、裏には回り込めるように」）----------
+   地形と置き物は1枚の絵（buf）に描いてからキャラを上に描くので、今までキャラはいつも置き物より上だった。
+   そこで立ち物を描くとき、ドットごとに「そのドットの真下の地面の y（ドット）」を occD に控えておき、
+   キャラを描き終えたあと（drawOccluders）、キャラの足もとより手前（南）に地面がある立ち物のドットだけを、
+   キャラの絵の範囲に描き戻す。手前に立てばキャラが上、奥に回れば柱に隠れる。当たり判定は根元だけなので裏へ回れる。 */
+let occD=null, occGY=null;   // occGY：dp/dpf/dpw で描くドットの地面の y（null なら控えない＝平たい物）
+let occCv=null, occX=null, occImg=null, occU=null;
+const OCC_HERO_A=.8;          // 主人公に重ねる立ち物の濃さ（1で完全に隠れる）
+/* キャラの足もと（ドット）。主人公・仲間は絵の真ん中から 0.3 マス下（足もとの影と同じ）、大きい敵は体の大きさで */
+function occFoot(e){ const r=Number.isFinite(e.r)?e.r:.3; return (e._dwy+Math.max(.3,r*.85))*Q; }
+function drawOccluders(camX,camY){
+  if(!occD||!lastT||!G||!CAVE.on) return 0;
+  const ps=TS/Q, ox=lastT.bx0, oy=lastT.by0, serial=(typeof _drawSerial!=='undefined')?_drawSerial:null;
+  const ents=[P, ...(W.enemies||[]), ...((typeof livingParty==='function'&&livingParty())||[]), W.npc]
+    .filter(e=>e && !e.dead && Number.isFinite(e._dwx) && (serial===null||e._drawn===serial));
+  let n=0;
+  for(const e of ents){
+    const r=Number.isFinite(e.r)?e.r:.3, foot=occFoot(e), hw=Math.max(.6,r*1.8), up=Math.max(.95,r*2.4);
+    let x0=Math.floor((e._dwx-hw)*Q)-ox, x1=Math.ceil((e._dwx+hw)*Q)-ox, y0=Math.floor((e._dwy-up)*Q)-oy, y1=Math.ceil(foot)-oy+2;
+    if(x0<0) x0=0; if(y0<0) y0=0; if(x1>bw) x1=bw; if(y1>bh) y1=bh;
+    const w=x1-x0, h=y1-y0; if(w<=0||h<=0) continue;
+    // 手前（足もとより南に地面がある）立ち物のドットがあるかを先に見る
+    let any=false; for(let y=y0;y<y1&&!any;y++){ const row=y*bw; for(let x=x0;x<x1;x++) if(occD[row+x]>foot){ any=true; break; } }
+    if(!any) continue;
+    if(!occCv||occCv.width<w||occCv.height<h){ occCv=document.createElement('canvas'); occCv.width=Math.max(w,64); occCv.height=Math.max(h,64); occX=occCv.getContext('2d'); occImg=occX.createImageData(occCv.width,occCv.height); occU=new Uint32Array(occImg.data.buffer); }
+    occU.fill(0);
+    const OW=occCv.width;
+    for(let y=y0;y<y1;y++){ const row=y*bw, orow=(y-y0)*OW; for(let x=x0;x<x1;x++){ const k=row+x; if(occD[k]>foot) occU[orow+x-x0]=buf[k]; } }
+    occX.putImageData(occImg,0,0,0,0,w,h);
+    ctx.save(); ctx.imageSmoothingEnabled=false;
+    if(e===P) ctx.globalAlpha*=OCC_HERO_A;               // 主人公だけは、柱の奥でもうっすら透けて見える（見失わないように）
+    ctx.drawImage(occCv,0,0,w,h,(ox+x0)*ps-camX,(oy+y0)*ps-camY,w*ps,h*ps);
+    ctx.restore(); n++;
+  }
+  CAVE.occDrawn=n; return n;
+}
+CAVE.drawOccluders=drawOccluders;
+function dpf(x,y,c){ x=Math.round(x)-DB0x; y=Math.round(y)-DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ const k=y*bw+x; buf[k]=c; if(occGY!==null) occD[k]=occGY; } }
 function sh5(r,L,x,y){ const i=Math.floor(Math.min(1,L)*4.99+(BAYER[((y&3)<<2)|(x&3)]-.5)*.9); return r[i<0?0:i>4?4:i]; }
-function dpw(x,y,c,m){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ buf[y*bw+x]=c; wmask[y*bw+x]=m; } }
-function dp(x,y,c){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh) buf[y*bw+x]=c; }
+function dpw(x,y,c,m){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ const k=y*bw+x; buf[k]=c; wmask[k]=m; if(occGY!==null) occD[k]=occGY; } }
+function dp(x,y,c){ x=Math.round(x); y=Math.round(y); if(x<0||y<0||x>=G.PW||y>=G.PH||G.code[y*G.PW+x]) return; x-=DB0x; y-=DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ const k=y*bw+x; buf[k]=c; if(occGY!==null) occD[k]=occGY; } }
 function sh3(r,L,x,y){ const i=Math.floor(Math.min(1,L*1.5)*2.99+(BAYER[((y&3)<<2)|(x&3)]-.5)*.9); return r[i<0?0:i>2?2:i]; }
 function dl(x0,y0,x1,y1,r,L){ const n=Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0)))||1; for(let i=0;i<=n;i++){const x=Math.round(x0+(x1-x0)*i/n),y=Math.round(y0+(y1-y0)*i/n); dp(x,y,typeof r==='number'?r:sh3(r,L,x,y));} }
 function drect(x0,y0,x1,y1,r,L,top){ for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++) dp(x,y,sh3(r,L*(y===y0&&top?1.4:1)*(x===x0?.7:1),x,y)); }
@@ -1659,7 +1696,8 @@ function drawCaveSprite(d,sp,P_){
       const ex=D.ed[i*2], ey=D.ed[i*2+1];
       if(ex||ey){ const aw=ex*(lampX-X)+ey*(lampY-Y)<0; if(ey>0||aw) k=0; else k=Math.max(0,k-1); }
       c=P_.lime[k<0?0:k>4?4:k]; }
-    dpf(X,Y,c); }
+    occGY=gy; dpf(X,Y,c); }
+  occGY=null;
   // 床との境：底の輪郭の下に最暗を1列、ランタンと反対の側だけ2〜3ドットの網の影
   let edgeX=-1, edgeY=0;
   for(let x=0;x<W;x++){ let b=-1; for(let y=H-1;y>=0;y--) if(D.m[y*W+x]){ b=y; break; } if(b<0) continue;
@@ -1704,6 +1742,7 @@ function drawBigSprite(d,t,sp){
      立ち石より1段暗く、外の縁に輪郭を引かず半分だけ地面に溶かし、所々欠かす。縁に1〜2か所マス大の欠け。 */
   const pave=/^pave_/.test(d.name||''), pm=pave?paveMask(d,sp):null;
   const cap=sp.n?relightCap(sp,Math.round(d.x),Math.round(d.y)):6, shK=bakedShadowK(d.x,d.y);
+  const stand=!/^(pave|steps)_/.test(d.name||'');                               // 立ち物だけ前後を控える（敷石・段は床）
   for(let r=0;r<H;r++){ const row=sp.rows[r], hr=sp.hts[r], Y=y0+r-DB0y; if(Y<0||Y>=bh) continue;
     for(let q=0;q<W;q++){ const ch=row[q]; if(ch==='.') continue; const X=x0+q-DB0x; if(X<0||X>=bw) continue;
       if(pave){ const m=pm[r*W+q]; if(!m) continue;
@@ -1722,7 +1761,7 @@ function drawBigSprite(d,t,sp){
         if(hp<sk+1){ buf[k]=mixU(buf[k],c,.5); continue; }                      // 水面の行：半々
         if(hp<sk+3) c=mixU(mixU(RP_DARK,c,.8),RP_WET,.15);                      // 水際は濡れて暗い
       }
-      buf[k]=c; wmask[k]=0; } }
+      buf[k]=c; wmask[k]=0; if(stand) occD[k]=y0+r+hp; } }
 }
 /*RUIN_SPR_BEGIN*/const RUIN_SPR={"tall_a":{"w":8,"h":17,"rows":["..2330..",".215330.","21555330","15555330","15554310","15443210","14433230","14433210","14422110","14443110","14443110","14443110","14433100","14232100","0423210o",".133210.",".00000o."],"n":["..0000..",".100000.","91100038","me66bbgt","uzrjwoBt","uzrwwwBt","uzrEwowt","zzrwww6t","uzMEJwBt","uzrrwwBt","uzrEwoBt","uzrEwoBt","uzrwwwot","mzrwwwBt","zzrEwwBt",".zrEwwB.",".MrEwwO."],"k":["..6666..",".766665.","99766640","78876420","66654200","66542100","76542040","66543080","66310100","66653000","66542100","66542000","66542100","76543100","66542100",".654210.",".344200."]},"tall_b":{"w":8,"h":16,"rows":["...20...",".261330.","21555330","15555330","15555320","15443210","15432210","15432110","15433210","15433210","12432210","14432210","b4432100","0bbba10o",".bbba10.",".00000o."],"n":["...22...",".100000.","91000038","me6633gl","urrjjoot","uzrrwwBt","uzrEwwBt","uzrEwwBt","zzrwwwBt","mzrwwwBt","uwrEwoBt","u3uEwwBt","uzrwwwBt","uzrwwwBt",".zrwwoB.",".MEEwJO."],"k":["...65...",".766665.","98666650","89886530","67764300","66542100","66542100","66542100","66533100","66543100","61542100","66842100","65542100","66542100",".654310.",".344200."]},"broken_a":{"w":8,"h":16,"rows":["..20....","2310....","144330..","144330..","1543330.","15433330","15433330","15432110","14432110","14432210","14332110","14432200","bbbba100","0bbaa10o",".bbaa10.",".00000o."],"n":["..05....","0200....","113888..","m023d8..","uzr85d8.","uzrw8830","uzrwww08","zzrrwwBt","uzrEwwBt","uzrrwwBG","mzwEwJot","uzrrwoBt","uzrwwwBt","uzrEwoBt",".zrwwwB.",".MrEwJB."],"k":["..63....","6564....","887111..","776502..","6651113.","66543164","66532141","66542100","76542000","76542100","76442010","66553100","66642100","66542100",".654200.",".343200."]},"broken_b":{"w":8,"h":13,"rows":["....240.","...21330","...14330","..214310",".2143110",".1443110","21443110","15432210","b4432130","0bb3212o",".bbba10.",".b33a00.",".00000o."],"n":["....h40.","...94114","...h933y","..hh9oBy",".49hwoBy",".999woBy","99rwwoBy","uzrEwwBy","uzrEwojy","uzrwwo1y",".zrwwoB.",".zrwwBB.",".MEEwJB."],"k":["....886.","...98787","...89740","..899000",".7982000",".9993000","99542000","66542100","66542060","66543170",".654200.",".654200.",".243200."]},"water_a":{"w":7,"h":12,"rows":[".26330.","2165330","1655320","1543210","1543210","1443210","1333210","1444310","044321o",".13a10.",".1ba10.",".0000o."],"n":[".10000.","h91033l","umjjboy","uzrwwBy","uzrwwBt","uzrwwBt","hzrwwOl","uzjjoBy","uzrwwBt",".zrwwB.",".zrwwB.",".UEwJB."],"k":[".76665.","8977640","6776410","6653100","6653100","6653100","8443100","6776300","6653100",".65310.",".65310.",".13200."]},"water_b":{"w":6,"h":12,"rows":["..0...","260...","1330..","15330.","154330","154230","153210","153210","143210","0bba0o",".bba0.",".000o."],"n":["..0...","013...","4058..","zr888.","zrE8d0","zrrwol","zrEwot","urEwBt","zrrwot","zrrwot",".rEwo.",".MEJJ."],"k":["..3...","775...","7722..","65231.","654206","664200","654200","654200","654200","664200",".5420.",".3300."]},"water_c":{"w":7,"h":11,"rows":["....0..","...2130","..21330",".214320","2144210","1443210","1543210","1543210","0b3310o",".b3210.",".0000o."],"n":["....1..","...9001","..44113",".499oBt","994wwBt","444wwBt","uzrwwBt","uzrwwBt","uzrwwBt",".zrwwB.",".MEwwJ."],"k":["....7..","...9567","..88787",".899300","9993100","9883100","6653100","6653100","7653100",".65310.",".34200."]},"stub":{"w":8,"h":11,"rows":["..20....",".2130...","214330..","1444330.","15434330","15434330","15432110","14432110","0443221o",".133210.",".00000o."],"n":["..05....",".1053...","001800..","u108003.","uzr88058","uzrE008l","uzrwwwBG","mMrwwwOl","uzejjoBt",".zrwwwB.",".MEEwJO."],"k":["..63....",".7636...","558354..","6773444.","66534623","66545420","66542100","83542000","66765300",".654310.",".243200."]}};/*RUIN_SPR_END*/
 const RUIN_SPR_PAL={o:RP_OL, a:RP_MOSS[0], b:RP_MOSS[1], c:RP_MOSS[2]};
@@ -1737,7 +1776,7 @@ function drawRuinSprite(d,t,L,inW,sp){
   const s=d.s, x=Math.round(d.x), y=Math.round(d.y), Wd=sp.w, Hs=sp.h, x0=x-(Wd>>1), top=y-Hs;
   const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
-  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
+  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; occD[k]=y; };     // 柱の前後は根元の y で
   const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
   const col=ch=> ch>='0'&&ch<='6' ? RP_T[ch.charCodeAt(0)-48] : RUIN_SPR_PAL[ch];
   // 列ごとの根元（スプライトの一番下の不透明な行）
@@ -2071,6 +2110,7 @@ function drawRuinRoom(d,t,L){
 }
 function drawDeco(bx0,by0,t,blindR){
   DB0x=bx0; DB0y=by0; const P_=G.Z.id==='sump'?DECO_PAL_WET:DECO_PAL, code=G.code, PW=G.PW;
+  occD.fill(-32768); occGY=null;
   drawPools(bx0,by0,t,blindR);
   drawDrips(bx0,by0,t,blindR);
   for(const d of G.deco){
@@ -2083,8 +2123,9 @@ function drawDeco(bx0,by0,t,blindR){
     if(!seenAt(G.f,G.L,d.x|0,d.y|0) && !(mg && [[-mg,0],[mg,0],[0,-mg],[0,mg]].some(([ox,oy])=>seenAt(G.f,G.L,(d.x+ox)|0,(d.y+oy)|0)))) continue;
     if(Math.hypot(d.x-lampX,d.y-lampY)>blindR+mg) continue;
     const L=Math.max(.22,pxLight(d.x,d.y)), s=d.s, x=d.x, y=d.y;
-    if(mg && ruinBigFor(d)){ drawBigSprite(d,t,ruinBigFor(d)); continue; }   // 3Dから作った大きな遺跡
-    { const cs=(d.k==='rock'||d.k==='stalagC')&&caveSprFor(d); if(cs){ drawCaveSprite(d,cs,P_); continue; } }   // 3Dから作った石の層の岩・石筍
+    occGY = standBox(d) ? Math.round(d.y) : null;        // 高さのある手描きの品目は、錨点（根元）の y で前後を決める
+    if(mg && ruinBigFor(d)){ occGY=null; drawBigSprite(d,t,ruinBigFor(d)); continue; }   // 3Dから作った大きな遺跡
+    { const cs=(d.k==='rock'||d.k==='stalagC')&&caveSprFor(d); if(cs){ occGY=null; drawCaveSprite(d,cs,P_); occGY=null; continue; } }   // 3Dから作った石の層の岩・石筍
     switch(d.k){
     case 'moss': for(let i=0;i<34;i++){const h=hs(s,i),px=x+(h%17)-8,py=y+((h>>>5)%7)-3; dp(px,py,sh3(P_.moss,L,px,py));}
       for(let i=0;i<5;i++){const h=hs(s,i+40); if(Math.sin(t*1.5+i*2+s)>.2) dp(x+(h%13)-6,y+((h>>>5)%5)-3,P_.mossTip);} break;
@@ -2279,6 +2320,7 @@ function drawDeco(bx0,by0,t,blindR){
     case 'palegrass': for(let i=0;i<4;i++){ const h=hs(s,i), bx=x-3+i*2, H=4+h%5; for(let j=0;j<H;j++) dp(bx+Math.sin(t+j*.5+i)*.8*(j/H),y-j,P_.pale[j>H-2?2:1]); } break;
     }
   }
+  occGY=null;
 }
 
 /* ---------- 漂う粒（1ドット） ---------- */
@@ -2978,6 +3020,8 @@ function install(){
   if(typeof window.drawFeelMist==='function') window.drawFeelMist=noop;
   if(typeof window.drawFeelDarkness==='function') window.drawFeelDarkness=noop;
   // 漂う粒は1ドットに
+  const oldPL=window.drawPlayerLight;                   // キャラを全員描き終えた所＝立ち物の手前側を描き戻す所
+  if(typeof oldPL==='function') window.drawPlayerLight=function(camX,camY){ try{ drawOccluders(camX,camY); }catch(err){ console.error(err); } return oldPL(camX,camY); };
   const oldAir=window.drawAir;
   window.drawAir=function(Z,dt){ if(!CAVE.on||!G) return oldAir&&oldAir(Z,dt); if(Z&&Z.id==='stone'&&oldAir) oldAir(Z,dt); airStep(Z,dt||0.016); };   // 石の層は元の羽虫・蛾も舞う
   // 足元の影もドットで

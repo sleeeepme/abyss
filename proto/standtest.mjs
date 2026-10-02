@@ -19,4 +19,19 @@ R.standClear = await pg.evaluate(()=>{
   const missing=need.filter(k=>!per[k]);
   return {all, over, missing, per, ok: over===0 && missing.length===0 && all>300};
 });
+/* 2026-10-02 立ち物の前後：根元より奥（北）に立つと立ち物が主人公の上に描き戻され、手前（南）では描き戻さない。
+   当たり判定は根元だけなので、奥へ回り込める（柱の真上の高さの所は歩ける） */
+R.occlusion = await pg.evaluate(async ()=>{
+  const res=[];
+  for(const [d,seed,pick] of [[4,44,o=>o.k==='stalagC'],[17,44,o=>o.k==='rbig'&&/^col_[abd]/.test(o.name)],[17,44,o=>o.k==='rbig'&&/^wall_/.test(o.name)]]){
+    TH.run(d,{seed}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; S.hero.party=[]; draw();
+    const o=CAVE._G().deco.find(pick); if(!o){ res.push({d,none:true}); continue; }
+    const at=(dy)=>{ P.x=o.x/16+0.1; P.y=o.y/16+dy; draw(); draw(); return CAVE.occDrawn||0; };
+    const behind=at(-0.75), front=at(0.8);
+    // 柱の絵の高い所（根元から1マス奥）は歩ける＝回り込める
+    const walk=!window.solid(o.x/16+0.1, o.y/16-1.0);
+    res.push({d, n:o.name||o.k, behind, front, walk});
+  }
+  return {res, ok: res.every(r=>!r.none && r.behind>0 && r.front===0 && r.walk)};
+});
 await done(b, errs, R);
