@@ -427,144 +427,64 @@ function waterPost(bx0,by0,t){
     if(!any) continue;
     for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
   }
-  /* 波紋は**水面の高さの場**を解いて動かし（輪が広がり、岸で跳ね返り、重なって干渉する）、
-     描くのは**ドットの線だけ**にする（報告「波紋がドット表現とかち合っている」）。
-       ・盛り上がった所（h>T）の縁に1ドットの明るい線だけ。窪みの暗い線は、波が干渉した所に
-         黒い多角形がぽつぽつ出て汚く見えたのでやめた
-       ・色は水の段の色（中間色・網点・屈折は使わない）。強い所だけ一段明るい色
-     セルは横4×縦3ドットなので、輪は地面に寝た楕円になる。 */
-  if(reduced||!WV||WV.x1<0||WV.G!==G) return;
-  wvTick();
-  if(WV.x1<0) return;
-  const g=WV, cw=g.cw, CX=WV_CX, CY=WV_CY, H=g.h, W_=HZ.water;
-  const X0=Math.max(1,g.x0*CX-bx0-CX), X1=Math.min(bw-2,(g.x1+1)*CX-bx0+CX), Y0=Math.max(1,g.y0*CY-by0-CY), Y1=Math.min(bh-2,(g.y1+1)*CY-by0+CY);
-  if(X1<X0||Y1<Y0) return;
-  if(!wvRows||wvRows[0].length!==bw) wvRows=[new Float32Array(bw),new Float32Array(bw),new Float32Array(bw)];
-  const rowH=(y,out)=>{                                          // y 行の高さ（ドットごと、なめらかに補間）
-    const fy=(by0+y+.5)/CY-.5, j=Math.floor(fy), ty0=fy-j, ty=ty0*ty0*(3-2*ty0);
-    if(j<1||j>=g.ch-2){ out.fill(0); return; }
-    for(let x=X0-1;x<=X1+1;x++){
-      const fx=(bx0+x+.5)/CX-.5, i=Math.floor(fx), tx0=fx-i, tx=tx0*tx0*(3-2*tx0);
-      if(i<1||i>=cw-2){ out[x]=0; continue; }
-      const a=j*cw+i;
-      out[x]=(H[a]*(1-tx)+H[a+1]*tx)*(1-ty)+(H[a+cw]*(1-tx)+H[a+cw+1]*tx)*ty;
-    }
-  };
-  let up=wvRows[0], cur=wvRows[1], dn=wvRows[2];
-  rowH(Y0-1,up); rowH(Y0,cur);
-  const hiW=W_.band[5], hi2W=W_.hi, hiP=DECO_PAL.poolGleam, hi2P=DECO_PAL.poolGleam;   // 水溜りの面は明るい横縞があるので、輪は一番明るい照り返しの色で
-  const T=WV_T, T2=WV_T2;
-  for(let y=Y0;y<=Y1;y++){
-    rowH(y+1,dn);
-    const o=y*bw;
-    for(let x=X0;x<=X1;x++){
-      const k=o+x, m=wmask[k]; if(!m) continue;
-      /* 水の層は盛り上がり（h>T）の縁だけ。水溜りは狭くて盛り上がりの輪が育たないので、
-         窪み（踏んだ所）の縁も同じ明るい線で描く——小さな楕円が広がって縁で消える。 */
-      const h=m===2?Math.abs(cur[x]):cur[x];
-      if(h>T){
-        const inn=m===2?(Math.abs(cur[x-1])>T&&Math.abs(cur[x+1])>T&&Math.abs(up[x])>T&&Math.abs(dn[x])>T):(cur[x-1]>T&&cur[x+1]>T&&up[x]>T&&dn[x]>T);
-        if(inn) continue;
-        /* 線は半分の濃さで重ねる（報告「目立ち過ぎる」）。途切れと網かけは**輪に沿って長く**続くように、
-           なめらかなノイズ（十数ドットの大きさ）で決める：線 → 網かけ → 切れ目 → 網かけ → 線。
-           1ドットずつばらばらに間引くと、輪ではなく水しぶきの粒に見えた（報告）。
-           弱い波は点を間引かず、線ごと薄くして消す。 */
-        const wx=bx0+x, wy=by0+y, n=.5+.25*(Math.sin(wx*.23+wy*.41)+Math.sin(wx*.13-wy*.29+1.7));   // 20〜50ドット周期のなめらかな揺らぎ
-        if(n<WV_GAP) continue;                                     // 途切れ
-        if(n<WV_NET&&((wx+wy)&1)) continue;                        // 途切れの手前は網かけ
-        const st=Math.min(1,(h-T)/(WV_FULL-T));
-        buf[k]=mixU(buf[k], m===2 ? hi2P : hi2W, WV_ALPHA*(st<.3?.6:1)+(h>T2?.15:0));   // 弱い波ほど薄く
-      }
-    }
-    const tmp=up; up=cur; cur=dn; dn=tmp;
-  }
+  if(!reduced) ripDraw(bx0,by0);
 }
-let wvRows=null;
-/* ---------- 水面の高さの場 ----------
-   1セル＝4ドット（1マス＝4×4セル）の格子で、高さと速さを持つ。毎秒60歩で
-     速さ += K×（上下左右の高さ − 4×自分）、速さ ×= VD、高さ += 速さ、高さ ×= HD
-   岸（水でないセル）は隣を自分と同じ高さとみなす＝波は岸で跳ね返る。
-   動いているのは波がある範囲（x0..x1, y0..y1）だけで、静まったら止める（重さは波の広さぶんだけ）。 */
-const WV_CX=4, WV_CY=3, WV_K=.19, WV_VD=.975, WV_HD=.995, WV_T=.06, WV_T2=.2;
-const WV_ALPHA=.5, WV_GAP=.2, WV_NET=.3, WV_FULL=.16;   // 線の濃さ／途切れ・網かけになるノイズのしきい値／これ以上の強さで一番濃く
-let WV=null;
-function wvGrid(){
-  if(!G) return null;
-  const haz=(typeof W!=='undefined'&&W.haz)||null;
-  if(WV&&WV.G===G&&WV.haz===haz) return WV;
-  const cw=Math.ceil(G.PW/WV_CX)+2, ch=Math.ceil(G.PH/WV_CY)+2, n=cw*ch;
-  WV={G,haz,cw,ch,h:new Float32Array(n),v:new Float32Array(n),wet:new Int8Array(n).fill(-1),
-      x0:1e9,y0:1e9,x1:-1,y1:-1,acc:0,last:performance.now(),
-      seen:new WeakSet(),pos:new WeakMap()};
-  return WV;
+/* ---------- 波紋（2026-10-03 作り直し）----------
+   ユーザー「水の層の水の波紋の表現が微妙なので、もっとシンプルな形に波紋が起こるようにして欲しい」。
+   以前は水面の高さの場を解いていた（輪が岸で跳ね返り、重なって干渉する）。歩くと航跡と干渉で形が崩れ、
+   何の形か分からない線の群れに見えていた。
+   今は**1ドットの楕円の輪が1つ、足もとから広がって消える**だけにした:
+     ・足音（FEEL.ripples。水の中を歩く者の一歩ごと）につき輪を1つ。強い物（amp>1.5：落ちて着水など）は2重
+     ・輪は横長の楕円（縦は横の半分＝地面に寝た輪）。0.9秒で半径1.5→13ドットへ、はじめ速く後でゆっくり広がる
+     ・濃さは広がるほど薄く、終わりの3割は1ドットおきの点線になって消える
+     ・水の上（wmask）だけに描く。岸を越えた所は描かない（跳ね返りはしない）
+     ・色は水面のいちばん明るい色、水溜りは照り返しの色。航跡（動くたびの波）はやめた */
+const RP_LIFE=.9, RP_R0=1.5, RP_R=13, RP_MAX=40, RP_A=.85, RP_GAP2=.24;
+let RIPS=[], ripLast=0;
+const ripSeen=new WeakSet();
+function ripWet(px,py){
+  const tx=Math.floor(px/Q), ty=Math.floor(py/Q), f=G&&G.f; if(!f||!f.g[ty]) return false;
+  const t=f.g[ty][tx]; if(t===undefined||t===T.WALL) return false;
+  if(W.haz&&W.haz.kind==='water'&&W.haz.g[ty]&&W.haz.g[ty][tx]) return true;
+  return !!(G.pools&&G.pools.length&&poolU(G.pools,px,py)>0);
 }
-function wvWet(k){
-  const g=WV; let w=g.wet[k]; if(w>=0) return w;
-  const cx=k%g.cw, cy=(k/g.cw)|0; w=0;
-  if(cx>0&&cy>0&&cx<g.cw-1&&cy<g.ch-1){
-    const px=cx*WV_CX+2, py=Math.round(cy*WV_CY+1.5), tx=Math.floor(px/Q), ty=Math.floor(py/Q), f=G.f, row=f.g[ty], tt=row&&row[tx];
-    if(tt!==undefined&&tt!==T.WALL){
-      if(g.haz&&g.haz.kind==='water'&&g.haz.g[ty]&&g.haz.g[ty][tx]) w=1;
-      else if(G.pools&&G.pools.length&&poolU(G.pools,px,py)>0) w=1;
-    }
-  }
-  g.wet[k]=w; return w;
+function ripAdd(x,y,amp){                      // x,y はマス単位の足もと
+  if(!G||!Number.isFinite(x)||!Number.isFinite(y)) return false;
+  const px=x*Q, py=y*Q+5; if(!ripWet(px,py)) return false;   // 足もと（絵の中心の0.3マス下＝足もとの影と同じ）
+  if(RIPS.some(r=>r.t<.38&&Math.hypot(r.x-px,r.y-py)<14)) return false;   // 歩いている間は、前の輪が育つまで次を出さない（輪が鎖のように連なった）
+  RIPS.push({x:px,y:py,t:0,n:(amp||0)>1.5?2:1}); if(RIPS.length>RP_MAX) RIPS.shift();
+  return true;
 }
-/* 水面を押し下げる（x,y はマス単位の足元）。周りが盛り上がって輪になって広がる。 */
-function wvPoke(x,y,amp,rad){
-  const g=wvGrid(); if(!g||!Number.isFinite(x)||!Number.isFinite(y)) return false;
-  const cx=x*Q/WV_CX-.5, cy=(y*Q+2)/WV_CY-.5, R=Math.ceil(rad);
-  let any=false;
-  for(let j=Math.floor(cy)-R;j<=Math.ceil(cy)+R;j++) for(let i=Math.floor(cx)-R;i<=Math.ceil(cx)+R;i++){
-    if(i<2||j<2||i>=g.cw-2||j>=g.ch-2) continue;
-    const k=j*g.cw+i; if(!wvWet(k)) continue;
-    const d=Math.hypot(i-cx,j-cy)/rad; if(d>=1) continue;
-    const q=1-d*d; g.h[k]-=amp*q*q; any=true;
-    if(i<g.x0)g.x0=i; if(i>g.x1)g.x1=i; if(j<g.y0)g.y0=j; if(j>g.y1)g.y1=j;
-  }
-  return any;
-}
-function wvStep(){
-  const g=WV; if(!g||g.x1<0) return;
-  const cw=g.cw, H=g.h, V=g.v;
-  const x0=Math.max(2,g.x0-1), x1=Math.min(cw-3,g.x1+1), y0=Math.max(2,g.y0-1), y1=Math.min(g.ch-3,g.y1+1);
-  for(let j=y0;j<=y1;j++) for(let i=x0;i<=x1;i++){
-    const k=j*cw+i; if(!wvWet(k)) continue;
-    const c=H[k], l=wvWet(k-1)?H[k-1]:c, r=wvWet(k+1)?H[k+1]:c, u=wvWet(k-cw)?H[k-cw]:c, d=wvWet(k+cw)?H[k+cw]:c;
-    V[k]=(V[k]+(l+r+u+d-4*c)*WV_K)*WV_VD;
-  }
-  let nx0=1e9,ny0=1e9,nx1=-1,ny1=-1;
-  for(let j=y0;j<=y1;j++) for(let i=x0;i<=x1;i++){
-    const k=j*cw+i; if(g.wet[k]<=0) continue;
-    const h=(H[k]+V[k])*WV_HD; H[k]=h;
-    if(Math.abs(h)+Math.abs(V[k])>.004){ if(i<nx0)nx0=i; if(i>nx1)nx1=i; if(j<ny0)ny0=j; if(j>ny1)ny1=j; }
-  }
-  if(nx1<0){ for(let j=y0;j<=y1;j++){ H.fill(0,j*cw+x0,j*cw+x1+1); V.fill(0,j*cw+x0,j*cw+x1+1); } g.x0=g.y0=1e9; g.x1=g.y1=-1; return; }
-  g.x0=nx0; g.x1=nx1; g.y0=ny0; g.y1=ny1;
-}
-/* 1フレームぶん：足音・滴の波紋（FEEL.ripples に積まれた物）と、水の中を動く者の航跡を入れて、時間ぶん進める。 */
-function wvFeed(){
-  const g=wvGrid(); if(!g) return;
+let ripG=null;
+function ripFeed(){
+  if(!G) return;
+  if(ripG!==G){ RIPS=[]; ripG=G; }                     // 階が替わったら前の階の輪は捨てる
   const rs=(typeof FEEL!=='undefined'&&FEEL.ripples)||[];
-  for(const r of rs){ if(g.seen.has(r)) continue; g.seen.add(r); if(r.age<.2) wvPoke(r.x,r.y,r.amp||WV_STEP,2.4); }
-  const movers=[P].concat((S.hero&&S.hero.party)||[], W.enemies||[]);
-  for(const e of movers){
-    if(!e||e.dead||e.fallAnim||!Number.isFinite(e.x)||!Number.isFinite(e.y)) continue;
-    const o=g.pos.get(e);
-    if(o){ const d=Math.hypot(e.x-o.x,e.y-o.y); if(d>.004&&d<.6) wvPoke(e.x,e.y,Math.min(.5,d*WV_WAKE),1.7); o.x=e.x; o.y=e.y; }
-    else g.pos.set(e,{x:e.x,y:e.y});
+  for(const r of rs){ if(ripSeen.has(r)) continue; ripSeen.add(r); if(r.age<.2) ripAdd(r.x,r.y,r.amp); }
+  const now=performance.now(), dt=CAVE.ripFixed?1/30:Math.min(.1,ripLast?(now-ripLast)/1000:0); ripLast=now;
+  ripStep(dt);
+}
+function ripStep(dt){ for(const r of RIPS) r.t+=dt; RIPS=RIPS.filter(r=>r.t<RP_LIFE+(r.n-1)*RP_GAP2); }
+function ripDraw(bx0,by0){
+  if(!RIPS.length||!wmask) return;
+  const hiW=HZ.water.hi, hiP=DECO_PAL.poolGleam, done=new Set();
+  for(const r of RIPS) for(let i=0;i<r.n;i++){
+    const u=(r.t-i*RP_GAP2)/RP_LIFE; if(u<=0||u>=1) continue;
+    const e=1-(1-u)*(1-u), rx=RP_R0+(RP_R-RP_R0)*e*(i?0.75:1), ry=rx*.5;
+    const a=RP_A*Math.pow(1-u,.6)*(i?0.7:1), dotted=u>.7, N=Math.max(12,Math.ceil(rx*7));
+    done.clear();
+    for(let s=0;s<N;s++){
+      const an=s/N*6.2831853, X=Math.round(r.x+Math.cos(an)*rx)-bx0, Y=Math.round(r.y+Math.sin(an)*ry)-by0;
+      if(X<0||Y<0||X>=bw||Y>=bh) continue;
+      const k=Y*bw+X; if(done.has(k)) continue; done.add(k);
+      if(dotted&&((X+Y+bx0+by0)&1)) continue;
+      const m=wmask[k]; if(!m) continue;
+      buf[k]=mixU(buf[k], m===2?hiP:hiW, a);
+    }
   }
 }
-const WV_STEP=1.1, WV_WAKE=1.7;
-function wvTick(){
-  const g=WV; if(CAVE.waveFixed){ wvStep(); return; }                 // テスト用：1フレーム＝1歩
-  const now=performance.now();
-  g.acc+=Math.min(.1,(now-g.last)/1000); g.last=now;
-  let n=0; while(g.acc>=1/60&&n<4){ wvStep(); g.acc-=1/60; n++; }
-  if(n===4) g.acc=0;
-}
-CAVE.waveStep=(n)=>{ wvGrid(); for(let i=0;i<(n||1);i++) wvStep(); };
-CAVE.wave=()=>WV;
+CAVE.ripples=()=>RIPS;
+CAVE.rippleStep=(dt)=>ripStep(dt);
 /* 足元が石の層の水溜りか（波紋を出すため）。水溜りは見た目だけの賑やかしなので、ここで引く。 */
 function puddleAt(x,y){
   if(!G||!G.pools) return false;
@@ -844,7 +764,7 @@ function terrain(f,Z,camX,camY,blinded){
     }}
   if(!G.deco){ G.deco=genDeco(f,Z); G.bats=genBats(f,Z); }
   drawDeco(bx0,by0,t,blindR);
-  if(!(typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches)) wvFeed();
+  if(!(typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches)) ripFeed();
   waterPost(bx0,by0,t);
   bufX.putImageData(img,0,0);
   ctx.save(); ctx.imageSmoothingEnabled=false;

@@ -569,21 +569,25 @@ R.puddlesHugWallsAvoidRocks = await pg.evaluate(()=>{
   return {n, nearWall, rockHit, ok: n>20 && nearWall===n && rockHit===0};
 });
 
-/* 波紋は水面の高さの場で解く（リファレンス：輪が広がり、岸で跳ね返り、重なって干渉する）。
-   踏むと広がる／水でない所には波が乗らない／しばらくで静まって計算も止まる。 */
-R.waterWavesSpreadAndSettle = await pg.evaluate(()=>{
-  TH.run(13,{seed:12}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; CAVE.waveFixed=true;
-  const g=W.haz.g; let best=null; for(let y=4;y<g.length-4&&!best;y++) for(let x=4;x<g[0].length-4;x++) if(g[y][x]===1){best={x,y};break;}
+/* 波紋（2026-10-03 作り直し：ユーザー「もっとシンプルな形に」）。足音1つにつき、足もとから1ドットの楕円の輪が1つ広がって消える。
+   輪は水の上だけに描く／歩いている間は前の輪が育つまで次を出さない（鎖のように連ならない）／0.9秒ほどで消える。 */
+R.waterRipplesSimple = await pg.evaluate(()=>{
+  TH.run(18,{seed:12}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[]; S.hero.party=[]; CAVE.ripFixed=true;
+  const g=W.haz.g; let best=null; for(let y=4;y<g.length-4&&!best;y++) for(let x=4;x<g[0].length-4;x++){ let ok=true; for(let dy=-1;dy<=1&&ok;dy++)for(let dx=-2;dx<=2;dx++) if(!g[y+dy]||!g[y+dy][x+dx]||g[y+dy][x+dx]>2){ok=false;break;} if(ok){best={x,y};break;} }
   P.x=best.x+.5; P.y=best.y+.5; draw(); draw();
-  FEEL.ripples.push({x:P.x,y:P.y,age:0}); draw();
-  const w=CAVE.wave(), span0=w.x1-w.x0;
-  for(let i=0;i<14;i++) draw();
-  const span1=w.x1-w.x0;
-  let dryWave=0; for(let j=w.y0;j<=w.y1;j++) for(let i=w.x0;i<=w.x1;i++){ const k=j*w.cw+i; if(w.wet[k]<=0&&Math.abs(w.h[k])>1e-6) dryWave++; }
-  for(let i=0;i<600;i++) CAVE.waveStep(1);
-  const settled=w.x1<0;
-  CAVE.waveFixed=false;
-  return {span0, span1, dryWave, settled, ok: span1>span0+4 && dryWave===0 && settled};
+  const cv=document.querySelector('canvas'), cx=cv.getContext('2d');
+  const snap=()=>cx.getImageData(0,0,cv.width,cv.height).data;
+  FEEL.ripples.length=0; draw(); const a0=snap();
+  FEEL.ripples.push({x:P.x,y:P.y,age:0}); FEEL.ripples.push({x:P.x+.05,y:P.y,age:0});   // 同じ所の2つ目は輪にならない
+  draw(); const n1=CAVE.ripples().length;
+  for(let i=0;i<9;i++) draw(); const a1=snap();
+  let diff=0; for(let i=0;i<a0.length;i+=16) if(Math.abs(a0[i]-a1[i])+Math.abs(a0[i+1]-a1[i+1])>40) diff++;
+  // 陸の上に置いた輪は出ない
+  let dry=null; for(let y=2;y<g.length-2&&!dry;y++) for(let x=2;x<g[0].length-2;x++) if(!g[y][x]&&tileWalk(W.fl,x,y)){ dry={x,y}; break; }
+  FEEL.ripples.push({x:dry.x+.5,y:dry.y+.5,age:0}); draw(); const n2=CAVE.ripples().length;
+  for(let i=0;i<40;i++) draw(); const gone=CAVE.ripples().length===0;
+  CAVE.ripFixed=false;
+  return {n1, diff, n2, gone, ok: n1===1 && diff>3 && n2===n1 && gone};
 });
 
 /* 水溜りに落ちる滴は水しぶきだけ。波紋を立てると水面がずっと動いて見えた（報告）。
@@ -597,7 +601,7 @@ R.dripsDoNotRipple = await pg.evaluate(async ()=>{
     const push=FEEL.ripples.push.bind(FEEL.ripples); FEEL.ripples.push=(...a)=>{ pushes++; return push(...a); };
     for(let i=0;i<110;i++){ draw(); await new Promise(r=>setTimeout(r,40)); }
     delete FEEL.ripples.push;
-    const w=CAVE.wave(); if(w&&w.x1>=0) wave++;
+    if(CAVE.ripples().length) wave++;
   }
   return {drips, pushes, wave, ok: drips>0 && pushes===0 && wave===0};
 });
