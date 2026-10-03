@@ -116,8 +116,41 @@ class Stalagmite:
         a = a + 0.10 * (drip > 0.62)                                                       # 縦に流れた白い筋
         return a
 
+class Column:
+    """鍾乳洞の石柱（石筍と鍾乳石がつながった物）。ヴェラの大広間の柱（2026-10-03）。
+       根元は流れ石で広がり、上は天井へ向けて広がって闇に溶ける（上の方ほど暗くする）。くびれ・ふくらみ・成長の輪。
+       断面は z を2倍（画面で丸く見える）"""
+    def __init__(self, c, R, H, seed, moss=0.15):
+        self.c, self.R, self.H, self.seed, self.moss, self.tone = np.array(c, float), R, H, seed, moss, 1.0
+    def radius(self, y, ang):
+        t = np.clip(y / self.H, 0, 1)
+        r = self.R * (0.80 + 0.50 * np.exp(-np.maximum(y, 0) / (0.10 * self.H)) + 0.12 * t)
+        r = r * (1 + 0.06 * np.sin(y * math.cos(THETA) * PX / 9.0 * 2 * math.pi + self.seed) + 0.05 * np.sin(t * 5.0 + self.seed * 1.3))
+        lobes = 0.6 + 0.4 * np.maximum(0, np.cos(4 * ang + self.seed)) ** 2
+        r = r + 0.35 * self.R * lobes * np.exp(-np.maximum(y, 0) / (0.06 * self.H))       # 流れ石の舌
+        r = r + 0.035 * self.R * (fbm(np.stack([np.cos(ang) * 2, y * 1.2, np.sin(ang) * 2], -1), self.seed) - 0.5) * 2
+        return r
+    def sdf(self, p):
+        q = p - self.c
+        y = q[..., 1]; x = q[..., 0]; z = q[..., 2] / 2.0
+        ang = np.arctan2(z, x); rr = np.sqrt(x * x + z * z)
+        return np.maximum((rr - self.radius(y, ang)) * 0.7, y - self.H)
+    def aabb(self):
+        e = self.R * 1.8 + 0.3
+        return self.c - np.array([e, 0.1, 2 * e]), self.c + np.array([e, self.H + 0.2, 2 * e])
+    def albedo(self, p, n):
+        y = p[..., 1] - self.c[1]
+        a = 1.0 + 0.06 * (fbm(p * np.array([2.0, 0.6, 2.0]), self.seed + 3) - 0.5)
+        drip = fbm(np.stack([np.arctan2(p[..., 2] - self.c[2], p[..., 0] - self.c[0]) * 3.0, y * 0.25, y * 0.0], -1), self.seed + 11)
+        a = a + 0.10 * (drip > 0.62)
+        return a * np.clip((self.H - y) / (0.35 * self.H), 0.10, 1.0)               # 上は天井の闇へ溶ける
+
 # ---------------- 描く ----------------
 def render(parts, ground_moss=None):
+    import ruin3d
+    big = any(isinstance(pt, Column) for pt in parts)
+    ruin3d.GS = 0.09 if big else 0.05          # 柱は大きいので距離場の格子を粗く（細かいとメモリが足りない）
+    globals()['GS'] = ruin3d.GS
     sc = Scene('c', parts); sc.bake()
     right = np.array([1.0, 0, 0]); up = np.array([0, math.cos(THETA), -math.sin(THETA)]); fwd = np.array([0, -math.sin(THETA), -math.cos(THETA)])
     corners = np.array([[x, y, z] for x in (sc.lo[0], sc.hi[0]) for y in (0, sc.hi[1]) for z in (sc.lo[2], sc.hi[2])])
@@ -166,6 +199,11 @@ def render(parts, ground_moss=None):
             ang = np.arctan2((p[m][:, 2] - pt.c[2]) / 2.0, p[m][:, 0] - pt.c[0]); kk = np.floor(yy / RING)
             arc = np.cos(ang - kk * 2.1 - pt.seed) > 0.0                                  # 輪は半周だけ、輪ごとにずらす
             ring[m] = (np.abs((yy / RING) % 1 - 0.5) > 0.40) & (yy > 0.5) & (yy < pt.H - 0.6) & arc
+        elif isinstance(pt, Column):
+            m = hit & (pid == k); yy = p[m][:, 1] - pt.c[1]
+            ang = np.arctan2((p[m][:, 2] - pt.c[2]) / 2.0, p[m][:, 0] - pt.c[0]); kk = np.floor(yy / RING)
+            arc = np.cos(ang - kk * 2.1 - pt.seed) > 0.0
+            ring[m] = (np.abs((yy / RING) % 1 - 0.5) > 0.40) & (yy > 0.8) & (yy < pt.H * 0.6) & arc
     # ドットへ：覆いは重みで、面の向き・部品は真ん中の標本で（面の境をにじませない）
     wy = np.exp(-(((np.arange(SS) + 0.5) / SS - 0.5) / 0.34) ** 2); wk = np.outer(wy, wy); wk /= wk.sum()
     def pool(a): return (a.reshape(H, SS, W, SS) * wk[None, :, None, :]).sum(axis=(1, 3))
@@ -182,17 +220,37 @@ def render(parts, ground_moss=None):
     DEP = pool(np.where(hit, t, 0)) / np.maximum(cov, 1e-6)
     HT = pool(np.where(hit, p[..., 1], 0)) / np.maximum(cov, 1e-6)
     RG = pool(ring.astype(float)) / np.maximum(cov, 1e-6)
+    # 柱の天辺（切り口）は見せない：上を向いた面で、高さが柱の上端近く
+    cap = np.zeros(gx.shape, bool)
+    for k, pt in enumerate(parts):
+        if isinstance(pt, Column):
+            m = hit & (pid == k); cap[m] = (p[m][:, 1] - pt.c[1] > pt.H - 0.6) & (n[m][:, 1] > 0.5)
+    CAP = pool(cap.astype(float)) / np.maximum(cov, 1e-6)
+    COLH = max([pt.H for pt in parts if isinstance(pt, Column)] or [0])
     ROCK = np.array([isinstance(pt, Boulder) for pt in parts] + [False])
-    return dict(W=W, H=H, cov=cov, N=nc, A=A, M=M, WT=WT, RG=RG, DEP=DEP, HT=HT, ax=-x0, ay=-y0, PID=pc, ROCK=ROCK)
+    return dict(W=W, H=H, cov=cov, N=nc, A=A, M=M, WT=WT, RG=RG, DEP=DEP, HT=HT, ax=-x0, ay=-y0, PID=pc, ROCK=ROCK, CAP=CAP, COLH=COLH)
+
+BAY4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
+FADE = 9.0
 
 def encode(r):
     W, H = r['W'], r['H']
     on = r['cov'] >= 0.45
     # 小さな苔の点は捨てる（3ドット未満）
     m = [['.'] * W for _ in range(H)]
+    ycut = -1
+    if r['COLH']:
+        cy_, cx_ = np.nonzero((r['CAP'] >= 0.3) & on)
+        ycut = int(cy_.max()) + 1 if len(cy_) else -1
     for y in range(H):
         for x in range(W):
             if not on[y, x]: continue
+            if r['COLH']:
+                # 柱の上は、画面の横一直線で切って、下へ向かって網目で闇から現れる（切り口の楕円を抜くと、
+                # 縁だけ残って城の胸壁のような凹みになった）。ycut＝切り口が見える一番下の行
+                if y <= ycut: continue
+                u = (y - ycut) / FADE
+                if u < 1 and BAY4[y & 3][x & 3] >= u * u * 16: continue
             m[y][x] = 't' if r['WT'][y, x] >= 0.5 else ('m' if r['M'][y, x] >= 0.5 else ('g' if r['RG'][y, x] >= 0.5 else 'r'))
     # 岩の苔は黄土色の点を2つまで（大きな苔は「シール」に見える）
     pts = sorted([(r['M'][y, x], y, x) for y in range(H) for x in range(W) if m[y][x] == 'm' and r['ROCK'][r['PID'][y, x]]], reverse=True)
@@ -274,7 +332,15 @@ def stal(name, seed, main, others=(), moss=0.25):
     foot = [round(R0 * PX * 1.3), round(R0 * 2 * math.sin(THETA) * PX * 1.2)]
     return name, parts, dict(obs=obs, foot=foot, kind='stal')
 
+def column(name, seed, R, H):
+    parts = [Column((0, 0, 0), R, H, seed)]
+    foot = [round(R * PX * 1.25), round(R * 2 * math.sin(THETA) * PX * 1.15)]
+    return name, parts, dict(obs=[], foot=foot, kind='stal')
+
 SCENES = [
+    lambda: column('column_a', 41, 1.75, 15.0),
+    lambda: column('column_b', 42, 1.85, 15.5),
+    lambda: column('column_c', 43, 1.7, 14.5),
     lambda: rock('rock_a', 11, 1.8, 1.3, 3.0, moss=0.5),
     lambda: rock('rock_b', 12, 2.2, 1.5, 3.8, moss=0.6),
     lambda: rock('rock_c', 13, 1.3, 1.0, 2.4),

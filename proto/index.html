@@ -321,6 +321,7 @@
   #bossbar .bl>i{display:block;height:100%;background:linear-gradient(90deg,#c4433f,#e0803f);
     width:100%;transition:width .12s linear}
   #bossbar span{font-size:12px;font-weight:700;color:#e0a090;letter-spacing:.06em}
+  #bossbar #bossparts{margin-left:8px;color:#c8bca4;letter-spacing:.12em}   /* 部位破壊：脚の残り（◆残り・◇傷・×壊れた） */
   /* 試練の残り時間。ボスのバーと同じ形にしてあるのは、
      どちらも「これが終わるまで戦い続ける」という同じ意味だから。 */
   #trialbar{position:absolute;left:50%;transform:translateX(-50%);
@@ -946,7 +947,7 @@
     </div>
     <div id="depth"><b id="dnum">1F</b><span id="dsub"></span></div>
   </div>
-  <div id="bossbar"><div class="bl"><i id="bossfill"></i></div><span id="bossname"></span></div>
+  <div id="bossbar"><div class="bl"><i id="bossfill"></i></div><span id="bossname"></span><span id="bossparts"></span></div>
   <div id="trialbar"><div class="bl"><i id="trialfill"></i></div><span id="trialname"></span></div>
   <div id="partybar"></div>
   <div id="gravehint"></div>
@@ -4929,6 +4930,7 @@ function hitEnemyByAlly(a, st, e, mult){
   // 背面（BACK_MUL）。敵が主人公を追っているあいだ、仲間は自然に背を取る
   const dmg = Math.max(1, Math.round(st.atk*mult*backAttackMul(e, a.x, a.y)));
   e.hp -= dmg; e.hit = Math.max(e.hit, 0.12);
+  if(e.parts) partHit(e, dmg, a.x, a.y);                // 仲間の一撃も、仲間の側の脚に入る
   pop(e.x, e.y-0.3, dmg, jobDef(a.job).col);
   applyAllyOnHit(a, e, st);
   if(e.hp<=0) killEnemy(e, a);
@@ -5689,6 +5691,9 @@ const UNIQUE_BOSSES={
           「礫」を選んだのは、第一形態の「空引き」と対になるから。
           引くものが何も無かった者が、石そのものを射る者になる。 */
        nm2:'礫の狩人、ヴェラ',
+       /* 第二形態の部位破壊（2026-10-03 ユーザー要望）。岩の蟹脚のうち4本（手前左右・奥左右）を壊せる。
+          壊すたびに数秒ダウン、4本とも壊すと守りが大きく落ちる。値は BOSS_PARTS を参照 */
+       parts:'legs',
        line:'矢はとうに尽きている。それでも引く動作をやめない。'},
 
   15: {nm:'沼の大蛭',      reg:'現象体・二号／滞',   fam:'slime',  dt:'blunt',
@@ -6419,8 +6424,36 @@ function genArena(depth){
   rooms.push(start);
   const sx=W-5, sy=Math.floor(cy);
   g[sy][sx]=T.STAIR;
+  /* ヴェラの大広間には、広間の真ん中から見て時計の1・3・5・7・9・11時の方向に柱を1本ずつ立てる
+     （2026-10-03 ユーザー要望「技から退避できるようにしたい」）。
+     柱は1マスの壁：歩けない・矢と礫（bolt）は当たって消える・貫き（帯）と波動（輪）も柱の陰には届かない（coverBlocks）。
+     見た目は洞窟版が石灰岩の柱として描く（壁の岩としては描かない：cover のマスは描画では床扱い）。 */
+  const cover=[];
+  if(uniqueBossAt(depth)===UNIQUE_BOSSES[10]){
+    const pr=ARENA_PILLAR_R;
+    for(const h of [1,3,5,7,9,11]){ const a=h*Math.PI/6;
+      const tx=Math.floor(cx+0.5+Math.sin(a)*rx*pr), ty=Math.floor(cy+0.5-Math.cos(a)*ry*pr);
+      if(g[ty][tx]!==T.FLOOR) continue;
+      g[ty][tx]=T.WALL; cover.push({x:tx+0.5, y:ty+0.5, tx, ty, h}); }
+  }
   return {W,H,g,rooms,start,stair:{x:sx+0.5,y:sy+0.5},
-          arena:true, zone:zoneAt(depth), cycle:zoneCycle(depth)};
+          arena:true, zone:zoneAt(depth), cycle:zoneCycle(depth), cover};
+}
+const ARENA_PILLAR_R = 0.55;     // 柱を立てる輪の大きさ（広間の楕円の半径に対する割合）
+/* 柱（fl.cover）が、2点のあいだを遮っているか。帯・輪の技の「陰」に使う。普通の壁は見ない（他の階の技の当たり方を変えない） */
+function coverAt(tx,ty){ const c=W.fl&&W.fl.cover; if(!c||!c.length) return false; for(const p of c) if(p.tx===tx&&p.ty===ty) return true; return false; }
+function coverBlocks(x0,y0,x1,y1){
+  const c=W.fl&&W.fl.cover; if(!c||!c.length) return false;
+  const dx=x1-x0, dy=y1-y0, n=Math.ceil(Math.hypot(dx,dy)/0.2);
+  for(let i=1;i<n;i++){ const t=i/n; if(coverAt(Math.floor(x0+dx*t), Math.floor(y0+dy*t))) return true; }
+  return false;
+}
+/* 向き a へ len まで伸びる帯が、最初に柱に当たる距離（当たらなければ len） */
+function coverReach(x,y,a,len){
+  const c=W.fl&&W.fl.cover; if(!c||!c.length) return len;
+  const cx=Math.cos(a), cy=Math.sin(a);
+  for(let d=0.3; d<len; d+=0.15) if(coverAt(Math.floor(x+cx*d), Math.floor(y+cy*d))) return d;
+  return len;
 }
 function genFloor(depth){
   if(isArenaDepth(depth)) return genArena(depth);
@@ -6951,7 +6984,53 @@ function bossChangeForm(e){
   e.cast=null; e.tele=0; e.moveCd=BOSS_FORM_PAUSE;
   e.hit=0.4;
   if(e.revealed) log(e.name+'——姿が変わった');
+  const U=uniqueBossAt(e.uniqueBoss);
+  if(U && U.parts) e.parts=makeBossParts(e, U.parts);
   startBossFormFx(e);
+}
+
+/* ---------- 部位破壊（ヴェラ第二形態の脚）----------
+   ユーザー要望：「第二形態に部位破壊できる部位を4箇所。壊すごとに数秒ダウン、全部壊すと防御力が大幅ダウン」
+   「ヴェラの脚に部位破壊の部位を設定して」。
+   脚は**盤面の上の向き**で持つ：手前（南）と奥（北）×東と西。体の中心からの位置（マス）。
+   当てた一撃は、殴った者（弾ならその弾）から見た体の縁にいちばん近い、まだ壊れていない脚にも同じだけ入る。
+   ＝回り込んで殴る側の脚が壊れる。片側から殴り続けると、反対側の脚は残る。 */
+const BOSS_PARTS={
+  legs:{hp:0.10,          // 脚1本の耐久（第二形態の最大HPに対する割合）
+        down:3.0,         // 1本壊すごとのダウン（秒）。技・移動が止まる
+        allDef:0.35,      // 4本とも壊したときの防御の倍率（＝65%減）
+        list:[{id:'SW',nm:'手前の左脚',ox:-0.95,oy:0.45},{id:'SE',nm:'手前の右脚',ox:0.95,oy:0.45},
+              {id:'NW',nm:'奥の左脚',ox:-0.85,oy:-0.35},{id:'NE',nm:'奥の右脚',ox:0.85,oy:-0.35}]},
+};
+function makeBossParts(e, kind){
+  const P_=BOSS_PARTS[kind]; if(!P_) return null;
+  return P_.list.map(q=>({id:q.id, nm:q.nm, ox:q.ox, oy:q.oy, max:Math.max(1,Math.round(e.maxHp*P_.hp)), hp:Math.max(1,Math.round(e.maxHp*P_.hp)), broken:false, hit:0, kind}));
+}
+/* 一撃が体のどの脚に入るか。殴った位置（sx,sy）から体の中心へ向かう線が体の縁を横切る所に、いちばん近い脚 */
+function partFor(e, sx, sy){
+  if(!e.parts) return null;
+  const dx=sx-e.x, dy=sy-e.y, l=Math.hypot(dx,dy)||1, hx=e.x+dx/l*e.r*0.85, hy=e.y+dy/l*e.r*0.85;
+  let best=null, bd=1e9;
+  for(const p of e.parts){ if(p.broken) continue; const d=Math.hypot(e.x+p.ox-hx, e.y+p.oy-hy); if(d<bd){ bd=d; best=p; } }
+  return (best && bd<=e.r*1.25) ? best : null;
+}
+function partHit(e, dmg, sx, sy){
+  const p=partFor(e, sx, sy); if(!p || !(dmg>0) || e.dead) return null;
+  p.hp-=dmg; p.hit=0.25;
+  if(p.hp>0) return p;
+  p.hp=0; p.broken=true;
+  const P_=BOSS_PARTS[p.kind]||BOSS_PARTS.legs;
+  e.down=P_.down; e.cast=null; e.tele=0; e.vx=0; e.vy=0; e.hit=0.4;
+  log(e.name+'——'+p.nm+'が砕けた。崩れ落ちた');
+  W.pops.push({x:e.x+p.ox, y:e.y+p.oy-0.4, txt:'部位破壊', c:'#ffd06a', life:1.1});
+  if(typeof feelKick==='function') feelKick(3.0, 0.25);
+  W.fx.push({t:'shock', x:e.x+p.ox, y:e.y+p.oy, r:0.9, life:0.3, max:0.3, col:'#b8b0a0'});
+  if(e.parts.every(q=>q.broken) && !e.partsAll){
+    e.partsAll=true; e.def*=P_.allDef;
+    log(e.name+'——脚をすべて失った。守りが大きく崩れた');
+    W.pops.push({x:e.x, y:e.y-1.2, txt:'防御ダウン', c:'#ff9a6a', life:1.4});
+  }
+  return p;
 }
 
 /* ---------- 形態変化の見せ場 ----------
@@ -8701,6 +8780,7 @@ function hitEnemy(e, st, mult, opt){
   const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
+  if(e.parts){ const at=opt.at||(src===S.hero?P:src); partHit(e, r.total, at.x, at.y); }   // 部位破壊（ヴェラ第二形態の脚）
   feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
   // 弱点／耐性は色と記号で即座に見せる。見えないと属性を選ぶ意味が伝わらない。
@@ -10802,6 +10882,8 @@ function enemyUpdate(e,dt){
   });
   if(e.dead) return;
   if(hasStatus(e,'stagger')){ e.hit=Math.max(e.hit,0.05); return; }   // 打撃で止まる
+  if(e.parts) for(const p of e.parts) p.hit=Math.max(0,p.hit-dt);
+  if(e.down>0){ e.down-=dt; e.vx=0; e.vy=0; e.cast=null; e.tele=0; return; }   // 部位破壊のダウン：技も移動も止まる
   const slow = hasStatus(e,'chill') ? (1-CHILL_SLOW) : 1;
 
   const a=e.arch;
@@ -11270,7 +11352,8 @@ function resolveBossMove(e){
     /* 線の攻撃。突進は本体がその線を走り抜け、貫きは撃つだけ。
        どちらも**横に避ける**しか無い形なので、下がって避ける癖を否定する。
        線の当たり判定は「始点から len までの帯」で、予兆の絵とまったく同じ。 */
-    const len=m.len, wide=m.wide;
+    /* 貫きは柱で止まる（柱の陰に入れば当たらない）。突進は本体が走るので止めない（下で壁と同じく止まる） */
+    const len = e.cast.id==='beam' ? coverReach(e.x, e.y, dir, m.len) : m.len, wide=m.wide;
     const cx=Math.cos(dir), cy=Math.sin(dir);
     const beamArt = BA && BA.pre==='bv' && e.cast.id==='beam';
     W.fx.push({t:'ultbeam', artId:beamArt?'bv_beam':undefined, x:e.x, y:e.y, a:dir, len, wide, life:0.42, maxLife:0.42,
@@ -11279,7 +11362,7 @@ function resolveBossMove(e){
     aoeTargets().forEach(t=>{
       const dx=t.x-e.x, dy=t.y-e.y;
       const along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
-      if(along>=-0.4 && along<=len && side<=wide+t.r) aoeHit(e, t, m.mult);
+      if(along>=-0.4 && along<=len && side<=wide+t.r && !(e.cast.id==='beam' && coverBlocks(e.x,e.y,t.x,t.y))) aoeHit(e, t, m.mult);
     });
     if(e.cast.id==='charge'){
       // 走り抜ける。壁は抜けない（抜けると部屋の外へ消えてしまう）
@@ -12936,7 +13019,7 @@ function update(dt){
         if(e.dead || f.hitIds.has(e)) continue;
         if(Math.hypot(f.x-e.x,f.y-e.y) > e.r+0.25) continue;
         f.hitIds.add(e);
-        hitEnemy(e, stNow, f.mult ?? 1, {foot:f.foot});
+        hitEnemy(e, stNow, f.mult ?? 1, {foot:f.foot, at:{x:f.x-f.vx*0.05, y:f.y-f.vy*0.05}});
         if(--f.pierce<=0) return false;   // 弓は 1 体で消える、杖は 2 体貫通
       }
     }
@@ -12952,6 +13035,7 @@ function update(dt){
         const d = Math.hypot(t.x-f.x, t.y-f.y);
         if(Math.abs(d - f.r) <= band + t.r){
           f.hit.push(key);
+          if(coverBlocks(f.x, f.y, t.x, t.y)) return;        // 柱の陰には輪が届かない（一度通り過ぎたら、その輪では当たらない）
           if(t.ent) hitAlly(t.ent, f.src, f.dmg);
           else hitPlayer(f.src, f.dmg);
         }
@@ -15353,6 +15437,9 @@ function updateHUD(){
     hset('bossfill.w', clamp(boss.hp/boss.maxHp*100,0,100)+'%', v=>el('bossfill').style.width=v);
     hset('bossname.t', boss.name + (boss.rage?'（激昂）':''), v=>el('bossname').textContent=v);
   }
+  /* 部位破壊の脚。壊れていない脚は◆、半分を切ったら◇、壊れたら×。ダウン中は「ダウン」 */
+  const bp = boss && boss.parts ? '脚 '+boss.parts.map(q=>q.broken?'×':(q.hp<q.max*.5?'◇':'◆')).join('')+(boss.down>0?' ダウン':'') : '';
+  hset('bossparts.t', bp, v=>el('bossparts').textContent=v);
   /* デバフ（枷）の帯。
      ・ラスボスと実際に戦っている間（S.run.bossBane）は、次々切り替わる枷の
        残り時間を本物のゲージで見せる——ボスのHPバーと同じ場所を取り合っていた
@@ -17872,7 +17959,7 @@ function drawBossCast(e, sx, sy, R){
     /* 帯。**当たる範囲そのもの**を描く。
        ここが実際の判定とずれた瞬間に「避けたのに当たった」が生まれ、
        回避ボタンの無いこのゲームでは即座に理不尽になる。 */
-    const a=e.cast.dir, L=m.len*TS, Wd=m.wide*TS;
+    const a=e.cast.dir, L=(e.cast.id==='beam'?coverReach(e.x,e.y,a,m.len):m.len)*TS, Wd=m.wide*TS;   // 貫きの予兆も柱で止まる（判定と同じ）
     ctx.save();
     ctx.translate(sx,sy); ctx.rotate(a);
     ctx.fillStyle='rgba('+warn+','+(0.09+p*0.22)+')';
@@ -19347,7 +19434,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261003a"></script>
+<script src="cave-look.js?v=20261003b"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
