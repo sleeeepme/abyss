@@ -127,9 +127,9 @@
      地図の側もこの帯を避けて描く（MAP_KEEP_BOTTOM）ので、
      **どちらか片方を直すだけでは必ずまた重なる**——2つで1組の数字。 */
   #ultbtn{position:absolute;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));
-    width:74px;height:74px;border-radius:50%;display:none;
+    width:74px;height:74px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(16,20,28,.82);border:2px solid #39415a;
+    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     /* #hud は pointer-events:none なので、押せるものは自分で auto に戻す。
        これが抜けていて、大技ボタンは**見えているのに押せなかった**
@@ -154,9 +154,9 @@
      盾を持っていないときも**消さずにグレーで出す。**
      消してしまうと「盾を持てば何かできる」こと自体が伝わらない。 */
   #guardbtn{position:absolute;left:16px;bottom:calc(96px + env(safe-area-inset-bottom));
-    width:66px;height:66px;border-radius:50%;display:none;
+    width:66px;height:66px;display:none;
     align-items:center;justify-content:center;font-size:24px;
-    background:rgba(16,20,28,.82);border:2px solid #39415a;color:#8fc7ff;
+    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;color:#8fc7ff;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   /* 出るのは盾を装備しているときだけ（updateHUD が付け外しする） */
@@ -166,9 +166,9 @@
      見えていると必ず押されるので、**入口を隠す**のではなく
      入口そのものを普段は存在させない。 */
   #dbgbtn{position:fixed;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));
-    width:38px;height:38px;border-radius:10px;display:none;
+    width:38px;height:38px;display:none;
     align-items:center;justify-content:center;font-size:16px;
-    background:rgba(60,20,20,.9);border:1.5px solid #b5563f;color:#ffb0a0;
+    background:rgba(60,20,20,.9);border:2px solid #b5563f;color:#ffb0a0;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:40}
   #dbgbtn.on{display:flex}
@@ -177,9 +177,9 @@
   #m-debug .row b{font-size:12px}
   #m-debug .row s{display:block;text-decoration:none;color:var(--dim);font-size:12px;margin-top:2px}
   #m-debug .sw{flex:0 0 auto;width:auto;padding:6px 14px;font-size:12px;margin:0}
-  #guardbtn.held{background:rgba(40,64,96,.9);border-color:#8fc7ff;
-    box-shadow:0 0 14px -2px #8fc7ff}
-  #ultbtn.ready{border-color:currentColor;box-shadow:0 0 14px -2px currentColor}
+  #guardbtn.held{--pf:rgba(40,64,96,.9);--pb:#8fc7ff;
+    filter:drop-shadow(0 0 4px #8fc7ff)}
+  #ultbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
   #ultbtn i{font-style:normal;font-size:24px;line-height:1}
   #ultbtn b{font-size:12px;font-weight:700;letter-spacing:.06em;margin-top:2px}
   #ultbtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
@@ -189,13 +189,13 @@
      反対側は盾（押しているあいだ構える）で埋まっている。
      大技より一回り小さくして、切り札と気軽な技の格を見た目で分ける。 */
   #wavebtn{position:absolute;right:24px;bottom:calc(162px + env(safe-area-inset-bottom));
-    width:58px;height:58px;border-radius:50%;display:none;
+    width:58px;height:58px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(16,20,28,.82);border:2px solid #39415a;
+    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #wavebtn.on{display:flex}
-  #wavebtn.ready{border-color:currentColor;box-shadow:0 0 12px -2px currentColor}
+  #wavebtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
   #wavebtn i{font-style:normal;font-size:20px;line-height:1}
   #wavebtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
     font-weight:700;margin-top:1px}
@@ -207,13 +207,13 @@
      武器を持ち替えると中身が変わる（技は武器種に付いている）ので、
      名札を出す——衝撃波と違って「今なにが乗っているか」が変わりうる。 */
   #artbtn{position:absolute;right:22px;bottom:calc(228px + env(safe-area-inset-bottom));
-    width:62px;height:62px;border-radius:50%;display:none;
+    width:62px;height:62px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(16,20,28,.82);border:2px solid #39415a;
+    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #artbtn.on{display:flex}
-  #artbtn.ready{border-color:currentColor;box-shadow:0 0 12px -2px currentColor}
+  #artbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
   #artbtn i{font-style:normal;font-size:19px;line-height:1}
   /* 名前変更で長い名前を付けられる（最大12文字）が、このボタンは直径62px。
      以前は text-overflow:ellipsis で切っていたが、「…」がこの極小ドット
@@ -237,19 +237,19 @@
   h1{font-size:24px;margin:0 0 4px;letter-spacing:.06em}
   h2{font-size:12px;margin:18px 0 8px;color:var(--dim);font-weight:600;letter-spacing:.08em}
   .sub{font-size:12px;color:var(--dim);margin:0 0 14px;line-height:1.6}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .card{background:var(--panel);border:2px solid var(--line);padding:12px;margin-bottom:10px}
   .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:3px 0}
   .row .k{color:var(--dim)}
   button{font-family:inherit;font-size:16px;font-weight:600;color:var(--txt);background:#232a38;
-    border:1px solid var(--line);border-radius:9px;padding:12px 16px;cursor:pointer;width:100%}
+    border:2px solid var(--line);padding:12px 16px;cursor:pointer;width:100%}
   button:active{background:#2e3648}
   button.primary{background:#2f5c46;border-color:#3d7a5c}
   button.danger{background:#4a2523;border-color:#6b3230}
   button.ghost{background:transparent}
   .btnrow{display:flex;gap:8px;margin-top:8px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-  .item{background:var(--panel);border:1px solid var(--line);border-left-width:3px;border-radius:8px;
-    padding:9px 10px;font-size:12px;cursor:pointer;line-height:1.5}
+  .item{background:var(--panel);border:2px solid var(--line);border-left-width:0;
+    padding:9px 10px 9px 13px;font-size:12px;cursor:pointer;line-height:1.5}
   .item:active{background:#1e2432}
   .item .nm{font-weight:700;font-size:12px}
   .item .af{color:var(--dim);font-size:12px}
@@ -279,7 +279,7 @@
   #scr-title .foot{margin-top:30px;font-size:12px;color:#5c6479;line-height:1.8}
   /* 名前の入力。text-size-adjust を切らないと iOS が勝手に拡大する */
   #nm-input,#an-input{width:100%;font-family:inherit;font-size:16px;font-weight:700;text-align:center;
-    color:var(--txt);background:#171c26;border:1px solid #2a3040;border-radius:10px;
+    color:var(--txt);background:#171c26;border:2px solid #2a3040;
     padding:14px 12px;margin:6px 0 10px;-webkit-text-size-adjust:100%}
   #nm-input:focus,#an-input:focus{outline:none;border-color:#3d7a5c}
 
@@ -343,20 +343,20 @@
   #partybar .mb{height:4px;background:rgba(9,12,17,.75);overflow:hidden;margin-top:2px;
     box-shadow:0 1px 2px rgba(0,0,0,.7)}
   #partybar .mb>i{display:block;height:100%;transition:width .12s linear}
-  .boon{background:var(--panel);border:1px solid var(--line);border-left:3px solid #d6b34a;
-    border-radius:9px;padding:12px 14px;cursor:pointer;text-align:left}
+  .boon{background:var(--panel);border:2px solid var(--line);border-left:0 solid #d6b34a;
+    padding:12px 14px 12px 17px;cursor:pointer;text-align:left}
   .boon:active{background:#2a2c33}
   .boon b{font-size:16px;color:#d6b34a}
   .boon .e{display:block;font-size:12px;color:var(--txt);margin-top:3px}
   .boon .own{display:block;font-size:12px;color:var(--dim);margin-top:2px}
   #gravehint{position:absolute;left:12px;top:calc(max(10px,env(safe-area-inset-top)) + 62px);
     display:none;font-size:12px;font-weight:700;color:#7fe0c0;
-    border:1px solid rgba(127,224,192,.35);border-radius:14px;padding:3px 10px;background:rgba(20,40,34,.55)}
+    border:2px solid rgba(127,224,192,.35);padding:3px 10px;background:rgba(20,40,34,.55)}
   /* 侵入者の警告。画面中央上に置く。端に出すと戦闘中は視界に入らない。 */
   #intruder{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 88px);
     display:none;font-size:12px;font-weight:800;color:#ff8a7a;letter-spacing:.04em;
-    border:1px solid rgba(255,74,58,.5);border-radius:14px;padding:4px 12px;
+    border:2px solid rgba(255,74,58,.5);padding:4px 12px;
     background:rgba(48,16,14,.72);pointer-events:none;
     /* 1行に押し込むと iPhone 幅で距離と時計がはみ出して切れる。
        時計は2行目に落として、小さく薄く出す（読ませたいのは距離のほう）。 */
@@ -364,17 +364,17 @@
   #intruder .t{display:block;font-size:12px;font-weight:700;opacity:.8;letter-spacing:0}
   #statusbar{position:absolute;left:12px;top:calc(max(10px,env(safe-area-inset-top)) + 62px);
     display:flex;gap:6px;flex-wrap:wrap}
-  #statusbar span{font-size:12px;font-weight:700;border-radius:12px;padding:2px 9px;
-    border:1px solid currentColor;background:rgba(10,12,18,.6)}
+  #statusbar span{font-size:12px;font-weight:700;padding:2px 9px;
+    border:2px solid currentColor;background:rgba(10,12,18,.6)}
   #targetinfo{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 96px);
     display:none;text-align:center;font-size:12px;line-height:1.6;
-    background:rgba(10,12,18,.72);border:1px solid #262d3b;border-radius:10px;padding:5px 12px;
+    background:rgba(10,12,18,.72);border:2px solid #262d3b;padding:5px 12px;
     max-width:74%}
   /* 侵入者の警告が出ているあいだは、その下へ逃がす（重なって両方読めなくなる） */
   /* 鍛冶場の対象を選ぶ行。自分と仲間を横に並べる */
   #fg-who{display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
-  .fgwho{border:1px solid #2a3040;border-radius:10px;padding:4px 10px;font-size:12px;
+  .fgwho{border:2px solid #2a3040;padding:4px 10px;font-size:12px;
     line-height:1.4;text-align:center;background:#171c26;cursor:pointer}
   .fgwho b{display:block;font-size:12px}
   .fgwho.on{background:#1e2634}
@@ -402,8 +402,8 @@
     transform:translateX(-50%);
     display:none;pointer-events:none;
     width:max-content;max-width:min(78%,560px);text-align:center;
-    padding:6px 14px;border-radius:10px;
-    border:1px solid var(--pn-col,#8ad7c0);
+    padding:6px 14px;
+    border:2px solid var(--pn-col,#8ad7c0);
     background:rgba(8,10,14,.72);
     color:#eaf2ef;font-size:13px;line-height:1.5;text-shadow:var(--pxshadow)}
   #potnote.on{display:block}
@@ -430,17 +430,17 @@
   #potnote.pot-note-anim{animation:potNoteIn .34s cubic-bezier(.25,.9,.35,1.15),
                                    potNoteGlow .8s ease-out}
 
-  #stick{position:absolute;width:130px;height:130px;border-radius:50%;
-    border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);display:none}
-  #knob{position:absolute;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.16);
+  #stick{position:absolute;width:130px;height:130px;
+    --pb:rgba(255,255,255,.14);border:none;--pf:rgba(255,255,255,.03);background:none;display:none}
+  #knob{position:absolute;width:54px;height:54px;--pf:rgba(255,255,255,.16);background:none;
     left:38px;top:38px}
   /* 「攻撃は自動」の常設タグと探索中の「？」は畳んだ。
      遊び始めの1〜2分で分かることを、以後ずっと画面の隅に置いておく理由が無い
      （説明はタイトルの「遊び方」に集約した）。 */
   /* 飛び道具の「足の状態」。なぜ削れないのかが見えないと理不尽になるので常時出す */
   #foottag{position:absolute;right:14px;bottom:calc(50px + env(safe-area-inset-bottom));
-    font-size:12px;font-weight:700;border-radius:20px;padding:5px 11px;display:none;
-    border:1px solid #3a2a2a;background:rgba(13,15,20,.72)}
+    font-size:12px;font-weight:700;padding:5px 11px;display:none;
+    border:2px solid #3a2a2a;background:rgba(13,15,20,.72)}
   /* 耐久の警告。壊れる＝気づかないうちに戦力が消えることなので、出しっぱなしにする */
   /* 日本語はどこでも折り返せるので、放っておくと勝手に細く縮んで行が割れる。
      max-content で行の長さに合わせ、画面幅だけを上限にする。 */
@@ -448,7 +448,7 @@
     width:max-content;max-width:calc(100vw - 28px);
     bottom:calc(140px + env(safe-area-inset-bottom));display:none;
     font-size:12px;font-weight:700;line-height:1.55;text-align:center;
-    border-radius:9px;padding:6px 13px;border:1px solid #6a3a2a;
+    padding:6px 13px;border:2px solid #6a3a2a;
     background:rgba(26,14,11,.88);color:#ffb08a;pointer-events:none}
   #durtag b{color:#ff8a5a}
   #durtag .brk{color:#ff6a5a}
@@ -464,18 +464,18 @@
      ボタンの列より上へ逃がすこと（大技は 96〜170px を占める）。
      入れる文言のほうも短く保つこと——長い札は、狭くしても結局はみ出す。 */
   #prompt{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(182px + env(safe-area-inset-bottom));
-    pointer-events:auto;display:none;background:#232a38;border:1px solid var(--line);border-radius:9px;
+    pointer-events:auto;display:none;background:#232a38;border:2px solid var(--line);
     padding:10px 18px;font-size:12px;font-weight:600;
     white-space:nowrap;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis}
   #kb{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));font-size:12px;color:#6b7488;line-height:1.6}
   /* 右上は「開く物」の列。上に詰めすぎると、階層・所持金の行に
      🎒 の個数バッジが重なる（実際に重なった）ので、その下から始める。 */
   #bagbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 106px);
-    width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
+    width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
   #statbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 156px);
-    width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
+    width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
   /* ---------- 地図のトグル ----------
@@ -483,14 +483,14 @@
      地図もその列に並べたほうが探さずに済む。
      出ているあいだは縁を光らせる——押したかどうかが一目で分かるように。 */
   #mapbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 206px);
-    width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:rgba(22,26,35,.9);
+    width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
-  #mapbtn.on{border-color:#7fc3e0;color:#7fc3e0;box-shadow:0 0 10px -2px #7fc3e0}
-  #mapbtn:active{background:#2e3648}
-  #statbtn:active{background:#2e3648}
-  #bagbtn:active{background:#2e3648}
-  #bagcount{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;border-radius:9px;
+  #mapbtn.on{--pb:#7fc3e0;color:#7fc3e0;filter:drop-shadow(0 0 3px #7fc3e0)}
+  #mapbtn:active{--pf:#2e3648}
+  #statbtn:active{--pf:#2e3648}
+  #bagbtn:active{--pf:#2e3648}
+  #bagcount{position:absolute;right:-3px;top:-3px;min-width:18px;height:18px;
     background:#4a9d6e;color:#fff;font-size:12px;font-weight:700;line-height:18px;text-align:center;padding:0 4px}
   .item.locked{opacity:.55}
   #nojs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:999;display:flex;
@@ -513,7 +513,7 @@
   #toast{position:fixed;left:50%;transform:translateX(-50%);
     bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;
     max-width:min(360px,calc(100vw - 32px));display:none;
-    background:rgba(16,20,28,.96);border:1px solid var(--line);border-radius:10px;
+    background:rgba(16,20,28,.96);border:2px solid var(--line);
     padding:10px 16px;font-size:12px;font-weight:700;line-height:1.5;text-align:center;
     box-shadow:0 6px 20px -8px #000;pointer-events:none}
   #toast.on{display:block}
@@ -556,7 +556,7 @@
   .hubui>*{pointer-events:auto}
   .hub-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
   /* 自前の背景板（rgba(10,12,18,.55)）を持つバッジなので、縁取りは要らない。 */
-  .hub-id{background:rgba(10,12,18,.55);border-radius:10px;padding:6px 12px;
+  .hub-id{background:rgba(10,12,18,.55);padding:6px 12px;
     text-shadow:none}
   .hub-id .nm{font-size:16px;font-weight:700}
   .hub-id .res{font-size:12px;margin-top:2px;display:flex;gap:10px;white-space:nowrap}
@@ -567,8 +567,8 @@
      同じ大きさの正方形ボタンに揃える。役割が違っても押しやすさは同じにしたい。 */
   .hub-corner,.hub-mini{position:relative;flex:0 0 auto;width:64px;height:64px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:3px;padding:4px;background:rgba(22,26,35,.82);
-    border:1px solid var(--line);border-radius:12px}
+    gap:3px;padding:4px;--pf:rgba(22,26,35,.82);background:none;
+    --pb:var(--line);border:none;}
   .hub-corner i,.hub-mini i{font-style:normal;font-size:20px;line-height:1}
   .hub-corner b,.hub-mini b{font-size:10.5px;font-weight:700;line-height:1.2;text-align:center}
   /* まだ建っていない施設。押せる物と並べたままグレーにして、
@@ -591,8 +591,8 @@
   .hub-ava{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:2px;width:auto;background:none;border:none;padding:0;
     transition:left 2s ease-in-out,top 2s ease-in-out}
-  .hub-ava .glyph{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;font-size:19px;background:rgba(18,20,28,.8);border:2px solid var(--line)}
+  .hub-ava .glyph{width:38px;height:38px;display:flex;align-items:center;
+    justify-content:center;font-size:19px;--pf:rgba(18,20,28,.8);background:none;--pb:var(--line);border:none;}
   /* 実キャラアート版。台座は置かず、キャラ絵だけを広場に立たせる。
      向き（scaleX）と歩行中の弾みはJS側（hubWander）が実移動に合わせて操作する。
 
@@ -649,9 +649,9 @@
   .hub-row2{display:flex;justify-content:space-between;gap:10px}
   .hub-row5{display:flex;justify-content:space-between;gap:6px}
   /* 数の通知はバッジ1つだけに絞る。0件なら出さない（常設のUIに見せない） */
-  .hub-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;border-radius:9px;
+  .hub-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;
     background:#c4433f;color:#fff;font-size:11px;font-weight:700;font-style:normal;line-height:17px;
-    text-align:center;padding:0 3px;border:1.5px solid var(--bg);display:none}
+    text-align:center;padding:0 3px;border:2px solid var(--bg);display:none}
   /* タイトル→街／街→アビスの遷移に挟む暗転。
      状態は即座に切り替え、これは重ねる見た目だけの演出（テストの同期を壊さない）。 */
   #scr-fade{position:fixed;top:0;right:0;bottom:0;left:0;z-index:45;
@@ -660,8 +660,38 @@
   .subhead h1{flex:1;font-size:16px;margin:0}
   .subhead .back{width:auto;padding:8px 12px;font-size:12px;background:transparent}
   .subhead .gold{font-size:12px;font-weight:700;color:#d6b34a;white-space:nowrap}
-  #adbox{border:1px dashed #39415a;border-radius:12px;
+  #adbox{border:2px dashed #39415a;
     padding:26px 18px;background:#12151d}
+  /* ---------- 角丸と円をドット絵に（tools/pixel_round.py が書く。手で直さない）----------
+     1ドット＝2px。四角は clip-path の段で角を切り、段の内側の1ドットは ::before が親の border を inherit して描く。
+     円は大きさごとのドットの円（SVG マスク）：中身 ::before（--pf）、縁 ::after（--pb）。光は drop-shadow でドットの形のまま。 */
+  :root{--pxr1:polygon(0 2px,2px 2px,2px 0,calc(100% - 2px) 0,calc(100% - 2px) 2px,100% 2px,100% calc(100% - 2px),calc(100% - 2px) calc(100% - 2px),calc(100% - 2px) 100%,2px 100%,2px calc(100% - 2px),0 calc(100% - 2px));--pxr2:polygon(0 4px,2px 4px,2px 2px,4px 2px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 4px) calc(100% - 2px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 2px),2px calc(100% - 2px),2px calc(100% - 4px),0 calc(100% - 4px));--pxr3:polygon(0 6px,2px 6px,2px 4px,2px 2px,6px 2px,6px 0,calc(100% - 6px) 0,calc(100% - 6px) 2px,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 6px,100% 6px,100% calc(100% - 6px),calc(100% - 2px) calc(100% - 6px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 6px) calc(100% - 2px),calc(100% - 6px) 100%,6px 100%,6px calc(100% - 2px),4px calc(100% - 2px),2px calc(100% - 2px),2px calc(100% - 6px),0 calc(100% - 6px));--pxr2r:polygon(0 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 4px) calc(100% - 2px),calc(100% - 4px) 100%,0 100%)}
+  :where(.item,.boon){clip-path:var(--pxr2r)}
+  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox){clip-path:var(--pxr2)}
+  :where(#gravehint,#intruder,#statusbar span,#foottag){clip-path:var(--pxr3)}
+  :where(#nm-input,#an-input,#bagcount,.hub-badge){clip-path:var(--pxr1)}
+  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox,#gravehint,#intruder,#statusbar span,#foottag,.item,.boon){position:relative}
+  .item::before,.boon::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
+  .item::after,.boon::after{content:"";position:absolute;left:0;top:-2px;bottom:-2px;border-left:3px solid;border-left-color:inherit;pointer-events:none}
+  #dbgbtn::before,.card::before,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob)::before,#targetinfo::before,.fgwho::before,#potnote::before,#durtag::before,#prompt::before,#toast::before,.hub-id::before,#adbox::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
+  #gravehint::before,#intruder::before,#statusbar span::before,#foottag::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/4px 2px no-repeat,linear-gradient(#000 0 0) right top/4px 2px no-repeat,linear-gradient(#000 0 0) left bottom/4px 2px no-repeat,linear-gradient(#000 0 0) right bottom/4px 2px no-repeat,linear-gradient(#000 0 0) left top/2px 4px no-repeat,linear-gradient(#000 0 0) right top/2px 4px no-repeat,linear-gradient(#000 0 0) left bottom/2px 4px no-repeat,linear-gradient(#000 0 0) right bottom/2px 4px no-repeat;mask:linear-gradient(#000 0 0) left top/4px 2px no-repeat,linear-gradient(#000 0 0) right top/4px 2px no-repeat,linear-gradient(#000 0 0) left bottom/4px 2px no-repeat,linear-gradient(#000 0 0) right bottom/4px 2px no-repeat,linear-gradient(#000 0 0) left top/2px 4px no-repeat,linear-gradient(#000 0 0) right top/2px 4px no-repeat,linear-gradient(#000 0 0) left bottom/2px 4px no-repeat,linear-gradient(#000 0 0) right bottom/2px 4px no-repeat}
+  .hub-corner,.hub-mini{isolation:isolate}
+  .hub-corner::before,.hub-mini::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--pf);border:2px solid var(--pb);clip-path:var(--pxr2);pointer-events:none}
+  .hub-corner::after,.hub-mini::after{content:"";position:absolute;inset:2px;z-index:-1;border:2px solid var(--pb);pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
+  #ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob,.hub-ava .glyph{isolation:isolate;border-radius:0}
+  #ultbtn::before,#guardbtn::before,#wavebtn::before,#artbtn::before,#bagbtn::before,#statbtn::before,#mapbtn::before,#stick::before,#knob::before,.hub-ava .glyph::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pf,transparent);-webkit-mask:var(--pxdisk) 0 0/100% 100% no-repeat;mask:var(--pxdisk) 0 0/100% 100% no-repeat}
+  #ultbtn::after,#guardbtn::after,#wavebtn::after,#artbtn::after,#bagbtn::after,#statbtn::after,#mapbtn::after,#stick::after,#knob::after,.hub-ava .glyph::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pb,transparent);-webkit-mask:var(--pxring) 0 0/100% 100% no-repeat;mask:var(--pxring) 0 0/100% 100% no-repeat}
+  .hub-ava .glyph{position:relative}
+  #ultbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h17v1h-17zM8 3h21v1h-21zM7 4h23v1h-23zM6 5h25v1h-25zM5 6h27v1h-27zM4 7h29v1h-29zM3 8h31v1h-31zM3 9h31v1h-31zM2 10h33v1h-33zM2 11h33v1h-33zM1 12h35v1h-35zM1 13h35v1h-35zM1 14h35v1h-35zM0 15h37v1h-37zM0 16h37v1h-37zM0 17h37v1h-37zM0 18h37v1h-37zM0 19h37v1h-37zM0 20h37v1h-37zM0 21h37v1h-37zM1 22h35v1h-35zM1 23h35v1h-35zM1 24h35v1h-35zM2 25h33v1h-33zM2 26h33v1h-33zM3 27h31v1h-31zM3 28h31v1h-31zM4 29h29v1h-29zM5 30h27v1h-27zM6 31h25v1h-25zM7 32h23v1h-23zM8 33h21v1h-21zM10 34h17v1h-17zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h3v1h-3zM22 1h3v1h-3zM10 2h2v1h-2zM25 2h2v1h-2zM8 3h2v1h-2zM27 3h2v1h-2zM7 4h1v1h-1zM29 4h1v1h-1zM6 5h1v1h-1zM30 5h1v1h-1zM5 6h1v1h-1zM31 6h1v1h-1zM4 7h1v1h-1zM32 7h1v1h-1zM3 8h1v1h-1zM33 8h1v1h-1zM3 9h1v1h-1zM33 9h1v1h-1zM2 10h1v1h-1zM34 10h1v1h-1zM2 11h1v1h-1zM34 11h1v1h-1zM1 12h1v1h-1zM35 12h1v1h-1zM1 13h1v1h-1zM35 13h1v1h-1zM1 14h1v1h-1zM35 14h1v1h-1zM0 15h1v1h-1zM36 15h1v1h-1zM0 16h1v1h-1zM36 16h1v1h-1zM0 17h1v1h-1zM36 17h1v1h-1zM0 18h1v1h-1zM36 18h1v1h-1zM0 19h1v1h-1zM36 19h1v1h-1zM0 20h1v1h-1zM36 20h1v1h-1zM0 21h1v1h-1zM36 21h1v1h-1zM1 22h1v1h-1zM35 22h1v1h-1zM1 23h1v1h-1zM35 23h1v1h-1zM1 24h1v1h-1zM35 24h1v1h-1zM2 25h1v1h-1zM34 25h1v1h-1zM2 26h1v1h-1zM34 26h1v1h-1zM3 27h1v1h-1zM33 27h1v1h-1zM3 28h1v1h-1zM33 28h1v1h-1zM4 29h1v1h-1zM32 29h1v1h-1zM5 30h1v1h-1zM31 30h1v1h-1zM6 31h1v1h-1zM30 31h1v1h-1zM7 32h1v1h-1zM29 32h1v1h-1zM8 33h2v1h-2zM27 33h2v1h-2zM10 34h2v1h-2zM25 34h2v1h-2zM12 35h3v1h-3zM22 35h3v1h-3zM15 36h7v1h-7z'/%3E%3C/svg%3E")}
+  #guardbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h13v1h-13zM8 2h17v1h-17zM7 3h19v1h-19zM5 4h23v1h-23zM4 5h25v1h-25zM4 6h25v1h-25zM3 7h27v1h-27zM2 8h29v1h-29zM2 9h29v1h-29zM1 10h31v1h-31zM1 11h31v1h-31zM1 12h31v1h-31zM0 13h33v1h-33zM0 14h33v1h-33zM0 15h33v1h-33zM0 16h33v1h-33zM0 17h33v1h-33zM0 18h33v1h-33zM0 19h33v1h-33zM1 20h31v1h-31zM1 21h31v1h-31zM1 22h31v1h-31zM2 23h29v1h-29zM2 24h29v1h-29zM3 25h27v1h-27zM4 26h25v1h-25zM4 27h25v1h-25zM5 28h23v1h-23zM7 29h19v1h-19zM8 30h17v1h-17zM10 31h13v1h-13zM13 32h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h3v1h-3zM20 1h3v1h-3zM8 2h2v1h-2zM23 2h2v1h-2zM7 3h1v1h-1zM25 3h1v1h-1zM5 4h2v1h-2zM26 4h2v1h-2zM4 5h1v1h-1zM28 5h1v1h-1zM4 6h1v1h-1zM28 6h1v1h-1zM3 7h1v1h-1zM29 7h1v1h-1zM2 8h1v1h-1zM30 8h1v1h-1zM2 9h1v1h-1zM30 9h1v1h-1zM1 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM31 11h1v1h-1zM1 12h1v1h-1zM31 12h1v1h-1zM0 13h1v1h-1zM32 13h1v1h-1zM0 14h1v1h-1zM32 14h1v1h-1zM0 15h1v1h-1zM32 15h1v1h-1zM0 16h1v1h-1zM32 16h1v1h-1zM0 17h1v1h-1zM32 17h1v1h-1zM0 18h1v1h-1zM32 18h1v1h-1zM0 19h1v1h-1zM32 19h1v1h-1zM1 20h1v1h-1zM31 20h1v1h-1zM1 21h1v1h-1zM31 21h1v1h-1zM1 22h1v1h-1zM31 22h1v1h-1zM2 23h1v1h-1zM30 23h1v1h-1zM2 24h1v1h-1zM30 24h1v1h-1zM3 25h1v1h-1zM29 25h1v1h-1zM4 26h1v1h-1zM28 26h1v1h-1zM4 27h1v1h-1zM28 27h1v1h-1zM5 28h2v1h-2zM26 28h2v1h-2zM7 29h1v1h-1zM25 29h1v1h-1zM8 30h2v1h-2zM23 30h2v1h-2zM10 31h3v1h-3zM20 31h3v1h-3zM13 32h7v1h-7z'/%3E%3C/svg%3E")}
+  #wavebtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h13v1h-13zM7 2h15v1h-15zM5 3h19v1h-19zM4 4h21v1h-21zM3 5h23v1h-23zM3 6h23v1h-23zM2 7h25v1h-25zM1 8h27v1h-27zM1 9h27v1h-27zM1 10h27v1h-27zM0 11h29v1h-29zM0 12h29v1h-29zM0 13h29v1h-29zM0 14h29v1h-29zM0 15h29v1h-29zM0 16h29v1h-29zM0 17h29v1h-29zM1 18h27v1h-27zM1 19h27v1h-27zM1 20h27v1h-27zM2 21h25v1h-25zM3 22h23v1h-23zM3 23h23v1h-23zM4 24h21v1h-21zM5 25h19v1h-19zM7 26h15v1h-15zM8 27h13v1h-13zM11 28h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h3v1h-3zM18 1h3v1h-3zM7 2h1v1h-1zM21 2h1v1h-1zM5 3h2v1h-2zM22 3h2v1h-2zM4 4h1v1h-1zM24 4h1v1h-1zM3 5h1v1h-1zM25 5h1v1h-1zM3 6h1v1h-1zM25 6h1v1h-1zM2 7h1v1h-1zM26 7h1v1h-1zM1 8h1v1h-1zM27 8h1v1h-1zM1 9h1v1h-1zM27 9h1v1h-1zM1 10h1v1h-1zM27 10h1v1h-1zM0 11h1v1h-1zM28 11h1v1h-1zM0 12h1v1h-1zM28 12h1v1h-1zM0 13h1v1h-1zM28 13h1v1h-1zM0 14h1v1h-1zM28 14h1v1h-1zM0 15h1v1h-1zM28 15h1v1h-1zM0 16h1v1h-1zM28 16h1v1h-1zM0 17h1v1h-1zM28 17h1v1h-1zM1 18h1v1h-1zM27 18h1v1h-1zM1 19h1v1h-1zM27 19h1v1h-1zM1 20h1v1h-1zM27 20h1v1h-1zM2 21h1v1h-1zM26 21h1v1h-1zM3 22h1v1h-1zM25 22h1v1h-1zM3 23h1v1h-1zM25 23h1v1h-1zM4 24h1v1h-1zM24 24h1v1h-1zM5 25h2v1h-2zM22 25h2v1h-2zM7 26h1v1h-1zM21 26h1v1h-1zM8 27h3v1h-3zM18 27h3v1h-3zM11 28h7v1h-7z'/%3E%3C/svg%3E")}
+  #artbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h17v1h-17zM6 3h19v1h-19zM5 4h21v1h-21zM4 5h23v1h-23zM3 6h25v1h-25zM2 7h27v1h-27zM2 8h27v1h-27zM1 9h29v1h-29zM1 10h29v1h-29zM1 11h29v1h-29zM0 12h31v1h-31zM0 13h31v1h-31zM0 14h31v1h-31zM0 15h31v1h-31zM0 16h31v1h-31zM0 17h31v1h-31zM0 18h31v1h-31zM1 19h29v1h-29zM1 20h29v1h-29zM1 21h29v1h-29zM2 22h27v1h-27zM2 23h27v1h-27zM3 24h25v1h-25zM4 25h23v1h-23zM5 26h21v1h-21zM6 27h19v1h-19zM7 28h17v1h-17zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h3v1h-3zM19 1h3v1h-3zM7 2h2v1h-2zM22 2h2v1h-2zM6 3h1v1h-1zM24 3h1v1h-1zM5 4h1v1h-1zM25 4h1v1h-1zM4 5h1v1h-1zM26 5h1v1h-1zM3 6h1v1h-1zM27 6h1v1h-1zM2 7h1v1h-1zM28 7h1v1h-1zM2 8h1v1h-1zM28 8h1v1h-1zM1 9h1v1h-1zM29 9h1v1h-1zM1 10h1v1h-1zM29 10h1v1h-1zM1 11h1v1h-1zM29 11h1v1h-1zM0 12h1v1h-1zM30 12h1v1h-1zM0 13h1v1h-1zM30 13h1v1h-1zM0 14h1v1h-1zM30 14h1v1h-1zM0 15h1v1h-1zM30 15h1v1h-1zM0 16h1v1h-1zM30 16h1v1h-1zM0 17h1v1h-1zM30 17h1v1h-1zM0 18h1v1h-1zM30 18h1v1h-1zM1 19h1v1h-1zM29 19h1v1h-1zM1 20h1v1h-1zM29 20h1v1h-1zM1 21h1v1h-1zM29 21h1v1h-1zM2 22h1v1h-1zM28 22h1v1h-1zM2 23h1v1h-1zM28 23h1v1h-1zM3 24h1v1h-1zM27 24h1v1h-1zM4 25h1v1h-1zM26 25h1v1h-1zM5 26h1v1h-1zM25 26h1v1h-1zM6 27h1v1h-1zM24 27h1v1h-1zM7 28h2v1h-2zM22 28h2v1h-2zM9 29h3v1h-3zM19 29h3v1h-3zM12 30h7v1h-7z'/%3E%3C/svg%3E")}
+  #bagbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
+  #statbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
+  #mapbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
+  #stick{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 65 65' shape-rendering='crispEdges'%3E%3Cpath d='M28 0h9v1h-9zM23 1h19v1h-19zM20 2h25v1h-25zM18 3h29v1h-29zM16 4h33v1h-33zM15 5h35v1h-35zM13 6h39v1h-39zM12 7h41v1h-41zM11 8h43v1h-43zM10 9h45v1h-45zM9 10h47v1h-47zM8 11h49v1h-49zM7 12h51v1h-51zM6 13h53v1h-53zM6 14h53v1h-53zM5 15h55v1h-55zM4 16h57v1h-57zM4 17h57v1h-57zM3 18h59v1h-59zM3 19h59v1h-59zM2 20h61v1h-61zM2 21h61v1h-61zM2 22h61v1h-61zM1 23h63v1h-63zM1 24h63v1h-63zM1 25h63v1h-63zM1 26h63v1h-63zM1 27h63v1h-63zM0 28h65v1h-65zM0 29h65v1h-65zM0 30h65v1h-65zM0 31h65v1h-65zM0 32h65v1h-65zM0 33h65v1h-65zM0 34h65v1h-65zM0 35h65v1h-65zM0 36h65v1h-65zM1 37h63v1h-63zM1 38h63v1h-63zM1 39h63v1h-63zM1 40h63v1h-63zM1 41h63v1h-63zM2 42h61v1h-61zM2 43h61v1h-61zM2 44h61v1h-61zM3 45h59v1h-59zM3 46h59v1h-59zM4 47h57v1h-57zM4 48h57v1h-57zM5 49h55v1h-55zM6 50h53v1h-53zM6 51h53v1h-53zM7 52h51v1h-51zM8 53h49v1h-49zM9 54h47v1h-47zM10 55h45v1h-45zM11 56h43v1h-43zM12 57h41v1h-41zM13 58h39v1h-39zM15 59h35v1h-35zM16 60h33v1h-33zM18 61h29v1h-29zM20 62h25v1h-25zM23 63h19v1h-19zM28 64h9v1h-9z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 65 65' shape-rendering='crispEdges'%3E%3Cpath d='M28 0h9v1h-9zM23 1h5v1h-5zM37 1h5v1h-5zM20 2h3v1h-3zM42 2h3v1h-3zM18 3h2v1h-2zM45 3h2v1h-2zM16 4h2v1h-2zM47 4h2v1h-2zM15 5h1v1h-1zM49 5h1v1h-1zM13 6h2v1h-2zM50 6h2v1h-2zM12 7h1v1h-1zM52 7h1v1h-1zM11 8h1v1h-1zM53 8h1v1h-1zM10 9h1v1h-1zM54 9h1v1h-1zM9 10h1v1h-1zM55 10h1v1h-1zM8 11h1v1h-1zM56 11h1v1h-1zM7 12h1v1h-1zM57 12h1v1h-1zM6 13h1v1h-1zM58 13h1v1h-1zM6 14h1v1h-1zM58 14h1v1h-1zM5 15h1v1h-1zM59 15h1v1h-1zM4 16h1v1h-1zM60 16h1v1h-1zM4 17h1v1h-1zM60 17h1v1h-1zM3 18h1v1h-1zM61 18h1v1h-1zM3 19h1v1h-1zM61 19h1v1h-1zM2 20h1v1h-1zM62 20h1v1h-1zM2 21h1v1h-1zM62 21h1v1h-1zM2 22h1v1h-1zM62 22h1v1h-1zM1 23h1v1h-1zM63 23h1v1h-1zM1 24h1v1h-1zM63 24h1v1h-1zM1 25h1v1h-1zM63 25h1v1h-1zM1 26h1v1h-1zM63 26h1v1h-1zM1 27h1v1h-1zM63 27h1v1h-1zM0 28h1v1h-1zM64 28h1v1h-1zM0 29h1v1h-1zM64 29h1v1h-1zM0 30h1v1h-1zM64 30h1v1h-1zM0 31h1v1h-1zM64 31h1v1h-1zM0 32h1v1h-1zM64 32h1v1h-1zM0 33h1v1h-1zM64 33h1v1h-1zM0 34h1v1h-1zM64 34h1v1h-1zM0 35h1v1h-1zM64 35h1v1h-1zM0 36h1v1h-1zM64 36h1v1h-1zM1 37h1v1h-1zM63 37h1v1h-1zM1 38h1v1h-1zM63 38h1v1h-1zM1 39h1v1h-1zM63 39h1v1h-1zM1 40h1v1h-1zM63 40h1v1h-1zM1 41h1v1h-1zM63 41h1v1h-1zM2 42h1v1h-1zM62 42h1v1h-1zM2 43h1v1h-1zM62 43h1v1h-1zM2 44h1v1h-1zM62 44h1v1h-1zM3 45h1v1h-1zM61 45h1v1h-1zM3 46h1v1h-1zM61 46h1v1h-1zM4 47h1v1h-1zM60 47h1v1h-1zM4 48h1v1h-1zM60 48h1v1h-1zM5 49h1v1h-1zM59 49h1v1h-1zM6 50h1v1h-1zM58 50h1v1h-1zM6 51h1v1h-1zM58 51h1v1h-1zM7 52h1v1h-1zM57 52h1v1h-1zM8 53h1v1h-1zM56 53h1v1h-1zM9 54h1v1h-1zM55 54h1v1h-1zM10 55h1v1h-1zM54 55h1v1h-1zM11 56h1v1h-1zM53 56h1v1h-1zM12 57h1v1h-1zM52 57h1v1h-1zM13 58h2v1h-2zM50 58h2v1h-2zM15 59h1v1h-1zM49 59h1v1h-1zM16 60h2v1h-2zM47 60h2v1h-2zM18 61h2v1h-2zM45 61h2v1h-2zM20 62h3v1h-3zM42 62h3v1h-3zM23 63h5v1h-5zM37 63h5v1h-5zM28 64h9v1h-9z'/%3E%3C/svg%3E")}
+  #knob{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 27 27' shape-rendering='crispEdges'%3E%3Cpath d='M10 0h7v1h-7zM8 1h11v1h-11zM6 2h15v1h-15zM5 3h17v1h-17zM4 4h19v1h-19zM3 5h21v1h-21zM2 6h23v1h-23zM2 7h23v1h-23zM1 8h25v1h-25zM1 9h25v1h-25zM0 10h27v1h-27zM0 11h27v1h-27zM0 12h27v1h-27zM0 13h27v1h-27zM0 14h27v1h-27zM0 15h27v1h-27zM0 16h27v1h-27zM1 17h25v1h-25zM1 18h25v1h-25zM2 19h23v1h-23zM2 20h23v1h-23zM3 21h21v1h-21zM4 22h19v1h-19zM5 23h17v1h-17zM6 24h15v1h-15zM8 25h11v1h-11zM10 26h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 27 27' shape-rendering='crispEdges'%3E%3Cpath d='M10 0h7v1h-7zM8 1h2v1h-2zM17 1h2v1h-2zM6 2h2v1h-2zM19 2h2v1h-2zM5 3h1v1h-1zM21 3h1v1h-1zM4 4h1v1h-1zM22 4h1v1h-1zM3 5h1v1h-1zM23 5h1v1h-1zM2 6h1v1h-1zM24 6h1v1h-1zM2 7h1v1h-1zM24 7h1v1h-1zM1 8h1v1h-1zM25 8h1v1h-1zM1 9h1v1h-1zM25 9h1v1h-1zM0 10h1v1h-1zM26 10h1v1h-1zM0 11h1v1h-1zM26 11h1v1h-1zM0 12h1v1h-1zM26 12h1v1h-1zM0 13h1v1h-1zM26 13h1v1h-1zM0 14h1v1h-1zM26 14h1v1h-1zM0 15h1v1h-1zM26 15h1v1h-1zM0 16h1v1h-1zM26 16h1v1h-1zM1 17h1v1h-1zM25 17h1v1h-1zM1 18h1v1h-1zM25 18h1v1h-1zM2 19h1v1h-1zM24 19h1v1h-1zM2 20h1v1h-1zM24 20h1v1h-1zM3 21h1v1h-1zM23 21h1v1h-1zM4 22h1v1h-1zM22 22h1v1h-1zM5 23h1v1h-1zM21 23h1v1h-1zM6 24h2v1h-2zM19 24h2v1h-2zM8 25h2v1h-2zM17 25h2v1h-2zM10 26h7v1h-7z'/%3E%3C/svg%3E")}
+  .hub-ava .glyph{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 19' shape-rendering='crispEdges'%3E%3Cpath d='M7 0h5v1h-5zM5 1h9v1h-9zM3 2h13v1h-13zM2 3h15v1h-15zM2 4h15v1h-15zM1 5h17v1h-17zM1 6h17v1h-17zM0 7h19v1h-19zM0 8h19v1h-19zM0 9h19v1h-19zM0 10h19v1h-19zM0 11h19v1h-19zM1 12h17v1h-17zM1 13h17v1h-17zM2 14h15v1h-15zM2 15h15v1h-15zM3 16h13v1h-13zM5 17h9v1h-9zM7 18h5v1h-5z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 19' shape-rendering='crispEdges'%3E%3Cpath d='M7 0h5v1h-5zM5 1h2v1h-2zM12 1h2v1h-2zM3 2h2v1h-2zM14 2h2v1h-2zM2 3h1v1h-1zM16 3h1v1h-1zM2 4h1v1h-1zM16 4h1v1h-1zM1 5h1v1h-1zM17 5h1v1h-1zM1 6h1v1h-1zM17 6h1v1h-1zM0 7h1v1h-1zM18 7h1v1h-1zM0 8h1v1h-1zM18 8h1v1h-1zM0 9h1v1h-1zM18 9h1v1h-1zM0 10h1v1h-1zM18 10h1v1h-1zM0 11h1v1h-1zM18 11h1v1h-1zM1 12h1v1h-1zM17 12h1v1h-1zM1 13h1v1h-1zM17 13h1v1h-1zM2 14h1v1h-1zM16 14h1v1h-1zM2 15h1v1h-1zM16 15h1v1h-1zM3 16h2v1h-2zM14 16h2v1h-2zM5 17h2v1h-2zM12 17h2v1h-2zM7 18h5v1h-5z'/%3E%3C/svg%3E")}
 </style>
 </head>
 <body>
@@ -12618,7 +12648,7 @@ function renderStairHeal(){
   box.innerHTML = rows.map(r=>
     `<div class="row"><span class="k" style="color:${r.col}">${r.nm}</span>`
     + `<span>${r.now} / ${r.max}`
-    + `<span style="display:inline-block;width:54px;height:5px;background:#1b2029;border-radius:3px;`
+    + `<span style="display:inline-block;width:54px;height:5px;background:#1b2029;`
     + `margin-left:8px;vertical-align:middle;overflow:hidden">`
     + `<i style="display:block;height:100%;width:${r.pct}%;background:${r.col}"></i></span></span></div>`
   ).join('')
@@ -15764,7 +15794,7 @@ function masteryRow(){
   const need=lv>=MASTERY_MAX ? 0 : masteryNeed(lv+1);
   const xp=masteryXp(w.base);
   const bar = need
-    ? `<span style="display:inline-block;width:60px;height:5px;background:#1b2029;border-radius:3px;
+    ? `<span style="display:inline-block;width:60px;height:5px;background:#1b2029;
          margin-left:8px;vertical-align:middle;overflow:hidden">
          <i style="display:block;height:100%;width:${Math.round(xp/need*100)}%;background:#d6b34a"></i></span>`
     : '';
@@ -19434,7 +19464,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261003c"></script>
+<script src="cave-look.js?v=20261004a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
@@ -19482,6 +19512,7 @@ if(typeof tapDash === 'function'){
   };
 }
 </script>
+<script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261001a"></script>
 </body>
 </html>
