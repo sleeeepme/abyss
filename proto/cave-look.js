@@ -2153,6 +2153,32 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
       const isEnd=(j===0||!prev)||(j===tops.length-1||!nxt);
       if(isEnd) for(let y=q.top;y<q.gy;y++) dpf(q.wx,y,rimC(q.L,q.wx,y));
     }
+    if(wet&&CAVE.wallDrips!==false) wallDrips(tops,t);
+  }
+  occGY=null;
+}
+/* 水の層：天井のキワから落ちる水滴（2026-10-05 ユーザー要望「天井のキワから多めに水滴が落ちるようにして」）
+   - 落ちる所は壁の列のおよそ4列に1つ（世界の x で決める＝歩いても場所は変わらない。隣り合う列は選ばない）。
+   - 1滴ごとに：縁の下で膨らむ（0.55秒）→ 面の前を落ちる（重さで加速）→ 足もとの1〜3ドット先で水しぶき。間隔は 1.0〜2.4 秒。
+   - 床の雨漏り（drawDrips）と同じ色。灯りの弱い所は暗い色。前後は着く所の y（キャラの奥）。
+   - 波紋は立てない（滴のたびに水面が動き続けて見えた、という床の滴りの時の報告に合わせる）。
+   CAVE.wallDrips=false で止まる（見比べ用）。 */
+const WD_FORM=.55, WD_SPL=.28;
+function wallDrips(tops,t){
+  const drop=C('#cfeaff'), trail=C('#6f9cc0'), spl=C('#9cc8e8'), dimD=C('#6a92ae'), dimT=C('#34566e');
+  const pick=x=>ihash(x*31+7,913)%3===0;
+  for(const q of tops){ if(!q||!pick(q.wx)||pick(q.wx-1)) continue;
+    const hp=ihash(q.wx*7+3,914), per=1.0+(hp%1000)/1000*1.4, u=(t+(ihash(q.wx,9157)%1000)/1000*per)%per;   // 間隔・ずれ・着く所は別々のハッシュで（同じ値から取ると隣どうしが揃った）
+    const y0=q.top-1, land=q.gy+1+ihash(q.wx,733)%3, lit=q.L>.3, cD=lit?drop:dimD, cT=lit?trail:dimT;
+    const FALL=.20+(land-y0)*.005;
+    occGY=land;
+    if(u<WD_FORM){ const k=u/WD_FORM;                                       // 縁の下で膨らむ
+      dpf(q.wx,y0+1,cT); if(k>.45) dpf(q.wx,y0+2,cD); if(k>.8) dpf(q.wx,y0+3,cD); }
+    else if(u<WD_FORM+FALL){ const k=(u-WD_FORM)/FALL, y=y0+3+(land-y0-3)*k*k;   // 落ちる
+      dpf(q.wx,y,cD); dpf(q.wx,y-1,cD); dpf(q.wx,y-2,cT); if(k>.3) dpf(q.wx,y-3,cT); if(k>.6) dpf(q.wx,y-4,cT); }
+    else if(u<WD_FORM+FALL+WD_SPL){ const k=(u-WD_FORM-FALL)/WD_SPL, r=1+k*4;  // 水しぶき
+      if(k<.7) for(const [ax,ay] of [[-1,0],[1,0],[-.7,-.5],[.7,-.5]]) dpf(q.wx+ax*r,land+ay*r,lit?spl:dimD);
+      if(k<.3) dpf(q.wx,land,cD); }
   }
   occGY=null;
 }
