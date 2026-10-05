@@ -30,6 +30,11 @@
 | `ENEMY-BEAST-TURRET-001` | `beast / turret` | アッシュトード | 敵 | ![アッシュトードv10](../proto/assets/sprites/enemies/ash-toad/right-idle-tinyrpg-v10-8x.png) | [32×32 PNG](../proto/assets/sprites/enemies/ash-toad/right-idle-tinyrpg-v10.png) | 右・待機1 | 承認済み（2026-09-20） | 未反映 | TinyRPG系v10。可視22×15px・8色。v8の造形・全輪郭を維持して色面を整理。ユーザー「今回の稿で採用」 |
 | `ENEMY-BEAST-SWARM-001` | `beast / swarm` | ストーンボア | 敵 | ![ストーンボア・右向きv3](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/stone-boar/right-idle-v3-draft.png) | 右・待機1 | 承認済み | 未反映 | 選択された参考案を基準に、高い灰色の肩、茶色い耳・短脚、淡い眼、箱型の鼻と大きな上向き牙を整理 |
 | `ENEMY-MOSS-BALL-001` | `moss-ball` | 苔玉 | 敵 | ![苔玉・正面v1](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1.png) | 正面・待機1 | 承認済み | ゲーム反映済み | ユーザー指定の最新v6を採用。段状の頭、1pxの両目、短い腕、左右非対称の足、必要箇所のみの濃紺アウトライン |
+| `ENEMY-MOSS-BALL-SUMP` | `moss-ball-sump` | シルトモス | 敵 | ![苔玉・水の層・青](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-sump-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-sump.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（水の層・青）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `ENEMY-MOSS-BALL-ROOT` | `moss-ball-root` | ヴァインモス | 敵 | ![苔玉・根の層・若葉](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-root-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-root.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（根の層・若葉）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `ENEMY-MOSS-BALL-RUIN` | `moss-ball-ruin` | グラウトモス | 敵 | ![苔玉・跡の層・灰の石](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（跡の層・灰の石）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `ENEMY-MOSS-BALL-FURNACE` | `moss-ball-furnace` | エンバーモス | 敵 | ![苔玉・炉の層・熾火](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（炉の層・熾火）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `ENEMY-MOSS-BALL-PALE` | `moss-ball-pale` | フロストモス | 敵 | ![苔玉・白の層・霜](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（白の層・霜）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 初期解放ジョブの色違い
@@ -130,3 +135,4 @@
 - 2026-08-24: アッシュトードv3とストーンボアv3を承認済みに更新。アッシュハウンドは別タスクでユーザーがレタッチした最新版をv5として採用・承認。灰の大蛙は添付画像の縦1×2px黒目だけを移植したv4へ改訂。
 - 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。
 - 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
+- 2026-10-05: 苔玉の亜種を色違いで登録（ユーザー「苔玉の亜種は苔玉の色違いのものを入れておいて。水の層だと青など」）。水の層＝青、根の層＝若葉、跡の層＝灰の石、炉の層＝熾火、白の層＝霜。ゲームでは層ごとの苔玉にそのまま当たる。

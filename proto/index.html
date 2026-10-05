@@ -7125,16 +7125,16 @@ function tickBossFormFx(dt){
    表示名はカタカナ（雑魚の規則どおり）。**「苔玉」は種別の呼び名**で、
    登録行と記録の側に出す。 */
 const MOSS_KINDS = {
-  // 色は絵（moss-ball front-idle-v1）から取る。盤面の点と絵の色が違うと別物に見える
+  // 色は絵（moss-ball front-idle-v1 と層ごとの色違い）の一番明るい段から取る。盤面の点と絵の色が違うと別物に見える
   stone:   {nm:'ダストモス',   col:'#7f8040', dt:'blunt',  res:{blunt:20, pierce:-15}},
-  sump:    {nm:'シルトモス',   col:'#5f8f7a', dt:'blunt',  res:{pierce:45, slash:-20}},
-  root:    {nm:'ヴァインモス', col:'#8fbf58', dt:'arcane', res:{arcane:35, fire:-30}},
-  ruin:    {nm:'グラウトモス', col:'#8f9aa8', dt:'pierce', res:{slash:30, blunt:-30}},
+  sump:    {nm:'シルトモス',   col:'#4a80ad', dt:'blunt',  res:{pierce:45, slash:-20}},
+  root:    {nm:'ヴァインモス', col:'#77ac46', dt:'arcane', res:{arcane:35, fire:-30}},
+  ruin:    {nm:'グラウトモス', col:'#878f9c', dt:'pierce', res:{slash:30, blunt:-30}},
   /* エンバーモス。**シンダーモスにはできない**——
      雑魚三十二種の表（ZAKO.flame.turret）に既にその名前がいる（E-19 の蛾）。
      同じ名前の別の生き物が2種いると、覚えた側が必ず混乱する。 */
-  furnace: {nm:'エンバーモス', col:'#d08a4a', dt:'fire',   res:{fire:60, frost:-45}},
-  pale:    {nm:'フロストモス', col:'#8fd0e0', dt:'frost',  res:{frost:60, fire:-45}},
+  furnace: {nm:'エンバーモス', col:'#bf6a33', dt:'fire',   res:{fire:60, frost:-45}},
+  pale:    {nm:'フロストモス', col:'#97c4d4', dt:'frost',  res:{frost:60, fire:-45}},
 };
 const MOSS_PER_ZONE = 20;      // ドゥラントリーが来るまでに、各層で倒す数
 const MOSS_PER_FLOOR = [2, 4]; // 1階層に湧く数
@@ -13246,6 +13246,11 @@ function fadeToBlack(ms, cb){
 
 const SPRITES = {
   'moss-ball': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAlElEQVR42mNgGLRAXsP5PzImWXN9gwMKJskQkOKcHAu4ZhibKENgtoM0JSYYg2kYJtoAkMaXD7eBNcFoog2BOR9kCLILQOzAAF38BsBsBykEYZhmEBsmDqJxGgKSQFbs6a6Fwobx8RoAUgTzBkwTCMOcD5PH6w2QIliAwTDMK0QFIszJMM2wMCFoO3oyxpasB1+mAwB4q7UO8TomnwAAAABJRU5ErkJggg==',
+  'moss-ball-sump': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABFklEQVR42sWSv2rCUBTGf7FFWoVKLNiCQ4ZCaXFyq2t8AFefQfA9fAgfoC/hXLdsRgsV7lCNgSQ1oAZB0qF4SZobHT3TPX++737n8MGlQ8trGC/tOJmL6Ug5e50HbnR76eI7sYqkkKfgx/1OvRvdXkaVkiD5+2JmSaIk4VkFi5nFcNCnpNcYDvqyXjc7GRWaSkHd7LANXABKeg2AbeAShR67r8/UQQv/wXqzhS9sotCTYF/YckZvtlIqMitEocfN3T0AzmQslYTLOfvN+vwN9ps1gfVB1XhNAYvlCgdnRbic5/tATEeaQTu+enwA4OCsZK9qvuHD6Rsco1iu4EzGMr99esYXtnKFjBP/VBAn7XvMT1n6cvELL6mAFjWC3b8AAAAASUVORK5CYII=',
+  'moss-ball-root': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABFUlEQVR42sWSQWrCQBSGv6hYEUIgtIuWwuzEdb2AJWcQvIEeokt3bj1EoWcoHkAquCtRF1KJlYRAGAhGKOnKacYk2J1vNe/NvH++9/Pg2mGUXYi2k2bzzee78W8B0XbS/qiq1V5ffgpFKmUE319SO/dH1RxVoUD29+XCV0JZwYsEy4XPZDjGtBtMhmNV7w7iHIVRRNAdxMjwAIBpNwCQ4QEZJLjTe82LynlzpxfiuREySFSz50bqTacXahS5EWSQYN7eALCa+Ypkv5bE0fGyB3F05OPN5qFlaY1Nq852LtivdTNr+WVx0senDXDHdi40A2GHOxXlHpyiadVZzXyVt553eG5UOELtvHCi0Nf3z7Sylb5e/ALBM4LHz5/BAwAAAABJRU5ErkJggg==',
+  'moss-ball-ruin': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABH0lEQVR42sWSQUrDQBSGP8VdQxLFrbQIhYIg2IUHSOgBgqueoN10X7qWXsCNrjyCBxA9gAuF0kJKaIgNFNSSdEq6jgsxZsjELvtWM2/e++d///th17FX9lBt2Gn+/u4+KWsPypq7nbaUu70jVYHslzH4+vyQzt1Ou8BKCZD/feZNM6A84FYGM2/KoOegGyaDnpPlrxyrwEKpgW6Y9K/vARjePACwFitEHP3PoNqw05bVJAx8RByhGyYAYeBnNS2rKbEojCDiCOPwCAB3PGItVgAswjmbJNmuwSZJeHx+5aR2KjVWNI2Jt2QRzst98LNnOz2rHwMw8ZY5Ac8BeHkLJFMpt1DRNNzxKLtfXtQIA185QmELvyxk+/6JVmbp3cU3cMl5SpC1NNUAAAAASUVORK5CYII=',
+  'moss-ball-furnace': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABIUlEQVR42sWSsWrCUBSGv2hppFCiQ5YsgU4pDn2CLsneZyi4uPQN2s3BR+hS8Bm6dLIILq4ZAnGocAdTQdBIaNWAplNjQm509Ez3nnvOf/7z3x/OHUrZg2k5SfYu/L609qKsuWeHudwjTiIDqZQx+Pr+yZ17dlhgJQXITh/5ixQoC3iSwchf0OrY6JpKq2On+ZfbaYGFVANdU+k+fQDw9vwJwHy1JQjj4wxMy0naxgRXRARhjK6pALgiSmvaxiTHorBCEMYY9UsABuOQ+WoLgDdbs9zsTmuw3Ox4DW64M69zjY1aleG+iTdbl/tA+H0Fy0nuKx5QZ7hvHgQ0pyB83n+bOVNJf6FRqzIYH4z0cOXjiki6gnLMxv+TsqKVWfp88Qc0Jnw+2ZmvugAAAABJRU5ErkJggg==',
+  'moss-ball-pale': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABHklEQVR42mNgGGjAiEtCXsP5PzL/4Y29jEQbIK/h/L9izkQUsY6UfKyGMOFyweMHj1DYFXMmYrgKqwHItl8+cw5uELKBBF1w+cw5htZoTwYBERGG1mhPuHh0TTGGK1iwGSAgIsKQPXExAwMDA0P10u0MDAwMDB/evGF49/IFfhfIazj/986IZ7h39QrDu5cvGARERBgYGBgY7l29AlfjnRGP4goML7x7+YJBSFwC4pXjRxg+vHkDCYPbNxi+fvpAOAy+fvrAsHXGQgYlbR0Ujdx8AgyX9p5keHz7BgPOMIDG8389Z3MGBgYGhkt7T6IEIAMDA8Px9TtR0gPWWODmE2C4fPwInG8Z6M5w7+oVrF5gxJeMYTYhBxquJD1wAAAkY3cigTTL/gAAAABJRU5ErkJggg==',
 };
 const SPRIMG = {};
 for(const k in SPRITES){ const im=new Image(); im.src=SPRITES[k]; SPRIMG[k]=im; }
@@ -13265,9 +13270,13 @@ function drawSprite(k, sx, sy, size){
   ctx.imageSmoothingEnabled=sm;
   return true;
 }
-/* 苔玉の絵。**今あるのは石の層のぶんだけ。**
-   残り5層は絵が出来るまで元の図形のまま出る（絵が無い＝描かない、にしない）。 */
-const MOSS_SPRITE = {stone:'moss-ball'};
+/* 苔玉の絵。石の層の絵（moss-ball）を元に、層ごとの色違い（亜種）を当てる。
+   2026-10-05 ユーザー要望「苔玉の亜種は苔玉の色違いのものを入れておいて。水の層だと青など」。
+   形は同じで、体の5段と目の色だけを層の色に塗り替えた（濃紺の輪郭はそのまま）。
+   元の PNG は proto/assets/sprites/enemies/moss-ball/front-idle-v1-<層>.png。
+   ここに無い層ができたら、元の図形のまま出る（絵が無い＝描かない、にしない）。 */
+const MOSS_SPRITE = {stone:'moss-ball', sump:'moss-ball-sump', root:'moss-ball-root', ruin:'moss-ball-ruin',
+                     furnace:'moss-ball-furnace', pale:'moss-ball-pale'};
 function mossSpriteKey(e){ return (e && e.moss) ? (MOSS_SPRITE[e.moss]||null) : null; }
 
 /* 作成済みの右向きキャラクターアート。
@@ -19464,7 +19473,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261004a"></script>
+<script src="cave-look.js?v=20261005a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

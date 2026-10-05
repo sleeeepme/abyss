@@ -296,16 +296,24 @@ R.spriteAssigned = await pg.evaluate(()=>{
           ok: mossSpriteKey(m)==='moss-ball' && isDurantree(d)};
 });
 
-/* 5-c. **絵の無い層は、元の図形のまま出る。**
-       「絵が無い＝描かない」にすると、描き足すまで盤面から消える。 */
-R.otherZonesFallBack = await pg.evaluate(()=>{
+/* 5-c. 層ごとに色違いの絵（亜種）がある（2026-10-05 ユーザー要望「水の層だと青など」）。
+       どの層も自分の絵を持ち、絵どうしは別の物、どれも 16px で読める。
+       絵の無い層ができたら null（＝図形へ落ちる）を返すこと。 */
+R.zoneVariants = await pg.evaluate(async ()=>{
   const rows=mossZones().map(z=>({z, key:MOSS_SPRITE[z]||null}));
-  const withArt=rows.filter(r=>r.key);
-  const without=rows.filter(r=>!r.key);
-  return {rows, withArt:withArt.length, without:without.length,
-          // 絵の無い層は null（＝図形へ落ちる）。undefined や 'moss-ball' を返さない
-          allNull: without.every(r=>r.key===null),
-          ok: withArt.length>=1 && without.every(r=>r.key===null)};
+  for(const r of rows){ const im=r.key&&SPRIMG[r.key]; if(im&&!im.complete) await new Promise(res=>{ im.onload=res; im.onerror=res; }); }
+  const loaded=rows.map(r=>{ const im=r.key&&sprite(r.key); return !!im && im.naturalWidth===16 && im.naturalHeight===16; });
+  const keys=new Set(rows.map(r=>r.key));
+  const sumpKey=MOSS_SPRITE.sump;
+  // 水の層の絵は青い（体の一番多い色の青が赤・緑より強い）
+  let blue=false;
+  if(sumpKey && sprite(sumpKey)){ const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d'); x.drawImage(sprite(sumpKey),0,0);
+    const d=x.getImageData(0,0,16,16).data, cnt={};
+    for(let i=0;i<d.length;i+=4){ if(d[i+3]<200) continue; const k=d[i]+','+d[i+1]+','+d[i+2]; cnt[k]=(cnt[k]||0)+1; }
+    const top=Object.entries(cnt).filter(([k])=>k!=='31,40,67').sort((a,b)=>b[1]-a[1])[0];
+    if(top){ const [r,g,b]=top[0].split(',').map(Number); blue = b>r+20 && b>g+10; } }
+  return {rows, allLoaded:loaded.every(Boolean), distinct:keys.size===rows.length, sumpBlue:blue,
+          ok: loaded.every(Boolean) && keys.size===rows.length && blue};
 });
 
 // 5-d. 描いても落ちない（絵と図形が混じった床）
