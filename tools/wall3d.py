@@ -28,7 +28,7 @@ import ruin3d
 
 TILE = 4.0                 # 1マス＝4単位＝16ドット
 P = 8 * TILE               # 繰り返しの周期（8マス）
-H = 9.2                    # 面の高さ（単位）→ 画面で約32ドット＝2マス
+H = 4.8                    # 面の高さ（単位）→ 画面で約17ドット＝1マス強（2026-10-05 ユーザー「壁の高さは半分くらいにしたい」。前は 9.2）
 
 
 class Slab:
@@ -153,7 +153,7 @@ class Cell:
 def layout2(seed=11):
     """ボロノイの種：4段（地層）に、横に長めの間隔で散らす。周期 P で繰り返す"""
     rng = np.random.default_rng(seed)
-    rows = [(0.9, 0.45, 3.4), (3.4, 0.55, 4.6), (5.9, 0.5, 3.8), (8.3, 0.45, 3.6)]   # (y の中心, y の揺れ, x の間隔)
+    rows = [(0.8, 0.3, 3.0), (2.5, 0.35, 3.9), (4.1, 0.25, 3.3)]   # (y の中心, y の揺れ, x の間隔)。高さを半分にしたので3段
     seeds = []
     for r, (yc, yj, sp) in enumerate(rows):
         x = rng.uniform(0, sp)
@@ -162,17 +162,17 @@ def layout2(seed=11):
             x += sp * rng.uniform(0.45, 2.1)                 # 間隔を大きく揺らす（同じ大きさを並べない）
     strands = []
     for k in range(int(P / 4.5)):
-        strands.append((rng.uniform(0, P), rng.uniform(1.0, 1.8) * 2, 7.3, rng.uniform(1.6, 4.0), rng.uniform(.15, .22), int(rng.integers(1e6))))
+        strands.append((rng.uniform(0, P), rng.uniform(.9, 1.5) * 2, H - 1.1, rng.uniform(.9, 2.2), rng.uniform(.14, .2), int(rng.integers(1e6))))
     rubble = []
     x = rng.uniform(0, 3)
     while x < P:
         r = rng.uniform(.35, 1.0)
-        rubble.append((x, r * .5, rng.uniform(.6, 2.2) * 2, r, r * .6, r * 2, int(rng.integers(1e6)), rng.uniform(.75, .9)))
+        rubble.append((x, r * .5, rng.uniform(.3, .9) * 2, r, r * .6, r * 2, int(rng.integers(1e6)), rng.uniform(.75, .9)))   # 床へはみ出さないよう面の近くに
         x += rng.uniform(1.2, 3.6)
     return seeds, strands, rubble
 
 
-ROW_FRONT = (0.25, -0.35, 0.10, 0.95)       # 段ごとの前の位置（本当の z）：下は少し出て、2段目は引っ込み、天辺は庇
+ROW_FRONT = (0.20, -0.30, 0.80)       # 段ごとの前の位置（本当の z）：下は少し出て、2段目は引っ込み、天辺は庇
 SX = 0.62                                    # ボロノイを測るときの x の縮め（横長の片にする）
 
 
@@ -213,14 +213,14 @@ def cells_from(seeds, margin, seed=11):
         add((rng.uniform(-.2, .2), rng.uniform(-.08, .28), 1), (x, y, zf))                       # 前の面
         if rng.uniform() < .6:                                                                    # 2枚目の前の面（稜線）
             add((rng.uniform(-.45, .45), rng.uniform(-.25, .35), 1), (x + rng.uniform(-.8, .8), y + rng.uniform(-.5, .5), zf - rng.uniform(.0, .25)))
-        add((0, 0, -1), (x, y, -3.6))                                                            # 奥
+        add((0, 0, -1), (x, y, -1.8))                                                            # 奥（浅く：天辺の面を小さく）
         add((0, -1, 0), (x, 0, 0))                                                                # 地面より下は無い
-        top = H - (rng.uniform(0, .9) if r == 3 else rng.uniform(0, .25))
-        add((rng.uniform(-.16, .16), 1, rng.uniform(-.12, .05)), (x, top, zf))                    # 壁の天辺（天辺の段は高さも傾きも揃えない）
-        add((rng.uniform(-.4, .4), 1, rng.uniform(.7, 1.4)), (x + rng.uniform(-1, 1), top - rng.uniform(.3, .95), zf))   # 天辺の角の面取り（欠けた縁）
-        if r == 3: add((0, -1, .6), (x, y - rng.uniform(.6, 1.0), zf - .1))                     # 庇の下のえぐれ
+        top = H - rng.uniform(0, .15)                                                          # 天辺はほぼ揃える（段違いだと縁の線が城の胸壁のように見えた）
+        add((rng.uniform(-.08, .08), 1, rng.uniform(-.08, .04)), (x, top, zf))                    # 壁の天辺
+        add((rng.uniform(-.3, .3), 1, rng.uniform(.8, 1.3)), (x + rng.uniform(-1, 1), top - rng.uniform(.15, .45), zf))   # 天辺の角の面取り（小さく欠けた縁）
+        if r == 2: add((0, -1, .6), (x, y - rng.uniform(.4, .7), zf - .1))                      # 庇の下のえぐれ
         lo = np.array([x - 7, -.1, (zf - 4.2) * 2]); hi = np.array([x + 7, H + .3, (zf + 1.8) * 2])
-        tone = rng.uniform(.86, 1.04) * (1.0, .90, 1.0, 1.08)[r]
+        tone = rng.uniform(.86, 1.04) * (1.0, .92, 1.08)[r]
         parts.append(Cell(planes, cs, r, lo, hi, tone))
     return parts
 
@@ -236,7 +236,7 @@ def talus_pieces(margin, seed):
             if x1 < -margin or x0 > P + margin: continue
             planes = []
             def add(n, pt): n = _nz(n); planes.append((n, float(n @ np.asarray(pt, float))))
-            xc = (x0 + x1) / 2; hgt = r2.uniform(.7, 1.5); reach = r2.uniform(.9, 1.8)
+            xc = (x0 + x1) / 2; hgt = r2.uniform(.4, .8); reach = r2.uniform(.4, .8)   # 床へは 1/4 マスほどまで（前は 3/4 マスはみ出した）
             add((r2.uniform(-.25, .25), 1, hgt / reach * r2.uniform(.8, 1.2)), (xc, 0, reach))        # 斜面
             if r2.uniform() < .6: add((r2.uniform(-.6, .6), 1, r2.uniform(.3, 1.6)), (xc + r2.uniform(-1, 1), hgt * r2.uniform(.5, .9), reach * .4))
             add((-1, 0, r2.uniform(.2, .6)), (x0, 0, 0)); add((1, 0, r2.uniform(.2, .6)), (x1, 0, 0))
@@ -247,7 +247,7 @@ def talus_pieces(margin, seed):
 
 def scene2(margin=6.0, seed=11):
     seeds, strands, rubble = layout2(seed)
-    parts = [Slab(-margin, P + margin, H - 0.25)]
+    parts = [Slab(-margin, P + margin, H * 0.55)]          # 芯は低く：天辺の平らな面が暗い帯に見えないよう、片の天辺だけを見せる
     parts += cells_from(seeds, margin, seed)
     parts += talus_pieces(margin, seed)
     for sh in (-P, 0, P):
@@ -375,15 +375,27 @@ def main():
     for k in ('m', 'n', 'a', 'hts'):
         e[k] = [row[x0:x1] for row in e[k]]
     e['w'] = x1 - x0; e['ax'] = 0
-    # 庇より奥の天辺（壁の上の面）は、ゲームでは今の上から見た岩が描くので、庇の縁から上 LIP ドットだけ残す
-    LIP = 4
-    B36 = cave3d.B36
-    def row_top(y):   # この行に「面」（上向きでない）ドットがあるか
-        return any(c != '.' and NRM[ALPHA.index(nn)][1] < 0.6 for c, nn in zip(e['m'][y], e['n'][y]))
-    first = next(y for y in range(e['h']) if row_top(y))
-    cut = max(0, first - LIP)
-    for k in ('m', 'n', 'a', 'hts'): e[k] = e[k][cut:]
-    e['h'] -= cut; e['ay'] -= cut
+    # 天辺（上を向いた面）は、列ごとに面のすぐ上の LIP ドットだけ残す。
+    # 奥の天辺はゲームでは「上から見た岩（天井）」が描くので要らない。行でまとめて切ると、片の天辺の平らな面が
+    # 暗い帯として残った（前の版）。
+    LIP = 3
+    def up(y, x):                       # 面（カメラの方を向いた立ち上がり）でない＝天辺・横の割れ目の面
+        v = NRM[ALPHA.index(e['n'][y][x])]; return not (v[2] > 0.45 and v[1] < 0.75)
+    rows = [list(r) for r in e['m']]
+    for x in range(e['w']):
+        face = next((y for y in range(e['h']) if rows[y][x] != '.' and not up(y, x)), None)
+        if face is None: continue
+        for y in range(0, max(0, face - LIP)): rows[y][x] = '.'
+    # 列ごとの天辺の高さを、周り41列の中央値から3ドット以上は飛び出させない（引っ込んだ片の面が細い柱や箱に見えた）
+    tops = [next((y for y in range(e['h']) if rows[y][x] != '.'), e['h']) for x in range(e['w'])]
+    for x in range(e['w']):
+        win = sorted(tops[(x + k) % e["w"]] for k in range(-20, 21))
+        lim = win[len(win) // 2] - 1
+        for y in range(0, max(0, lim)): rows[y][x] = '.'
+    e['m'] = [''.join(r) for r in rows]
+    first = next(y for y in range(e['h']) if any(c != '.' for c in e['m'][y]))
+    for k in ('m', 'n', 'a', 'hts'): e[k] = e[k][first:]
+    e['h'] -= first; e['ay'] -= first
     json.dump(e, open(os.path.join(OUTDIR, 'wall_a.json'), 'w'))
     from PIL import Image
     shots = [shade(e, (-0.4, 0.5, 0.75), LIME), shade(e, (0.6, 0.3, 0.75), LIME), shade(e, (-0.4, 0.5, 0.75), WARM)]
