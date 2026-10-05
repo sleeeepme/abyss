@@ -146,10 +146,10 @@ class Column:
         return a * np.clip((self.H - y) / (0.35 * self.H), 0.10, 1.0)               # 上は天井の闇へ溶ける
 
 # ---------------- 描く ----------------
-def render(parts, ground_moss=None):
+def render(parts, ground_moss=None, gs=None):
     import ruin3d
     big = any(isinstance(pt, Column) for pt in parts)
-    ruin3d.GS = 0.09 if big else 0.05          # 柱は大きいので距離場の格子を粗く（細かいとメモリが足りない）
+    ruin3d.GS = gs or (0.09 if big else 0.05)  # 柱は大きいので距離場の格子を粗く（細かいとメモリが足りない）。壁（wall3d.py）は gs で渡す
     globals()['GS'] = ruin3d.GS
     sc = Scene('c', parts); sc.bake()
     right = np.array([1.0, 0, 0]); up = np.array([0, math.cos(THETA), -math.sin(THETA)]); fwd = np.array([0, -math.sin(THETA), -math.cos(THETA)])

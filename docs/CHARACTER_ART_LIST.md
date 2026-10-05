@@ -34,7 +34,7 @@
 | `ENEMY-MOSS-BALL-ROOT` | `moss-ball-root` | ヴァインモス | 敵 | ![苔玉・根の層・若葉](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-root-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-root.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（根の層・若葉）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `ENEMY-MOSS-BALL-RUIN` | `moss-ball-ruin` | グラウトモス | 敵 | ![苔玉・跡の層・灰の石](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（跡の層・灰の石）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `ENEMY-MOSS-BALL-FURNACE` | `moss-ball-furnace` | エンバーモス | 敵 | ![苔玉・炉の層・熾火](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（炉の層・熾火）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
-| `ENEMY-MOSS-BALL-PALE` | `moss-ball-pale` | フロストモス | 敵 | ![苔玉・白の層・霜](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（白の層・霜）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `ENEMY-MOSS-BALL-PALE` | `moss-ball-pale` | フロストモス | 敵 | ![苔玉・白の層・白い体とマゼンタの目](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（白の層：白い体とマゼンタの目、2026-10-05 ユーザー指定）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 初期解放ジョブの色違い
@@ -136,3 +136,4 @@
 - 2026-08-27: 敵キャラクター「苔玉」を登録。ユーザー指定の最新v6を、正面・待機1の承認済み画像として採用し、ダストモスとドゥラントリーに反映。
 - 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
 - 2026-10-05: 苔玉の亜種を色違いで登録（ユーザー「苔玉の亜種は苔玉の色違いのものを入れておいて。水の層だと青など」）。水の層＝青、根の層＝若葉、跡の層＝灰の石、炉の層＝熾火、白の層＝霜。ゲームでは層ごとの苔玉にそのまま当たる。
+- 2026-10-05: フロストモスを白い体とマゼンタの目に変更（ユーザー「フロストモスは白い体とマゼンタの目で」）。
