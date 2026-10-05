@@ -2052,7 +2052,7 @@ const WALL_AMB=.20, WALL_KD=.95, WALL_TOP=.22;
    左右の壁の縁（rockPx・地形の縁）と同じく、明るさを段に落とすときに BAYER の網目でしきい値を揺らす。
    段の真ん中を整数にした連続の段（WALL_MID の間を線形に）に網目を足して切り捨てるので、段と段の間は市松に混ざる。
    網目は世界のドットに固定（歩いても網が流れない）。CAVE.wallDither=0 で前の段だけの塗りに戻る（見比べ用）。 */
-const WALL_DITHER=1, WALL_MID=[.0,.275,.55,.79,.97];
+const WALL_TAPER=12, WALL_DITHER=1, WALL_MID=[.0,.275,.55,.79,.97];
 function wallTone(I,X,Y){
   const M=WALL_MID; let u;
   if(I<=M[0]) u=0; else if(I>=M[4]) u=4;
@@ -2074,30 +2074,31 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
   const sp=wet&&typeof WALL_SPR_WET!=='undefined'?WALL_SPR_WET:WALL_SPR, D=caveDecode(sp), ROCK=wet?WALL_ROCK_WET:P_.lime, MOSS=wet?WALL_MOSS_WET:WALL_MOSS;
   const hz=wet?wallWaterG():null, inWater=(x,y)=>hz?hazAt(hz,x,y)>.5:false;
   const W=sp.w, H=sp.h, AY=sp.ay, code=G.code, PW=G.PW, PH=G.PH, Pp=G.P;
-  const x0=Math.max(4,bx0-2), x1=Math.min(PW-4,bx0+bw+2), y0=Math.max(16,by0), y1=Math.min(PH-4,by0+bh+H);
+  const TAPER=WALL_TAPER, x0=Math.max(4,bx0-TAPER-6), x1=Math.min(PW-4,bx0+bw+TAPER+6), y0=Math.max(16,by0), y1=Math.min(PH-4,by0+bh+H);   // 横は端の細りが画面の外から始まっても分かるように広めに見る
   const rock=(x,y)=>code[y*PW+x]!==0;
   ensure(bx0-8, Math.max(0,by0-H-20), bx0+bw+8, by0+bh+8);                 // 画面の上の外にある岩も、面の厚みを見るのに要る
-  /* 1) 列ごとに「床の北の縁」を拾う：真上が岩・自分が床・上に14ドット以上の岩・3ドット下も床（側壁の小さな凹みを除く） */
+  /* 1) 列ごとに「床の北の縁」を拾う：真上が岩・自分が床・上に8ドット以上の岩・3ドット下も床（側壁の小さな凹みを除く）。
+        上の岩の厚み A（最大 AY+6）も覚えておく：薄い岩（向こうがすぐ別の部屋・通路）では壁を低くする */
   /* 縁は列ごとに覚えておく（岩の地図が変わる＝G.ver が進むまで）。毎フレーム全部の行を見直すと重かった */
   const WC=G._wallCache&&G._wallCache.ver===G.ver ? G._wallCache : (G._wallCache={ver:G.ver, cols:new Map()});
   const scan=(wx,a,b)=>{ const L=[];
     for(let ey=a; ey<b; ey++){
       if(!rock(wx,ey-1)||rock(wx,ey)||rock(wx,ey+3)) continue;
-      let thick=true; for(let k=2;k<=14;k++) if(!rock(wx,ey-k)){ thick=false; break; } if(!thick) continue;
-      L.push(ey); }
+      let A=1; while(A<AY+6&&ey-1-A>=0&&rock(wx,ey-1-A)) A++; if(A<8) continue;
+      L.push([ey,A]); }
     return L; };
   const edges=new Map();
   for(let wx=x0; wx<x1; wx++){
     let c=WC.cols.get(wx);
     if(!c||c.a>y0||c.b<y1){ const a=c?Math.min(c.a,y0):y0, b=c?Math.max(c.b,y1):y1; c={a,b,L:scan(wx,a,b)}; WC.cols.set(wx,c); }
-    const L=c.L.filter(ey=>ey>=y0&&ey<y1); if(L.length) edges.set(wx,L); }
+    const L=c.L.filter(e=>e[0]>=y0&&e[0]<y1); if(L.length) edges.set(wx,L); }
   /* 2) 隣の列と縁の高さが3ドット以内なら同じ壁の続き（ひと続き＝run）。6列に満たない run は捨てる（側壁の凸凹に面を立てない） */
   const runs=[], open=new Map();
   for(let wx=x0; wx<x1; wx++){ const L=edges.get(wx)||[], next=new Map();
-    for(const ey of L){ let run=null;
+    for(const [ey,A] of L){ let run=null;
       for(const [py,r] of open) if(Math.abs(py-ey)<=3){ run=r; open.delete(py); break; }
       if(!run){ run=[]; runs.push(run); }
-      run.push([wx,ey]); next.set(ey,run); }
+      run.push([wx,ey,A]); next.set(ey,run); }
     open.clear(); for(const [k,v] of next) open.set(k,v); }
   /* 縁の色：左右の壁の縁（地形の c=1〜4 の帯）と同じ式。fall＝縁からの距離ごとの弱まり、fc＝縁がランタンに向いている度合い */
   const wdOn=()=>(CAVE.wallDither===undefined?WALL_DITHER:CAVE.wallDither);
@@ -2106,8 +2107,24 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
   const RIM_FALL=[.55,.3,.15];                                               // 線の上（天井の側）の3ドット：側壁の縁の c=2,3,4 と同じ
   for(const run of runs){
     if(run.length<6) continue;
+    /* 2026-10-05 報告「水の層で天井部分がバッツリ見切れていたり、壁が変な位置で切れていたり、側面に変に縦ラインが入っていたり」
+       a) 高さ：上の岩が薄い所は、面を縦に縮める（列の厚みから決めた縮みの、run の下から4分の1の値）。縮みが 0.4 に届かない run は立てない。
+          前は面の高さのまま描いて、岩の外（向こうの床）で天辺が真っ直ぐ切れていた。
+       b) 端：run の端の隣が床（縁の段が4ドット以上ずれて別の run になった・岩が薄くて縁にならなかった）なら、
+          面を TAPER 列かけて低くしていき、床の縁へなだらかに降ろす。縦の線は引かない。
+          隣が岩（側壁）の時だけ、今まで通り縦の線で側壁の縁へ繋ぐ。
+       c) 見えない列・灯りの外の列（描かない列）は、もう「端」にしない（その両隣に縦の線が出ていた）。 */
+    const sCol=run.map(([,,A])=>Math.min(1,Math.max(0,(A-4)/AY)));
+    const sRun=sCol.slice().sort((a,b)=>a-b)[Math.floor(sCol.length*.25)];
+    if(sRun<.4) continue;
+    const [lx,ly]=run[0], [rx,ry]=run[run.length-1];
+    const leftOpen=lx>x0&&!rock(lx-1,ly+2), rightOpen=rx<x1-1&&!rock(rx+1,ry+2);       // 端の隣が床＝細らせる（見ている範囲の端は続きとみなす）
+    const leftWall=lx>x0&&!leftOpen, rightWall=rx<x1-1&&!rightOpen;                      // 端の隣が岩＝側壁へ縦の線
     const tops=[];
-    for(const [wx,ey] of run){
+    for(let ri=0; ri<run.length; ri++){ const [wx,ey]=run[ri];
+      let sc=Math.min(sRun,sCol[ri]);
+      const dl=leftOpen?ri:1e9, dr=rightOpen?run.length-1-ri:1e9, dm=Math.min(dl,dr);
+      if(dm<TAPER){ const u=(dm+1)/(TAPER+1); sc*=u*u*(3-2*u); }
       const col=((wx%W)+W)%W, gy=ey;                                         // 面の足もと（床の最初の行）
       if(!seenAt(G.f,G.L,wx,ey+2)||Math.hypot(wx-lampX,ey-lampY)>blindR+H){ tops.push(null); continue; }
       /* 明るさの強さ：足もとの床の明るさ（左右9ドットの平均：石筍の細い影で面が縦に切れないように）と、
@@ -2118,10 +2135,13 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
       let top=null;
       const lx0=(lampX-wx)/4, lz0=(lampY-gy)/2, l2=lx0*lx0+lz0*lz0;          // 光の向きの横・奥は列で同じ。高さだけ画素ごと
       const wetFoot=inWater(wx,gy+1);                                        // 水の層：足もとが水
-      for(let v=0;v<H;v++){ const i=v*W+col, mt=D.m[i]; if(!mt) continue;
-        const Y=gy+(v-AY); if(Y<1) continue;
+      const Hs=Math.round(AY*sc);                                            // 面（足もとより上）の行数
+      for(let o=-Hs;o<H-AY;o++){                                             // o<0：面（縮めて取る）、o>=0：足もとの岩屑（そのまま）
+        const v=o<0?AY-Math.max(1,Math.round(-o/sc)):AY+o; if(v<0) continue;
+        const i=v*W+col, mt=D.m[i]; if(!mt) continue;
+        const Y=gy+o; if(Y<1) continue;
         if(Y<gy&&!rock(wx,Y)) continue;                                    // 岩の外（向こうの部屋の床）には描かない
-        const ly0=(CAVE_LAMP_H-D.hp[i])/3.46, inv=1/(Math.sqrt(l2+ly0*ly0)||1);
+        const ly0=(CAVE_LAMP_H-D.hp[i]*(o<0?sc:1))/3.46, inv=1/(Math.sqrt(l2+ly0*ly0)||1);
         const n=NRM[D.ni[i]], dot=Math.max(0,(n[0]*lx0+n[1]*ly0+n[2]*lz0)*inv);
         const I=Lr*(WALL_AMB+WALL_KD*dot+WALL_TOP*Math.max(0,n[1]))*D.a[i];   // ランタンに向いた面がはっきり明るい。庇の上は岩の天辺ほど明るくしない
         if(Y>=gy&&wetFoot) continue;                                         // 水の中には岩屑を出さない
@@ -2150,7 +2170,7 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
       if(q.top-1>=1&&rock(q.wx,q.top-1)) dpf(q.wx,q.top-1,rimC(q.L,q.wx,q.top-1,q.fc));
       const prev=tops[j-1], nxt=tops[j+1];                                   // 隣と天辺の高さが違えば、段差を縦の線で繋ぐ
       for(const nb of [prev,nxt]) if(nb&&nb.top<q.top-1) for(let y=nb.top;y<q.top-1;y++) dpf(q.wx,y,rimC(q.L,q.wx,y,q.fc));
-      const isEnd=(j===0||!prev)||(j===tops.length-1||!nxt);
+      const isEnd=(j===0&&leftWall)||(j===tops.length-1&&rightWall);             // 側壁に当たる本当の端だけ
       if(isEnd) for(let y=q.top;y<q.gy;y++) dpf(q.wx,y,rimC(q.L,q.wx,y));
     }
     if(wet&&CAVE.wallDrips!==false) wallDrips(tops,t);
