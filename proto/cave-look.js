@@ -806,7 +806,8 @@ const DECO_PAL={
 /* → 2026-10-01：色は拠点（街の広場の石畳・柱）と同じ砂色の石に、オリーブ色の苔（ユーザー要望）。
    拠点の絵から取った値：明 #c3ad98／中 #9f906e／暗 #5a534f、照り #d6bca6。 */
 const DECO_PAL_WET=Object.assign({}, DECO_PAL, {stone:dcR(['#5a534f','#9f906e','#c3ad98']), stoneDk:C('#2e2a28'), stoneHi:C('#d6bca6'),
-  algae:dcR(['#3e3e18','#6e6c28','#a39a44']), mossBed:dcR(['#2e3014','#55561f','#86823a']), mossBedTip:C('#b0a650'), foam:C('#d8f4f4')});
+  algae:dcR(['#3e3e18','#6e6c28','#a39a44']), kelp:dcR(['#18241a','#34502a','#628a3e']), kelpTip:C('#9cc25a'), kelpBlad:C('#b8a248'),
+  alg:dcR(['#173a22','#2b6034','#4c9046']), algTip:C('#88d070'), mossBed:dcR(['#2e3014','#55561f','#86823a']), mossBedTip:C('#b0a650'), foam:C('#d8f4f4')});
 // 層ごとの品目：[名前, 置き場所, 出やすさ]
 const DECO_SET={
   /* 4つめは「この深さから出る」最小の階層（省略＝最初から出る）。
@@ -815,10 +816,12 @@ const DECO_SET={
   /* 水溜りは**角**に置く（床のまん中にぽつぽつ置くと不自然、という指摘）。
      低い所＝壁の付け根に水は溜まる。角の石筍より先に引くので、水溜りの角には石筍が立たない。
      壁沿いにも少しだけ。 */
-  stone:[['pool','corner',.24,6],['stalagC','corner',.35],['pool','wall',.005,6],['rock','open',.006],['vine','north',.05],['skel','floor',.006],
+  stone:[['pool','corner',.24,6],['stalagC','corner',.35],['pool','wall',.005,6],['rock','open',.006],['vine','north',.08],['skel','floor',.006],
          ['mossbed','floor',.020,6],
          ['moss','wall',.030],['reed','wall',.016],['pebble','floor',.008]],
   sump:[['weed','water',.030],['fish','water',.016],['plankton','water',.010],['shrimp','floor',.012],['shell','wall',.014],
+        /* 2026-10-05 ユーザー要望「床に海藻や藻のようなものを配置したい」：床に海藻の株（立ち物）と、平たい藻の広がり */
+        ['kelp','floor',.012],['algae','floor',.036],
         /* 第16〜20階層（層の6階目から）：遺跡の名残。立った柱は当たり判定を持つ（genDeco の末尾）。 */
         /* → 2026-10-01：壁際の柱・崩れ壁・倒れた石柱・部屋の残骸は、マスごとの抽選ではなく genRuinDressing が
            迷宮の部屋の形に沿って置く（通り道・入口・穴を塞がない、不自然な所に置かない）。ここに残すのは床の小物だけ。 */
@@ -1115,6 +1118,7 @@ function standBox(o){                 // 錨点からの絵の外枠 [左, 上, 
   switch(o.k){
     case 'reed': return [-10,-23,9,1];
     case 'weed': return [-6,-17,7,1];
+    case 'kelp': return [-7,-22,7,1];
     case 'crystal': return [-3,-7,3,1];
     case 'shroom': return [-5,-8,9,1];
     case 'pillar': return G&&G.Z.id==='sump'?[-5,-18,5,1]:[-7,-30,6,2];
@@ -2074,6 +2078,7 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
   const sp=wet&&typeof WALL_SPR_WET!=='undefined'?WALL_SPR_WET:WALL_SPR, D=caveDecode(sp), ROCK=wet?WALL_ROCK_WET:P_.lime, MOSS=wet?WALL_MOSS_WET:WALL_MOSS;
   const hz=wet?wallWaterG():null, inWater=(x,y)=>hz?hazAt(hz,x,y)>.5:false;
   const W=sp.w, H=sp.h, AY=sp.ay, code=G.code, PW=G.PW, PH=G.PH, Pp=G.P;
+  const WT=G._wtops||(G._wtops=new Map()); WT.clear();                       // このフレームの壁の列：wx→{top,gy,L}（蔦を天井から垂らすのに使う）
   const TAPER=WALL_TAPER, x0=Math.max(4,bx0-TAPER-6), x1=Math.min(PW-4,bx0+bw+TAPER+6), y0=Math.max(16,by0), y1=Math.min(PH-4,by0+bh+H);   // 横は端の細りが画面の外から始まっても分かるように広めに見る
   const rock=(x,y)=>code[y*PW+x]!==0;
   ensure(bx0-8, Math.max(0,by0-H-20), bx0+bw+8, by0+bh+8);                 // 画面の上の外にある岩も、面の厚みを見るのに要る
@@ -2132,7 +2137,7 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
       const Lf=(pxLight(wx-4,ey+2)+pxLight(wx,ey+2)+pxLight(wx+4,ey+2))/3;
       const dd=Math.hypot(wx-lampX,ey-lampY), fall=dd<Rpx?Math.pow(1-dd/Rpx,1.1):0;
       const Lr=Math.min(1.1,Math.max(.10,Math.max(Lf,fall*.6)*1.15));
-      let top=null;
+      let top=null, bot=gy-1;
       const lx0=(lampX-wx)/4, lz0=(lampY-gy)/2, l2=lx0*lx0+lz0*lz0;          // 光の向きの横・奥は列で同じ。高さだけ画素ごと
       const wetFoot=inWater(wx,gy+1);                                        // 水の層：足もとが水
       const Hs=Math.round(AY*sc);                                            // 面（足もとより上）の行数
@@ -2151,9 +2156,11 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
         occGY=gy;
         if(mt===2){ const km=Math.min(3,k); dpf(wx,Y,MOSS[km<0?0:km]); }     // 苔：同じ明るさの段を苔の4段に（いちばん明るい段は苔の3段目止まり）
         else dpf(wx,Y,ROCK[k<0?0:k>4?4:k]);
-        if(top===null) top=Y;
+        if(top===null) top=Y; bot=Y;
       }
       tops.push(top===null?null:{wx,gy,top,L:Lr});
+      if(top!==null) WT.set(wx,{top,gy,L:Lr});
+      if(!wet&&top!==null&&CAVE.wallFoot!==false) wallFoot(wx,gy,bot,Lr,t,P_);
     }
     /* 3) 天井と壁の境に、今までの岩の縁と同じ線を通す（面の天辺の外側1ドット）。
           run の両端は、面の横の縁を縦の線で床まで下ろし、側壁の縁の線へ繋ぐ */
@@ -2183,6 +2190,54 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
    - 床の雨漏り（drawDrips）と同じ色。灯りの弱い所は暗い色。前後は着く所の y（キャラの奥）。
    - 波紋は立てない（滴のたびに水面が動き続けて見えた、という床の滴りの時の報告に合わせる）。
    CAVE.wallDrips=false で止まる（見比べ用）。 */
+/* 石の層：壁の足もとの苔と草（2026-10-05 ユーザー要望「壁の足元に苔や草が生えたりしているようにしたい」）
+   - 生える所は塊になる（世界の x で引いたノイズが .40 より上の所。6〜7割）。塊の中は：
+       苔：面のいちばん下から上へ 1〜5 ドット這い上がり、床にも1ドット。縁は網目で間引く。
+       草：3列に1本くらいの房（2本）、床から2〜7ドット。先だけゆっくり揺れる。
+   - 色は緑寄りの苔と草（黄色い苔の色だと縁の線のように帯に見えた）。明るさは面と同じ足もとの明るさ。前後は足もと（キャラより奥）。
+   CAVE.wallFoot=false で消える（見比べ用）。 */
+const FOOT_GRASS=dcR(['#24341a','#4c6e2c','#8cb450']), FOOT_MOSS=dcR(['#1c2814','#3a5222','#64803a']);
+function wallFoot(wx,gy,bot,L,t,P_){
+  const pn=NZB[(((gy>>3)*7+40)&255)<<8|((wx*3+17)&255)];
+  if(pn<.40) return;
+  const a=Math.min(1,(pn-.40)*4.5), h=ihash(wx,gy*3+5), n2=NZB[((gy*5+90)&255)<<8|((wx*7+3)&255)];
+  occGY=gy+2;
+  /* 苔：面のいちばん下（列の最後に描いたドット bot）から上へ 1〜5 ドット這い上がり、床にも1ドットはみ出す。縁は網目で間引く */
+  const up=Math.round(1+a*2.5+(n2-.5)*4);
+  for(let k=-1;k<up;k++){ const Y=bot-k;
+    const edge=k===up-1||k<0; if(edge&&BAYER[((Y&3)<<2)|(wx&3)]>a*.9) continue;
+    dpf(wx,Y,sh3(FOOT_MOSS,L*(.95-k*.06),wx,Y)); }
+  /* 草：3列に1本くらい、床から2〜7ドット。房にして2本目を隣に。先だけゆっくり揺れる */
+  if(h%3===0&&a>.25){ const hgt=2+(h>>>8)%6, sw=Math.sin(t*1.2+wx*.7)*.7, lean=((h>>>12)&1)?1:-1;
+    for(const [ox,hh] of [[0,hgt],[lean,Math.max(2,hgt-2)]]){
+      for(let j=0;j<hh;j++){ const q=j/hh, X=wx+ox+(j>=hh-2?Math.round(sw*q+lean*q):0), Y=bot+1-j;
+        dpf(X,Y,sh3(FOOT_GRASS,L*(.85+q*.55),X,Y)); } } }
+  occGY=null;
+}
+/* 石の層：蔦は天井（北の壁の天辺の縁）から垂れる（2026-10-05 ユーザー要望「石の層の長い蔦は天井から垂れるようにして」）。
+   蔦の置き場所（北の壁の下のマス）の近く±3列に壁の列があれば、その列の天辺の縁の下から、面の前を垂らす。
+   1〜3本。1本目は面の高さの 0.8〜1.25 倍（床まで届いた先は少し溜まる）、横の2本は短め。先ほど大きく揺れ、ところどころ葉が付く。
+   壁の無い所（岩が薄い・灯りの外）では、前の通り縁から床へ短く垂らす。 */
+function vineFromCeiling(d,t,L,P_){
+  const WT=G._wtops; if(!WT||!WT.size) return false;
+  const x=Math.round(d.x); let c=null, cx=x;
+  for(const dx of [0,-1,1,-2,2,-3,3]){ const q=WT.get(x+dx); if(q&&Math.abs(q.gy-d.y)<10){ c=q; cx=x+dx; break; } }
+  if(!c) return false;
+  const s=d.s, Lv=Math.max(L,c.L);
+  occGY=c.gy;
+  /* 1〜3本を少しずつずらして垂らす（1本目がいちばん長い） */
+  const n=1+(s%3===0?2:s%2);
+  for(let k=0;k<n;k++){ const sx=cx+(k===0?0:k===1?2:-2), q0=WT.get(sx)||c, Hf=q0.gy-q0.top;
+    const len=Math.max(6,Math.round(Hf*((k===0?.8:.45)+((s>>>(k*5))%45)/100))), sw=Math.sin(t*.8+s+k*1.7)*1.4, y0=q0.top-1, ss=s+k*97;
+    for(let j=0;j<len;j++){ const q=j/len, Y=y0+j, X=sx+Math.sin(j*.7+ss)*.8+sw*q*q;
+      if(Y>q0.gy+1) break;
+      dpf(X,Y,sh3(P_.vine,Lv*(1.25-q*.45),X|0,Y));
+      if(j%3===1) dpf(X+((j>>1)&1?1:-1),Y,P_.vine[(j+ss)%4===1?2:1]);         // 葉
+      if(j%5===3&&(ss>>>j)%2) dpf(X+((j>>2)&1?-1:1),Y+1,P_.vine[1]); }
+    if(len>=Hf){ const Xe=sx+sw; dpf(Xe-1,q0.gy+1,P_.vine[1]); dpf(Xe+1,q0.gy+1,P_.vine[0]); } }   // 床に届いた先は少し溜まる
+  occGY=null;
+  return true;
+}
 const WD_FORM=.55, WD_SPL=.28;
 function wallDrips(tops,t){
   const drop=C('#cfeaff'), trail=C('#6f9cc0'), spl=C('#9cc8e8'), dimD=C('#6a92ae'), dimT=C('#34566e');
@@ -2208,7 +2263,7 @@ function drawDeco(bx0,by0,t,blindR){
   drawPools(bx0,by0,t,blindR);
   drawDrips(bx0,by0,t,blindR);
   drawNorthWalls(bx0,by0,t,blindR,P_);
-  for(const d of G.deco){
+  if(CAVE.deco!==false) for(const d of G.deco){                    // CAVE.deco=false：床の置き物を描かない（測定用）
     const mg=d.ext||0;                                  // 大きな水溜りは端で切らない
     if(d.x<bx0-24-mg||d.y<by0-8-mg||d.x>bx0+bw+24+mg||d.y>by0+bh+30+mg) continue;
     if(d.ok===0){ // 岩に埋まっていたら床の側へずらす。ずらしきれなければ出さない
@@ -2249,6 +2304,23 @@ function drawDeco(bx0,by0,t,blindR){
        面の上を光の筋がゆっくり横切る。波は立てない——流れていない水なので。 */
     case 'pool': break;                                        // drawPools がまとめて描く
     case 'crystal': for(let i=0;i<3;i++){const h=hs(s,i), bx=x-2+i*2, H=3+h%4; for(let j=0;j<H;j++) dp(bx,y-j,P_.crys[j===H-1?2:(Math.sin(t*2+i+s)>.5?1:0)+((j+i)%2&&L>.3?1:0)]);} break;
+    /* 海藻の株（水の層の床）：3〜5本の葉が根元から立ち、波打ちながらゆっくり揺れる。ところどころ気泡の袋（黄土の点） */
+    case 'kelp': { const n=3+s%3;
+      for(let i=0;i<n;i++){ const h=hs(s,i+3), bx=x-(n-1)*1.5+i*3+((h>>>3)&1), Hh=11+h%11, ph=(h%628)/100;
+        for(let j=0;j<Hh;j++){ const q=j/Hh, px=bx+Math.sin(t*.9+j*.35+ph)*1.6*q+Math.sin(j*.5+ph)*.7, py=y-j;
+          const c=j>=Hh-2?P_.kelpTip:sh3(P_.kelp,L*(.75+q*.6),px|0,py);
+          dp(px,py,c); if(j>2&&j<Hh-2&&(j+i)%4===0) dp(px+((i+j)&1?1:-1),py,sh3(P_.kelp,L*(.6+q*.5),(px|0)+1,py));
+          if(j>3&&(h>>>j)%9===0) dp(px,py,P_.kelpBlad); } }
+      break; }
+    /* 藻の広がり（水の層の床）：平たいまだらの塊。濃淡の筋を混ぜて、ところどころ明るい粒 */
+    case 'algae': { const rx=6+s%5, ry=2+(s>>>3)%2;
+      for(let dy=-ry;dy<=ry;dy++)for(let dx=-rx;dx<=rx;dx++){
+        const nx=dx/rx, ny=dy/ry, dd=nx*nx+ny*ny; if(dd>1) continue;
+        const hh=hs(s,(dx+20)*40+(dy+20)); if(dd>.35&&hh%5<2) continue;
+        const px=x+dx+((dy&1)?((s>>>5)&1):0), py=y+dy, st=Math.sin((dx+s%7)*.9+dy*2.1);
+        dp(px,py,sh3(P_.alg, L*(1-dd*.3)*(st>.4?1.15:.85)*(.8+(hh>>>4)%3*.12), px,py)); }
+      for(let i=0;i<3;i++){ const h=hs(s,i+90); if(Math.sin(t*1.1+i*2.3+s)>.3) dp(x+(h%(rx*2))-rx,y+((h>>>5)%(ry*2+1))-ry,P_.algTip); }
+      break; }
     case 'weed': { for(let i=0;i<4;i++){const h=hs(s,i), bx=x-4+i*3, H=8+h%8; for(let j=0;j<H;j++){const px=bx+Math.sin(t*2+j*.6+i)*1.2*(j/H); dp(px,y-j,sh3(P_.weed,L+.1,px|0,y-j));}} break; }
     case 'fish': { const R=10+s%10, sp=.5+(s%5)*.12, a=t*sp+(s%628)/100, fx=x+Math.cos(a)*R, fy=y+Math.sin(a*2)*R*.35;
       if(hazAt(W.haz.g,fx|0,fy|0)<=.55) break;
@@ -2397,7 +2469,8 @@ function drawDeco(bx0,by0,t,blindR){
         for(let i=0;i<3;i++){ const h=hs(d.s,i+c.x*3); dpf(cx+(h%(hw*2+6))-hw-3,cy+1+((h>>>4)%2),sh5(P_.lime,Lc*.7,cx,cy)); }
         for(let i=0;i<3;i++){ const h=hs(d.s,i+c.x); if(h%2) dpf(cx-hw+1+(h%(hw*2)),cy-((h>>>4)%3),P_.moss[1+(h>>>6)%2]); } }
       break; }
-    case 'vine': { const len=10+s%14, sw=Math.sin(t*.8+s)*1.2;
+    case 'vine': { if(vineFromCeiling(d,t,L,P_)) break;
+      const len=10+s%14, sw=Math.sin(t*.8+s)*1.2;
       for(let j=0;j<len;j++){ const q=j/len, px=x+Math.sin(j*.9+s)*.8+sw*q*q, py=y+j; dpf(px,py,sh3(P_.vine,L*(1.2-q*.4),px|0,py|0)); if(j%3===1) dpf(px+((j>>1)&1?1:-1),py,P_.vine[2]); }
       break; }
     case 'rubble': for(let i=0;i<5;i++){const h=hs(s,i),px=x+(h%13)-6,py=y+((h>>>4)%7)-3,w=1+h%3; drect(px,py-1,px+w,py,P_.stone,L,true);} break;
@@ -2468,7 +2541,7 @@ function batStep(dt){
    空中に少しだけ浮かぶ、虹色の縁の泡（ユーザー要望「新しい層に到着した感じを出したい」）。
    床のおよそ70マスに1つ。生まれた所からゆっくり昇りながら左右に揺れ、8〜14秒で弾けて、また同じあたりに生まれる。
    主人公が触れても弾ける。地形のバッファではなく、粒と同じく**キャラの上**に描く（宙に浮いて見えるように）。 */
-const SOAP_IRI=['#a8e4ff','#e8b8ff','#fff0a8','#b8ffd8'], SOAP_RIM={};
+const SOAP_IRI=['#a8e4ff','#e8b8ff','#fff0a8','#b8ffd8'], SOAP_RIM={}, SOAP_DOT=[[0,-1,4.71],[1,0,0],[0,1,1.57],[-1,0,3.14]];   // 半径1は十字の4点（四角い輪だと泡に見えない）
 function soapRim(r){ if(SOAP_RIM[r]) return SOAP_RIM[r]; const pts=[], seen=new Set();
   for(let i=0;i<64;i++){ const a=i/64*6.2831853, x=Math.round(Math.cos(a)*r), y=Math.round(Math.sin(a)*r), k=x+','+y; if(seen.has(k)) continue; seen.add(k); pts.push([x,y,a]); }
   return SOAP_RIM[r]=pts; }
@@ -2479,9 +2552,18 @@ function genSoap(f){
     if(h%1000>=14) continue;
     out.push({hx:tx*Q+8, hy:ty*Q+8, s:h, r:[2,3,3,4][(h>>>4)&3], life:8+((h>>>8)%600)/100, age:((h>>>12)%1000)/1000*8, ox:0, oy:0});
     if(out.length>=60) break; }
+  /* 小さい泡（2026-10-05 ユーザー要望「小さいものもふよふよさせたい」）：半径1〜2ドット、床のおよそ12マスに1つ。
+     大きい泡よりゆっくり昇り、左右と上下に2つの揺れを重ねて、ふよふよ漂う */
+  let ns=0;
+  for(let ty=1;ty<f.H-1&&ns<240;ty++)for(let tx=1;tx<f.W-1;tx++){
+    if(f.g[ty][tx]!==T.FLOOR) continue; const h=hs(tx*31337+ty*7919+depth*11,917);
+    if(h%1000>=85) continue;
+    out.push({hx:tx*Q+2+(h>>>20)%12, hy:ty*Q+2+(h>>>24)%12, s:h, r:1+((h>>>4)&1), small:true, life:6+((h>>>8)%500)/100, age:((h>>>12)%1000)/1000*6, ox:0, oy:0});
+    if(++ns>=240) break; }
   return out;
 }
 function soapStep(dt){
+  if(CAVE.soap===false) return;                                             // 測定用（画面の1点の色を読むテストで、泡が横切って値が揺れないように）
   if(!G.soap) G.soap=genSoap(G.f);
   const ps=TS/Q, t=(performance.now()-T0)/1000, camX=P.x*TS-innerWidth/2, camY=P.y*TS-innerHeight/2;
   const px=P.x*Q, py=P.y*Q-8, hw=innerWidth/ps/2+16, hh=innerHeight/ps/2+16, q=Math.ceil(ps);
@@ -2490,7 +2572,8 @@ function soapStep(dt){
     b.age+=dt;
     if(b.age>b.life+.3){ b.age=0; const h=hs(b.s,(t*10)|0); b.ox=(h%17)-8; b.oy=((h>>>5)%11)-5; }
     const u=Math.min(b.age,b.life), k=u/b.life;
-    const x=b.hx+b.ox+Math.sin(u*1.1+b.s%7)*5, y=b.hy+b.oy-6-22*k;
+    const x=b.small? b.hx+b.ox+Math.sin(u*1.7+b.s%7)*3+Math.sin(u*.55+b.s%5)*4 : b.hx+b.ox+Math.sin(u*1.1+b.s%7)*5;
+    const y=b.small? b.hy+b.oy-4-12*k+Math.sin(u*2.4+b.s%11)*1.6 : b.hy+b.oy-6-22*k;
     if(Math.abs(x-px)>hw||Math.abs(y-py)>hh) continue;
     if(b.age<b.life && Math.hypot(x-px,y-py)<b.r+5) b.age=b.life;          // 触れると弾ける
     if(!tileSeen(x/Q,(y+6)/Q)) continue;
@@ -2500,12 +2583,12 @@ function soapStep(dt){
       const e=(b.age-b.life)/.3; ctx.globalAlpha=(1-e)*(.4+.5*lit); ctx.fillStyle=SOAP_IRI[0];
       for(const [ax,ay] of [[-1,-1],[1,-1],[-1,1],[1,1]]) ctx.fillRect(sx+Math.round(ax*(b.r+1+e*3)*ps),sy+Math.round(ay*(b.r+1+e*3)*ps),q,q);
       continue; }
-    const fade=Math.min(1,b.age/.6)*(k>.92?1-(k-.92)/.08*.5:1), A=(.22+.5*lit)*fade;
-    for(const [rx,ry,a] of soapRim(b.r)){
+    const fade=Math.min(1,b.age/.6)*(k>.92?1-(k-.92)/.08*.5:1), A=((b.small?.4:.22)+.5*lit)*fade;   // 小さい泡は暗がりでも少し見える
+    for(const [rx,ry,a] of (b.r===1?SOAP_DOT:soapRim(b.r))){
       ctx.globalAlpha=A*(ry<0?1:.7); ctx.fillStyle=SOAP_IRI[((a/6.2831853+t*.12+(b.s%100)/100)*4|0)&3];
       ctx.fillRect(sx+rx*ps|0, sy+ry*ps|0, q, q); }
-    ctx.globalAlpha=Math.min(1,A*1.8); ctx.fillStyle='#ffffff';
-    ctx.fillRect(sx+Math.round(-b.r*.5)*ps|0, sy+Math.round(-b.r*.5)*ps|0, q, q);   // 照り
+    if(b.r>1){ ctx.globalAlpha=Math.min(1,A*1.8); ctx.fillStyle='#ffffff';
+      ctx.fillRect(sx+Math.round(-b.r*.5)*ps|0, sy+Math.round(-b.r*.5)*ps|0, q, q); }   // 照り（いちばん小さい泡には付けない）
   }
   ctx.restore();
 }
@@ -2570,14 +2653,15 @@ const SPR={N:0,cv:document.createElement('canvas'),id:null,u32:null};
 SPR.cx=SPR.cv.getContext('2d');
 const PT={k:1,ox:0,oy:0,N:0,lx:.6,ly:-.5,lz:.6,lit:1,glows:[]};
 function sBegin(N,k,lx,ly,lit){
+  PT.alpha=1; PT.outA=1;
   if(SPR.N!==N){SPR.N=N;SPR.cv.width=SPR.cv.height=N;SPR.id=SPR.cx.createImageData(N,N);SPR.u32=new Uint32Array(SPR.id.data.buffer);}
   else SPR.u32.fill(0);
   PT.N=N;PT.k=k;PT.ox=N/2;PT.oy=N-Math.max(3,Math.round(3*k));const l=Math.hypot(lx,ly)||1;PT.lx=lx/l;PT.ly=ly/l;PT.lit=lit;PT.glows.length=0;
 }
-function put(X,Y,c){ if(X>=0&&Y>=0&&X<PT.N&&Y<PT.N) SPR.u32[Y*PT.N+X]=c; }
+function put(X,Y,c){ if(X>=0&&Y>=0&&X<PT.N&&Y<PT.N) SPR.u32[Y*PT.N+X]=PT.alpha<1?(((c&0xffffff)|((PT.alpha*255|0)<<24))>>>0):c; }   // PT.alpha：半透明の体（シルトジェリー）
 const sx_=x=>Math.round(PT.ox+x*PT.k), sy_=y=>Math.round(PT.oy+y*PT.k);
 function dot(x,y,c){ const s=Math.max(1,Math.round(PT.k)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c); }
-function glow(x,y,c,sz=1){ PT.glows.push([x,y,c,sz]); }
+function glow(x,y,c,sz=1,a=1){ PT.glows.push([x,y,c,sz,a]); }
 function shadeIdx(I,X,Y){ return Math.max(0,Math.min(2,Math.floor(I*3+(BAYER[((Y&3)<<2)|(X&3)]-.5)*.7))); }
 function ell(cx,cy,rx,ry,ramp,emis){
   const k=PT.k, X0=Math.floor(PT.ox+(cx-rx)*k), X1=Math.ceil(PT.ox+(cx+rx)*k), Y0=Math.floor(PT.oy+(cy-ry)*k), Y1=Math.ceil(PT.oy+(cy+ry)*k);
@@ -2603,11 +2687,12 @@ function tri(ax,ay,bx,by,cx,cy,ramp){ const k=PT.k; const A=[PT.ox+ax*k,PT.oy+ay
 function sEnd(p,flash){
   const N=PT.N,u=SPR.u32;
   if(flash){ const wc=0xffffffff; for(let i=0;i<u.length;i++) if(u[i]) u[i]=wc; }
-  else if(!p.soft){ const o=p.o, src=u.slice();
+  else if(!p.soft){ const o=PT.outA<1?(((p.o&0xffffff)|((PT.outA*255|0)<<24))>>>0):p.o, src=u.slice();
     for(let Y=0;Y<N;Y++)for(let X=0;X<N;X++){const i=Y*N+X; if(src[i]) continue;
       if((X>0&&src[i-1])||(X<N-1&&src[i+1])||(Y>0&&src[i-N])||(Y<N-1&&src[i+N])) u[i]=o;} }
   else { for(let i=0;i<u.length;i++){ if(u[i]&&((i*7+(i/N|0))%5===0)&&!( (u[i-1]&&u[i+1]&&u[i-N]&&u[i+N]) )) u[i]=0; } }  // 輪郭が滲む
-  for(const [x,y,c,sz] of PT.glows){ const s=Math.max(1,Math.round(PT.k*sz)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c); }
+  for(const [x,y,c,sz,a] of PT.glows){ PT.alpha=a==null?1:a; const s=Math.max(1,Math.round(PT.k*sz)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c); }
+  PT.alpha=1;
   SPR.cx.putImageData(SPR.id,0,0);
 }
 
@@ -2728,10 +2813,14 @@ function serpent(p,t,opt={}){
   if(opt.split){ const o=.6+Math.sin(t*5)*.5; line(hx+2.5,hy-.5,hx+4.4,hy-1.4-o,p.B[2]); line(hx+2.5,hy+.5,hx+4.4,hy+1.4+o,p.B[2]); }
   glow(hx+2.2,hy-.8,p.e);
 }
+/* シルトジェリー：体は半分以上透ける（2026-10-05 ユーザー要望「シルトジェリーはもっと透けさせたい」）。
+   傘は 42%、輪郭は 65%、触手は根元 70%→先 40%。照り（白い点）だけは不透明で、水の中の物と読める */
+const JELLY_A=.42, JELLY_OUT=.65;
 function jelly(p,t){
   const b=Math.sin(t*2.6)*1.2, y=-9+b;
-  ell(0,y,3.8,2.9,p.G,true); hole(0,y+2.2,4.2,1.1,0);
-  for(let i=-1.5;i<=1.5;i+=1){const bx=i*2; for(let j=1;j<=8;j++) glow(bx+Math.sin(t*3+j*.6+i*2)*j/8*1.8,y+1.2+j*.9,j<4?p.G[1]:((j+((t*6)|0))%2?p.G[1]:p.G[0]));}
+  PT.alpha=JELLY_A; PT.outA=JELLY_OUT;
+  ell(0,y,3.8,2.9,p.G,true); PT.alpha=1; hole(0,y+2.2,4.2,1.1,0);
+  for(let i=-1.5;i<=1.5;i+=1){const bx=i*2; for(let j=1;j<=8;j++) glow(bx+Math.sin(t*3+j*.6+i*2)*j/8*1.8,y+1.2+j*.9,j<4?p.G[1]:((j+((t*6)|0))%2?p.G[1]:p.G[0]),1,.7-j*.04);}
   glow(-1.2,y-1,p.w);
 }
 function grub(p,t,e){

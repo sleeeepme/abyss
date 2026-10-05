@@ -71,14 +71,14 @@ R.drips = await pg.evaluate(()=>{
 R.soap = await pg.evaluate(()=>{
   TH.run(13,{seed:48}); setScreen('game'); W.seen.forEach(r=>r.fill(1)); W.enemies=[];
   for(let i=0;i<3;i++) draw();
-  const G=CAVE._G(), n=(G.soap||[]).length;
+  const G=CAVE._G(), n=(G.soap||[]).filter(b=>!b.small).length, small=(G.soap||[]).filter(b=>b.small).length;   // 小さい泡（2026-10-05）は別に数える
   // 触れると弾ける
-  const s=G.soap[0]; s.age=1; s.ox=0; s.oy=0;
+  const s=G.soap.find(b=>!b.small); s.age=1; s.ox=0; s.oy=0;
   const x=s.hx+Math.sin(1.1+s.s%7)*5, y=s.hy-6-22*(1/s.life);
   P.x=x/16; P.y=(y+8)/16; draw();
   const popped = s.age>=s.life;
   TH.run(5,{seed:48}); setScreen('game'); draw(); const none=!CAVE._G().soap;
-  return {n, popped, none, ok: n>=5 && n<=60 && popped && none};
+  return {n, small, popped, none, ok: n>=5 && n<=60 && small>=20 && small<=240 && popped && none};
 });
 /* 遺跡の置き方（16〜20階）：部品は部屋の中だけ・入口から2マス・穴から3マス離れ、置いても入口から穴まで歩けて、
    全部の部屋に入れること。当たり判定を持ち、12・14階には出ないこと */

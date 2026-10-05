@@ -227,6 +227,7 @@ R.danger = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(12); S.hero.party=[];
   setScreen('game');
   W.seen.forEach(r=>r.fill(1));
+  if(window.CAVE){ CAVE.soap=false; CAVE.deco=false; }   // 水の層のシャボン玉・揺れる海藻や藻（2026-10-05）が外周の1点を横切ると、色の読みが揺れる
   const max=stats(S.hero).maxHp;
 
   /* 実際に描かれた色を読む。関数の戻り値ではなく画面に出た結果を見たいので、
@@ -277,6 +278,7 @@ R.danger = await pg.evaluate(()=>{
               && warnYellow && critRedder && visible
               && (crit.mid[0]-crit.mid[2])<=6};
 });
+await pg.evaluate(()=>{ if(window.CAVE){ delete CAVE.soap; delete CAVE.deco; } });
 
 /* ================= レベルアップの見せ方 =================
    ログの1行だけだった。ログは他の行にすぐ押し流されるので、
