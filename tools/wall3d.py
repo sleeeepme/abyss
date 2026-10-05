@@ -12,12 +12,15 @@
 - 横に繋がるように、塊の並びは周期 P（単位）で繰り返す。描くのは真ん中の1周期ぶん。
 - 光は焼き込まない（ゲームがランタンの位置で当てる）。ここの見本の光は確かめ用。
 
-  python3 tools/wall3d.py [出力ディレクトリ]
+  python3 tools/wall3d.py [出力ディレクトリ] [--views] [--apply]
+    --views：3Dモデルを滑らかな陰影で3方向から（wall_views.png）
+    --apply：proto/cave-look.js の WALL_SPR（/*WALL_SPR_BEGIN*/〜/*WALL_SPR_END*/）を書き換える
 """
 import sys, os, math, json
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = next((a for a in sys.argv[1:] if not a.startswith('--')), '/tmp/wall3d-out')
+FLAGS = [a for a in sys.argv[1:] if a.startswith('--')]
 sys.argv = [sys.argv[0], OUTDIR]           # cave3d は読み込み時に引数を読むので揃えておく
 import cave3d
 from cave3d import Boulder, NRM, ALPHA, THETA, PX, fbm
@@ -142,6 +145,61 @@ def shade(e, lamp, pal, amb=0.12):
     return im
 
 
+def views(parts, path, W=640):
+    """3Dモデルそのものを見るための絵：ドットに落とす前の形を、滑らかな陰影で3方向から。
+    z は2倍で組んであるので、ここでは半分に戻して（本当の奥行きで）見せる。"""
+    from PIL import Image
+    ruin3d.GS = 0.08
+    sc = ruin3d.Scene('w', parts); sc.bake()
+    def cam(yaw, pitch, w, h, span_x, span_y, center):
+        cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
+        fwd = np.array([-sy * cp, -sp, -cy * cp]); right = np.array([cy, 0, -sy]); up = np.cross(right, fwd)
+        xs = (np.arange(w) + .5) / w - .5; ys = (np.arange(h) + .5) / h - .5
+        gx, gy = np.meshgrid(xs * span_x, -ys * span_y)
+        org = center + gx[..., None] * right + gy[..., None] * up - fwd * 40
+        return org, fwd
+    def march(org, fwd):
+        S = np.array([1, 1, 2.0])                         # 見る空間（z 実寸）→ 組んだ空間（z 2倍）
+        t = np.zeros(org.shape[:2]); hit = np.zeros(org.shape[:2], bool); alive = np.ones(org.shape[:2], bool)
+        for it in range(300):
+            if not alive.any(): break
+            p = (org + fwd * t[..., None]) * S
+            d = np.ones(t.shape); d[alive] = sc.sample(p[alive])
+            nh = alive & (d < 0.01); hit |= nh; alive &= ~nh & (t < 90)
+            t = np.where(alive, t + np.maximum(d * 0.5, 0.01), t)
+        p = (org + fwd * t[..., None]) * S
+        e = 0.08; n = np.zeros(p.shape)
+        q = p[hit]
+        g = np.stack([sc.sample(q + [e, 0, 0]) - sc.sample(q - [e, 0, 0]), sc.sample(q + [0, e, 0]) - sc.sample(q - [0, e, 0]), (sc.sample(q + [0, 0, e]) - sc.sample(q - [0, 0, e])) / 2], -1)
+        n[hit] = g / (np.linalg.norm(g, axis=-1, keepdims=True) + 1e-9)
+        return hit, n, p
+    L = np.array([-0.45, 0.7, 0.55]); L /= np.linalg.norm(L)
+    shots = []
+    for (yaw, pitch, label) in ((0.0, math.radians(30), 'game'), (math.radians(-38), math.radians(22), 'three-quarter'), (math.radians(-88), math.radians(8), 'side')):
+        h = int(W * 0.42)
+        org, fwd = cam(yaw, pitch, W, h, 30, 30 * 0.42, np.array([P / 2, H * 0.45, -0.5]))
+        hit, n, p = march(org, fwd)
+        I = np.clip(0.18 + 0.82 * (n @ L), 0, 1)
+        img = np.zeros(hit.shape + (3,), np.uint8); img[:] = (24, 28, 38)
+        col = np.array([200, 192, 178]) * I[..., None]
+        img[hit] = col[hit].astype(np.uint8)
+        shots.append(Image.fromarray(img))
+    out = Image.new('RGB', (W, sum(s.size[1] for s in shots) + 8 * len(shots)), (12, 12, 16)); y = 0
+    for s_ in shots: out.paste(s_, (0, y)); y += s_.size[1] + 8
+    out.save(path)
+
+
+def apply(e):
+    """proto/cave-look.js の WALL_SPR を書き換える"""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'proto', 'cave-look.js')
+    s = open(p, encoding='utf-8').read()
+    a, b = s.index('/*WALL_SPR_BEGIN*/'), s.index('/*WALL_SPR_END*/')
+    keep = {k: e[k] for k in ('w', 'h', 'ax', 'ay', 'm', 'n', 'a', 'hts')}
+    s = s[:a] + '/*WALL_SPR_BEGIN*/const WALL_SPR=' + json.dumps(keep, separators=(',', ':')) + ';' + s[b:]
+    open(p, 'w', encoding='utf-8').write(s)
+    print('applied WALL_SPR', e['w'], e['h'])
+
+
 def main():
     os.makedirs(OUTDIR, exist_ok=True)
     parts = scene()
@@ -169,6 +227,8 @@ def main():
     for i, s in enumerate(shots): sheet.alpha_composite(s, (0, i * (Hh + 4)))
     sheet.resize((W * 5, sheet.size[1] * 5), Image.NEAREST).save(os.path.join(OUTDIR, 'wall_a.png'))
     print('wall', e['w'], e['h'], 'ay', e['ay'])
+    if '--views' in FLAGS: views(parts, os.path.join(OUTDIR, 'wall_views.png'))
+    if '--apply' in FLAGS: apply(e)
 
 
 if __name__ == '__main__':
