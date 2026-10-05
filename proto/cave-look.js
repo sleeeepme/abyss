@@ -2088,7 +2088,11 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
       if(!run){ run=[]; runs.push(run); }
       run.push([wx,ey]); next.set(ey,run); }
     open.clear(); for(const [k,v] of next) open.set(k,v); }
-  const rimC=(L,X,Y)=>{ const lv=Math.floor(Math.min(1,L*1.25)*5.6+((CAVE.wallDither===undefined?WALL_DITHER:CAVE.wallDither)?BAYER[((Y&3)<<2)|(X&3)]:.5)); return lv>0?Pp.rim[Math.min(4,lv-1)]:Pp.edge[0]; };   // 縁の線も左右の壁の縁と同じ網
+  /* 縁の色：左右の壁の縁（地形の c=1〜4 の帯）と同じ式。fall＝縁からの距離ごとの弱まり、fc＝縁がランタンに向いている度合い */
+  const wdOn=()=>(CAVE.wallDither===undefined?WALL_DITHER:CAVE.wallDither);
+  const rimLv=(L,fall,fc,X,Y)=>Math.floor(Math.min(1,L*1.25)*(.15+.85*fc)*fall*5.6+(wdOn()?BAYER[((Y&3)<<2)|(X&3)]:.5));
+  const rimC=(L,X,Y,fc=1)=>{ const lv=rimLv(L,1,fc,X,Y); return lv>0?Pp.rim[Math.min(4,lv-1)]:Pp.edge[0]; };
+  const RIM_FALL=[.55,.3,.15];                                               // 線の上（天井の側）の3ドット：側壁の縁の c=2,3,4 と同じ
   for(const run of runs){
     if(run.length<6) continue;
     const tops=[];
@@ -2119,10 +2123,18 @@ function drawNorthWalls(bx0,by0,t,blindR,P_){
     /* 3) 天井と壁の境に、今までの岩の縁と同じ線を通す（面の天辺の外側1ドット）。
           run の両端は、面の横の縁を縦の線で床まで下ろし、側壁の縁の線へ繋ぐ */
     occGY=null;
+    /* 天井の側の網の帯（2026-10-05 ユーザー要望「北側の天井のキワも側面の網掛けと合わせて」）：
+       線の上3ドットを、側壁の縁の帯と同じく、灯りの強さ×弱まり（.55/.3/.15）＋網目で塗る。暗ければ1ドット目だけ縁の暗い色、残りは岩のまま。
+       線より先に塗る（段差の縦線が上に乗る） */
+    for(const q of tops){ if(!q) continue;
+      const dx=q.wx-lampX, dy=(q.top-1)-lampY, d=Math.hypot(dx,dy)||1; q.fc=Math.max(0,-dy/d);   // 縁の外向き＝南（床の側）
+      for(let k=0;k<3;k++){ const Y=q.top-2-k; if(Y<1||!rock(q.wx,Y)) break;
+        const lv=rimLv(q.L,RIM_FALL[k],q.fc,q.wx,Y);
+        if(lv>0) dpf(q.wx,Y,Pp.rim[Math.min(4,lv-1)]); else if(k===0) dpf(q.wx,Y,Pp.edge[1]); } }
     for(let j=0;j<tops.length;j++){ const q=tops[j]; if(!q) continue;
-      if(q.top-1>=1&&rock(q.wx,q.top-1)) dpf(q.wx,q.top-1,rimC(q.L,q.wx,q.top-1));
+      if(q.top-1>=1&&rock(q.wx,q.top-1)) dpf(q.wx,q.top-1,rimC(q.L,q.wx,q.top-1,q.fc));
       const prev=tops[j-1], nxt=tops[j+1];                                   // 隣と天辺の高さが違えば、段差を縦の線で繋ぐ
-      for(const nb of [prev,nxt]) if(nb&&nb.top<q.top-1) for(let y=nb.top;y<q.top-1;y++) dpf(q.wx,y,rimC(q.L,q.wx,y));
+      for(const nb of [prev,nxt]) if(nb&&nb.top<q.top-1) for(let y=nb.top;y<q.top-1;y++) dpf(q.wx,y,rimC(q.L,q.wx,y,q.fc));
       const isEnd=(j===0||!prev)||(j===tops.length-1||!nxt);
       if(isEnd) for(let y=q.top;y<q.gy;y++) dpf(q.wx,y,rimC(q.L,q.wx,y));
     }
