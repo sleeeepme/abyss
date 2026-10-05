@@ -354,15 +354,74 @@ def views(parts, path, W=640):
     out.save(path)
 
 
-def apply(e):
-    """proto/cave-look.js の WALL_SPR を書き換える"""
+def _vnoise(W, H, cell, seed, wrap=True):
+    """横に周期 W で繋がる値ノイズ（苔の塊の大きさを cell で決める）"""
+    rng = np.random.default_rng(seed)
+    gw, gh = max(1, W // cell), H // cell + 2
+    g = rng.random((gh, gw))
+    xs = np.arange(W) / cell; ys = np.arange(H) / cell
+    x0 = np.floor(xs).astype(int); fx = xs - x0; y0 = np.floor(ys).astype(int); fy = ys - y0
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy)
+    a = g[y0][:, x0 % gw]; b = g[y0][:, (x0 + 1) % gw]; c = g[y0 + 1][:, x0 % gw]; d = g[y0 + 1][:, (x0 + 1) % gw]
+    return (a * (1 - fx) + b * fx) * (1 - fy[:, None]) + (c * (1 - fx) + d * fx) * fy[:, None]
+
+
+def mossify(e, seed=5):
+    """水の層の版：石の層より苔を多く（2026-10-05 ユーザー要望「水の層にも同じように壁を追加しておいて。石の層より苔とかを多めに」）。
+    形（3D）は石の層と同じ。苔の印（'m'）を絵の上で足す：
+      1) 天辺の縁（上を向いた面）と面の中の棚（上向き）→ 塊のノイズで大半を苔に
+      2) 苔の縁から下へ垂れる房（1〜6ドット、列ごとに長さを変える）
+      3) 割れ目（'k'）のまわりに少し
+      4) 足もと（水の線の近く）と岩屑の上 → 藻の帯"""
+    W, H, AY = e['w'], e['h'], e['ay']
+    m = [list(r) for r in e['m']]
+    nz = _vnoise(W, H, 5, seed); nz2 = _vnoise(W, H, 3, seed + 1)
+    rng = np.random.default_rng(seed + 2)
+    def nrm(y, x): return NRM[ALPHA.index(e['n'][y][x])]
+    solid = lambda y, x: 0 <= y < H and m[y][x % W] != '.'
+    moss = np.zeros((H, W), bool)
+    tops = [next((y for y in range(H) if m[y][x] != '.'), H) for x in range(W)]
+    for x in range(W):
+        t = tops[x]
+        for y in range(H):
+            if m[y][x] == '.': continue
+            v = nrm(y, x); up = v[1]
+            if y - t < 3 and nz[y, x] > .38: moss[y, x] = True                          # 1) 天辺の縁
+            elif up > .85 and nz[y, x] > .62: moss[y, x] = True                          #    面の中の棚
+            elif m[y][x] == 'k' and nz2[y, x] > .55: moss[y, x] = True                   # 3) 割れ目
+            elif y >= AY - 2 and nz[y, x] + .25 * (y - (AY - 2)) / 4 > .66: moss[y, x] = True   # 4) 足もとの藻
+            elif y > AY and up > .5 and nz2[y, x] > .4: moss[y, x] = True                                    #    岩屑の上
+    # 2) 垂れる房：苔の下の端から、列ごとに長さを揺らして下へ
+    drip = moss.copy()
+    for x in range(W):
+        for y in range(H - 1):
+            if moss[y, x] and not moss[y + 1, x] and solid(y + 1, x):
+                L = int(rng.choice([0, 0, 0, 1, 1, 2, 3, 5]) * (0.6 + nz2[y, x]))
+                for k in range(1, L + 1):
+                    if not solid(y + k, x) or y + k >= AY: break
+                    drip[y + k, x] = True
+    for y in range(H):
+        for x in range(W):
+            if drip[y, x] and m[y][x] != '.': m[y][x] = 'm'
+    out = dict(e); out['m'] = [''.join(r) for r in m]
+    tot = sum(c != '.' for r in out['m'] for c in r); mm = sum(c == 'm' for r in out['m'] for c in r)
+    print('wet moss', mm, '/', tot, f'{mm / tot:.0%}')
+    return out
+
+
+def apply(e, name='WALL_SPR'):
+    """proto/cave-look.js の WALL_SPR（水の層の版は WALL_SPR_WET）を書き換える"""
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'proto', 'cave-look.js')
     s = open(p, encoding='utf-8').read()
-    a, b = s.index('/*WALL_SPR_BEGIN*/'), s.index('/*WALL_SPR_END*/')
     keep = {k: e[k] for k in ('w', 'h', 'ax', 'ay', 'm', 'n', 'a', 'hts')}
-    s = s[:a] + '/*WALL_SPR_BEGIN*/const WALL_SPR=' + json.dumps(keep, separators=(',', ':')) + ';' + s[b:]
+    B, E = f'/*{name}_BEGIN*/', f'/*{name}_END*/'
+    body = B + f'const {name}=' + json.dumps(keep, separators=(',', ':')) + ';' + E
+    if B in s:
+        a, b = s.index(B), s.index(E) + len(E); s = s[:a] + body + s[b:]
+    else:                                                    # 初回：WALL_SPR のすぐ後ろに足す
+        b = s.index('/*WALL_SPR_END*/') + len('/*WALL_SPR_END*/'); s = s[:b] + '\n' + body + s[b:]
     open(p, 'w', encoding='utf-8').write(s)
-    print('applied WALL_SPR', e['w'], e['h'])
+    print('applied', name, e['w'], e['h'])
 
 
 def main():
@@ -392,6 +451,23 @@ def main():
         win = sorted(tops[(x + k) % e["w"]] for k in range(-20, 21))
         lim = win[len(win) // 2] - 1
         for y in range(0, max(0, lim)): rows[y][x] = '.'
+    # 1列だけ両隣より2ドット以上高い天辺（細い棘）は、両隣の低い方の1つ上まで切る（縁の線が細い縦棒に見えた）
+    for _ in range(2):
+        tops = [next((y for y in range(e['h']) if rows[y][x] != '.'), e['h']) for x in range(e['w'])]
+        for x in range(e['w']):
+            lim = min(tops[(x - 1) % e['w']], tops[(x + 1) % e['w']]) - 1
+            for y in range(0, max(0, lim)): rows[y][x] = '.'
+    # 1列だけの深い切れ込みは、隣の列の絵で埋める（切れ込みの列に段差の縦線が通り、縁から上へ伸びる細い棒に見えた）
+    W_ = e['w']; cols = {k: [list(r) for r in e[k]] for k in ('n', 'a', 'hts')}
+    tops = [next((y for y in range(e['h']) if rows[y][x] != '.'), e['h']) for x in range(W_)]
+    for x in range(W_):
+        l, r = tops[(x - 1) % W_], tops[(x + 1) % W_]
+        if tops[x] > max(l, r) + 1:
+            src = (x - 1) % W_ if l <= r else (x + 1) % W_
+            for y in range(min(l, r), tops[x]):
+                rows[y][x] = rows[y][src]
+                for k in cols: cols[k][y][x] = cols[k][y][src]
+    for k in cols: e[k] = [''.join(r) for r in cols[k]]
     e['m'] = [''.join(r) for r in rows]
     first = next(y for y in range(e['h']) if any(c != '.' for c in e['m'][y]))
     for k in ('m', 'n', 'a', 'hts'): e[k] = e[k][first:]
@@ -405,7 +481,9 @@ def main():
     sheet.resize((W * 5, sheet.size[1] * 5), Image.NEAREST).save(os.path.join(OUTDIR, 'wall_a.png'))
     print('wall', e['w'], e['h'], 'ay', e['ay'])
     if '--views' in FLAGS: views(parts, os.path.join(OUTDIR, 'wall_views.png'))
-    if '--apply' in FLAGS: apply(e)
+    wet = mossify(e)
+    json.dump(wet, open(os.path.join(OUTDIR, 'wall_wet.json'), 'w'))
+    if '--apply' in FLAGS: apply(e); apply(wet, 'WALL_SPR_WET')
 
 
 if __name__ == '__main__':
