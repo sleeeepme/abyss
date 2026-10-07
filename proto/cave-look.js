@@ -294,6 +294,42 @@ const HZ={
   void_:{ramp:cs(['#0a0614','#160c28','#2a1848','#5a3a90']), hi:C('#e0ccff'), glow:true},
 };
 
+/* ---------- 波打ち際（水の層） ----------
+   2026-10-07 ユーザー要望（見本の動画：砂浜に寄せては返す波）「水面と地面の境界線のところの波」。
+   水の縁から陸へ、最大 SW_R（場の値で。だいたい6〜7ドット）まで、波が寄せては返す：
+   - 寄せ（周期の 32%）：速く上がって止まる。返し：ゆっくり引く。周期 SW_PER 秒。届く高さは波ごとに 0.6〜1.0。
+   - 波の先は1ドットの白い泡の線（寄せる時は濃く、返す時は網目で間引いて薄く）。
+   - 波に覆われた砂は、浅瀬の色を半分重ねて透けて見せる。
+   - 波が引いた後の砂は濡れて暗い。乾くまで 2.2 秒、網目で少しずつ消える。
+   - 波の来る時刻は場所ごとにずらす（世界の x,y と大きなノイズ）。岸に沿って、波が斜めに順に打ち寄せる。
+   地形を描いた後、置き物の前に、縁の近くの床のドットだけを塗り直す（その場で拾った SWK/SWV）。
+   CAVE.swash=false で止まる（見比べ用）。 */
+const SW_R=.40, SW_LO=.5-SW_R, SW_PER=3.4, SW_ADV=.32, SW_DRY=2.2;
+let SWK=new Int32Array(0), SWV=new Float32Array(0);
+function swashPass(n,bx0,by0,t,hz){
+  const wash=hz.shallow[3], foam=hz.hi, wetC=0xff0a0c10, PXR=SW_R*16;      // PXR：q の1単位がおよそ何ドットか
+  for(let i=0;i<n;i++){
+    const k=SWK[i], q=(.5-SWV[i])/SW_R, wx=bx0+k%bw, wy=by0+((k/bw)|0);
+    const ph=wx*.011+wy*.017+NZS[(((wy>>2)+30)&255)<<8|(((wx>>2)+60)&255)]*.6;
+    const T=t/SW_PER-ph, cyc=Math.floor(T), u=T-cyc;
+    const amp=.6+.4*(Math.sin(cyc*2.3+wx*.013)*.5+.5);
+    let s, adv=u<SW_ADV;
+    if(adv){ const e=u/SW_ADV; s=1-(1-e)*(1-e); } else { const e=(u-SW_ADV)/(1-SW_ADV); s=Math.pow(1-e,1.5); }
+    const reach=s*amp, b=BAYER[((wy&3)<<2)|(wx&3)], c=buf[k];
+    if(q<reach){                                                               // 波の下
+      const fp=(reach-q)*PXR;
+      if(fp<1.25){ if(adv||b<.55) buf[k]=mixU(c,foam,adv?.85:.6); else buf[k]=mixU(c,wash,.5); }   // 先の泡
+      else buf[k]=mixU(c,wash,fp<3?.42:.5);
+      continue; }
+    if(q>=amp) continue;                                                       // この波は届かなかった
+    // 引いた後の濡れ：この波が q から引いた時刻（返しの式の逆）からの経過
+    const eL=1-Math.pow(q/amp,1/1.5), uL=SW_ADV+eL*(1-SW_ADV);
+    const since=((u>=uL?u-uL:u+1-uL))*SW_PER;
+    const w=1-since/SW_DRY; if(w<=0) continue;
+    if(w*.95>b) buf[k]=mixU(c,wetC,.3);
+  }
+}
+
 /* ---------- 階ごとの岩の形（遅延で 32×32 ドットずつ作る） ---------- */
 let G=null;
 const OFF=[];for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const d=Math.hypot(dx,dy);if(d>0&&d<=4.3)OFF.push([dx,dy,Math.max(1,Math.round(d))]);}
@@ -603,6 +639,8 @@ function terrain(f,Z,camX,camY,blinded){
   const useLut=!flat&&R<=LUT_MAX; if(useLut) lightLut(Math.ceil(R)+1);
   const LR=lutR, LW=lutR*2+1, LD=lutD, LA=lutA;
   const haz=W.haz, hz=haz?(HZ[haz.kind]||HZ.poison):null, hg=haz?haz.g:null;
+  const swOn=!!(haz&&haz.kind==='water'&&CAVE.swash!==false); let swN=0;
+  if(swOn&&SWK.length<bw*bh){ SWK=new Int32Array(bw*bh); SWV=new Float32Array(bw*bh); }
   const fx0=Math.round(bx0*.45), fy0=Math.round(by0*.45);          // 奥の岩影は遅れて流れる
   const stx=f.stair?f.stair.x*Q:-1e9, sty=f.stair?f.stair.y*Q:-1e9;
   let k=0;
@@ -684,7 +722,7 @@ function terrain(f,Z,camX,camY,blinded){
         if(sd<HR){ buf[k]= sd>HR*.66 ? (wy>sty ? rim[Math.min(4,Math.floor(Lv*4.5+b))] : ed[0]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
         if(pitOn&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
-        if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(hv>.5){
+        if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(swOn&&hv>SW_LO&&hv<=.5){ SWK[swN]=k; SWV[swN++]=hv; } if(hv>.5){
           let lv = hz.glow ? 1+((Math.sin(t*1.6+(wx+wy)*.05)*.5+.5)*1.6+b)|0 : Math.floor(Math.max(Lv,Cv*.8)*4+b*.9);
           if(haz.kind==='water'){
             /* 深さはマスごとの段（1浅瀬/2深み/3淵）を**マスの中心どうしで混ぜた値**で塗る。
@@ -765,6 +803,7 @@ function terrain(f,Z,camX,camY,blinded){
       if(feat==='masonry'&&c<5&&(((wy%6)===0)||(((wx+(((wy/6)|0)&1)*5)%10)===0))){buf[k]=ed[2];continue;}
       buf[k]=dp[NZB[((wy&255)<<8)|(wx&255)]>.56?1:0];
     }}
+  if(swN) swashPass(swN,bx0,by0,t,hz);
   if(!G.deco){ G.deco=genDeco(f,Z); G.bats=genBats(f,Z); }
   drawDeco(bx0,by0,t,blindR);
   if(!(typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches)) ripFeed();
