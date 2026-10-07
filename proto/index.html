@@ -3158,6 +3158,7 @@ function pickSpot(fl, tries){
     if(gx<0 || gy<0 || gx>=fl.W || gy>=fl.H) continue;
     if(!tileWalk(fl,gx,gy)) continue;
     if(!clearOfStair(fl, x, y)) continue;
+    if(W.fl===fl && waterVoidAt(x,y)) continue;   // 水の層の淵（落ちる所）にも置かない
     return {x, y};
   }
   return null;
@@ -8351,6 +8352,7 @@ function enterFloor(depth){
   W.forge = arena ? null : spawnForge(fl, depth, W.ores);   // 鍛冶場は別の場所
   W.shop  = arena ? null : spawnMerchant(fl, depth, [W.forge, ...(W.ores||[])]);
   W.trial = arena ? null : spawnTrial(fl, depth, [W.forge, W.shop, W.ev, ...(W.ores||[])]);
+  clearAbyss(fl);                     // 水の層：淵に置かれた物・敵（浮いていないもの）を立てる床へ
   W.mine = null;
   W.arts = [];                        // 置き型の効果は階をまたがない
   /* 試練は階をまたげない。持ち越せると「湧いた敵から逃げて穴へ」が正解になり、
@@ -9099,7 +9101,32 @@ function fallBack(e){
   e.x=p.x; e.y=p.y;
   W.fx.push({t:'ultring', x:p.x, y:p.y, r:0, max:2.2, life:0.35, maxLife:0.35, col:'#c0e07f'});
 }
+/* ---------- 淵（水の層のいちばん深い所）に物を置かない ----------
+   2026-10-07 ユーザー要望「水の層の水の一番深いところには味方やアイテム、浮いていない敵を置かないようにして」。
+   実測（11〜20階×12本＝120階）で、淵の上に置かれていた物：
+     磯虫 436体・ほかの雑魚 約200体・宝箱 85・鉱脈 11・商人 11・鍛冶場 7・イベント 10・仲間候補 5・試練 2。
+   原因は、水（W.haz）を作るのが敵・宝箱・仲間候補・イベントを置いた**後**だったことと、
+   置く場所の確かめが tileWalk（壁と縁のタイル）だけで、水の深さを見ていなかったこと。
+   水を作った後に、ここで全部まとめて立てる床（snapToStandable）へ移す。
+   浮いている敵（クラゲ・コウモリ・蛾・亡霊・浮く刃）は淵の上にいてよい。
+   倒した敵の落とし物も淵に落ちうるので、落とし物は出た後に1度だけ確かめる（settleDropsOffAbyss）。 */
+const FLOAT_FOES = new Set(['slime/turret','flame/range','flame/turret','armor/range','frost/turret','storm/range','storm/turret']);
+function floatsOverWater(e){ return !!(e && e.fam && e.arch && FLOAT_FOES.has(e.fam.id+'/'+e.arch.id)); }
+function clearAbyss(fl){
+  if(!(W.haz && W.haz.kind==='water')) return;
+  const mv=o=>{ if(o && Number.isFinite(o.x) && waterVoidAt(o.x,o.y)){ const p=snapToStandable(fl,o.x,o.y); o.x=p.x; o.y=p.y; } };
+  (W.enemies||[]).forEach(e=>{ if(!floatsOverWater(e)) mv(e); });
+  (W.drops||[]).forEach(mv); (W.ores||[]).forEach(mv);
+  [W.npc, W.ev, W.trial, W.shop, W.forge].forEach(mv);
+  livingParty().forEach(mv);
+}
+function settleDropsOffAbyss(){
+  if(!(W.haz && W.haz.kind==='water') || !W.drops) return;
+  for(const d of W.drops){ if(d._abyssOk) continue; d._abyssOk=1;
+    if(Number.isFinite(d.x) && waterVoidAt(d.x,d.y)){ const p=snapToStandable(W.fl,d.x,d.y); d.x=p.x; d.y=p.y; } }
+}
 function tickPits(dt){
+  settleDropsOffAbyss();
   /* 穴のある階（根の層）だけでなく、**淵のある水の階**でも回す。
      ここを W.fl.pit で切っていたせいで、水の淵に立っても何も起きなかった。 */
   const anyVoid = (W.fl && W.fl.pit) || (W.haz && W.haz.kind==='water');
@@ -19473,7 +19500,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261007e"></script>
+<script src="cave-look.js?v=20261007f"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

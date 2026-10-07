@@ -1125,18 +1125,21 @@ function genRuinDressing(f,depth,existing){
   const rooms=(f.rooms||[]).filter(r=>r!==f.start&&r.w>=5&&r.h>=4);
   const used=new Set(), long=r=>(r.w>=14&&r.h<=10)||(r.h>=14&&r.w<=10);
   const big=rooms.filter(r=>r.w>=10&&r.h>=8).sort(()=>rnd()-.5);
-  const nDist=rooms.length>=16?2:1;
+  /* 19階（水の層の9階目）は遺跡を多く（2026-10-07 ユーザー要望「19階ではもっと遺跡物を増やしたい」）：
+     建物の跡を最大3つ（部屋が少なくても2つ）、街区の欠片を2つずつ、残りの部屋の欠片 22%→60%（4割は2つ目も）、列柱 40%→75% */
+  const rich=zoneFloor(depth)===9;
+  const nDist=rich?(rooms.length>=12?3:2):(rooms.length>=16?2:1);
   let made=0;
   for(const c of big){ if(made>=nDist) break; if(used.has(c)) continue;
     if(!building(c)) continue;
     made++; used.add(c);
     // 街区：中ほどが近い部屋を2〜3つ
     const near=rooms.filter(r=>r!==c&&!used.has(r)&&Math.hypot(r.cx-c.cx,r.cy-c.cy)<20).sort((a,b)=>Math.hypot(a.cx-c.cx,a.cy-c.cy)-Math.hypot(b.cx-c.cx,b.cy-c.cy)).slice(0,2+Math.floor(rnd()*2));
-    for(const r of near){ used.add(r); if(long(r)) colonnade(r); else { fragment(r,true); if(chance(.4)) fragment(r,true); } }
+    for(const r of near){ used.add(r); if(long(r)) colonnade(r); else { fragment(r,true); if(chance(rich?1:.4)) fragment(r,true); } }
   }
   for(const r of rooms){ if(used.has(r)) continue;
-    if(long(r)&&chance(.4)){ used.add(r); colonnade(r); continue; }
-    if(chance(.22)){ used.add(r); fragment(r,false); } }
+    if(long(r)&&chance(rich?.75:.4)){ used.add(r); colonnade(r); continue; }
+    if(chance(rich?.6:.22)){ used.add(r); fragment(r,false); if(rich&&chance(.4)) fragment(r,false); } }
   /* 柱は遺跡の4割まで（細い柱ばかりだと「柱が立っているだけ」に見える）。ぽつんと立つ物から抜く */
   const isCol=o=>o.k==='rbig'&&/^col_/.test(o.name);
   for(const role of ['frag','stray','row','door','colonnade']){
@@ -3343,6 +3346,7 @@ function install(){
      当たり判定・座標は変えない。落ちている最中・倒れた相手には掛けない。 */
   const wadeLine=(ent)=>{
     if(!CAVE.on||!ent||ent.dead||ent.fallAnim||!W.haz||W.haz.kind!=='water'||typeof hazTier!=='function') return 0;
+    if(typeof floatsOverWater==='function'&&floatsOverWater(ent)) return 0;   // 浮いている敵（クラゲ・コウモリ・亡霊など）は浸からない
     return hazTier(ent.x,ent.y)>=2 ? .25 : 0;               // 絵の中心から、大きさの何割下が水面か（.25＝すね）
   };
   const wadeDraw=(draw,x,y,n,frac,ent)=>{  // 水面より下は .40 で透かす
