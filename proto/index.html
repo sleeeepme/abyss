@@ -6525,9 +6525,11 @@ function genFloor(depth){
 
   function carveH(x1,x2,y){ for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++){g[y][x]=T.FLOOR;g[y+1]&&(g[y+1][x]=g[y+1][x]||T.FLOOR);} }
   function carveV(y1,y2,x){ for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++){g[y][x]=T.FLOOR;g[y][x+1]=g[y][x+1]||T.FLOOR;} }
+  /* 通路の道筋を控える（根の層の見た目が、通路を根の橋として描くのに使う。乱数は引かない） */
+  const corr=[];
   function connect(a,b){
-    if(rnd()<0.5){ carveH(a.cx,b.cx,a.cy); carveV(a.cy,b.cy,b.cx); }
-    else{ carveV(a.cy,b.cy,a.cx); carveH(a.cx,b.cx,b.cy); }
+    if(rnd()<0.5){ carveH(a.cx,b.cx,a.cy); carveV(a.cy,b.cy,b.cx); corr.push([a.cx,a.cy,b.cx,b.cy,0]); }
+    else{ carveV(a.cy,b.cy,a.cx); carveH(a.cx,b.cx,b.cy); corr.push([a.cx,a.cy,b.cx,b.cy,1]); }
   }
   // BSPツリーを葉から遡って兄弟を接続 → 全部屋連結
   (function link(n){
@@ -6554,7 +6556,7 @@ function genFloor(depth){
   g[far.cy][far.cx]=T.STAIR;
 
   const fl = {W,H,g,rooms,start,stair:{x:far.cx+0.5,y:far.cy+0.5},
-              zone:zoneAt(depth), cycle:zoneCycle(depth)};
+              zone:zoneAt(depth), cycle:zoneCycle(depth), corr};
   applyZoneTerrain(fl, depth);
   return fl;
 }
@@ -19500,7 +19502,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261007f"></script>
+<script src="cave-look.js?v=20261007g"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

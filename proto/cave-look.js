@@ -582,6 +582,429 @@ CAVE.lightAt=function(xT,yT){
 
 /* ---------- 地形を描く（draw() のマス塗りの代わり） ---------- */
 const bufC=document.createElement('canvas'), bufX=bufC.getContext('2d');
+/* ==================== 根の層：根に呑まれた遺跡 ====================
+   2026-10-07 ユーザー要望「根の層は木の根に取り込まれた遺跡。広間は遺跡の部屋、通路は木の根。
+   根の外は落ちる所で、下の階が見えている（雰囲気だけでよい）。部屋は遺跡なので壁があってよい」。
+   静止画の第3版（tools/root3d.py で3Dで育てた根）を、階に入ったときに1度だけ組み立てる：
+
+   1. 部屋の床：拠点の広場と同じ大判の石畳（8ドットの升を2〜3升の板に）・中央の菱形・苔。
+   2. 遺跡：北の石積み（高さ24・厚さ8、天辺は崩れる）・左右の低い壁（高さ10）・北の角の角柱・
+      南の縁の基礎の崖（18ドット）。どれも穴のマスの上に描くだけで、当たり判定は変えない。
+   3. 根：root3d.py の育て方をそのまま移した（管の模型で太さ・石の面をつかむ・重さで垂れる・枝分かれ）。
+      - 部屋ごとに、北の闇から石積みを越えて壁ぎわを這い、横の縁から闇へ降りる根
+      - 部屋の下から南の縁の下へ抜けて闇の底へ降りる根（部屋を支える）・縁をつかむ根
+      - 通路（2マス幅）は6本の根を螺旋に撚った橋。端は部屋の床の下へ潜り、細い根が床へほどける
+      - 橋と縁から垂れる細い気根
+      根は斜め見下ろしの光線と円筒（カプセル）の交わりで、1ドットずつ高さ・面の向き・樹皮の溝を焼く。
+   4. 穴：下の階の雰囲気（霧の中の遺跡の部屋・根・光る茸）を256ドット四方の絵にして、遅れて流す（奥行き）。
+      上の階の影が下へずれて落ちる。
+
+   毎フレームは、焼いた「面の向き・高さ・地の明るさ」に、その時のランタンを当てて段に落とすだけ。
+   CAVE.rootLayer=false で以前の見た目に戻る（見比べ用）。 */
+const RL_BARK=['#141210','#24201b','#383129','#4f463a','#695e4e','#857865','#a3967f','#c4b89f'].map(C);
+const RL_MOSS=['#1c2612','#2c3a18','#3e5220','#55692a','#6f8436','#8ea044'].map(C);
+const RL_FLR=['#0b0a09','#13110f','#1c1916','#28231f','#3a3430','#524a43','#6f6457','#8f826f','#ad9d86','#c7b49c','#dcc8b0'].map(C);
+const RL_FMOSS=['#0e120a','#161d0e','#212b14','#2f3d1a','#41521f','#566a28','#6f8436'].map(C);
+const RL_FOG=C('#173038'), RL_VOID=C('#04060a');
+const RL_WALL_H=24, RL_WALL_D=8, RL_SIDE_H=10, RL_SIDE_D=6, RL_CLIFF=18;
+function rlOn(f){ return CAVE.rootLayer!==false && f && !f.arena && f.zone && f.zone.id==='root'; }
+function rlRand(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+/* 面の向き → NRM の番号（16^3 の表で最寄りを引く） */
+let RL_NLUT=null;
+function rlNrm(x,up,s){
+  if(!RL_NLUT){ RL_NLUT=new Uint8Array(4096);
+    for(let i=0;i<16;i++)for(let j=0;j<16;j++)for(let k=0;k<16;k++){ const a=(i+.5)/8-1, b=(j+.5)/8-1, c=(k+.5)/8-1; let best=-9, bi=0;
+      for(let q=0;q<64;q++){ const n=NRM[q], d=n[0]*a+n[1]*b+n[2]*c; if(d>best){best=d;bi=q;} } RL_NLUT[(i<<8)|(j<<4)|k]=bi; } }
+  const q=v=>{ let r=((v+1)*8)|0; return r<0?0:r>15?15:r; };
+  return RL_NLUT[(q(x)<<8)|(q(up)<<4)|q(s)];
+}
+
+/* ---------- 石（遺跡）の箱：根が面をつかむための距離 ---------- */
+function rlBoxes(){ const B=[], cell=new Map(), CS=64;
+  return { B,
+    add(x0,y0,z0,x1,y1,z1){ const i=B.length; B.push([x0,y0,z0,x1,y1,z1]);
+      for(let cy=Math.floor((y0-24)/CS);cy<=Math.floor((y1+24)/CS);cy++) for(let cx=Math.floor((x0-24)/CS);cx<=Math.floor((x1+24)/CS);cx++){
+        const k=cy*4096+cx; let a=cell.get(k); if(!a){a=[];cell.set(k,a);} a.push(i);} },
+    /* 距離と外向きの法線（[d, nx, ny, nz]） */
+    sd(x,y,z,out){ const a=cell.get(Math.floor(y/CS)*4096+Math.floor(x/CS)); let best=1e3, bn0=0, bn1=0, bn2=1;
+      if(a) for(const i of a){ const b=B[i];
+        const dx0=b[0]-x, dx1=x-b[3], dy0=b[1]-y, dy1=y-b[4], dz0=b[2]-z, dz1=z-b[5];
+        const ox=Math.max(dx0,dx1,0), oy=Math.max(dy0,dy1,0), oz=Math.max(dz0,dz1,0);
+        let d, n0, n1, n2;
+        if(ox||oy||oz){ d=Math.hypot(ox,oy,oz); n0=(dx1>0?ox:-ox)/d; n1=(dy1>0?oy:-oy)/d; n2=(dz1>0?oz:-oz)/d; }
+        else { const m=Math.max(dx0,dx1,dy0,dy1,dz0,dz1); d=m; n0=n1=n2=0;
+          if(m===dx0) n0=-1; else if(m===dx1) n0=1; else if(m===dy0) n1=-1; else if(m===dy1) n1=1; else if(m===dz0) n2=-1; else n2=1; }
+        if(d<best){ best=d; bn0=n0; bn1=n1; bn2=n2; } }
+      out[0]=best; out[1]=bn0; out[2]=bn1; out[3]=bn2; return best; } };
+}
+
+/* ---------- 根を育てる（tools/root3d.py の Grower と同じ考え） ---------- */
+function rlGrower(boxes, rnd, keepOut){
+  const N={x:[],y:[],z:[],par:[],rid:[],tip:[],cl:[],r:[],u:[]}; let rid=0; const sd=[0,0,0,0];
+  function node(x,y,z,par,id,tip,cl){ N.x.push(x);N.y.push(y);N.z.push(z);N.par.push(par);N.rid.push(id);N.tip.push(tip);N.cl.push(cl);N.r.push(0);N.u.push(0); return N.x.length-1; }
+  function grow(st,d0,steps,o,parent,depth){
+    const id=rid++; let px=st[0],py=st[1],pz=st[2]; let L=Math.hypot(d0[0],d0[1],d0[2])||1; let dx=d0[0]/L,dy=d0[1]/L,dz=d0[2]/L;
+    let par=parent!=null?parent:node(px,py,pz,-1,id,o.tip||.8,0);
+    const way=o.way, step=o.step||2.4, iner=o.inertia||3, grav=o.grav||0, cling=o.cling||0, wan=o.wander==null?.35:o.wander, sink=o.sink||.55;
+    const ph=[rnd()*99,rnd()*99,rnd()*99]; let wi=0, cn0=0, cn1=0, cn2=1;
+    for(let it=0;it<steps;it++){
+      let fx=dx*iner, fy=dy*iner, fz=dz*iner;
+      if(o.guide){ const g=o.guide(it/Math.max(1,steps-1)); const vx=g[0]-px, vy=g[1]-py, vz=g[2]-pz, l=Math.hypot(vx,vy,vz); if(l>1e-6){ const w=2.2*Math.min(1,l/4); fx+=vx/l*w; fy+=vy/l*w; fz+=vz/l*w; } }
+      else if(way&&wi<way.length){ const w=way[wi], vx=w[0]-px, vy=w[1]-py, vz=w[2]-pz, l=Math.hypot(vx,vy,vz);
+        if(l<6&&wi<way.length-1) wi++; else if(l<3&&wi===way.length-1) break;
+        if(l>1e-6){ fx+=vx/l*1.6; fy+=vy/l*1.6; fz+=vz/l*1.6; } }
+      fz-=grav;
+      const t=it*step*.045;
+      fx+=wan*(Math.sin(t*1.7+ph[0])+.5*Math.sin(t*3.1+ph[1]));
+      fy+=wan*(Math.sin(t*1.3+ph[1])+.5*Math.sin(t*2.9+ph[2]));
+      fz+=wan*.5*(Math.sin(t*1.1+ph[2])+.5*Math.sin(t*2.3+ph[0]));
+      if(keepOut&&!o.noKeep){ const k=keepOut(px,py,pz); if(k){ fx+=k[0]*2.5; fy+=k[1]*2.5; } }
+      boxes.sd(px,py,pz,sd);
+      // 面の向きはなだらかに追う（床と壁の付け根で向きが入れ替わってジグザグになるのを防ぐ）
+      if(sd[0]<9){ cn0=cn0*.75+sd[1]*.25; cn1=cn1*.75+sd[2]*.25; cn2=cn2*.75+sd[3]*.25; const cl_=Math.hypot(cn0,cn1,cn2)||1; cn0/=cl_; cn1/=cl_; cn2/=cl_; }
+      if(cling>0&&sd[0]<7){ const dn=fx*cn0+fy*cn1+fz*cn2; if(dn<0){ fx-=cn0*dn; fy-=cn1*dn; fz-=cn2*dn; }
+        const pull=-cling*Math.max(-1.5,Math.min(1.5,sd[0]-sink*2.5)); fx+=cn0*pull; fy+=cn1*pull; fz+=cn2*pull; }
+      else if(sd[0]<1.5){ const dn=fx*sd[1]+fy*sd[2]+fz*sd[3]; if(dn<0){ fx-=sd[1]*dn*1.2; fy-=sd[2]*dn*1.2; fz-=sd[3]*dn*1.2; } }
+      L=Math.hypot(fx,fy,fz); if(L<1e-6) continue; dx=fx/L; dy=fy/L; dz=fz/L;
+      px+=dx*step; py+=dy*step; pz+=dz*step;
+      boxes.sd(px,py,pz,sd); if(sd[0]<.3){ const e=.3-sd[0]; px+=sd[1]*e; py+=sd[2]*e; pz+=sd[3]*e; }
+      par=node(px,py,pz,par,id,o.tip||.8,sd[0]<6?1:0);
+      if(o.branch&&depth<(o.maxDepth==null?3:o.maxDepth)&&rnd()<o.branch&&it>4&&it<steps-4){
+        const kw=o.bkw||{}, ang=(25+rnd()*30)*Math.PI/180*(rnd()<.5?1:-1), c=Math.cos(ang), s=Math.sin(ang);
+        const sub=Object.assign({},o,{grav:kw.grav!=null?kw.grav:grav, cling:kw.cling!=null?kw.cling:cling, wander:wan*1.1, branch:o.branch*.7, tip:kw.tip||(o.tip||.8)*.8, way:null, guide:null});
+        const n=Math.floor((steps-it)*(kw.frac||.55)); if(n>6) grow([px,py,pz],[dx*c-dy*s,dx*s+dy*c,dz-.25],n,sub,par,depth+1); }
+    }
+    return id;
+  }
+  function path(pts,tip){ const id=rid++; let par=-1; for(const p of pts) par=node(p[0],p[1],p[2],par,id,tip,0); return id; }
+  function finish(n,taper,rmax,fixed){
+    const M=N.x.length, acc=new Float64Array(M), has=new Uint8Array(M);
+    for(let i=M-1;i>=0;i--){
+      let r; if(!has[i]) r=N.tip[i]; else { const p=N.par[i]; r=Math.min(rmax, Math.pow(acc[i],1/n)+taper*1.5); }
+      if(fixed&&fixed.has(N.rid[i])) r=fixed.get(N.rid[i])*(1+.12*Math.sin(i*.07+N.rid[i]));
+      N.r[i]=r; const p=N.par[i]; if(p>=0){ acc[p]+=Math.pow(r,n); has[p]=1; } }
+    for(let i=0;i<M;i++){ const p=N.par[i]; if(p>=0) N.u[i]=N.u[p]+Math.hypot(N.x[i]-N.x[p],N.y[i]-N.y[p],N.z[i]-N.z[p]); }
+  }
+  return {N,grow:(st,d0,steps,o)=>grow(st,d0,steps,o,null,0),path,finish,get rid(){return rid;}};
+}
+
+/* ---------- 段取り（階に入ったとき）：マスの種類・石の箱・部屋と橋の「組」を決めるだけ。重い焼きは組ごとに後で ----------
+   1度に全部焼くと、広い階（94×90マス）で1秒前後止まった。組（部屋1つ／橋1本）は画面に入る少し前に焼く。
+   どの組も自分の種で乱数を引くので、焼く順番が変わっても絵は同じ。 */
+function rlPlan(f){
+  const tP=performance.now();
+  const PW=f.W*Q, PH=f.H*Q, Wt=f.W, Ht=f.H, n=PW*PH;
+  const RB={f,PW,PH,Wt,Ht,mat:new Uint8Array(n),alb:new Uint8Array(n),nrm:new Uint8Array(n),hp:new Int16Array(n),
+            ft:new Uint8Array(n),fa:new Uint8Array(n).fill(255),key:new Float32Array(n).fill(-1e9),kind:new Uint8Array(Wt*Ht),units:[],bg:null,ms:0,baked:0};
+  let seed=(f.W*7919+f.H*104729)>>>0; for(const r of (f.rooms||[])) seed=(Math.imul(seed^(r.x*31+r.y*57+r.w*13+r.h),2654435761))>>>0;
+  RB.seed=seed;
+  const roomIx=new Int16Array(Wt*Ht).fill(-1);
+  (f.rooms||[]).forEach((r,ri)=>{ for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++) if(y>=0&&y<Ht&&x>=0&&x<Wt) roomIx[y*Wt+x]=ri; });
+  RB.roomIx=roomIx;
+  const walk=(tx,ty)=>tx>=0&&ty>=0&&tx<Wt&&ty<Ht&&f.g[ty][tx]!==T.PIT&&f.g[ty][tx]!==T.WALL;
+  for(let ty=0;ty<Ht;ty++)for(let tx=0;tx<Wt;tx++) RB.kind[ty*Wt+tx]= !walk(tx,ty)?0 : roomIx[ty*Wt+tx]>=0?1:2;
+  const kindAt=RB.kindAt=(tx,ty)=>(tx<0||ty<0||tx>=Wt||ty>=Ht)?0:RB.kind[ty*Wt+tx];
+  RB.pt={k:Math.round(performance.now()-tP)};
+  const boxes=RB.boxes=rlBoxes();
+  // 石畳の板の割り付け（全体で1つ）
+  { const CS=8, cw=Math.ceil(PW/CS)+1, ch=Math.ceil(PH/CS)+1, own=new Int32Array(cw*ch).fill(-1), info=[], rnd=rlRand(seed^0x51ab);
+    const SZ=[[2,2],[3,2],[2,2],[3,2],[2,1],[1,2],[3,3],[2,3]];
+    for(let gy=0;gy<ch;gy++)for(let gx=0;gx<cw;gx++){ if(own[gy*cw+gx]>=0) continue;
+      let [sw,sh]=SZ[(rnd()*SZ.length)|0]; sw=Math.min(sw,cw-gx); sh=Math.min(sh,ch-gy);
+      const busy=(w,h)=>{ for(let yy=0;yy<h;yy++)for(let xx=0;xx<w;xx++) if(own[(gy+yy)*cw+gx+xx]>=0) return true; return false; };
+      while(sw>1&&busy(sw,1)) sw--; while(sh>1&&busy(sw,sh)) sh--;
+      for(let yy=0;yy<sh;yy++)for(let xx=0;xx<sw;xx++) own[(gy+yy)*cw+gx+xx]=info.length;
+      info.push([gx*CS,gy*CS,sw*CS,sh*CS,rnd(),rnd()]); }
+    RB.slab={own,info,cw}; }
+  RB.pt.slab=Math.round(performance.now()-tP);
+  // 部屋：石の箱（床の台・北の石積み・左右の低い壁・角柱）
+  (f.rooms||[]).forEach((r,ri)=>{ if(r.w<2||r.h<2) return;
+    const x0=r.x*Q, x1=(r.x+r.w)*Q, y0=r.y*Q, y1=(r.y+r.h)*Q, rs=(seed^Math.imul(r.x+1,73856093)^Math.imul(r.y+1,19349663))>>>0, rnd=rlRand(rs);
+    boxes.add(x0,y0,-RL_CLIFF,x1,y1,0);
+    let northN=0; for(let tx=r.x;tx<r.x+r.w;tx++) if(kindAt(tx,r.y-1)===0) northN++;
+    if(northN) boxes.add(x0-RL_SIDE_D,y0-RL_WALL_D,-RL_CLIFF,x1+RL_SIDE_D,y0,RL_WALL_H-2);
+    for(const side of [-1,1]){ const xb= side<0 ? x0-RL_SIDE_D : x1;
+      for(let ty=r.y;ty<r.y+r.h;ty++) if(kindAt(side<0?r.x-1:r.x+r.w,ty)===0) boxes.add(xb,ty*Q,-RL_CLIFF,xb+RL_SIDE_D,ty*Q+Q,RL_SIDE_H); }
+    const pillars=[];
+    for(const cx of [x0-RL_SIDE_D-1, x1+RL_SIDE_D+1]){ if(kindAt(Math.floor(cx/Q),r.y-1)!==0) continue; if(rnd()<.25) continue;
+      const ph=30+((rnd()*10)|0); pillars.push([cx,ph]); boxes.add(cx-5,y0+2-8,-RL_CLIFF,cx+5,y0+2,ph); }
+    RB.units.push({t:0,r,ri,rs,pillars,northN,bb:[x0-70,y0-110,x1+70,y1+200],core:[x0-12,y0-44,x1+12,y1+30],done:0});
+  });
+  RB.pt.rooms=Math.round(performance.now()-tP);
+  // 通路：部屋の外の区間ごとに「橋の組」
+  const claimed=new Uint8Array(Wt*Ht);
+  for(const c of (f.corr||[])){
+    const [ax,ay,bx,by,o]=c, pts=o===0?[[ax,ay],[bx,ay],[bx,by]]:[[ax,ay],[ax,by],[bx,by]];
+    const P=[], px=p=>[(p[0]+1)*Q,(p[1]+1)*Q];
+    const A=px(pts[0]), B=px(pts[1]), Cc=px(pts[2]);
+    const seg=(p,q2)=>{ const L=Math.hypot(q2[0]-p[0],q2[1]-p[1]); const n_=Math.max(1,Math.ceil(L/2)); for(let i=0;i<n_;i++) P.push([p[0]+(q2[0]-p[0])*i/n_, p[1]+(q2[1]-p[1])*i/n_]); };
+    const rr=12, lAB=Math.hypot(B[0]-A[0],B[1]-A[1]), lBC=Math.hypot(Cc[0]-B[0],Cc[1]-B[1]);
+    if(lAB>rr*2&&lBC>rr*2){ const u1=[(B[0]-A[0])/lAB,(B[1]-A[1])/lAB], u2=[(Cc[0]-B[0])/lBC,(Cc[1]-B[1])/lBC];
+      const p1=[B[0]-u1[0]*rr,B[1]-u1[1]*rr], p2=[B[0]+u2[0]*rr,B[1]+u2[1]*rr]; seg(A,p1);
+      for(let i=0;i<8;i++){ const t=i/8, a=1-t; P.push([a*a*p1[0]+2*a*t*B[0]+t*t*p2[0], a*a*p1[1]+2*a*t*B[1]+t*t*p2[1]]); } seg(p2,Cc); }
+    else { seg(A,B); seg(B,Cc); }
+    P.push(Cc);
+    const inRoom=p=>kindAt(Math.floor(p[0]/Q),Math.floor(p[1]/Q))===1&&kindAt(Math.floor((p[0]-1)/Q),Math.floor((p[1]-1)/Q))===1;
+    const done_=p=>claimed[Math.floor((p[1]-1)/Q)*Wt+Math.floor((p[0]-1)/Q)]&&claimed[Math.floor(p[1]/Q)*Wt+Math.floor(p[0]/Q)];
+    let i=0;
+    while(i<P.length){ while(i<P.length&&(inRoom(P[i])||done_(P[i]))) i++; if(i>=P.length) break;
+      let j=i; while(j<P.length&&!inRoom(P[j])&&!done_(P[j])) j++;
+      const s0=Math.max(0,i-6), s1=Math.min(P.length-1,j+5), piece=P.slice(s0,s1+1);
+      for(let q=i;q<j;q++){ const tx=Math.floor(P[q][0]/Q), ty=Math.floor(P[q][1]/Q); for(const [ddx,ddy] of [[0,0],[-1,0],[0,-1],[-1,-1]]) if(tx+ddx>=0&&ty+ddy>=0&&tx+ddx<Wt&&ty+ddy<Ht) claimed[(ty+ddy)*Wt+tx+ddx]=1; }
+      if(piece.length>=3){ let bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9; for(const p of piece){ bx0=Math.min(bx0,p[0]); by0=Math.min(by0,p[1]); bx1=Math.max(bx1,p[0]); by1=Math.max(by1,p[1]); }
+        RB.units.push({t:1,piece,startIn:i>0,endIn:j<P.length,rs:(seed^Math.imul(Math.round(piece[0][0])+7,2246822519)^Math.imul(Math.round(piece[0][1])+3,3266489917))>>>0,
+          bb:[bx0-40,by0-40,bx1+40,by1+90],core:[bx0-20,by0-20,bx1+20,by1+20],done:0}); }
+      i=j; }
+  }
+  RB.pt.br=Math.round(performance.now()-tP);
+  RB.bg=RL_BG||(RL_BG=rlBackground(rlRand(0x9e3779b9)));             // 下の階の雰囲気は全階で共通（作るのは最初の1回だけ）
+  RB.pt.bg=Math.round(performance.now()-tP);
+  RB.planMs=performance.now()-tP;
+  return RB;
+}
+let RL_BG=null;
+function rlGet(f){ if(!G.rl||G.rl.f!==f){ G.rl=rlPlan(f); } return G.rl; }
+CAVE.rlBakeAll=()=>{ if(G&&G.rl) for(const u of G.rl.units) if(!u.done) rlBakeUnit(G.rl,u); };
+/* 画面（＋先読みの縁）に掛かる組を焼く。画面に入っている組は必ず、縁の組は1フレームあたり時間の許す分だけ */
+function rlEnsure(RB,x0,y0,x1,y1,pad){
+  const t0=performance.now();
+  // 画面に入っている組から（主人公に近い順）。1フレームで120msを超えたら残りは次のフレームへ（階に入った直後の暗転の下で済む）
+  const cx=(x0+x1)/2, cy=(y0+y1)/2, need=RB.units.filter(u=>!u.done&&!(u.core[2]<x0||u.core[0]>x1||u.core[3]<y0||u.core[1]>y1));
+  need.sort((a,b)=>Math.hypot((a.core[0]+a.core[2])/2-cx,(a.core[1]+a.core[3])/2-cy)-Math.hypot((b.core[0]+b.core[2])/2-cx,(b.core[1]+b.core[3])/2-cy));
+  for(const u of need){ rlBakeUnit(RB,u); if(performance.now()-t0>120) break; }
+  for(const u of RB.units){ if(u.done) continue; if(performance.now()-t0>6) break; const b=u.bb;
+    if(b[2]<x0-pad||b[0]>x1+pad||b[3]<y0-pad||b[1]>y1+pad) continue; rlBakeUnit(RB,u); }
+  RB.ms+=performance.now()-t0;
+}
+/* 床の高さ（前後の比べ用）：部屋の床は z=0、橋のマスは根の下敷きの z=-4、穴は無し */
+function rlFloorKey(RB,X,Y){ const kd=RB.kind[(Y>>4)*RB.Wt+(X>>4)]; return kd===1?Y:kd===2?Y-4:-1e9; }
+
+function rlBakeUnit(RB,u){
+  u.done=1; RB.baked++; const tm=RB.tm||(RB.tm={a:0,g:0,r:0,p:0}); let tq=performance.now(); const lap=k=>{ const n_=performance.now(); tm[k]+=n_-tq; tq=n_; };
+  const f=RB.f, PW=RB.PW, PH=RB.PH, Wt=RB.Wt, key=RB.key, kindAt=RB.kindAt, rnd=rlRand(u.rs^0x2545F491);
+  const bd=[1e9,1e9,-1e9,-1e9];
+  const put=(X,Y,kk,mat,alb,nrm,hp)=>{ X|=0; Y|=0; if(X<0||Y<0||X>=PW||Y>=PH) return; const i=Y*PW+X; if(kk<key[i]||kk<rlFloorKey(RB,X,Y)) return; key[i]=kk; RB.mat[i]=mat; RB.alb[i]=alb; RB.nrm[i]=nrm; RB.hp[i]=hp;
+    if(X<bd[0]) bd[0]=X; if(Y<bd[1]) bd[1]=Y; if(X>bd[2]) bd[2]=X; if(Y>bd[3]) bd[3]=Y; };
+  const N_UP=rlNrm(0,1,0), N_S=rlNrm(0,0,1);
+  const G3=rlGrower(RB.boxes,rnd,(x,y,z)=>{ if(z<-3) return null; const tx=x>>4, ty=y>>4; if(tx<0||ty<0||tx>=Wt||ty>=RB.Ht) return null;
+    const ri=RB.roomIx[ty*Wt+tx]; if(ri<0) return null; const r=f.rooms[ri];
+    const ix0=r.x*Q+18, ix1=(r.x+r.w)*Q-18, iy0=r.y*Q+20, iy1=(r.y+r.h)*Q-16; if(x<ix0||x>ix1||y<iy0||y>iy1) return null;
+    const dl=x-ix0, dr=ix1-x, du=y-iy0, dd=iy1-y, m=Math.min(dl,dr,du,dd);
+    const k_=Math.min(1,m/14)*.6; return m===dl?[-k_,0]:m===dr?[k_,0]:m===du?[0,-k_]:[0,k_]; });
+  const FIXED=new Map(), NOMOSS=new Set();
+  if(u.t===0){
+    const r=u.r, x0=r.x*Q, x1=(r.x+r.w)*Q, y0=r.y*Q, y1=(r.y+r.h)*Q, sx=(r.x*7+r.y*3)%15, cxr=(x0+x1)/2;
+    /* ---- 石畳 ---- */
+    const {own,info,cw}=RB.slab, big=r.w>=8&&r.h>=6, icx=(r.x+r.w/2)*Q, icy=(r.y+r.h/2)*Q;
+    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+      if(x<0||y<0||x>=PW||y>=PH) continue; const i=y*PW+x;
+      const s=info[own[(y>>3)*cw+(x>>3)]], fx=x-s[0], fy=y-s[1], base=s[4]>.35?8:7;
+      let tn=base;
+      if(fx===0||fy===0) tn=base-2; else if(fx===1||fy===1) tn=base+1; else if(fx===s[2]-1||fy===s[3]-1) tn=base-1;
+      else if(NZB[((y&255)<<8)|(x&255)]*.6+NZ[((y&255)<<8)|(x&255)]*.4>.66) tn=base-1;
+      if(s[5]<.07&&Math.abs((fx-fy*.9)-s[2]*.45)<.6&&fx>1&&fx<s[2]-1&&fy>1&&fy<s[3]-1) tn=4;
+      if(big){ const d=Math.abs(x-icx)+Math.abs(y-icy)*1.3;
+        if(d>=30&&d<34) tn=(d>=31&&d<33)?10:5; else if(d<30&&Math.abs(d-16)<.6) tn=5; else if(d<4) tn=d<2.5?10:5; }
+      let moss=0;
+      const m1=NZS[(((y+40)&255)<<8)|((x+70)&255)]*.6+NZ[((y&255)<<8)|(x&255)]*.4;
+      const edge=Math.min(x-x0, x1-1-x, y-y0, y1-1-y);
+      if(m1>.72-Math.max(0,(14-edge))*.012) moss=1;
+      else if((fx===0||fy===0)&&NZB[((y&255)<<8)|(x&255)]>.62) moss=1;
+      const tx=x>>4, ty=y>>4;
+      if((y&15)===15&&kindAt(tx,ty+1)===0){ tn=10; moss=0; }
+      else if((x&15)===0&&kindAt(tx-1,ty)===0) tn=Math.max(tn,9);
+      else if((x&15)===15&&kindAt(tx+1,ty)===0) tn=4;
+      RB.ft[i]=tn|(moss<<4); }
+    /* ---- 遺跡：北の石積み・左右の低い壁・南の基礎の崖・角柱 ---- */
+    const masonry=(x,z,top,seedx)=>{ const row=(z/6)|0, zz=((z%6)+6)%6, jx=(x+row*9+((row*row*5)%11)+seedx)%15;
+      let a= (zz===5||jx===0) ? 120 : zz===4 ? 235 : jx<3 ? 210 : 185;
+      if(NZ[(((z*3+seedx)&255)<<8)|(x&255)]>.62) a-=30; return a; };
+    const mossy=(x,y,z,top)=>{ const v=NZS[((((y-z*2)+90)&255)<<8)|((x+30)&255)]; return z<top*.5&&v>.6+z/top*.25 || (top-z<4&&v>.68); };
+    const wallCol=(x,yb,d,hTop)=>{
+      for(let y=yb-d;y<yb;y++) put(x,y-hTop,y+hTop,NZ[((y&255)<<8)|(x&255)]>.68?4:3,(x+y)%13?220:170,N_UP,hTop);
+      put(x,yb-d-hTop-1,yb-d+hTop,5,0,N_UP,hTop);
+      for(let z=hTop-1;z>=-RL_CLIFF;z--){ if(z<0) put(x,yb-z,yb+z,mossy(x,yb,z+RL_CLIFF,RL_CLIFF)?4:3,Math.max(40,masonry(x,-z,RL_CLIFF,sx+7)+z*7),N_S,z);
+        else put(x,yb-z,yb+z,mossy(x,yb,z,hTop)?4:3,masonry(x,z,hTop,sx),N_S,z); } };
+    if(u.northN) for(let x=x0-RL_SIDE_D;x<x1+RL_SIDE_D;x++){ const tx=Math.floor(x/Q);
+      if(kindAt(Math.min(r.x+r.w-1,Math.max(r.x,tx)),r.y-1)!==0) continue;
+      if(x<x0&&kindAt(r.x-1,r.y)!==0) continue; if(x>=x1&&kindAt(r.x+r.w,r.y)!==0) continue;
+      const nv=NZS[(((r.y*37)&255)<<8)|(x&255)]; wallCol(x,y0,RL_WALL_D,Math.max(6,RL_WALL_H-(nv>.6?Math.floor((nv-.6)*10)*6:0))); }
+    for(const side of [-1,1]){ const xb= side<0 ? x0-RL_SIDE_D : x1;
+      for(let ty=r.y;ty<r.y+r.h;ty++){ if(kindAt(side<0?r.x-1:r.x+r.w,ty)!==0) continue;
+        for(let y=ty*Q;y<ty*Q+Q;y++){ if(y>=y1-4) continue; if(NZB[((y&255)<<8)|((xb*3)&255)]>.74) continue;
+          const h=RL_SIDE_H-(NZ[((y&255)<<8)|((xb+11)&255)]>.62?4:0);
+          for(let x=xb;x<xb+RL_SIDE_D;x++){ const fx=x-xb, a=fx===0?150:(fx<3?235:fx<5?205:140); put(x,y-h,y+h,NZ[((y&255)<<8)|(x&255)]>.66?4:3,(y-y0)%14===0?150:a,N_UP,h); }
+          const last=y===ty*Q+Q-1||y===y1-5||NZB[(((y+1)&255)<<8)|((xb*3)&255)]>.74;
+          if(last) for(let z=h-1;z>=-RL_CLIFF;z--) for(let x=xb;x<xb+RL_SIDE_D;x++) put(x,y-z,y+z,3,z<0?Math.max(40,150+z*6):masonry(x,z,h,sx),N_S,z); } } }
+    for(let x=x0;x<x1;x++){ if(kindAt(x>>4,r.y+r.h)!==0) continue;
+      for(let z=-1;z>=-RL_CLIFF;z--) put(x,y1-z,y1+z,mossy(x,y1,z+RL_CLIFF,RL_CLIFF)?4:3,Math.max(40,masonry(x,-z,RL_CLIFF,sx+3)+z*7),N_S,z); }
+    for(const [cx,ph] of u.pillars){ const w=10, d=8, yb=y0+2;
+      for(let x=cx-w/2;x<cx+w/2;x++){ const fx=x-(cx-w/2);
+        for(let y=yb-d;y<yb;y++) put(x,y-ph,y+ph,3,fx<w-3?250:200,N_UP,ph);
+        put(x,yb-d-ph-1,yb-d+ph,5,0,N_UP,ph);
+        for(let z=ph-1;z>=-RL_CLIFF;z--){ const zz=((z%9)+9)%9; let a=fx===0?250:fx>=w-3?120:200; if(zz===8) a-=60; put(x,yb-z,yb+z,NZ[(((z*5)&255)<<8)|(x&255)]>.66?4:3,a,N_S,z); } } }
+    lap('a');
+    /* ---- 根 ---- */
+    const BKW={frac:.45,grav:.5,cling:1,tip:.6}, CKW={frac:.35,grav:1.3,cling:0,tip:.6};
+    const nOver=u.northN>=Math.min(3,r.w)?(1+(r.w*r.h>48?1:0)+(rnd()<.5?1:0)):0;
+    for(let k=0;k<nOver;k++){ const side=(k%2===0)===(rnd()<.5)?-1:1;
+      const x=side<0? x0+12+rnd()*Math.max(8,(x1-x0)*.3) : x1-12-rnd()*Math.max(8,(x1-x0)*.3);
+      if(kindAt(x>>4,r.y-1)!==0) continue;
+      const sxo= side<0 ? x0-RL_SIDE_D-4 : x1+RL_SIDE_D+4, ym=y0+(y1-y0)*(.35+rnd()*.4), sideOpen=kindAt(side<0?r.x-1:r.x+r.w,Math.floor(ym/Q))===0;
+      const way=[[x,y0-14,30],[x+side*4,y0+4,6],[x+side*10,y0+18,1],[side<0?x0+8:x1-8,ym,1]];
+      if(sideOpen) way.push([sxo,ym+6,-6],[sxo+side*6,ym+12,-60],[sxo+side*8,ym+16,-170]);
+      G3.grow([x,y0-46,34],[0,1,-.3],150,{way,cling:1,grav:.25,branch:.022,bkw:BKW,tip:.8}); }
+    const nC=1+(r.w>=7?1:0)+(rnd()<.5?1:0);
+    for(let k=0;k<nC;k++){ const ex=x0+(x1-x0)*((k+.5)/nC)+(rnd()-.5)*20; if(kindAt(ex>>4,r.y+r.h)!==0) continue;
+      G3.grow([cxr+(rnd()-.5)*30,(y0+y1)/2,-26],[0,1,-.1],140,{way:[[ex,y1+4,-28],[ex-4+rnd()*8,y1+14,-70],[ex+(rnd()-.5)*16,y1+20,-170]],
+        cling:.8,grav:.4,branch:.018,bkw:CKW,tip:.9,maxDepth:1}); }
+    const nG=1+(r.w>=6?1:0)+(rnd()<.5?1:0);
+    for(let k=0;k<nG;k++){ const gx=x0+10+rnd()*Math.max(4,x1-x0-20); if(kindAt(gx>>4,r.y+r.h)!==0) continue;
+      G3.grow([gx-6,y1-16,.5],[0,1,0],80,{step:1.8,way:[[gx,y1-2,.5],[gx+2,y1+2,-6],[gx+3,y1+4,-18],[gx+4,y1+10,-60]],cling:1.2,grav:.5,tip:.7,branch:.04,bkw:{frac:.5,grav:1.5,cling:0,tip:.5},maxDepth:1}); }
+    for(let x=x0+3;x<x1-3;x+=5){ if(kindAt(x>>4,r.y+r.h)!==0||rnd()>.35) continue;
+      G3.grow([x,y1+1.5,-RL_CLIFF+2],[0,0,-1],8+((rnd()*22)|0),{grav:2.4,wander:.15,tip:.45}); }
+  } else {
+    /* ---- 橋：6本の根を螺旋に撚る。端は床の下へ潜り、細い根が床へほどける ---- */
+    const piece=u.piece, Lc=[0];
+    for(let q=1;q<piece.length;q++) Lc.push(Lc[q-1]+Math.hypot(piece[q][0]-piece[q-1][0],piece[q][1]-piece[q-1][1]));
+    const tot=Lc[Lc.length-1], NS=6, Amp=10, turns=Math.max(1,tot/70);
+    const at=s=>{ s=Math.max(0,Math.min(tot,s)); let q=1; while(q<Lc.length-1&&Lc[q]<s) q++; const t=(s-Lc[q-1])/Math.max(1e-6,Lc[q]-Lc[q-1]);
+      const p=[piece[q-1][0]+(piece[q][0]-piece[q-1][0])*t, piece[q-1][1]+(piece[q][1]-piece[q-1][1])*t];
+      const dx=piece[q][0]-piece[q-1][0], dy=piece[q][1]-piece[q-1][1], l=Math.hypot(dx,dy)||1; return [p[0],p[1],dx/l,dy/l]; };
+    const endIn=u.startIn?10:0, endOut=u.endIn?10:0;
+    for(let k=0;k<NS;k++){ const ph=2*Math.PI*k/NS, rad=4.4+((k*37)%5)*.25, pts_=[];
+      for(let s=0;s<=tot;s+=4){ const [cx,cy,tx_,ty_]=at(s), nx=-ty_, ny=tx_, a=2*Math.PI*turns*s/tot+ph, w=1+.12*Math.sin(s*.07+k*2.1);
+        let dive=0; if(s<endIn) dive=(endIn-s)/endIn; if(s>tot-endOut) dive=Math.max(dive,(s-(tot-endOut))/endOut);
+        pts_.push([cx+nx*Amp*w*Math.sin(a), cy+ny*Amp*w*Math.sin(a), -rad+Amp*.4*Math.cos(a)-dive*10]); }
+      const id=G3.path(pts_,rad); FIXED.set(id,rad); }
+    { const pts_=[]; for(let s=0;s<=tot;s+=6){ const [cx,cy]=at(s); pts_.push([cx,cy,-15]); } const id=G3.path(pts_,11); FIXED.set(id,11); NOMOSS.add(id); }
+    for(let s=8;s<tot-6;s+=7){ if(rnd()>.5) continue; const [cx,cy,tx_,ty_]=at(s), off=(rnd()-.5)*20;
+      G3.grow([cx-ty_*off,cy+tx_*off,-14],[0,0,-1],8+((rnd()*20)|0),{grav:2.2,wander:.12,tip:.5}); }
+    for(const e of [0,1]){ if(e===0&&!u.startIn) continue; if(e===1&&!u.endIn) continue;
+      const [cx,cy,tx_,ty_]=at(e?tot:0), sg=e?1:-1;
+      for(const sp of [-1,1]) G3.grow([cx,cy,.5],[tx_*sg*.45+(-ty_)*sp,ty_*sg*.45+tx_*sp,0],8+((rnd()*8)|0),{cling:1.2,grav:.1,tip:.7,wander:.25,noKeep:1}); }
+  }
+  G3.finish(2.5,.018,5.5,FIXED); lap('g');
+  rlRaster(RB,G3,NOMOSS,bd); lap('r');
+  if(bd[2]>=bd[0]) rlPost(RB,[bd[0]-4,bd[1]-4,bd[2]+4,bd[3]+4]); lap('p');
+}
+
+/* 根を焼く：画面の各ドットの光線（y=Y+z）と、節と節をつなぐ円筒の交わり */
+function rlRaster(RB,G3,NOMOSS,bd){
+  const Nn=G3.N, M=Nn.x.length, S2=Math.SQRT1_2, PW=RB.PW, PH=RB.PH, key=RB.key, kind=RB.kind, Wt=RB.Wt;
+  const skip=new Uint8Array(M), kidN=new Uint8Array(M);
+  for(let q=0;q<M;q++){ const p=Nn.par[q]; if(p>=0&&kidN[p]<255) kidN[p]++; }
+  for(let q=0;q<M;q++){ const p=Nn.par[q]; if(p<0||kidN[q]!==1||skip[p]) continue; const g_=Nn.par[p]; if(g_<0) continue;
+    const ux=Nn.x[p]-Nn.x[g_], uy=Nn.y[p]-Nn.y[g_], uz=Nn.z[p]-Nn.z[g_], vx=Nn.x[q]-Nn.x[p], vy=Nn.y[q]-Nn.y[p], vz=Nn.z[q]-Nn.z[p];
+    const c_=(ux*vx+uy*vy+uz*vz)/((Math.hypot(ux,uy,uz)*Math.hypot(vx,vy,vz))||1); if(c_>.985&&kidN[p]===1&&Math.abs(Nn.r[q]-Nn.r[g_])<.6) skip[p]=1; }
+  const up_=q=>{ let p=Nn.par[q]; while(p>=0&&skip[p]) p=Nn.par[p]; return p; };
+  for(let q=0;q<M;q++){ if(skip[q]) continue; const p=up_(q); if(p<0) continue;
+    const ax=Nn.x[p], ay=Nn.y[p], az=Nn.z[p], bx=Nn.x[q], by=Nn.y[q], bz=Nn.z[q];
+    const r=Math.max(.45,(Nn.r[p]+Nn.r[q])*.5), u0=Nn.u[p], u1=Nn.u[q], id=Nn.rid[q], nm=NOMOSS&&NOMOSS.has(id);
+    const bax=bx-ax, bay=by-ay, baz=bz-az, baba=bax*bax+bay*bay+baz*baz; if(baba<1e-9) continue;
+    let Nx=bay, Ny=-bax, Nz=0; let nl=Math.hypot(Nx,Ny,Nz); if(nl<1e-3){ Nx=0; Ny=baz; Nz=-bay; nl=Math.hypot(Nx,Ny,Nz)||1; } Nx/=nl; Ny/=nl; Nz/=nl;
+    const bl=Math.sqrt(baba), Tx=bax/bl, Ty=bay/bl, Tz=baz/bl, Bx=Ty*Nz-Tz*Ny, By=Tz*Nx-Tx*Nz, Bz=Tx*Ny-Ty*Nx;
+    const nf=Math.max(3,Math.round(2*Math.PI*r/3.2)), lum0=(nm?150:200)+(((id*2654435761)>>>0)%1000)/1000*30-15;
+    const X0=Math.floor(Math.min(ax,bx)-r-1), X1=Math.ceil(Math.max(ax,bx)+r+1);
+    const Y0=Math.floor(Math.min(ay-az,by-bz)-r*1.45-1), Y1=Math.ceil(Math.max(ay-az,by-bz)+r*1.45+1), kmax=Math.max(ay+az,by+bz)+r*1.42;
+    for(let Y=Math.max(0,Y0);Y<=Math.min(PH-1,Y1);Y++)for(let X=Math.max(0,X0);X<=Math.min(PW-1,X1);X++){
+      const i=Y*PW+X, kd_=kind[(Y>>4)*Wt+(X>>4)], kfl=kd_===1?Y:kd_===2?Y-4:-1e9, kcur=key[i]>kfl?key[i]:kfl;
+      if(kcur>=kmax) continue;
+      const Z0=400, roy=Y+Z0, roz=Z0, rdy=-S2, rdz=-S2;
+      const oax=X-ax, oay=roy-ay, oaz=roz-az;
+      const bard=bay*rdy+baz*rdz, baoa=bax*oax+bay*oay+baz*oaz, rdoa=rdy*oay+rdz*oaz, oaoa=oax*oax+oay*oay+oaz*oaz;
+      const A_=baba-bard*bard, B_=baba*rdoa-baoa*bard, C_=baba*oaoa-baoa*baoa-r*r*baba;
+      let h=B_*B_-A_*C_, tt=-1;
+      if(h>=0&&A_>1e-9){ tt=(-B_-Math.sqrt(h))/A_; const yy=baoa+tt*bard; if(!(yy>0&&yy<baba)){
+          const ox=yy<=0?oax:X-bx, oy=yy<=0?oay:roy-by, oz=yy<=0?oaz:roz-bz; const B2=rdy*oy+rdz*oz, C2=ox*ox+oy*oy+oz*oz-r*r; const h2=B2*B2-C2; tt= h2>0 ? -B2-Math.sqrt(h2) : -1; } }
+      if(tt<0) continue;
+      const hx=X, hy=roy+rdy*tt, hz=roz+rdz*tt, kk=hy+hz;
+      if(kk<=kcur) continue;
+      let hh=((hx-ax)*bax+(hy-ay)*bay+(hz-az)*baz)/baba; hh=hh<0?0:hh>1?1:hh;
+      const qx=hx-ax-bax*hh, qy=hy-ay-bay*hh, qz=hz-az-baz*hh, ql=Math.hypot(qx,qy,qz)||1, nx=qx/ql, ny=qy/ql, nz=qz/ql;
+      const uu=u0+(u1-u0)*hh, th=Math.atan2(qx*Bx+qy*By+qz*Bz, qx*Nx+qy*Ny+qz*Nz);
+      let g=.5+.5*Math.cos(th*nf+uu*.045+1.9*Math.sin(uu*.09+id*1.7)); g=g-.62; g=g<0?0:g/.38;
+      let a=lum0*(1-.42*g*g); if(NZ[((Math.round(hy*.5)&255)<<8)|(Math.round(hx*.5)&255)]>.78) a+=22;
+      const moss= !nm && nz>.5 && NZS[((Math.round(hy*.6)&255)<<8)|(Math.round(hx*.6+hz)&255)]>.62 && NZ[((Math.round(hy)&255)<<8)|(Math.round(hx+hz*.5)&255)]>.42;
+      key[i]=kk; RB.mat[i]=moss?2:1; RB.alb[i]=Math.max(0,Math.min(255,a|0)); RB.nrm[i]=rlNrm(nx,nz,ny); RB.hp[i]=Math.round(hz);
+      if(X<bd[0]) bd[0]=X; if(Y<bd[1]) bd[1]=Y; if(X>bd[2]) bd[2]=X; if(Y>bd[3]) bd[3]=Y;
+    } }
+}
+/* 焼いた物の画素から、周りの奥の画素へ「輪郭」と「くぼみの暗さ」を配る */
+function rlPost(RB,bb){
+  const PW=RB.PW, PH=RB.PH, key=RB.key, kind=RB.kind, Wt=RB.Wt, mat=RB.mat;
+  const X0=Math.max(3,Math.floor(bb[0])), X1=Math.min(PW-4,Math.ceil(bb[2])), Y0=Math.max(3,Math.floor(bb[1])), Y1=Math.min(PH-4,Math.ceil(bb[3]));
+  if(X1<=X0||Y1<=Y0) return;
+  const w=X1-X0+1, h=Y1-Y0+1, KK=new Float32Array(w*h), occ=new Float32Array(w*h), edge=new Uint8Array(w*h);
+  // 前後の比べに使う高さ（床も含む）を先に1枚にしておく
+  for(let Y=Y0;Y<=Y1;Y++){ const kr=(Y>>4)*Wt, o=(Y-Y0)*w-X0, ro=Y*PW;
+    for(let X=X0;X<=X1;X++){ const kd=kind[kr+(X>>4)], kf=kd===1?Y:kd===2?Y-4:-1e9, v=key[ro+X]; KK[o+X]=v>kf?v:kf; } }
+  for(let Y=Y0+3;Y<=Y1-3;Y++){ const ro=Y*PW, o=(Y-Y0)*w-X0;
+    for(let X=X0+3;X<=X1-3;X++){ if(!mat[ro+X]) continue; const j=o+X, kq=KK[j];
+      let kp;
+      kp=KK[j-1]; if(kp>-1e8&&kq-kp>3) edge[j-1]=1;
+      kp=KK[j+1]; if(kp>-1e8&&kq-kp>3) edge[j+1]=1;
+      kp=KK[j-w]; if(kp>-1e8&&kq-kp>3) edge[j-w]=1;
+      kp=KK[j+w]; if(kp>-1e8&&kq-kp>3) edge[j+w]=1;
+      kp=KK[j-3]; if(kp>-1e8&&kq>kp+1) occ[j-3]+=Math.min(4,kq-kp-1);
+      kp=KK[j+3]; if(kp>-1e8&&kq>kp+1) occ[j+3]+=Math.min(4,kq-kp-1);
+      kp=KK[j-3*w]; if(kp>-1e8&&kq>kp+1) occ[j-3*w]+=Math.min(4,kq-kp-1);
+      kp=KK[j+3*w]; if(kp>-1e8&&kq>kp+1) occ[j+3*w]+=Math.min(4,kq-kp-1);
+      kp=KK[j-2-2*w]; if(kp>-1e8&&kq>kp+1) occ[j-2-2*w]+=Math.min(4,kq-kp-1);
+      kp=KK[j+2-2*w]; if(kp>-1e8&&kq>kp+1) occ[j+2-2*w]+=Math.min(4,kq-kp-1);
+      kp=KK[j-2+2*w]; if(kp>-1e8&&kq>kp+1) occ[j-2+2*w]+=Math.min(4,kq-kp-1);
+      kp=KK[j+2+2*w]; if(kp>-1e8&&kq>kp+1) occ[j+2+2*w]+=Math.min(4,kq-kp-1); } }
+  for(let Y=Y0;Y<=Y1;Y++){ const ro=Y*PW, o=(Y-Y0)*w-X0;
+    for(let X=X0;X<=X1;X++){ const j=o+X, i=ro+X;
+      if(edge[j]){ if(mat[i]) mat[i]=5; else if(RB.fa[i]>90) RB.fa[i]=90; continue; }
+      const o_=occ[j]; if(o_>0){ const a=Math.max(110,255-o_*9); if(mat[i]) RB.alb[i]=(RB.alb[i]*a/255)|0; else if(RB.fa[i]>a) RB.fa[i]=a; } } }
+}
+
+/* 下の階の雰囲気：霧の向こうの遺跡の部屋・根・光る茸。端が反対の端へつながる256ドット四方 */
+function rlBackground(rnd){
+  const S=256, im=new Float32Array(S*S*3), occ=new Uint8Array(S*S);
+  const fogc=[0x17,0x30,0x38], base=[0x0b,0x12,0x16];
+  for(let i=0;i<S*S;i++){ im[i*3]=base[0]; im[i*3+1]=base[1]; im[i*3+2]=base[2]; }
+  const set=(x,y,c)=>{ x=((x%S)+S)%S; y=((y%S)+S)%S; const i=y*S+x; im[i*3]=c[0]; im[i*3+1]=c[1]; im[i*3+2]=c[2]; occ[i]=1; };
+  const ST=[[0x3b,0x35,0x36],[0x5c,0x52,0x4c],[0x85,0x76,0x64],[0xa8,0x97,0x7f],[0xc2,0xae,0x98]];
+  const BK=[[0x24,0x20,0x1b],[0x38,0x31,0x29],[0x4f,0x46,0x3a],[0x69,0x5e,0x4e]];
+  for(let k=0;k<5;k++){ const x0=(rnd()*S)|0, y0=(rnd()*S)|0, w=40+((rnd()*50)|0), h=30+((rnd()*36)|0);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){ const row=(y/8)|0, seam=y%8===0||((x+row*5)%12===0); set(x0+x,y0+y,seam?ST[2]:ST[3+((NZB[(((y0+y)&255)<<8)|((x0+x)&255)]>.6)?1:0)]); }
+    for(let x=0;x<w;x++){ for(let d=0;d<9;d++) set(x0+x,y0+h+d,ST[1].map(v=>v*(1-d*.08))); for(let d=1;d<10;d++) set(x0+x,y0-d,ST[d>7?3:2].map(v=>v*((x+((d/4)|0)*4)%9?.9:.7))); } }
+  for(let k=0;k<6;k++){ let x=rnd()*S, y=rnd()*S, a=rnd()*6.28; const w=3+((rnd()*2.5)|0), L=60+rnd()*80;
+    for(let s=0;s<L;s++){ a+=(rnd()-.5)*.25; x+=Math.cos(a); y+=Math.sin(a);
+      for(let dy=-w;dy<=w+2;dy++)for(let dx=-w;dx<=w;dx++){ if(dx*dx+Math.min(dy,w)**2>w*w+2) continue; set((x+dx)|0,(y+dy)|0, BK[dy<-w*.3?3:dy<=w?2:0]); } } }
+  const out=new Float32Array(S*S*3);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){ const i=y*S+x;
+    const f=.62+.2*NZS[((y&255)<<8)|(x&255)]+(BAYER[((y&3)<<2)|(x&3)]-.5)*.16;
+    if(occ[i]){ out[i*3]=im[i*3]*.85*(1-f)+fogc[0]*f*.55+4*f*.45; out[i*3+1]=im[i*3+1]*.85*(1-f)+fogc[1]*f*.55+6*f*.45; out[i*3+2]=im[i*3+2]*.85*(1-f)+fogc[2]*f*.55+10*f*.45; }
+    else { out[i*3]=2.4+fogc[0]*.1*f; out[i*3+1]=3.6+fogc[1]*.1*f; out[i*3+2]=6+fogc[2]*.1*f; } }
+  // 光る茸（深さの目印）
+  for(let k=0;k<9;k++){ const gx=(rnd()*S)|0, gy=(rnd()*S)|0;
+    for(let dy=-22;dy<=22;dy++)for(let dx=-22;dx<=22;dx++){ const d=Math.hypot(dx,dy); if(d>=22) continue; const x=((gx+dx)%S+S)%S, y=((gy+dy)%S+S)%S, i=y*S+x;
+      const a=Math.pow(1-d/22,1.5)*.55; out[i*3]+=0x9c*a*.5; out[i*3+1]+=0xf2*a*.5; out[i*3+2]+=0xdc*a*.5; if(d<1.2){ out[i*3]=0xd8; out[i*3+1]=0xff; out[i*3+2]=0xf4; } } }
+  const o=new Uint32Array(S*S);
+  for(let i=0;i<S*S;i++) o[i]=(0xff000000|(Math.min(255,out[i*3+2]|0)<<16)|(Math.min(255,out[i*3+1]|0)<<8)|Math.min(255,out[i*3]|0))>>>0;
+  return o;
+}
+/* 焼いた1ドットに、今のランタンを当てて色にする */
+function rlShade(RB,i,wx,wy,Lv,Cv,b){
+  const m=RB.mat[i], hp=RB.hp[i];
+  if(m===5) return RL_BARK[0];
+  const n=NRM[RB.nrm[i]], gy=wy+hp, lx=lampX-wx, ly=lampY-gy, lz=CAVE_LAMP_H-hp, l=Math.hypot(lx,ly,lz)||1;
+  const dot=Math.max(0,(n[0]*lx+n[2]*ly+n[1]*lz)/l);
+  const dep=hp<-20?Math.max(0,1-(-hp-20)/90):1;
+  const I=(Lv*dep)*(m>=3?.46+.72*dot:.3+.92*dot)+.06+Cv*.6;
+  const v=I*RB.alb[i]/255, bb=(b-.5)*.45;
+  let c;
+  if(m===1) c=RL_BARK[Math.max(0,Math.min(7,Math.floor(v*8.6+bb+.3)))];
+  else if(m===2) c=RL_MOSS[Math.max(0,Math.min(5,Math.floor(v*6.6+bb+.2)))];
+  else if(m===3) c=RL_FLR[Math.max(0,Math.min(10,Math.floor(v*11.5+bb+.4)))];
+  else c=RL_FMOSS[Math.max(0,Math.min(6,Math.floor(v*7.6+bb+.3)))];
+  if(hp<-24){ const fz=Math.min(.75,(-hp-24)/150); c=mixU(c,RL_FOG,fz*.9); }
+  return c;
+}
+
 let bw=0,bh=0,img=null,buf=null,cool=null,wmask=null,wrow=null,wcolX=null;
 /* wmask … このフレームで「水面」として塗ったドット（1=水の層の水／2=石の層の水溜り）。
    屈折のずらしと波紋は、ここに印のあるドットの上にだけ描く。 */
@@ -652,6 +1075,9 @@ function terrain(f,Z,camX,camY,blinded){
     const x0=Math.max(0,sx-r),x1=Math.min(bw-1,sx+r),y0=Math.max(0,sy-r),y1=Math.min(bh-1,sy+r);
     for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const d=Math.hypot(x-sx,y-sy);if(d<r){const q=1-d/r;cool[y*bw+x]+=m.it*q*q;}}}
   const {code,nx,ny,PW,PH}=G;
+  /* 根の層：遺跡と根を焼いた物（階に入って最初の1回だけ組み立てる）。穴の絵は遅れて流す（下の階は遠い） */
+  const RB=rlOn(f)?rlGet(f):null;
+  let rbOX=0, rbOY=0; if(RB){ rbOX=Math.round((camX+innerWidth/2)/ps*.22); rbOY=Math.round((camY+innerHeight/2)/ps*.22); rlEnsure(RB,bx0,by0,bx0+bw,by0+bh,240); }
   const lit=Pp.lit, rim=Pp.rim, cl=Pp.cool, fl=Pp.floor, dp=Pp.deep, ed=Pp.edge, VOID=Pp.void;
   const R=Rpx, R2=R*R, iFac=NA/6.2831853, flat=!!L.flat, feat=L.feature, invR=1/R;
   /* 明るさは「ランタンからのずれ（整数ドット）」だけで決まる角度と距離を表から引く。
@@ -740,7 +1166,19 @@ function terrain(f,Z,camX,camY,blinded){
            手前（下）の縁は灯りを受けた岩、奥（上）の縁は影——穴の縁が段になって見える。 */
         const hn=NZ[((wy&255)<<8)|(wx&255)]-.5, HR=64*(1+hn*.6);
         if(sd<HR){ buf[k]= sd>HR*.66 ? (wy>sty ? rim[Math.min(4,Math.floor(Lv*4.5+b))] : ed[0]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
-        if(pitOn&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
+        if(RB){
+          if(CAVE.rlFlat) Lv=Math.max(Lv,CAVE.rlFlat);                // 見た目の確認用：灯りの外も照らす
+          if(RB.mat[i]){ buf[k]=rlShade(RB,i,wx,wy,Lv,Cv,b); continue; }
+          const kd=RB.kind[(wy>>4)*f.W+(wx>>4)];
+          if(kd===0){                                               // 穴：下の階の雰囲気
+            let col=RB.bg[(((wy-rbOY)&255)<<8)|((wx-rbOX)&255)];
+            const sx=wx-10, sy=wy-16;
+            if(sx>=0&&sy>=0&&(RB.kind[(sy>>4)*f.W+(sx>>4)]||RB.mat[sy*PW+sx])) col=mulU(col,b<.8?.45:.7);   // 上の階の影
+            if(wy>1&&(RB.mat[i-PW]||RB.mat[i-2*PW]||RB.kind[((wy-2)>>4)*f.W+(wx>>4)])) col=mulU(col,.5);        // 縁のすぐ下
+            buf[k]=col; continue; }
+          if(kd===2){ buf[k]=RL_BARK[Math.max(0,Math.min(3,Math.floor(Lv*3.6+Cv+b*.8)))]; continue; }   // 橋の根の隙間（下の根の塊）
+        }
+        if(pitOn&&!RB&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
         if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(swOn&&hv>SW_LO&&hv<=.5){ SWK[swN]=k; SWV[swN++]=hv; } if(hv>.5){
           let lv = hz.glow ? 1+((Math.sin(t*1.6+(wx+wy)*.05)*.5+.5)*1.6+b)|0 : Math.floor(Math.max(Lv,Cv*.8)*4+b*.9);
@@ -786,6 +1224,10 @@ function terrain(f,Z,camX,camY,blinded){
           else if(haz.kind==='void_'){ if(ihash(wx,wy)%53===0&&Math.sin(t*4+wx*1.3)>.2) col=hz.hi; }
           buf[k]=col; continue; }}
         /* ---- 床 ---- */
+        if(RB){ const ft=RB.ft[i], tn=ft&15, fct=(.2+.85*Math.min(1,Lv*1.25)+Cv*.55)*RB.fa[i]/255;
+          if(ft>>4&1) buf[k]=RL_FMOSS[Math.max(0,Math.min(6,Math.floor(tn*.66*fct+(b-.5)*.8+.3)))];
+          else buf[k]=RL_FLR[Math.max(0,Math.min(10,Math.floor(tn*fct+(b-.5)*.8+.3)))];
+          continue; }
         if(Cv>Lv*.9&&Cv>.02){const lv=Math.floor(Math.min(1,Cv)*5+b); if(lv>0){buf[k]=cl[Math.min(4,lv-1)];continue;}}
         let lv=flat? Math.floor(Lv*7): Math.floor(Lv*7+b);
         // 層の特徴
@@ -1220,7 +1662,8 @@ function standClear(f,list){
   return out;
 }
 function genDeco(f,Z){
-  const set=DECO_SET[Z.id]||DECO_SET.stone, depth=(S.run&&S.run.depth)||1;
+  /* 根の層の新しい見た目では、縁に這う蔓と苔は本物の根と石積みに任せる（重ねると縁が点線に見えた） */
+  const set=(DECO_SET[Z.id]||DECO_SET.stone).filter(e=>!(rlOn(f)&&(e[0]==='tendril'||e[0]==='moss'))), depth=(S.run&&S.run.depth)||1;
   let out=[];
   const haz=W.haz, water=haz&&haz.kind==='water'?haz.g:null;
   for(let ty=1;ty<f.H-1;ty++)for(let tx=1;tx<f.W-1;tx++){
