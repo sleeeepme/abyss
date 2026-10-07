@@ -1714,6 +1714,12 @@ const RUIN_MOSS=[C('#252b19'),C('#384326'),C('#525d36'),C('#6f7a48')], RUIN_MOSS
 const RUIN_IVY=[C('#14281a'),C('#21442a'),C('#34683a'),C('#5a9a4c')];                                    // 蔦（苔より青い緑）
 const RUIN_SHROOM=[C('#6e6250'),C('#b8a888'),C('#ddd0b4'),C('#f4ead6'),C('#9a8e78')];                  // キノコ：傘の影・傘・傘の明・照り・柄
 const RUIN_SHROOM_G=[C('#2e6a6a'),C('#5ec0b4'),C('#a8f0e0'),C('#e8fff8'),C('#7aa8a0')];                // 青白く光るキノコ   // くすんだ緑（黄色に寄ると石が全部黄色く見えた）
+/* 遺跡の明るさ（2026-10-07 ユーザー報告「ライトの影響を正しく受けていない遺跡物がある」）。
+   前は .5+.5×明るさ で、しかも明るさに .22 の下限があったので、灯りの外でも遺跡が 6〜7割の明るさで浮いていた
+   （実測：灯りの無い所で床の輝度 16〜25 に対し、柱 70・倒れた柱 69・石碑 59）。
+   今は RUIN_FMIN（灯りの無い所）→ 1（灯りの真ん中）。岩・石筍と同じく、暗がりでは輪郭がやっと分かる程度に沈む。 */
+const RUIN_FMIN=.16;
+function ruinF(L){ return RUIN_FMIN+(1-RUIN_FMIN)*Math.min(1,Math.max(0,L)*1.4); }
 function ruinAgeOf(){
   if(typeof CAVE.ruinAge==='number') return CAVE.ruinAge;
   if(!G||!G.Z||G.Z.id!=='sump') return 0;
@@ -1755,7 +1761,7 @@ function ruinAge(c,X,Y,h,up,sid,flat){
    5本に1本は青白く光る傘（暗がりでも見える・周りを少し照らす）。前後は根元の y。 */
 function ruinShrooms(d,left,right,L){
   const s=d.s>>>0, A=RUIN_AGE; if(hs(s,4100)%100>=85*A) return;
-  const ng=1+(hs(s,4101)%100<50*A?1:0), wg=W.haz&&W.haz.kind==='water'?W.haz.g:null, f=.5+.5*Math.min(1,L*1.4);
+  const ng=1+(hs(s,4101)%100<50*A?1:0), wg=W.haz&&W.haz.kind==='water'?W.haz.g:null, f=ruinF(L);
   for(let g=0;g<ng;g++){
     const hg=hs(s,4110+g), gx=Math.round(d.x-left*.7+(hg%1000)/1000*(left+right)*.7), gy=Math.round(d.y+1+((hg>>>10)%3));
     if(wg&&hazAt(wg,gx,gy)>.4) continue;
@@ -1801,8 +1807,13 @@ function drawBigSprite(d,t,sp){
   // 水の印は描く前に控える（描いたドットは印が消えるので、後の行の「真下は水か」が狂う）
   const ext=40, n=(W)*(H+ext); if(!_bigW||_bigW.length<n) _bigW=new Uint8Array(n);
   for(let r=0;r<H+ext;r++) for(let q=0;q<W;q++){ const X=x0+q-DB0x, Y=y0+r-DB0y; _bigW[r*W+q]=(X>=0&&Y>=0&&X<bw&&Y<bh)?wmask[Y*bw+X]:0; }
-  const Lc=[]; for(let cy=0;cy<=H;cy+=8) for(let cx=0;cx<=W;cx+=8) Lc.push(Math.max(.22,pxLight(x0+cx,y0+cy)));
+  const Lc=[]; for(let cy=0;cy<=H;cy+=8) for(let cx=0;cx<=W;cx+=8) Lc.push(pxLight(x0+cx,y0+cy));
   const cw=(W>>3)+1;
+  /* 立ち物の明るさは、絵のドットの所ではなく**根元の、ランタンの側の床**で取る（8ドットの列ごと）。
+     絵の上の方は床の上では自分の影の中（ランタンは手前にあるので、柱の影は奥＝絵の上の方に落ちる）。そこで取ると柱の上が真っ暗になった。
+     根元のすぐ手前3・7ドットと斜め前の3点の大きい方（根元は当たりの岩になっていて、そこで取ると0になる） */
+  const sg=lampY>=d.y?1:-1, Ls=[];
+  for(let cx=0;cx<=W;cx+=8){ const X=x0+cx, side=lampX>X?4:-4; Ls.push(Math.max(pxLight(X,d.y+sg*3),pxLight(X,d.y+sg*7),pxLight(X+side,d.y+sg*4))); }
   /* 敷石は「地面に残った石の床」に見せる（ユーザー評価：上に置いた厚紙に見える）:
      立ち石より1段暗く、外の縁に輪郭を引かず半分だけ地面に溶かし、所々欠かす。縁に1〜2か所マス大の欠け。 */
   const pave=/^pave_/.test(d.name||''), pm=pave?paveMask(d,sp):null;
@@ -1811,12 +1822,12 @@ function drawBigSprite(d,t,sp){
   for(let r=0;r<H;r++){ const row=sp.rows[r], hr=sp.hts[r], Y=y0+r-DB0y; if(Y<0||Y>=bh) continue;
     for(let q=0;q<W;q++){ const ch=row[q]; if(ch==='.') continue; const X=x0+q-DB0x; if(X<0||X>=bw) continue;
       if(pave){ const m=pm[r*W+q]; if(!m) continue;
-        const k=Y*bw+X, hp=parseInt(hr[q],36), wet=_bigW[(r+hp)*W+q]===1, L=Lc[(r>>3)*cw+(q>>3)], f=.5+.5*Math.min(1,L*1.4);
+        const k=Y*bw+X, hp=parseInt(hr[q],36), wet=_bigW[(r+hp)*W+q]===1, L=Lc[(r>>3)*cw+(q>>3)], f=ruinF(L);
         const n=ch>='0'&&ch<='6'?ch.charCodeAt(0)-48:2; let c=mixU(RP_DARK,RP_T[Math.max(1,Math.min(4,n-1))],f);
         if(RUIN_AGE>0) c=ruinAge(c,x0+q,y0+r,0,1,d.s&255,true);                             // 敷石の目地にも苔（上面の半分）
         buf[k]=mixU(buf[k],c,(m===2?.5:1)*(wet?.5:1)); if(!wet) wmask[k]=0; continue; }
       const k=Y*bw+X, hp=parseInt(hr[q],36), gr=r+hp, wet= gr<H+ext && _bigW[gr*W+q]===1;
-      const L=Lc[(r>>3)*cw+(q>>3)], f=.5+.5*Math.min(1,L*1.4);
+      const L=Ls[q>>3], f=ruinF(L);
       if(ch==='s'){ if(shK>0) buf[k]=mixU(buf[k], wet?RP_WSH:RP_DARK, (wet?.5:.38)*shK); continue; }
       if(ch==='G'||ch==='H'||ch==='S'){ if(wet) continue; buf[k]=mixU(RP_DARK, ch==='S'?RP_T[3]:RP_GND[ch==='G'?0:1], f); wmask[k]=0; continue; }
       let c= sp.n ? relightPx(ch,sp.n[r][q],sp.k[r][q],x0+q,y0+r,hp,cap) : ch>='0'&&ch<='6' ? RP_T[ch.charCodeAt(0)-48] : RUIN_SPR_PAL[ch];
@@ -1841,7 +1852,7 @@ function ruinSprKey(d,inW){
 }
 function drawRuinSprite(d,t,L,inW,sp){
   const s=d.s, x=Math.round(d.x), y=Math.round(d.y), Wd=sp.w, Hs=sp.h, x0=x-(Wd>>1), top=y-Hs;
-  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const f=ruinF(L), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
   const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; occD[k]=y; };     // 柱の前後は根元の y で
   const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
@@ -1880,7 +1891,7 @@ function drawRuinPost(d,t,L,inW){
   const s=d.s, x=Math.round(d.x), y=Math.round(d.y);
   const Wd= d.W || (inW ? [5,6,7,6][s%4] : [8,8,7][s%3]), x0=x-(Wd>>1), cols=RP_COLS[Wd];
   const broken=d.broken!=null ? d.broken : s%3===0, H= d.H || (inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5);
-  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const f=ruinF(L), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
   const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; let v=lit(c); if(RUIN_AGE>0) v=ruinAge(v,px,py,y-py,py<=topY(px-x0)+1?1:0,s&255); buf[k]=v; wmask[k]=0; occD[k]=y; };   // 経年の苔（手続きの柱も）。前後の印は根元の y（水面の映り込みにも使う）
   const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
@@ -1964,7 +1975,7 @@ function drawRuinPost(d,t,L,inW){
    見本（添付の水没した遺跡）の、横倒しの大きな円柱と、石の塊を積んだ部屋の跡。drawRuinPost と同じ色・同じ描き方の規則
    （左上から光、上の面が一番明るい、右と下にだけ濃い輪郭、2ドットの塊の肌理、オリーブの苔、水に浸かった所は濡れて沈む）。 */
 function rpTools(L){
-  const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
+  const f=ruinF(L), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px=Math.round(px)-DB0x; py=Math.round(py)-DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
   const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; buf[k]=lit(c); wmask[k]=0; };
   const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
@@ -2154,7 +2165,7 @@ function drawRuinRoom(d,t,L){
         out.push(xx,yy,T(i2),1); }
       if(sl.s%5===0&&sl.w>6){ const cx=sl.x+2+sl.s%Math.max(1,sl.w-4), cy=sl.y+1; for(let r=0;r<3;r++) out.push(cx+(r>>1),cy+r,T(2),2); } }
     lay.px=out; }
-  { const P_=lay.px, f=.5+.5*Math.min(1,L*1.4);
+  { const P_=lay.px, f=ruinF(L);
     for(let n=0;n<P_.length;n+=4){ const k=idx(P_[n],P_[n+1]); if(k<0) continue; const m=P_[n+3], c=mixU(RP_DARK,P_[n+2],f);
       if(wmask[k]){ if(m===1) buf[k]=mixU(buf[k],c,.4); continue; }   // 水の上：土台とひびは敷かず、敷石は水に透ける
       buf[k]=c; } }
@@ -2408,9 +2419,9 @@ function drawDeco(bx0,by0,t,blindR){
     if(d.ok<0) continue;
     if(!seenAt(G.f,G.L,d.x|0,d.y|0) && !(mg && [[-mg,0],[mg,0],[0,-mg],[0,mg]].some(([ox,oy])=>seenAt(G.f,G.L,(d.x+ox)|0,(d.y+oy)|0)))) continue;
     if(Math.hypot(d.x-lampX,d.y-lampY)>blindR+mg) continue;
-    const L=Math.max(.22,pxLight(d.x,d.y)), s=d.s, x=d.x, y=d.y;
+    const L0=pxLight(d.x,d.y), L=Math.max(.22,L0), s=d.s, x=d.x, y=d.y;   // L0：生の明るさ（遺跡はこれで塗る。.22 の下限があると暗がりで遺跡だけ浮いた）
     occGY = standBox(d) ? Math.round(d.y) : null;        // 高さのある手描きの品目は、錨点（根元）の y で前後を決める
-    if(mg && ruinBigFor(d)){ occGY=null; const sp_=ruinBigFor(d); drawBigSprite(d,t,sp_); if(RUIN_AGE>0&&!/^(pave|steps)_/.test(d.name||'')) ruinShrooms(d,sp_.ax,sp_.w-sp_.ax,L); continue; }   // 3Dから作った大きな遺跡（経年のキノコを根元に）
+    if(mg && ruinBigFor(d)){ occGY=null; const sp_=ruinBigFor(d); drawBigSprite(d,t,sp_); if(RUIN_AGE>0&&!/^(pave|steps)_/.test(d.name||'')) ruinShrooms(d,sp_.ax,sp_.w-sp_.ax,L0); continue; }   // 3Dから作った大きな遺跡（経年のキノコを根元に）
     { const cs=(d.k==='rock'||d.k==='stalagC'||d.k==='column')&&caveSprFor(d); if(cs){ occGY=null; drawCaveSprite(d,cs,P_); occGY=null; continue; } }   // 3Dから作った石の層の岩・石筍
     switch(d.k){
     case 'moss': for(let i=0;i<34;i++){const h=hs(s,i),px=x+(h%17)-8,py=y+((h>>>5)%7)-3; dp(px,py,sh3(P_.moss,L,px,py));}
@@ -2477,7 +2488,7 @@ function drawDeco(bx0,by0,t,blindR){
       for(let j=0;j<len;j++){const q=j/len; px+=dx*1+(dy?sw*.25:0); py+=dy*1+(dx?sw*.25:0)+(dx?.25:0); dp(px,py,sh3(P_.tendril,L*(1.1-q*.5),px|0,py|0)); if(j%4===2) dp(px+1,py,P_.tendril[0]);}
       break; }
     case 'bulb': { const p=1+Math.sin(t*2+s)*.15; for(let yy=-3;yy<=0;yy++)for(let xx=-2;xx<=2;xx++){ if((xx*xx)/(4*p)+((yy+1.5)**2)/(2.8*p)>1) continue; dp(x+xx,y+yy,xx===0&&yy===-2?P_.bulb[2]:sh3(P_.bulb,L+.25,x+xx,y+yy)); } break; }
-    case 'pillar': if(G.Z.id==='sump'){ drawRuinPost(d,t,L,false); if(RUIN_AGE>0) ruinShrooms(d,4,4,L); break; } { const H=18+s%12, bx=x-4;
+    case 'pillar': if(G.Z.id==='sump'){ drawRuinPost(d,t,L0,false); if(RUIN_AGE>0) ruinShrooms(d,4,4,L0); break; } { const H=18+s%12, bx=x-4;
       drect(bx-2,y-2,bx+9,y+1,P_.stone,L*.9,true); drect(bx-1,y-4,bx+8,y-3,P_.stone,L,true);
       for(let j=5;j<H;j++){ const top=j>H-4; for(let q=0;q<8;q++){ if(top&&hs(s,q+j*7)%3===0) continue; const px=bx+q, py=y-j; dp(px,py,(q===2||q===5)?P_.stone[0]:sh3(P_.stone,L*(q<2?1.25:q>6?.6:1),px,py)); } }
       if(s%2){ const fx=x+(s%3?10:-15), fy=y+3; drect(fx,fy-4,fx+7,fy,P_.stone,L,true); dp(fx+2,fy-2,P_.stoneDk); dp(fx+5,fy-2,P_.stoneDk); }
@@ -2486,22 +2497,22 @@ function drawDeco(bx0,by0,t,blindR){
     /* ---- 水の中の遺跡（水の層・第16〜20階層）----
        立っている物は wmask を消して描く（dpw の 0）——水面の揺らぎ（屈折）と波の線が乗らない。
        沈んだ跡だけは水の色に混ぜて、印を残す＝水と一緒に揺れて「水の下にある」に見える。 */
-    case 'wpost': drawRuinPost(d,t,L,true); break;   // 水の中の柱にはキノコを生やさない
-    case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone; occGY=y;   // 前後の印（水面に映る）
+    case 'wpost': drawRuinPost(d,t,L0,true); break;   // 水の中の柱にはキノコを生やさない
+    case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone, fR=ruinF(L0), lr=c=>mixU(RP_DARK,c,fR); occGY=y;   // lr：遺跡と同じ明るさ   // 前後の印（水面に映る）
       for(let xx=0;xx<w;xx++){ const eH=H-((hs(s,xx)%3)*(xx>w*.55?1:0))-(xx<2||xx>w-3?1:0);
         for(let yy=0;yy<eH;yy++){ const px=x0+xx, py=y-yy, mortar=(yy%3===2)||(((xx+((yy/3|0)%2)*3)%6)===0);
-          dpw(px,py, yy===eH-1?P_.stoneHi:mortar?P_.stoneDk:sh3(sb,L*(xx<w/3?1.15:.85),px,py), 0); }
-        if(((xx+((t*4)|0))%5)!==0) dpw(x0+xx,y+1,P_.foam,0); }
-      if(P_.algae) for(let i=0;i<8+Math.round(28*RUIN_AGE);i++){ const h=hs(s,i+60); dpw(x0+(h%w), y-((h>>>5)%(2+Math.round(3*RUIN_AGE))), sh3(P_.algae,L,x0,y),0); }
+          dpw(px,py, lr(yy===eH-1?P_.stoneHi:mortar?P_.stoneDk:sh3(sb,.5*(xx<w/3?1.15:.85),px,py)), 0); }
+        if(((xx+((t*4)|0))%5)!==0) dpw(x0+xx,y+1,lr(P_.foam),0); }
+      if(P_.algae) for(let i=0;i<8+Math.round(28*RUIN_AGE);i++){ const h=hs(s,i+60); dpw(x0+(h%w), y-((h>>>5)%(2+Math.round(3*RUIN_AGE))), lr(sh3(P_.algae,1,x0,y)),0); }
       if(RUIN_AGE>0) for(let xx=0;xx<w;xx++){ if(hs(s,xx+700)%100>=70*RUIN_AGE) continue; const eH=H-((hs(s,xx)%3)*(xx>w*.55?1:0))-(xx<2||xx>w-3?1:0);   // 天辺に積もった苔
-        dpw(x0+xx,y-eH+1,RUIN_MOSS[2+(hs(s,xx+800)&1)],0); if(hs(s,xx+900)%3===0) dpw(x0+xx,y-eH+2,RUIN_MOSS[1],0); }
+        dpw(x0+xx,y-eH+1,lr(RUIN_MOSS[2+(hs(s,xx+800)&1)]),0); if(hs(s,xx+900)%3===0) dpw(x0+xx,y-eH+2,lr(RUIN_MOSS[1]),0); }
       break; }
-    case 'wsteps': for(let i=0;i<3;i++){ const h=hs(s,i), px=x-9+i*8+(h%3)-1, py=y+((h>>>3)%5)-2;
+    case 'wsteps': { const fR=ruinF(L0), lr=c=>mixU(RP_DARK,c,fR); for(let i=0;i<3;i++){ const h=hs(s,i), px=x-9+i*8+(h%3)-1, py=y+((h>>>3)%5)-2;
         for(let yy=-2;yy<=1;yy++)for(let xx=-3;xx<=3;xx++){ if(xx*xx/10+yy*yy/2.6>1) continue;
           const mo=RUIN_AGE>0&&yy<0&&hs(s,i*50+xx*7+yy)%100<75*RUIN_AGE;                              // 上面の苔（経年）
-          dpw(px+xx,py+yy, mo?RUIN_MOSS[yy===-2?3:2]:yy<0?P_.stoneHi:sh3(P_.stone,L*.9,px+xx,py+yy),0); }
-        if(Math.sin(t*2+i+s)>.3) dpw(px+4,py+1,P_.foam,0); }
-      break;
+          dpw(px+xx,py+yy, lr(mo?RUIN_MOSS[yy===-2?3:2]:yy<0?P_.stoneHi:sh3(P_.stone,.45,px+xx,py+yy)),0); }
+        if(Math.sin(t*2+i+s)>.3) dpw(px+4,py+1,lr(P_.foam),0); }
+      break; }
     case 'sunken': { const w=26+s%20, h=16+(s>>>5)%14, x0=x-(w>>1), y0=y-(h>>1), stc=P_.stone[2], dk=P_.stoneDk;
       const mixAt=(px,py,c,a)=>{ px=Math.round(px)-DB0x; py=Math.round(py)-DB0y; if(px<0||py<0||px>=bw||py>=bh) return; const k=py*bw+px; if(!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
       const A=.24+.18*Math.min(1,L*1.4);
@@ -2512,9 +2523,9 @@ function drawDeco(bx0,by0,t,blindR){
       for(let yy=y0+4;yy<y0+h-2;yy+=5)for(let xx=x0+4;xx<x0+w-2;xx+=6) if(hs(s,xx*13+yy)%3) mixAt(xx,yy,stc,A*.55);   // 床の敷石
       break; }
     /* 倒れた柱：横倒しの円柱。太鼓（継ぎ目）ごとに少しずれて、片端は折れて欠けている。跨げる高さなので当たり判定は持たない。 */
-    case 'wfallen': drawFallenColumn(d,t,L); break;
-    case 'ruinroom': drawRuinRoom(d,t,L); break;
-    case 'fallen': if(G.Z.id==='sump'){ drawFallenColumn(d,t,L); break; } { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
+    case 'wfallen': drawFallenColumn(d,t,L0); break;
+    case 'ruinroom': drawRuinRoom(d,t,L0); break;
+    case 'fallen': if(G.Z.id==='sump'){ drawFallenColumn(d,t,L0); break; } { const len=26+s%10, R=3, x0=x-(len>>1), dir=s%2?1:-1;
       for(let xx=0;xx<len;xx++){ const drum=(xx/8|0), off=(hs(s,drum)%3)-1, seam=xx%8===0;
         const brk=(dir>0?len-1-xx:xx); const top=brk<3?(hs(s,xx+40)%3):0;
         for(let yy=-R+top;yy<=R;yy++){ const px=x0+xx, py=y-R-1+yy+off*(yy<0?0:0);
