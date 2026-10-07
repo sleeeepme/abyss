@@ -1830,7 +1830,7 @@ const ZONES=[
    floor:'#3a3328', wall:'#120e0a', edge:'#2a2419', dot:'#6a5236', accent:'#c0e07f',
    deco:'vein', decoEvery:7, lightR:12,
    air:{n:24, col:'#a8c878', size:1.7, vx:0.08, vy:-0.26, a:0.28},
-   gen:{room:1.06, loops:1}, fam:{arcane:2.8, slime:1.5, frost:1.2, beast:0.5}},
+   gen:{room:0.80, loops:1}, fam:{arcane:2.8, slime:1.5, frost:1.2, beast:0.5}},   // 部屋を小さめに＝根の橋でつながる浮き島（2026-10-07）
 
   /* 第四層／築。誰かが住んだ痕。階段、扉、規格された石材。
      **建てた者の記録が無い。** ここから先、加工痕が濃くなる。 */
@@ -6575,6 +6575,14 @@ function applyZoneTerrain(fl, depth){
        この層だけ道の付き方が違って見えて、同じ坑の続きに見えなくなる。 */
     for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++)
       if(fl.g[y][x]===T.WALL) fl.g[y][x]=T.PIT;
+    /* 部屋は「根に呑まれた遺跡の部屋」：北と左右は石積みの壁（歩けない・落ちない）、南の縁だけが落ちる所。
+       2026-10-07 ユーザー指摘「壁があるところでも落下する」——壁を絵だけで描いていたので、壁の上へ歩けて落ちた。
+       通路（橋）の口は空けておく（床のマスはそのまま）。 */
+    for(const r of (fl.rooms||[])){
+      const wallAt=(x,y)=>{ if(x>=0&&y>=0&&x<fl.W&&y<fl.H&&fl.g[y][x]===T.PIT) fl.g[y][x]=T.WALL; };
+      for(let x=r.x-1;x<=r.x+r.w;x++) wallAt(x,r.y-1);
+      for(let y=r.y;y<r.y+r.h;y++){ wallAt(r.x-1,y); wallAt(r.x+r.w,y); }
+    }
     fl.pit = true;
   }
   return fl;
@@ -19502,7 +19510,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20260929b"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
-<script src="cave-look.js?v=20261007g"></script>
+<script src="cave-look.js?v=20261007h"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

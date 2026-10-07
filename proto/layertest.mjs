@@ -100,7 +100,13 @@ R.ledges = await pg.evaluate(()=>{
       const t=fl.g[y][x];
       if(t===T.PIT) pit++; else if(t===T.WALL) wall++; else floor++;
     }
-    return {pit, wall, floor, marked: fl.pit ? 'あり' : 'なし'};
+    /* 2026-10-07：根の層の部屋は北と左右を石積みの壁で囲む（壁の絵の所で落ちないように）。
+       壁は「部屋の北の列・左右の列」にだけあり、それ以外（通路の外・部屋の南）は落ちる所のまま。 */
+    let stray=0;
+    for(let y=0;y<fl.H;y++) for(let x=0;x<fl.W;x++){ if(fl.g[y][x]!==T.WALL) continue;
+      const ok=(fl.rooms||[]).some(r=>(y===r.y-1&&x>=r.x-1&&x<=r.x+r.w)||((x===r.x-1||x===r.x+r.w)&&y>=r.y&&y<r.y+r.h));
+      if(!ok) stray++; }
+    return {pit, wall, floor, stray, marked: fl.pit ? 'あり' : 'なし'};
   };
   const root=look(25), stone=look(5);
   /* 縁は「黒い壁」に見えないよう、壁の色ではなく空の水色で塗る。 */
@@ -108,11 +114,11 @@ R.ledges = await pg.evaluate(()=>{
   const rootWallColour = ZONES.find(z=>z.id==='root').wall;
   return {root, stone, pitColour, rootWallColour,
           rootHasPits: root.pit>0 && root.marked==='あり',
-          rootHasNoWalls: root.wall===0,
+          rootWallsOnlyAroundRooms: root.stray===0,
           othersUnchanged: stone.pit===0 && stone.wall>0 && stone.marked==='なし',
           roomsRemain: root.floor>0,
           pitIsSkyBlue: !!pitColour && pitColour.toLowerCase()!==rootWallColour.toLowerCase(),
-          ok: root.pit>0 && root.wall===0 && stone.pit===0 && !!pitColour && pitColour.toLowerCase()!==rootWallColour.toLowerCase()};
+          ok: root.pit>0 && root.stray===0 && stone.pit===0 && !!pitColour && pitColour.toLowerCase()!==rootWallColour.toLowerCase()};
 });
 
 /* 2-b. 落ちるのは**落ちられる者だけ**。棲んでいる側は縁で止まる。

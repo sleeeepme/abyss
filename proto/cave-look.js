@@ -606,7 +606,7 @@ const RL_MOSS=['#1c2612','#2c3a18','#3e5220','#55692a','#6f8436','#8ea044'].map(
 const RL_FLR=['#0b0a09','#13110f','#1c1916','#28231f','#3a3430','#524a43','#6f6457','#8f826f','#ad9d86','#c7b49c','#dcc8b0'].map(C);
 const RL_FMOSS=['#0e120a','#161d0e','#212b14','#2f3d1a','#41521f','#566a28','#6f8436'].map(C);
 const RL_FOG=C('#173038'), RL_VOID=C('#04060a');
-const RL_WALL_H=24, RL_WALL_D=8, RL_SIDE_H=10, RL_SIDE_D=6, RL_CLIFF=18;
+const RL_WALL_H=28, RL_WALL_D=10, RL_SIDE_H=12, RL_SIDE_D=10, RL_CLIFF=18, RL_AMB=.3;
 function rlOn(f){ return CAVE.rootLayer!==false && f && !f.arena && f.zone && f.zone.id==='root'; }
 function rlRand(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
 /* 面の向き → NRM の番号（16^3 の表で最寄りを引く） */
@@ -702,7 +702,7 @@ function rlPlan(f){
   (f.rooms||[]).forEach((r,ri)=>{ for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++) if(y>=0&&y<Ht&&x>=0&&x<Wt) roomIx[y*Wt+x]=ri; });
   RB.roomIx=roomIx;
   const walk=(tx,ty)=>tx>=0&&ty>=0&&tx<Wt&&ty<Ht&&f.g[ty][tx]!==T.PIT&&f.g[ty][tx]!==T.WALL;
-  for(let ty=0;ty<Ht;ty++)for(let tx=0;tx<Wt;tx++) RB.kind[ty*Wt+tx]= !walk(tx,ty)?0 : roomIx[ty*Wt+tx]>=0?1:2;
+  for(let ty=0;ty<Ht;ty++)for(let tx=0;tx<Wt;tx++) RB.kind[ty*Wt+tx]= f.g[ty][tx]===T.WALL?3 : !walk(tx,ty)?0 : roomIx[ty*Wt+tx]>=0?1:2;   // 3＝部屋の石積み（歩けない）
   const kindAt=RB.kindAt=(tx,ty)=>(tx<0||ty<0||tx>=Wt||ty>=Ht)?0:RB.kind[ty*Wt+tx];
   RB.pt={k:Math.round(performance.now()-tP)};
   const boxes=RB.boxes=rlBoxes();
@@ -721,13 +721,13 @@ function rlPlan(f){
   (f.rooms||[]).forEach((r,ri)=>{ if(r.w<2||r.h<2) return;
     const x0=r.x*Q, x1=(r.x+r.w)*Q, y0=r.y*Q, y1=(r.y+r.h)*Q, rs=(seed^Math.imul(r.x+1,73856093)^Math.imul(r.y+1,19349663))>>>0, rnd=rlRand(rs);
     boxes.add(x0,y0,-RL_CLIFF,x1,y1,0);
-    let northN=0; for(let tx=r.x;tx<r.x+r.w;tx++) if(kindAt(tx,r.y-1)===0) northN++;
-    if(northN) boxes.add(x0-RL_SIDE_D,y0-RL_WALL_D,-RL_CLIFF,x1+RL_SIDE_D,y0,RL_WALL_H-2);
-    for(const side of [-1,1]){ const xb= side<0 ? x0-RL_SIDE_D : x1;
-      for(let ty=r.y;ty<r.y+r.h;ty++) if(kindAt(side<0?r.x-1:r.x+r.w,ty)===0) boxes.add(xb,ty*Q,-RL_CLIFF,xb+RL_SIDE_D,ty*Q+Q,RL_SIDE_H); }
+    let northN=0; for(let tx=r.x-1;tx<=r.x+r.w;tx++) if(kindAt(tx,r.y-1)===3) northN++;
+    if(northN) boxes.add(x0-Q,y0-RL_WALL_D,-RL_CLIFF,x1+Q,y0,RL_WALL_H-2);
+    for(const side of [-1,1]){ const xb= side<0 ? x0-Q : x1;
+      for(let ty=r.y;ty<r.y+r.h;ty++) if(kindAt(side<0?r.x-1:r.x+r.w,ty)===3) boxes.add(xb,ty*Q,-RL_CLIFF,xb+Q,ty*Q+Q,RL_SIDE_H); }
     const pillars=[];
-    for(const cx of [x0-RL_SIDE_D-1, x1+RL_SIDE_D+1]){ if(kindAt(Math.floor(cx/Q),r.y-1)!==0) continue; if(rnd()<.25) continue;
-      const ph=30+((rnd()*10)|0); pillars.push([cx,ph]); boxes.add(cx-5,y0+2-8,-RL_CLIFF,cx+5,y0+2,ph); }
+    for(const [cx,tx] of [[x0-8,r.x-1],[x1+8,r.x+r.w]]){ if(kindAt(tx,r.y-1)!==3) continue; if(rnd()<.2) continue;
+      const ph=38+((rnd()*10)|0); pillars.push([cx,ph]); boxes.add(cx-6,y0-12,-RL_CLIFF,cx+6,y0,ph); }
     RB.units.push({t:0,r,ri,rs,pillars,northN,bb:[x0-70,y0-110,x1+70,y1+200],core:[x0-12,y0-44,x1+12,y1+30],done:0});
   });
   RB.pt.rooms=Math.round(performance.now()-tP);
@@ -777,7 +777,7 @@ function rlEnsure(RB,x0,y0,x1,y1,pad){
   RB.ms+=performance.now()-t0;
 }
 /* 床の高さ（前後の比べ用）：部屋の床は z=0、橋のマスは根の下敷きの z=-4、穴は無し */
-function rlFloorKey(RB,X,Y){ const kd=RB.kind[(Y>>4)*RB.Wt+(X>>4)]; return kd===1?Y:kd===2?Y-4:-1e9; }
+function rlFloorKey(RB,X,Y){ const kd=RB.kind[(Y>>4)*RB.Wt+(X>>4)]; return kd===1?Y:kd===2?Y-4:-1e9; }   // 3（石積みのマス）は絵で描くので床の高さは持たない
 
 function rlBakeUnit(RB,u){
   u.done=1; RB.baked++; const tm=RB.tm||(RB.tm={a:0,g:0,r:0,p:0}); let tq=performance.now(); const lap=k=>{ const n_=performance.now(); tm[k]+=n_-tq; tq=n_; };
@@ -808,7 +808,7 @@ function rlBakeUnit(RB,u){
       let moss=0;
       const m1=NZS[(((y+40)&255)<<8)|((x+70)&255)]*.6+NZ[((y&255)<<8)|(x&255)]*.4;
       const edge=Math.min(x-x0, x1-1-x, y-y0, y1-1-y);
-      if(m1>.72-Math.max(0,(14-edge))*.012) moss=1;
+      if(m1>.66-Math.max(0,(18-edge))*.014) moss=1;
       else if((fx===0||fy===0)&&NZB[((y&255)<<8)|(x&255)]>.62) moss=1;
       const tx=x>>4, ty=y>>4;
       if((y&15)===15&&kindAt(tx,ty+1)===0){ tn=10; moss=0; }
@@ -825,35 +825,38 @@ function rlBakeUnit(RB,u){
       put(x,yb-d-hTop-1,yb-d+hTop,5,0,N_UP,hTop);
       for(let z=hTop-1;z>=-RL_CLIFF;z--){ if(z<0) put(x,yb-z,yb+z,mossy(x,yb,z+RL_CLIFF,RL_CLIFF)?4:3,Math.max(40,masonry(x,-z,RL_CLIFF,sx+7)+z*7),N_S,z);
         else put(x,yb-z,yb+z,mossy(x,yb,z,hTop)?4:3,masonry(x,z,hTop,sx),N_S,z); } };
-    if(u.northN) for(let x=x0-RL_SIDE_D;x<x1+RL_SIDE_D;x++){ const tx=Math.floor(x/Q);
-      if(kindAt(Math.min(r.x+r.w-1,Math.max(r.x,tx)),r.y-1)!==0) continue;
-      if(x<x0&&kindAt(r.x-1,r.y)!==0) continue; if(x>=x1&&kindAt(r.x+r.w,r.y)!==0) continue;
-      const nv=NZS[(((r.y*37)&255)<<8)|(x&255)]; wallCol(x,y0,RL_WALL_D,Math.max(6,RL_WALL_H-(nv>.6?Math.floor((nv-.6)*10)*6:0))); }
-    for(const side of [-1,1]){ const xb= side<0 ? x0-RL_SIDE_D : x1;
-      for(let ty=r.y;ty<r.y+r.h;ty++){ if(kindAt(side<0?r.x-1:r.x+r.w,ty)!==0) continue;
-        for(let y=ty*Q;y<ty*Q+Q;y++){ if(y>=y1-4) continue; if(NZB[((y&255)<<8)|((xb*3)&255)]>.74) continue;
-          const h=RL_SIDE_H-(NZ[((y&255)<<8)|((xb+11)&255)]>.62?4:0);
-          for(let x=xb;x<xb+RL_SIDE_D;x++){ const fx=x-xb, a=fx===0?150:(fx<3?235:fx<5?205:140); put(x,y-h,y+h,NZ[((y&255)<<8)|(x&255)]>.66?4:3,(y-y0)%14===0?150:a,N_UP,h); }
-          const last=y===ty*Q+Q-1||y===y1-5||NZB[(((y+1)&255)<<8)|((xb*3)&255)]>.74;
-          if(last) for(let z=h-1;z>=-RL_CLIFF;z--) for(let x=xb;x<xb+RL_SIDE_D;x++) put(x,y-z,y+z,3,z<0?Math.max(40,150+z*6):masonry(x,z,h,sx),N_S,z); } } }
+    const isW=(tx,ty)=>kindAt(tx,ty)===3;
+    // 北の石積み（北の壁のマスの列。厚さ1マス・高さ28、天辺は所々崩れて段になる）
+    if(u.northN) for(let x=x0-Q;x<x1+Q;x++){ if(!isW(Math.floor(x/Q),r.y-1)) continue;
+      const nv=NZS[(((r.y*37)&255)<<8)|(x&255)]; wallCol(x,y0,RL_WALL_D,Math.max(10,RL_WALL_H-(nv>.58?Math.floor((nv-.58)*12)*6:0))); }
+    // 左右の石積み（低い。崩れて低くなる所はあるが、途切れない＝歩けない所はどこも壁に見える）
+    for(const side of [-1,1]){ const xb= side<0 ? x0-RL_SIDE_D : x1, tx=side<0?r.x-1:r.x+r.w;
+      for(let ty=r.y;ty<r.y+r.h;ty++){ if(!isW(tx,ty)) continue;
+        for(let y=ty*Q;y<ty*Q+Q;y++){
+          const h=RL_SIDE_H-(NZ[((y&255)<<8)|((xb+11)&255)]>.6?5:0);
+          for(let x=xb;x<xb+RL_SIDE_D;x++){ const fx=side<0?x-xb:xb+RL_SIDE_D-1-x, a=fx===0?140:(fx<3?205:fx<8?232:250); put(x,y-h,y+h,NZ[((y&255)<<8)|(x&255)]>.62?4:3,(y-y0)%14===0?160:a,N_UP,h); }
+          const last= y===ty*Q+Q-1 && !isW(tx,ty+1);
+          if(last) for(let z=h-1;z>=-RL_CLIFF;z--) for(let x=xb;x<xb+RL_SIDE_D;x++) put(x,y+1-z,y+1+z,mossy(x,y,z+RL_CLIFF,RL_CLIFF+h)?4:3,z<0?Math.max(40,masonry(x,-z,RL_CLIFF,sx+5)+z*7):masonry(x,z,h,sx),N_S,z); } } }
+    // 南の縁の基礎の崖（下のマスが穴の所）
     for(let x=x0;x<x1;x++){ if(kindAt(x>>4,r.y+r.h)!==0) continue;
       for(let z=-1;z>=-RL_CLIFF;z--) put(x,y1-z,y1+z,mossy(x,y1,z+RL_CLIFF,RL_CLIFF)?4:3,Math.max(40,masonry(x,-z,RL_CLIFF,sx+3)+z*7),N_S,z); }
-    for(const [cx,ph] of u.pillars){ const w=10, d=8, yb=y0+2;
+    // 北の角の角柱
+    for(const [cx,ph] of u.pillars){ const w=12, d=12, yb=y0;
       for(let x=cx-w/2;x<cx+w/2;x++){ const fx=x-(cx-w/2);
-        for(let y=yb-d;y<yb;y++) put(x,y-ph,y+ph,3,fx<w-3?250:200,N_UP,ph);
-        put(x,yb-d-ph-1,yb-d+ph,5,0,N_UP,ph);
-        for(let z=ph-1;z>=-RL_CLIFF;z--){ const zz=((z%9)+9)%9; let a=fx===0?250:fx>=w-3?120:200; if(zz===8) a-=60; put(x,yb-z,yb+z,NZ[(((z*5)&255)<<8)|(x&255)]>.66?4:3,a,N_S,z); } } }
+        for(let y=yb-d;y<yb;y++) put(x,y-ph,y+ph+.5,3,fx<w-3?250:200,N_UP,ph);
+        put(x,yb-d-ph-1,yb-d+ph+.5,5,0,N_UP,ph);
+        for(let z=ph-1;z>=-RL_CLIFF;z--){ const zz=((z%9)+9)%9; let a=fx===0?250:fx>=w-3?120:200; if(zz===8) a-=60; put(x,yb-z,yb+z+.5,mossy(x,yb,z,ph)?4:3,a,N_S,z); } } }
     lap('a');
     /* ---- 根 ---- */
     const BKW={frac:.45,grav:.5,cling:1,tip:.6}, CKW={frac:.35,grav:1.3,cling:0,tip:.6};
     const nOver=u.northN>=Math.min(3,r.w)?(1+(r.w*r.h>48?1:0)+(rnd()<.5?1:0)):0;
     for(let k=0;k<nOver;k++){ const side=(k%2===0)===(rnd()<.5)?-1:1;
       const x=side<0? x0+12+rnd()*Math.max(8,(x1-x0)*.3) : x1-12-rnd()*Math.max(8,(x1-x0)*.3);
-      if(kindAt(x>>4,r.y-1)!==0) continue;
-      const sxo= side<0 ? x0-RL_SIDE_D-4 : x1+RL_SIDE_D+4, ym=y0+(y1-y0)*(.35+rnd()*.4), sideOpen=kindAt(side<0?r.x-1:r.x+r.w,Math.floor(ym/Q))===0;
-      const way=[[x,y0-14,30],[x+side*4,y0+4,6],[x+side*10,y0+18,1],[side<0?x0+8:x1-8,ym,1]];
-      if(sideOpen) way.push([sxo,ym+6,-6],[sxo+side*6,ym+12,-60],[sxo+side*8,ym+16,-170]);
-      G3.grow([x,y0-46,34],[0,1,-.3],150,{way,cling:1,grav:.25,branch:.022,bkw:BKW,tip:.8}); }
+      if(kindAt(x>>4,r.y-1)!==3) continue;
+      const sxo= side<0 ? x0-Q-5 : x1+Q+5, ym=y0+(y1-y0)*(.3+rnd()*.45), wy_=Math.floor(ym/Q), sideOpen=isW(side<0?r.x-1:r.x+r.w,wy_)&&kindAt(side<0?r.x-2:r.x+r.w+1,wy_)===0;
+      const way=[[x,y0-26,34],[x+side*4,y0+2,8],[x+side*10,y0+16,1],[side<0?x0+6:x1-6,ym,1]];
+      if(sideOpen) way.push([side<0?x0-8:x1+8,ym+4,RL_SIDE_H+2],[sxo,ym+8,-6],[sxo+side*6,ym+14,-60],[sxo+side*8,ym+18,-170]);
+      G3.grow([x,y0-56,40],[0,1,-.3],170,{way,cling:1,grav:.25,branch:.02,bkw:BKW,tip:1.1}); }
     const nC=1+(r.w>=7?1:0)+(rnd()<.5?1:0);
     for(let k=0;k<nC;k++){ const ex=x0+(x1-x0)*((k+.5)/nC)+(rnd()-.5)*20; if(kindAt(ex>>4,r.y+r.h)!==0) continue;
       G3.grow([cxr+(rnd()-.5)*30,(y0+y1)/2,-26],[0,1,-.1],140,{way:[[ex,y1+4,-28],[ex-4+rnd()*8,y1+14,-70],[ex+(rnd()-.5)*16,y1+20,-170]],
@@ -861,18 +864,18 @@ function rlBakeUnit(RB,u){
     const nG=1+(r.w>=6?1:0)+(rnd()<.5?1:0);
     for(let k=0;k<nG;k++){ const gx=x0+10+rnd()*Math.max(4,x1-x0-20); if(kindAt(gx>>4,r.y+r.h)!==0) continue;
       G3.grow([gx-6,y1-16,.5],[0,1,0],80,{step:1.8,way:[[gx,y1-2,.5],[gx+2,y1+2,-6],[gx+3,y1+4,-18],[gx+4,y1+10,-60]],cling:1.2,grav:.5,tip:.7,branch:.04,bkw:{frac:.5,grav:1.5,cling:0,tip:.5},maxDepth:1}); }
-    for(let x=x0+3;x<x1-3;x+=5){ if(kindAt(x>>4,r.y+r.h)!==0||rnd()>.35) continue;
+    for(let x=x0+3;x<x1-3;x+=5){ if(kindAt(x>>4,r.y+r.h)!==0||rnd()>.2) continue;
       G3.grow([x,y1+1.5,-RL_CLIFF+2],[0,0,-1],8+((rnd()*22)|0),{grav:2.4,wander:.15,tip:.45}); }
   } else {
     /* ---- 橋：6本の根を螺旋に撚る。端は床の下へ潜り、細い根が床へほどける ---- */
     const piece=u.piece, Lc=[0];
     for(let q=1;q<piece.length;q++) Lc.push(Lc[q-1]+Math.hypot(piece[q][0]-piece[q-1][0],piece[q][1]-piece[q-1][1]));
-    const tot=Lc[Lc.length-1], NS=6, Amp=10, turns=Math.max(1,tot/70);
+    const tot=Lc[Lc.length-1], NS=4, Amp=8.5, turns=Math.max(1,tot/64);
     const at=s=>{ s=Math.max(0,Math.min(tot,s)); let q=1; while(q<Lc.length-1&&Lc[q]<s) q++; const t=(s-Lc[q-1])/Math.max(1e-6,Lc[q]-Lc[q-1]);
       const p=[piece[q-1][0]+(piece[q][0]-piece[q-1][0])*t, piece[q-1][1]+(piece[q][1]-piece[q-1][1])*t];
       const dx=piece[q][0]-piece[q-1][0], dy=piece[q][1]-piece[q-1][1], l=Math.hypot(dx,dy)||1; return [p[0],p[1],dx/l,dy/l]; };
     const endIn=u.startIn?10:0, endOut=u.endIn?10:0;
-    for(let k=0;k<NS;k++){ const ph=2*Math.PI*k/NS, rad=4.4+((k*37)%5)*.25, pts_=[];
+    for(let k=0;k<NS;k++){ const ph=2*Math.PI*k/NS, rad=6.2+((k*37)%5)*.3, pts_=[];
       for(let s=0;s<=tot;s+=4){ const [cx,cy,tx_,ty_]=at(s), nx=-ty_, ny=tx_, a=2*Math.PI*turns*s/tot+ph, w=1+.12*Math.sin(s*.07+k*2.1);
         let dive=0; if(s<endIn) dive=(endIn-s)/endIn; if(s>tot-endOut) dive=Math.max(dive,(s-(tot-endOut))/endOut);
         pts_.push([cx+nx*Amp*w*Math.sin(a), cy+ny*Amp*w*Math.sin(a), -rad+Amp*.4*Math.cos(a)-dive*10]); }
@@ -884,7 +887,7 @@ function rlBakeUnit(RB,u){
       const [cx,cy,tx_,ty_]=at(e?tot:0), sg=e?1:-1;
       for(const sp of [-1,1]) G3.grow([cx,cy,.5],[tx_*sg*.45+(-ty_)*sp,ty_*sg*.45+tx_*sp,0],8+((rnd()*8)|0),{cling:1.2,grav:.1,tip:.7,wander:.25,noKeep:1}); }
   }
-  G3.finish(2.5,.018,5.5,FIXED); lap('g');
+  G3.finish(2.5,.03,7,FIXED); lap('g');
   rlRaster(RB,G3,NOMOSS,bd); lap('r');
   if(bd[2]>=bd[0]) rlPost(RB,[bd[0]-4,bd[1]-4,bd[2]+4,bd[3]+4]); lap('p');
 }
@@ -904,7 +907,7 @@ function rlRaster(RB,G3,NOMOSS,bd){
     const bax=bx-ax, bay=by-ay, baz=bz-az, baba=bax*bax+bay*bay+baz*baz; if(baba<1e-9) continue;
     let Nx=bay, Ny=-bax, Nz=0; let nl=Math.hypot(Nx,Ny,Nz); if(nl<1e-3){ Nx=0; Ny=baz; Nz=-bay; nl=Math.hypot(Nx,Ny,Nz)||1; } Nx/=nl; Ny/=nl; Nz/=nl;
     const bl=Math.sqrt(baba), Tx=bax/bl, Ty=bay/bl, Tz=baz/bl, Bx=Ty*Nz-Tz*Ny, By=Tz*Nx-Tx*Nz, Bz=Tx*Ny-Ty*Nx;
-    const nf=Math.max(3,Math.round(2*Math.PI*r/3.2)), lum0=(nm?150:200)+(((id*2654435761)>>>0)%1000)/1000*30-15;
+    const nf=Math.max(3,Math.round(2*Math.PI*r/3.2)), lum0=(nm?160:232)+(((id*2654435761)>>>0)%1000)/1000*30-15;
     const X0=Math.floor(Math.min(ax,bx)-r-1), X1=Math.ceil(Math.max(ax,bx)+r+1);
     const Y0=Math.floor(Math.min(ay-az,by-bz)-r*1.45-1), Y1=Math.ceil(Math.max(ay-az,by-bz)+r*1.45+1), kmax=Math.max(ay+az,by+bz)+r*1.42;
     for(let Y=Math.max(0,Y0);Y<=Math.min(PH-1,Y1);Y++)for(let X=Math.max(0,X0);X<=Math.min(PW-1,X1);X++){
@@ -925,7 +928,7 @@ function rlRaster(RB,G3,NOMOSS,bd){
       const uu=u0+(u1-u0)*hh, th=Math.atan2(qx*Bx+qy*By+qz*Bz, qx*Nx+qy*Ny+qz*Nz);
       let g=.5+.5*Math.cos(th*nf+uu*.045+1.9*Math.sin(uu*.09+id*1.7)); g=g-.62; g=g<0?0:g/.38;
       let a=lum0*(1-.42*g*g); if(NZ[((Math.round(hy*.5)&255)<<8)|(Math.round(hx*.5)&255)]>.78) a+=22;
-      const moss= !nm && nz>.5 && NZS[((Math.round(hy*.6)&255)<<8)|(Math.round(hx*.6+hz)&255)]>.62 && NZ[((Math.round(hy)&255)<<8)|(Math.round(hx+hz*.5)&255)]>.42;
+      const moss= !nm && nz>.45 && NZS[((Math.round(hy*.6)&255)<<8)|(Math.round(hx*.6+hz)&255)]>.55 && NZ[((Math.round(hy)&255)<<8)|(Math.round(hx+hz*.5)&255)]>.38;
       key[i]=kk; RB.mat[i]=moss?2:1; RB.alb[i]=Math.max(0,Math.min(255,a|0)); RB.nrm[i]=rlNrm(nx,nz,ny); RB.hp[i]=Math.round(hz);
       if(X<bd[0]) bd[0]=X; if(Y<bd[1]) bd[1]=Y; if(X>bd[2]) bd[2]=X; if(Y>bd[3]) bd[3]=Y;
     } }
@@ -977,8 +980,8 @@ function rlBackground(rnd){
   const out=new Float32Array(S*S*3);
   for(let y=0;y<S;y++)for(let x=0;x<S;x++){ const i=y*S+x;
     const f=.62+.2*NZS[((y&255)<<8)|(x&255)]+(BAYER[((y&3)<<2)|(x&3)]-.5)*.16;
-    if(occ[i]){ out[i*3]=im[i*3]*.85*(1-f)+fogc[0]*f*.55+4*f*.45; out[i*3+1]=im[i*3+1]*.85*(1-f)+fogc[1]*f*.55+6*f*.45; out[i*3+2]=im[i*3+2]*.85*(1-f)+fogc[2]*f*.55+10*f*.45; }
-    else { out[i*3]=2.4+fogc[0]*.1*f; out[i*3+1]=3.6+fogc[1]*.1*f; out[i*3+2]=6+fogc[2]*.1*f; } }
+    if(occ[i]){ out[i*3]=im[i*3]*1.1*(1-f)+fogc[0]*f*.8+4*f*.45; out[i*3+1]=im[i*3+1]*1.1*(1-f)+fogc[1]*f*.8+6*f*.45; out[i*3+2]=im[i*3+2]*1.1*(1-f)+fogc[2]*f*.8+10*f*.45; }
+    else { out[i*3]=3+fogc[0]*.25*f; out[i*3+1]=4.5+fogc[1]*.25*f; out[i*3+2]=7+fogc[2]*.25*f; } }
   // 光る茸（深さの目印）
   for(let k=0;k<9;k++){ const gx=(rnd()*S)|0, gy=(rnd()*S)|0;
     for(let dy=-22;dy<=22;dy++)for(let dx=-22;dx<=22;dx++){ const d=Math.hypot(dx,dy); if(d>=22) continue; const x=((gx+dx)%S+S)%S, y=((gy+dy)%S+S)%S, i=y*S+x;
@@ -994,7 +997,7 @@ function rlShade(RB,i,wx,wy,Lv,Cv,b){
   const n=NRM[RB.nrm[i]], gy=wy+hp, lx=lampX-wx, ly=lampY-gy, lz=CAVE_LAMP_H-hp, l=Math.hypot(lx,ly,lz)||1;
   const dot=Math.max(0,(n[0]*lx+n[2]*ly+n[1]*lz)/l);
   const dep=hp<-20?Math.max(0,1-(-hp-20)/90):1;
-  const I=(Lv*dep)*(m>=3?.46+.72*dot:.3+.92*dot)+.06+Cv*.6;
+  const I=(Lv*dep)*(m>=3?.46+.72*dot:.3+.92*dot)+(.06+RL_AMB*(m>=3?1.5:1)*(.65+.35*Math.max(0,n[1])))*(hp<-20?Math.max(.25,dep):1)+Cv*.6;
   const v=I*RB.alb[i]/255, bb=(b-.5)*.45;
   let c;
   if(m===1) c=RL_BARK[Math.max(0,Math.min(7,Math.floor(v*8.6+bb+.3)))];
@@ -1142,7 +1145,7 @@ function terrain(f,Z,camX,camY,blinded){
       if((cv2&3)===0){ buf[k]=VOID; continue; }                 // 周りが全部未踏
       if((cv2&3)===1){                                          // 境目のマスだけ混ぜる
         const sv=seenV(wx,wy); if(sv<SEEN_HI){ if(sv<=SEEN_LO||(sv-SEEN_LO)/(SEEN_HI-SEEN_LO)<BAYER[((wy&3)<<2)|(wx&3)]){buf[k]=VOID;continue;} } }
-      const i=wy*PW+wx, c=code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;
+      const i=wy*PW+wx, c=RB?0:code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;   // 根の層はマスで描き分ける（石積みも絵で描く）
       let sl=0;                                                  // 蛍石の灯り
       if(LSn) for(let li=0;li<LSn;li++){ const ex=wx-LSx[li], ey=wy-LSy[li], e2=ex*ex+ey*ey, r=LSr[li];
         if(e2<r*r){ const q=1-Math.sqrt(e2)/r, v=q*q*(3-2*q)*.85; if(v>sl) sl=v; } }
@@ -1170,13 +1173,13 @@ function terrain(f,Z,camX,camY,blinded){
           if(CAVE.rlFlat) Lv=Math.max(Lv,CAVE.rlFlat);                // 見た目の確認用：灯りの外も照らす
           if(RB.mat[i]){ buf[k]=rlShade(RB,i,wx,wy,Lv,Cv,b); continue; }
           const kd=RB.kind[(wy>>4)*f.W+(wx>>4)];
-          if(kd===0){                                               // 穴：下の階の雰囲気
+          if(kd===0||kd===3){                                       // 穴：下の階の雰囲気（石積みのマスの、絵の掛からない所も）
             let col=RB.bg[(((wy-rbOY)&255)<<8)|((wx-rbOX)&255)];
             const sx=wx-10, sy=wy-16;
             if(sx>=0&&sy>=0&&(RB.kind[(sy>>4)*f.W+(sx>>4)]||RB.mat[sy*PW+sx])) col=mulU(col,b<.8?.45:.7);   // 上の階の影
             if(wy>1&&(RB.mat[i-PW]||RB.mat[i-2*PW]||RB.kind[((wy-2)>>4)*f.W+(wx>>4)])) col=mulU(col,.5);        // 縁のすぐ下
             buf[k]=col; continue; }
-          if(kd===2){ buf[k]=RL_BARK[Math.max(0,Math.min(3,Math.floor(Lv*3.6+Cv+b*.8)))]; continue; }   // 橋の根の隙間（下の根の塊）
+          if(kd===2){ buf[k]=RL_BARK[Math.max(0,Math.min(3,Math.floor((Lv+RL_AMB)*3.6+Cv+b*.8)))]; continue; }   // 橋の根の隙間（下の根の塊）
         }
         if(pitOn&&!RB&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
@@ -1224,7 +1227,7 @@ function terrain(f,Z,camX,camY,blinded){
           else if(haz.kind==='void_'){ if(ihash(wx,wy)%53===0&&Math.sin(t*4+wx*1.3)>.2) col=hz.hi; }
           buf[k]=col; continue; }}
         /* ---- 床 ---- */
-        if(RB){ const ft=RB.ft[i], tn=ft&15, fct=(.2+.85*Math.min(1,Lv*1.25)+Cv*.55)*RB.fa[i]/255;
+        if(RB){ const ft=RB.ft[i], tn=ft&15, fct=(.2+RL_AMB*.9+.8*Math.min(1,Lv*1.25)+Cv*.55)*RB.fa[i]/255;
           if(ft>>4&1) buf[k]=RL_FMOSS[Math.max(0,Math.min(6,Math.floor(tn*.66*fct+(b-.5)*.8+.3)))];
           else buf[k]=RL_FLR[Math.max(0,Math.min(10,Math.floor(tn*fct+(b-.5)*.8+.3)))];
           continue; }
