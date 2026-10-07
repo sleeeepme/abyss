@@ -455,9 +455,29 @@ function waterSurface(ramp,hi,lv,wx,wy,t,Lv,D,rowW1,rowW2,colW){
 }
 /* 屈折（下にある水草・魚・帯を横にずらす）と波紋。水面の印（wmask）がある所だけ。 */
 const RIP_LIFE=.85;
+/* 水面に立つ物の映り込み・水際のきらめき（2026-10-07 ユーザー要望「水面にあるものは水面の影響を受けたい」）。
+   置き物を描いた後、列ごとに上から見て「置き物（前後の印 occD がある＝立ち物・北の壁）のすぐ下が水」の所を水際とし：
+   - 水際から下 RF_K 行に、水際から上の絵を上下反対に映す（下ほど薄く、行ごとに左右へ±1揺らす。暗く沈めて水の色に溶かす）
+   - 水際の1行目に、横へ流れる明るいきらめき（白い泡ほど強くしない）
+   水の中に沈んだ所は、今まで通り水と一緒に屈折で揺れる（印 wmask を残してある）。CAVE.reflect=false で止まる。 */
+const RF_K=7, RF_A=.5;
+function waterReflect(t){
+  const NONE=-32768, hi=HZ.water.hi;
+  for(let x=1;x<bw-1;x++){
+    for(let y=1;y<bh;y++){
+      const k=y*bw+x; if(wmask[k]!==1) continue;
+      const ka=k-bw; if(wmask[ka]||occD[ka]===NONE) continue;              // すぐ上が水ではない置き物
+      for(let i=0;i<RF_K;i++){ const yy=y+i; if(yy>=bh) break; const kk=yy*bw+x; if(wmask[kk]!==1) break;
+        const sy=y-1-i; if(sy<0) break; let ks=sy*bw+x; if(wmask[ks]||occD[ks]===NONE) break;
+        const wob=Math.round(Math.sin(yy*.9+t*2.2+x*.05)*.9); if(wob){ const k2=ks+wob; if(!wmask[k2]&&occD[k2]!==NONE) ks=k2; }
+        buf[kk]=mixU(buf[kk],mixU(buf[ks],0xff000000,.35),RF_A*(1-i/RF_K)); }
+      if(Math.sin(x*.8-t*2.6+y*.3)>.72) buf[k]=mixU(buf[k],hi,.4);              // 水際のきらめき
+      y+=RF_K-1; } }
+}
 function waterPost(bx0,by0,t){
   if(!wmask) return;
   const reduced=typeof FEEL_REDUCED!=='undefined'&&FEEL_REDUCED.matches;
+  if(!reduced&&CAVE.reflect!==false&&occD) waterReflect(t);
   if(!reduced) for(let by=0;by<bh;by++){
     const wy=by0+by, sh=Math.round(Math.sin(wy*.16+t*1.6+Math.sin(wy*.05)*2));
     if(!sh) continue;
@@ -1690,7 +1710,10 @@ function drawCaveSprite(d,sp,P_){
    苔の色は元の石の明るさから4段を選ぶので、ランタンの当たり（明るい面・暗い面）はそのまま残る。
    CAVE.ruinAge に数を入れると強さを上書き（見比べ用。0で無し）。 */
 let RUIN_AGE=0;
-const RUIN_MOSS=[C('#252b19'),C('#384326'),C('#525d36'),C('#6f7a48')], RUIN_MOSS_HI=C('#93a05a');   // くすんだ緑（黄色に寄ると石が全部黄色く見えた）
+const RUIN_MOSS=[C('#252b19'),C('#384326'),C('#525d36'),C('#6f7a48')], RUIN_MOSS_HI=C('#93a05a');
+const RUIN_IVY=[C('#14281a'),C('#21442a'),C('#34683a'),C('#5a9a4c')];                                    // 蔦（苔より青い緑）
+const RUIN_SHROOM=[C('#6e6250'),C('#b8a888'),C('#ddd0b4'),C('#f4ead6'),C('#9a8e78')];                  // キノコ：傘の影・傘・傘の明・照り・柄
+const RUIN_SHROOM_G=[C('#2e6a6a'),C('#5ec0b4'),C('#a8f0e0'),C('#e8fff8'),C('#7aa8a0')];                // 青白く光るキノコ   // くすんだ緑（黄色に寄ると石が全部黄色く見えた）
 function ruinAgeOf(){
   if(typeof CAVE.ruinAge==='number') return CAVE.ruinAge;
   if(!G||!G.Z||G.Z.id!=='sump') return 0;
@@ -1702,16 +1725,51 @@ function ruinAge(c,X,Y,h,up,sid,flat){
   const sp=v=>(v-.5)*3.2+.5;                                                  // ノイズは .5 の周りに寄っているので広げる
   const n=sp(NZB[(((Y*3)+sid*5)&255)<<8|(((X*3)+sid*3)&255)])   // ×3：塊を物の大きさより細かく（×2だと物ごと全部か無しかになった）
    , n2=NZS[((Y+sid*7)&255)<<8|((X*3)&255)], bj=(BAYER[((Y&3)<<2)|(X&3)]-.5)*.22;
+  const lum=((c&255)+((c>>8)&255)+((c>>16)&255))/765, kL=lum<.16?0:lum<.28?1:lum<.42?2:3;
+  /* 蔦（2026-10-07「蔦やキノコも追加して」）：根元から面を登る茎。9列に1本ほど（強さで増える）、高さは列ごとに 5〜24 ドット×強さ。
+     茎の両隣の列に、3行おきに左右交互の葉。茎は暗い緑、葉は明るい緑（石の明るさで段を選ぶ） */
+  if(!flat&&up<=.5){
+    const ivyCol=x=>ihash(x,sid*7+3)%9<1+A*1.2, ivyH=x=>(5+ihash(x,sid+11)%20)*A;
+    if(ivyCol(X)&&h<ivyH(X)) return RUIN_IVY[Math.max(0,kL-1)];
+    for(const dx of [-1,1]) if(ivyCol(X-dx)&&h<ivyH(X-dx)-1&&((h+(dx>0?0:1)+(X-dx))%3===0)) return RUIN_IVY[Math.min(3,kL+1)];
+  }
+  /* キノコ：根元（h<5）と上面に、4×4 ドットの区画ごとの抽選で小さな傘（幅3・高さ3）。白っぽい傘と、まれに青白く光る傘 */
+  if(h<5||up>.5){ const cx=X>>2, cy=Y>>2, hh=ihash(cx*31+sid,cy*17+5);
+    if(hh%100<(flat?6:22)*A){ const u=X&3, v=Y&3, glow=(hh>>>8)%5===0, P=glow?RUIN_SHROOM_G:RUIN_SHROOM;
+      if(v===1&&u<3) return P[u===1?2:u===0?0:1];                             // 傘（左が影、中が明るい）
+      if(v===0&&u===1) return P[3];                                            // 傘の天辺の照り
+      if(v===2&&u===1) return P[4];                                            // 柄
+    } }
   let m=0;
   if(up>.5){ if(n+bj<(flat?.12+.35*A:.25+.5*A)) m=1; }                       // 上面：16階で4割・20階で7割ほど（敷石はその半分強）
   else if(h<(2+12*A)*(.4+n2)&&n+bj<.25+.5*A) m=1;                            // 根元から這い上がる
   else if(ihash(X,sid)%13<1+4*A&&sp(NZS[((((Y>>1)+sid)&255)<<8)|((X*4)&255)])+bj>1.05-.3*A) m=2;   // 垂れる筋
   if(!m){ if(ihash(X+sid,77)%9===0&&n2>.5) return mixU(c,RP_DARK,.16*A); return c; }   // 水の染み
-  const lum=((c&255)+((c>>8)&255)+((c>>16)&255))/765;
-  let k=lum<.16?0:lum<.28?1:lum<.42?2:3; if(m===2&&k>0) k--;
+  let k=kL; if(m===2&&k>0) k--;
   const v=ihash(X*3+sid,Y*5)%9; if(v===0&&k<3) k++; else if(v<=2&&k>0) k--;    // 苔の粒（平らな色の板に見えないように）
   if(v===8&&k>=2) return RUIN_MOSS_HI;                                         // ところどころ明るい芽
   return mixU(RUIN_MOSS[k],c,.15);                                            // 下の石の肌を少し残す
+}
+/* 遺跡の根元のキノコ（2026-10-07「蔦やキノコも追加して」）。絵の外にはみ出して生える、小さな群れ。
+   物ごとに 強さ×85% の確率で1〜2群れ、1群れに2〜4本。傘は幅3か5、柄は2〜4ドット。水の上には生やさない。
+   5本に1本は青白く光る傘（暗がりでも見える・周りを少し照らす）。前後は根元の y。 */
+function ruinShrooms(d,left,right,L){
+  const s=d.s>>>0, A=RUIN_AGE; if(hs(s,4100)%100>=85*A) return;
+  const ng=1+(hs(s,4101)%100<50*A?1:0), wg=W.haz&&W.haz.kind==='water'?W.haz.g:null, f=.5+.5*Math.min(1,L*1.4);
+  for(let g=0;g<ng;g++){
+    const hg=hs(s,4110+g), gx=Math.round(d.x-left*.7+(hg%1000)/1000*(left+right)*.7), gy=Math.round(d.y+1+((hg>>>10)%3));
+    if(wg&&hazAt(wg,gx,gy)>.4) continue;
+    const n=2+(hg>>>14)%3;
+    for(let i=0;i<n;i++){ const h=hs(s,4200+g*10+i), x=gx+(i-((n-1)/2))*3+((h>>>3)%3)-1, y=gy+((h>>>6)%2), sh=2+(h>>>8)%3, wide=(h>>>11)%3===0, glow=(h>>>13)%5===0;
+      const P=glow?RUIN_SHROOM_G:RUIN_SHROOM, lit=c=>glow?c:mixU(RP_DARK,c,f);
+      occGY=y;
+      for(let j=0;j<sh;j++) dpf(x,y-j,lit(P[4]));                                   // 柄
+      const cy=y-sh, hw=wide?2:1;
+      for(let dx=-hw;dx<=hw;dx++) dpf(x+dx,cy,lit(P[dx<0?(dx===-hw?0:1):dx===0?2:1]));   // 傘
+      if(wide){ dpf(x-1,cy-1,lit(P[2])); dpf(x,cy-1,lit(P[3])); dpf(x+1,cy-1,lit(P[1])); } else dpf(x,cy-1,lit(P[3]));
+      dpf(x-hw,cy+1,lit(P[0])); dpf(x+hw,cy+1,lit(P[0]));                           // 傘の縁の影
+      if(glow) CAVE.nextEmit.push({x,y:cy,r:12,it:.18});
+      occGY=null; } }
 }
 function upOf(sp,r,q){ if(!sp.n) return 0; const i=NRM_IX[(sp.n[r][q]||'.').charCodeAt(0)]; return i<0?0:NRM[i][1]; }
 function ruinBigFor(d){
@@ -1824,7 +1882,7 @@ function drawRuinPost(d,t,L,inW){
   const broken=d.broken!=null ? d.broken : s%3===0, H= d.H || (inW ? 10+(s>>>3)%5 : 14+(s>>>3)%5);
   const f=.5+.5*Math.min(1,L*1.4), lit=c=>mixU(RP_DARK,c,f);
   const idx=(px,py)=>{ px-=DB0x; py-=DB0y; return (px<0||py<0||px>=bw||py>=bh)?-1:py*bw+px; };
-  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; let v=lit(c); if(RUIN_AGE>0) v=ruinAge(v,px,py,y-py,py<=topY(px-x0)+1?1:0,s&255); buf[k]=v; wmask[k]=0; };   // 経年の苔（手続きの柱も）
+  const put=(px,py,c)=>{ const k=idx(px,py); if(k<0) return; let v=lit(c); if(RUIN_AGE>0) v=ruinAge(v,px,py,y-py,py<=topY(px-x0)+1?1:0,s&255); buf[k]=v; wmask[k]=0; occD[k]=y; };   // 経年の苔（手続きの柱も）。前後の印は根元の y（水面の映り込みにも使う）
   const mix=(px,py,c,a,keep)=>{ const k=idx(px,py); if(k<0) return; if(keep&&!wmask[k]) return; buf[k]=mixU(buf[k],c,a); };
   const T=i=>RP_T[i<0?0:i>6?6:i];
   const mid=(Wd-1)/2;
@@ -2352,7 +2410,7 @@ function drawDeco(bx0,by0,t,blindR){
     if(Math.hypot(d.x-lampX,d.y-lampY)>blindR+mg) continue;
     const L=Math.max(.22,pxLight(d.x,d.y)), s=d.s, x=d.x, y=d.y;
     occGY = standBox(d) ? Math.round(d.y) : null;        // 高さのある手描きの品目は、錨点（根元）の y で前後を決める
-    if(mg && ruinBigFor(d)){ occGY=null; drawBigSprite(d,t,ruinBigFor(d)); continue; }   // 3Dから作った大きな遺跡
+    if(mg && ruinBigFor(d)){ occGY=null; const sp_=ruinBigFor(d); drawBigSprite(d,t,sp_); if(RUIN_AGE>0&&!/^(pave|steps)_/.test(d.name||'')) ruinShrooms(d,sp_.ax,sp_.w-sp_.ax,L); continue; }   // 3Dから作った大きな遺跡（経年のキノコを根元に）
     { const cs=(d.k==='rock'||d.k==='stalagC'||d.k==='column')&&caveSprFor(d); if(cs){ occGY=null; drawCaveSprite(d,cs,P_); occGY=null; continue; } }   // 3Dから作った石の層の岩・石筍
     switch(d.k){
     case 'moss': for(let i=0;i<34;i++){const h=hs(s,i),px=x+(h%17)-8,py=y+((h>>>5)%7)-3; dp(px,py,sh3(P_.moss,L,px,py));}
@@ -2419,7 +2477,7 @@ function drawDeco(bx0,by0,t,blindR){
       for(let j=0;j<len;j++){const q=j/len; px+=dx*1+(dy?sw*.25:0); py+=dy*1+(dx?sw*.25:0)+(dx?.25:0); dp(px,py,sh3(P_.tendril,L*(1.1-q*.5),px|0,py|0)); if(j%4===2) dp(px+1,py,P_.tendril[0]);}
       break; }
     case 'bulb': { const p=1+Math.sin(t*2+s)*.15; for(let yy=-3;yy<=0;yy++)for(let xx=-2;xx<=2;xx++){ if((xx*xx)/(4*p)+((yy+1.5)**2)/(2.8*p)>1) continue; dp(x+xx,y+yy,xx===0&&yy===-2?P_.bulb[2]:sh3(P_.bulb,L+.25,x+xx,y+yy)); } break; }
-    case 'pillar': if(G.Z.id==='sump'){ drawRuinPost(d,t,L,false); break; } { const H=18+s%12, bx=x-4;
+    case 'pillar': if(G.Z.id==='sump'){ drawRuinPost(d,t,L,false); if(RUIN_AGE>0) ruinShrooms(d,4,4,L); break; } { const H=18+s%12, bx=x-4;
       drect(bx-2,y-2,bx+9,y+1,P_.stone,L*.9,true); drect(bx-1,y-4,bx+8,y-3,P_.stone,L,true);
       for(let j=5;j<H;j++){ const top=j>H-4; for(let q=0;q<8;q++){ if(top&&hs(s,q+j*7)%3===0) continue; const px=bx+q, py=y-j; dp(px,py,(q===2||q===5)?P_.stone[0]:sh3(P_.stone,L*(q<2?1.25:q>6?.6:1),px,py)); } }
       if(s%2){ const fx=x+(s%3?10:-15), fy=y+3; drect(fx,fy-4,fx+7,fy,P_.stone,L,true); dp(fx+2,fy-2,P_.stoneDk); dp(fx+5,fy-2,P_.stoneDk); }
@@ -2428,8 +2486,8 @@ function drawDeco(bx0,by0,t,blindR){
     /* ---- 水の中の遺跡（水の層・第16〜20階層）----
        立っている物は wmask を消して描く（dpw の 0）——水面の揺らぎ（屈折）と波の線が乗らない。
        沈んだ跡だけは水の色に混ぜて、印を残す＝水と一緒に揺れて「水の下にある」に見える。 */
-    case 'wpost': drawRuinPost(d,t,L,true); break;
-    case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone;
+    case 'wpost': drawRuinPost(d,t,L,true); break;   // 水の中の柱にはキノコを生やさない
+    case 'wwall': { const w=wwallW(d), H=7+s%5, x0=x-(w>>1), sb=P_.stone; occGY=y;   // 前後の印（水面に映る）
       for(let xx=0;xx<w;xx++){ const eH=H-((hs(s,xx)%3)*(xx>w*.55?1:0))-(xx<2||xx>w-3?1:0);
         for(let yy=0;yy<eH;yy++){ const px=x0+xx, py=y-yy, mortar=(yy%3===2)||(((xx+((yy/3|0)%2)*3)%6)===0);
           dpw(px,py, yy===eH-1?P_.stoneHi:mortar?P_.stoneDk:sh3(sb,L*(xx<w/3?1.15:.85),px,py), 0); }
