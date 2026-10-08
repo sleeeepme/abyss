@@ -591,7 +591,7 @@ const bufC=document.createElement('canvas'), bufX=bufC.getContext('2d');
    - 部屋：石畳（256ドット四方）＋中央の菱形、北の石積みの帯・左右の低い石積み・南の崖の帯を切って並べる、角柱
    - 根：北から石積みを越える根（幅6マスに1本。角の根は横の石積みを越えて闇へ）、横から垂れる根、
      南の縁の下から闇へ降りる根・縁をつかむ根・細根
-   - 橋：撚った根の帯を64ドットごとに並べる（位相は x+y なので継ぎ目が出ない）。曲がり角は根の瘤、部屋の口は潜る根
+   - 橋：太い根に細い根が沿った束（撚らない・3種）を128ドットごとに並べる。曲がり角は根の瘤、部屋の口は潜る根
    - 穴：下の階の雰囲気（256ドット四方・継ぎ目無し）を遅れて流す。上の階の影が下へずれて落ちる
    毎フレームは、焼いた「色の番号・面の向き・高さ・くぼみ」に今のランタンを当てる（石は地の色×段に落とした明るさ、
    根は明るさ×地で樹皮の8段）。
@@ -636,7 +636,8 @@ function rlPlan(f){
   const claimed=new Uint8Array(Wt*Ht);
   const roomish=(x,y)=>kindAt(x>>4,y>>4)===1&&kindAt((x-1)>>4,(y-1)>>4)===1;
   const taken=(x,y)=>claimed[((y-1)>>4)*Wt+((x-1)>>4)]&&claimed[(y>>4)*Wt+(x>>4)];
-  for(const c of (f.corr||[])){
+  (f.corr||[]).forEach((c,ci)=>{
+    const bv=((seed>>>3)+ci*7)%3;                                       // 橋の根の束の種類（1本の通路は同じ束）
     const [ax,ay,bx,by,o]=c, T3=o===0?[[ax,ay],[bx,ay],[bx,by]]:[[ax,ay],[ax,by],[bx,by]], px=p=>[(p[0]+1)*Q,(p[1]+1)*Q];
     const A=px(T3[0]), B=px(T3[1]), Cc=px(T3[2]);
     const legs=[[A,B],[B,Cc]], LL=legs.map(([p,q])=>Math.abs(q[0]-p[0])+Math.abs(q[1]-p[1]));
@@ -654,13 +655,15 @@ function rlPlan(f){
         // 部屋の側の向き（橋から見て部屋がどちらか）
         const dirOf=(v)=>h?(v>0?'e':'w'):(v>0?'s':'n');
         const ends=[]; if(roomA) ends.push({x:a[0],y:a[1],d:dirOf(-sg)}); if(roomB) ends.push({x:b[0],y:b[1],d:dirOf(sg)});
-        const cl0=(sg>0?(roomA?40:cornA?18:0):(roomB?40:cornB?18:0)), cl1=(sg>0?(roomB?40:cornB?18:0):(roomA?40:cornA?18:0));
-        RB.units.push({t:1,h,cc,lo,hi,cl0,cl1,ends,rs:(seed^Math.imul(lo+7,2246822519)^Math.imul(cc+3,3266489917))>>>0,
+        const cl0=(sg>0?(roomA?40:cornA?22:0):(roomB?40:cornB?22:0)), cl1=(sg>0?(roomB?40:cornB?22:0):(roomA?40:cornA?22:0));
+        RB.units.push({t:1,h,cc,lo,hi,cl0,cl1,ends,bv,rs:(seed^Math.imul(lo+7,2246822519)^Math.imul(cc+3,3266489917))>>>0,
           bb:h?[lo-60,cc-80,hi+60,cc+110]:[cc-70,lo-80,cc+70,hi+110], core:h?[lo-20,cc-24,hi+20,cc+24]:[cc-24,lo-20,cc+24,hi+20],done:0});
         s=e; } }
-    if(!roomish(...B)&&(A[0]!==B[0]||A[1]!==B[1])&&(B[0]!==Cc[0]||B[1]!==Cc[1]))
-      RB.units.push({t:2,x:B[0],y:B[1],rs:(seed^Math.imul(B[0]+1,2654435761)^Math.imul(B[1]+5,40503))>>>0,bb:[B[0]-60,B[1]-70,B[0]+60,B[1]+80],core:[B[0]-30,B[1]-30,B[0]+30,B[1]+30],done:0});
-  }
+    if(!roomish(...B)&&(A[0]!==B[0]||A[1]!==B[1])&&(B[0]!==Cc[0]||B[1]!==Cc[1])){
+      // 曲がり角：横の腕と縦の腕の向き
+      const hx=A[1]===B[1]?Math.sign(A[0]-B[0]):Math.sign(Cc[0]-B[0]), vy=A[0]===B[0]?Math.sign(A[1]-B[1]):Math.sign(Cc[1]-B[1]);
+      RB.units.push({t:2,x:B[0],y:B[1],bv,nm:'bend'+bv+'_'+(hx<0?'w':'e')+(vy<0?'n':'s'),rs:(seed^Math.imul(B[0]+1,2654435761)^Math.imul(B[1]+5,40503))>>>0,bb:[B[0]-60,B[1]-70,B[0]+60,B[1]+80],core:[B[0]-30,B[1]-30,B[0]+30,B[1]+30],done:0}); }
+  });
   RB.bg=RL_BG||(RL_BG=rlBackground(rlRand(0x9e3779b9)));             // 下の階の雰囲気は全階で共通（作るのは最初の1回だけ）
   RB.planMs=performance.now()-tP;
   return RB;
@@ -755,15 +758,15 @@ function rlBakeUnit(RB,u){
       for(let k=0;k<Math.ceil(south.length/10);k++){ const X=pick(south); rlStamp(RB,pick(['hang0','hang1','hang2']),X-80,y1-128); } }
   } else if(u.t===1){
     /* ---- 橋：撚った根の帯を64ドットごとに並べる（位相は x+y） ---- */
-    const v=u.rs%2, a0=u.lo+u.cl0, a1=u.hi-u.cl1;
+    const v=u.bv, a0=u.lo+u.cl0, a1=u.hi-u.cl1, BP=K.BR_P||64;
     if(a1>a0){
       if(u.h){ const nm='br_h'+v, base=-u.cc;
-        for(let X=a0-((((a0-base)%64)+64)%64)-64;X<a1+64;X+=64) rlStamp(RB,nm,X,u.cc,(x)=>x>=a0&&x<a1); }
+        for(let X=a0-((((a0-base)%BP)+BP)%BP)-BP;X<a1+BP;X+=BP) rlStamp(RB,nm,X,u.cc,(x)=>x>=a0&&x<a1); }
       else { const nm='br_v'+v, base=-u.cc;
-        for(let Y=a0-((((a0-base)%64)+64)%64)-64;Y<a1+64;Y+=64) rlStamp(RB,nm,u.cc,Y,(x,y,wx,wy)=>wy>=a0&&wy<a1); } }
-    for(const e of u.ends){ const bx=e.d==='e'||e.d==='w'?Math.round(e.x/Q)*Q:e.x, by=e.d==='n'||e.d==='s'?Math.round(e.y/Q)*Q:e.y; rlStamp(RB,'end_'+e.d,bx,by); }
+        for(let Y=a0-((((a0-base)%BP)+BP)%BP)-BP;Y<a1+BP;Y+=BP) rlStamp(RB,nm,u.cc,Y,(x,y,wx,wy)=>wy>=a0&&wy<a1); } }
+    for(const e of u.ends){ const bx=e.d==='e'||e.d==='w'?Math.round(e.x/Q)*Q:e.x, by=e.d==='n'||e.d==='s'?Math.round(e.y/Q)*Q:e.y; rlStamp(RB,'end_'+e.d+v,bx,by); }
   } else {
-    rlStamp(RB,'knot'+(u.rs%3),u.x,u.y);
+    rlStamp(RB,RL_KIT.parts[u.nm]?u.nm:'knot'+(u.rs%3),u.x,u.y);
   }
 }
 

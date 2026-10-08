@@ -381,27 +381,47 @@ def hang(seed):
 # ---------------------------------------------------------------------------
 # 橋：4本を螺旋に撚る。位相は x+y（どこで切っても、どの向きでも同じ所は同じ絵）
 # ---------------------------------------------------------------------------
-BR_A, BR_R, BR_P = 9.0, (4.6, 5.2, 4.3, 4.9), 64
-def braid_pts(axis, c0, s0, s1, k, step=2.0):
-    ph = 2 * math.pi * k / 4; out = []
+BR_P = 128
+# 橋の根の束（撚らない）：太い根に細い根が沿い、ゆっくり蛇行して寄ったり離れたりする。1本だけ斜めに乗り越える細根。
+# 2026-10-08 ユーザー「通路用の木が全部ねじれているのが気になる」→ 螺旋の撚りをやめた。
+# 各根：(半径, 横の位置, 蛇行の振れ, 位相, 高さの寄せ)
+BUNDLES = [
+    [(6.6, 0, 3.0, 0.0, 0), (4.2, -10.5, 2.0, 1.3, -1), (3.6, 10.5, 2.4, 2.1, -1)],
+    [(5.6, -5, 2.4, 0.0, 0), (5.0, 5.5, 2.4, 2.6, 0), (2.8, -12.5, 1.4, 1.0, -2), (2.5, 12.5, 1.4, 4.0, -2)],
+    [(7.2, 1.5, 2.2, 0.7, 0), (3.4, -11, 2.0, 1.9, -1), (2.9, 10.5, 2.2, 3.3, -1)],
+]
+def bundle_pts(axis, c0, s0, s1, root, step=2.0, dive=None):
+    r, lat0, amp, ph, zb = root; out = []
     for s in np.arange(s0, s1 + .01, step):
-        a = 2 * math.pi * s / BR_P + ph; w = 1 + .1 * math.sin(s * .07 + k * 2.1)
-        lat = BR_A * w * math.sin(a); zc = -BR_R[k] + BR_A * .42 * math.cos(a)
+        a = 2 * math.pi * s / BR_P
+        lat = lat0 + amp * math.sin(a + ph) + amp * .4 * math.sin(2 * a + ph * 2.3)
+        zc = -r + zb + .8 * math.sin(2 * a + ph * 1.7)
+        if dive: lat, zc = dive(s, lat, zc)
         out.append((s, c0 + lat, zc) if axis == 'h' else (c0 + lat, s, zc))
     return out
-def bridge_strip(axis, seed):
-    T = Template(room=False, bounds=(-100, -70, -60, 270, 150, 90) if axis == 'h' else (-70, -100, -60, 140, 270, 90))
+def crossing_pts(axis, c0, s0, s1, ph=0.0, step=2.0):
+    """斜めに乗り越える細根（周期ごとに一度、束の上を横切る）"""
+    out = []
+    for s in np.arange(s0, s1 + .01, step):
+        a = 2 * math.pi * s / BR_P + ph
+        lat = 11 * math.sin(a); zc = -1.0 + 2.2 * max(0, math.cos(a))
+        out.append((s, c0 + lat, zc) if axis == 'h' else (c0 + lat, s, zc))
+    return out
+def bridge_strip(axis, seed, var):
+    T = Template(room=False, bounds=(-140, -70, -60, 440, 150, 90) if axis == 'h' else (-70, -140, -60, 140, 440, 90))
     fixed = {}
     def g(G):
-        for k in range(4):
-            rid = G.rid; G.add_path(braid_pts(axis, 0, -96, 160, k), tip_r=BR_R[k]); fixed[rid] = BR_R[k]
+        for root in BUNDLES[var]:
+            rid = G.rid; G.add_path(bundle_pts(axis, 0, -96, 224, root), tip_r=root[0]); fixed[rid] = root[0]
+        if var != 1:
+            rid = G.rid; G.add_path(crossing_pts(axis, 0, -96, 224, ph=var * 1.7), tip_r=2.2); fixed[rid] = 2.2
         rr = random.Random(seed)
         if axis == 'h':
-            for s in (12, 30, 46):
-                if rr.random() < .8: G.grow((s + rr.uniform(-3, 3), rr.uniform(-5, 5), -9), (0, 0, -1), rr.randint(8, 26), grav=2.2, wander=.12, tip_r=.5)
-    win = (-4, -60, 68, 90) if axis == 'h' else (-30, -40, 30, 110)
-    P = bake_roots(T, g, win, seed, fixed=fixed, moss=.45)
-    # 周期の1回分だけ残す（h は世界の x、v は世界の y が [0,64)）
+            for s in (14, 40, 70, 96, 118):
+                if rr.random() < .7: G.grow((s + rr.uniform(-3, 3), rr.uniform(-6, 6), -9), (0, 0, -1), rr.randint(8, 28), grav=2.2, wander=.12, tip_r=.5)
+    win = (-4, -60, BR_P + 4, 90) if axis == 'h' else (-30, -40, 30, BR_P + 46)
+    P = bake_roots(T, g, win, seed, fixed=fixed, moss=.5)
+    # 周期の1回分だけ残す（h は世界の x、v は世界の y が [0,BR_P)）
     keep = np.zeros_like(P.has)
     for Y in range(P.H):
         for X in range(P.W):
@@ -411,6 +431,41 @@ def bridge_strip(axis, seed):
             keep[Y, X] = 0 <= u < BR_P
     P.has &= keep
     return P
+def bend(var, hx, vy, seed):
+    """通路の曲がり角：束がそのまま曲がる（中心が型の原点。横の腕は hx 側、縦の腕は vy 側へ30ドット）"""
+    T = Template(room=False, bounds=(-60, -80, -60, 120, 170, 90))
+    fixed = {}
+    Rr = 16
+    def g(G):
+        for root in BUNDLES[var]:
+            r, lat0, amp, ph, zb = root; pts = []
+            # 横の腕（外から角へ）→ 四分円 → 縦の腕（角から外へ）。横向きのずれは進む向きの左
+            cx, cy = hx * Rr, vy * Rr
+            L1 = 30 - Rr
+            for t in np.arange(0, L1 + .01, 2):
+                pts.append((hx * (30 - t), 0, -r + zb))
+            n = 12
+            a0 = math.atan2(0 - cy, hx * Rr - cx + 1e-9)       # 中心から腕の付け根へ
+            a1 = math.atan2(vy * Rr - cy, 0 - cx)
+            da = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
+            for i in range(1, n):
+                aa = a0 + da * i / n
+                pts.append((cx + math.cos(aa) * Rr, cy + math.sin(aa) * Rr, -r + zb))
+            for t in np.arange(0, L1 + .01, 2):
+                pts.append((0, vy * (Rr + t), -r + zb))
+            # 横へずらす：曲線の各点で進む向きの法線へ lat0
+            P2 = np.array(pts, float); out = []
+            for i in range(len(P2)):
+                j0, j1 = max(0, i - 1), min(len(P2) - 1, i + 1)
+                tx, ty = P2[j1, 0] - P2[j0, 0], P2[j1, 1] - P2[j0, 1]; l = math.hypot(tx, ty) or 1
+                nx, ny = -ty / l, tx / l
+                lt = lat0 * -hx                                   # 横の腕で帯（+y がずれの向き）と合わせる。束は左右ほぼ対称なので縦の腕はそのまま
+                out.append((P2[i, 0] + nx * lt, P2[i, 1] + ny * lt, P2[i, 2]))
+            rid = G.rid; G.add_path(out, tip_r=r); fixed[rid] = r
+        rr = random.Random(seed)
+        for k in range(2):
+            G.grow((hx * rr.uniform(4, 14), vy * rr.uniform(4, 14), -10), (0, 0, -1), rr.randint(10, 26), grav=2.2, wander=.12, tip_r=.5)
+    return bake_roots(T, g, (-48, -60, 48, 80), seed, fixed=fixed, moss=.5)
 def knot(seed):
     T = Template(room=False, bounds=(-60, -70, -60, 120, 150, 90))
     rr = random.Random(seed)
@@ -422,7 +477,7 @@ def knot(seed):
         for k in range(3):
             G.grow((rr.uniform(-10, 10), rr.uniform(-6, 10), -12), (0, 0, -1), rr.randint(14, 34), grav=2.2, wander=.12, tip_r=.5)
     return bake_roots(T, g, (-46, -56, 46, 70), seed, moss=.5, taper=.02, rmax=5)
-def bridge_end(d, seed):
+def bridge_end(d, seed, var=0):
     """d：橋から見た部屋の向き（'n'＝部屋が北）。部屋の床は境の線の向こう"""
     def floor(box):
         if d == 'n': box(-60, -120, -CLIFF, 60, 0, 0)
@@ -433,14 +488,12 @@ def bridge_end(d, seed):
     fixed = {}
     v = {'n': (0, -1), 's': (0, 1), 'w': (-1, 0), 'e': (1, 0)}[d]
     def g(G):
-        for k in range(4):
-            ph = 2 * math.pi * k / 4; pts = []
-            for s in np.arange(-48, 14, 2):            # s>0 で部屋の中（床の下へ潜る）
-                a = 2 * math.pi * s / BR_P + ph; lat = BR_A * math.sin(a) * (1 + max(0, s) * .03)
-                zc = -BR_R[k] + BR_A * .42 * math.cos(a) - max(0, s + 4) * .9
-                if v[0] == 0: pts.append((lat, v[1] * s, zc))
-                else: pts.append((v[0] * s, lat, zc))
-            rid = G.rid; G.add_path(pts, tip_r=BR_R[k]); fixed[rid] = BR_R[k]
+        for root in BUNDLES[var]:                        # s>0 で部屋の中（床の下へ潜り、少し開く）
+            pts = []
+            for (s, lat, zc) in bundle_pts('h', 0, -48, 14, root):
+                lat *= 1 + max(0, s) * .03; zc -= max(0, s + 4) * .9
+                pts.append((lat, v[1] * s, zc) if v[0] == 0 else (v[0] * s, lat, zc))
+            rid = G.rid; G.add_path(pts, tip_r=root[0]); fixed[rid] = root[0]
         rr = random.Random(seed)
         for sp in (-1, 1):
             for j in range(2):
@@ -483,10 +536,13 @@ def build(preview=None):
     for s in range(2): add(f'sidehang_r{s}', bake_roots(T, sidehang(1, s), (120, 40, 200, 170), 81 + s, taper=.02, rmax=4))
     for s in range(3): add(f'hang{s}', bake_roots(T, hang(s), (60, 120, 100, 175), 91 + s, outline=False))
     del T; import gc; gc.collect()
-    for s in range(2): add(f'br_h{s}', bridge_strip('h', 101 + s))
-    for s in range(2): add(f'br_v{s}', bridge_strip('v', 111 + s))
+    for s in range(3): add(f'br_h{s}', bridge_strip('h', 101 + s, s))
+    for s in range(3): add(f'br_v{s}', bridge_strip('v', 111 + s, s))
     for s in range(3): add(f'knot{s}', knot(121 + s))
-    for d in 'nsew': add(f'end_{d}', bridge_end(d, 131 + 'nsew'.index(d)))
+    for v in range(3):
+        for d in 'nsew': add(f'end_{d}{v}', bridge_end(d, 131 + 'nsew'.index(d) + v * 7, v))
+        for hx in (-1, 1):
+            for vy in (-1, 1): add(f'bend{v}_{"w" if hx < 0 else "e"}{"n" if vy < 0 else "s"}', bend(v, hx, vy, 141 + v * 5 + hx + vy * 2))
     # 1枚の絵に詰める（棚詰め）
     order = sorted(parts.items(), key=lambda kv: -kv[1].H)
     AW = 1024; x = y = rowh = 0; place = {}
