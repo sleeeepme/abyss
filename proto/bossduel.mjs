@@ -64,22 +64,22 @@ R.interrupt = await run(5, `
   duelCtx=null;
   const r={intr0, cast:boss.cast, recover:boss.recover, noIntr:boss.noIntr, brk:boss.brk};
   bossBeginCast(boss, 'slam', P, false);
-  r.againIntr=boss.cast.intr; boss.cast=null;
+  r.againBlocked=!boss.cast.intr; boss.cast=null;
   bossBeginCast(boss, 'slam', P, false);
   r.thirdIntr=boss.cast.intr; boss.cast=null;
   bossBeginCast(boss, 'wave', P, false);
-  r.waveIntr=boss.cast.intr;
+  r.waveBlocked=!boss.cast.intr;
   duelCtx={kind:'ult', hit:[]}; hitEnemy(boss, st0, 1); duelCtx=null;
   r.waveStill=!!boss.cast;
   r.ok = intr0 && r.cast===null && r.recover===1.2 && r.noIntr==='slam' && r.brk===17
-      && !r.againIntr && r.thirdIntr && !r.waveIntr && r.waveStill;
+      && r.againBlocked && r.thirdIntr && r.waveBlocked && r.waveStill;
   return r;
 `);
 R.rageNoIntr = await run(5, `
   boss.hp=boss.maxHp*0.45; bossRage(boss);
   const rm=boss.rageMoves.slice();
   bossBeginCast(boss, rm[0], P, false);
-  return {rageMoves:rm, intr:boss.cast.intr, ok: rm.length>0 && boss.cast.intr===false};
+  return {rageMoves:rm, blocked:!boss.cast.intr, ok: rm.length>0 && boss.cast.intr===false};
 `);
 
 /* ============ 3. 見切り ============ */
