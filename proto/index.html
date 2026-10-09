@@ -4140,6 +4140,16 @@ function boonAtCap(id){
   if(d.cap==='kin')   return kinCount(S.hero) >= KIN_MAX;
   return false;
 }
+/* 眷属の見た目。出てくるたびに6種から選ぶ（tools/npc_px.py の KIN）。
+   同時に連れている眷属とは重ならないようにする——3体が同じ絵だと数えにくい。
+   見た目だけの抽選なので、ゲームの乱数（rnd）は使わない。使うと敵や宝の並びまで変わる。 */
+const KIN_LOOKS = ['wisp','bat','owl','eye','skull','jelly'];
+function pickKinLook(kins){
+  const used = new Set((kins||[]).map(k=>k.look));
+  const free = KIN_LOOKS.filter(l=>!used.has(l));
+  const pool = free.length ? free : KIN_LOOKS;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
 /* 連れている眷属の一覧。**恩寵1つにつき1体**で、上限で切る。
    威力はその1体を連れてきた恩寵のレア度から引く。 */
 function kinOf(h){
@@ -13596,6 +13606,12 @@ const CharacterArt = (function(){
     'ore-fine-mined': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAz0lEQVR42u3YMQrCMBQG4Fa8gJviIAiiiCdwdfAaXsjNSRD0GA6unkBEEQQH0c0j1DkdLIHqYL9ve6RN4ScvpEkSAAAAAAAAAAAA4F+l3/5AZzDJYp6/nXbpLwOoVX0FCKDqAdTL7umiHp6Oh0Hd6/WDerFJsk/zlb2naAEB2APiej62h4tcLueo78/Wq2D8sZwH9XZ/tAIEIIAS/wXyPdhutoLxUbfx8f3D9RXU9+cjiTknFM2Xl5/fOUALCKDc+4DYs/ivxd4naAEBAFTYG3PzNOJ5N/w3AAAAAElFTkSuQmCC',
     'ore-deep': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABeUlEQVR42u2bv0oDQRDGN/6p7FJoJR6CIFznI2jAIgRS+QDiY4lgG5uQP4WgPoLdgSCEC1Za2FmJxNadYsdhd5PA/b5uuNnb42O+b272EucAAE1GK/YGB8dni7/x/OWxlfOBU++30fQKgAA8IFKD1fDBu172Oy6lRnPvhwQgoOHYSn3DweW1F1/cXJn6tqb5alRTARAAAWvsARLd3XMvnjq3COVrmr+d3FEBEAABS/QA2ZdTI3efpwIgAAJsHmCdv3ND9v3pxz0VAAEQsMJZQM77y/YE7T2i7HdM5w9IAALwgMTzvujTvZNTLx4/P2X1EOuZJBKAADwgDKtGy/Z+8Lr0hFn9Gsw/LI6CHqLNDlQABEBAnAdYNavBul7mS4+JfY9AAhCAB6TVrHV9/V57cbFXmPJLJb/6fKMCIAACEp4HaJq1alpbb83X9qMCIAACPKi/q5XfCne+f7JqOBZf25tezHcBJAABcR6gecK6gf8LIAEIAACAf+MXntGPSEmGCbMAAAAASUVORK5CYII=',
     'ore-deep-mined': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAzElEQVR42u3YPQrCMBgG4Pg3ubk4iUUQBI/hTbyJ9/AEToKzxxAEQSpOLm5OInVOB0ugOtjn2T7SpvCSL6QJAQAAAAAAAAAAAPhXrW9/YDxbFCnPX4771i8DaDd9BQig6QF06+7pqh6eD0ZRPcmmUb0Lofg0X917ihYQgD0gredTe7jKOT8lfX+zXEfjq+0qqg/3qxUgAAHU+C9Q7sH+8xWNZ8Ps4/v5LY/qR68TUs4JVfOVled3DtACAqj3PiD1LP5rqfcJWkAAAA32BmryMTJkxhHQAAAAAElFTkSuQmCC',
+    'kin-wisp': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA4klEQVR42u3avQ7BUBiH8RL3YSRhsLgC7O7DYjfbLXaXYFdXYDGQkFhcCat20DSOVvX3bCdtk5Mn7/89H2kUAQAAAKgjjbIn0O6OHq/j+2Vf6Jyada8AAvSAkjN/PMWJ54P+OCqyJ4gAATWnVXbmNzcVQAAB/7QP+DTzu8M1MT4vZ1/dF4gAAXpAtdb51TTsWUEECHAWCEs68+nMzrdxroxnva8CCCCAAAIIIOB39gFp8q7j3173VQABBIS9D8i6H+gt1onnk2Hn7ffuBEWAgGr3gKyekBf/B4gAAQAAAAAQnCeHaz7qlWIbogAAAABJRU5ErkJggg==',
+    'kin-bat': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA+0lEQVR42u3YMQrCMBiG4VQ8gHgBV0FwEDyBo0cQdXLs2sXZxdXRSUuO4OgJBAdBcPUC4g3qJiZDw0fbQfI+W2hTwk++v2mNAQAAAAAAsUnUCb3+pPgdPx/n5J/u97Vi3wEUIPYCtNXMb+c753qWp0XZ/Nlo5YytMbXeH1pPqCcQAQrAOUDLfEiWp6WZVtnr3tS5Hr8nEAEKwDlAczgdnfFyupDmbzo3Z7x+D0uv24bXQwQoAOcA7Vtg0B1LmVPPBep73+8B99fF8C1ABChAfT0g1BN8fo/wM6lSn8c/QSJAAZrtAVV7hPqfv2rG2QEUgAIAAAAAAAAAwNcHbW1bbhAG7OwAAAAASUVORK5CYII=',
+    'kin-owl': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABLklEQVR42u2aIQvCQBTHN7EKA4PB4JpGMajNIKjZIOYF8SOJwWwyazDY1CBGbVs0CH4Drd4Ld4xTOdnv1x67vcGf9/73bpvnAQAAAAAAAEDW8D+dsFLrPt/j5LL1XconyWW9AhAAD/hwz8+jknJ9srhZ5Tfls/UEWgABMk7+2w+QPUwFIAAC/PccIPf93ayvXd+ZblJ5gtzn0+ZPOxfQAgjAHGB5FggfSlxsr5S4EJSt8jfGCyW+74dUAAIggEMekMSBEp+WkXaf7o1CfUIxB8h8SUwFIAACuOQB1+NZiavNunaWN/WwafaXz6MCEAABfvs+wPR+QJ73pSfYegzfBWgBBHDLA0yeEK9byvVwcNDeb1rP/wG0AAK4dRYwkbaHw4H3pAIQAAEAAAAAvs4LY8RUYA3Pm9MAAAAASUVORK5CYII=',
+    'kin-eye': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABFElEQVR42u2asQrCMBCGo/gejhahS2c3F2cX6eAkCOID+Aw+gAiCk4O4OHdxc+5SkDr6JHVuhhxHGqz0+7YSkqY/91/uSowBAAAAAAAAgK7RC/2CYTStfOZ/ykfQPfa7HgEIQA4I7PHiefZaP56sguYILIAAHWeg9bjkOV/PS+tJOUG7XyyAANQBbg9dk1FtPM3fKs/PLievDWbLtapOkPZr5wQsgADUAc0ieb7c353j0W5OBCAAAvwwB9jnZGpM9U8fJJ37RAACIIC7F9Bi9w6+vYG29uefIBZAgHb1Aq8irz2P40TlcWk9IgABEKBddYBUF9jcjlvn/MXm4Bxv+r4AFkAAckBYuCOEBRAAAAAAoJV8ARctUUTeyAnRAAAAAElFTkSuQmCC',
+    'kin-skull': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABBklEQVR42u2YsQ3CMBBFL4g9aCkjGgYAIZZAomMAGkagYQA6JJZACAagQaGjZRJoiZFyOp1tCr/XRRe7+Pr/x44IAAAAAACUSBV7w8Fw8v5+fj2vlWVu3c9Lr3QHIAAdEDnzy9OlNT/Mp2KZh2jvezuBCCAAHRC3A0Ju551r//Fs3TmnA4gAAuTtgDDz3ox7CTvC2glEAAEKp586k9ZzgXc9DkAABPhvB2j3eZFH1vU4AAEQIG8H/H6nuzPb3BvXehyAAAiQ93+A9n9gv1205vWodp31w45YbY6u+z8OQAAEiNsBWidomQ47InXmcQACIEDaDtA6wUrszOMABEAAAAAAAAAA+QCaRVjKrY7UwwAAAABJRU5ErkJggg==',
+    'kin-jelly': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA+klEQVR42u2ZMQrCQBBFN+I9bO2EXMEL2EWw1jp96vT21gp26awUTyBolTJeQMgJtN5BhDCZuLDvdUt2Nsln/mRn4xwAAAAAAAAAxEZifYPJdP7WxD/rs+kzjmLPAASgBhh7vLmcOq3XPl7eeJavTGsEFkAAaoDO89Lj0sN9U18bb5xVhaomYAEEiJyxdgFrz5MBCIAAYdcAidy737f7XueTAQiAAGH1AsdF+dcXoBfAAggw7D5AeiyrnFcTinTtzS9vO2d5nQxAAAQIqxcYGv4LYAEECKsGbA7L5FfvYB1PBiAAAtieB2jPD7p+t7XxZAACIAAAAADAVz50+UnpoNX1TgAAAABJRU5ErkJggg==',
   };
   const img={};
   for(const [id,src] of Object.entries(FILES)){ const im=new Image(); im.src=src; img[id]=im; }
@@ -14321,7 +14337,17 @@ function draw(){
      刃が回っていれば届く範囲は目で読めるので、円まで敷くと
      ただの線が1本増えるだけになる（画面は既に線が多い）。
      向きは進行方向ではなく接線——回っている物として読ませる。 */
-  (P.blades||[]).forEach((bl,i)=>{
+  /* 盗賊の短剣の技（ダンシングソード）と同じドット絵の短剣で描く。
+     刃の位置は当たり判定（bl.x, bl.y＝主人公から BLADE_R の円）そのもの。後ろに残像と弧を引く。 */
+  const bladeAngs=(P.blades||[]).filter(bl=>bl.x!==undefined).map((bl,i,a)=>(P.bladeAng||0)+i*Math.PI*2/(P.blades.length||1));
+  const bladePix = bladeAngs.length && window.PixelArtFx && PixelArtFx.defs && PixelArtFx.defs.dgblade;
+  if(bladePix){
+    try{
+      PixelArtFx.renderEffect(ctx,{id:'dgblade', age:(S.run&&S.run.elapsed)||0, x:P.x*TS-camX, y:P.y*TS-camY,
+        range:BLADE_R, angles:bladeAngs, scale:TS/48, layer:'air'});
+    }catch(err){ /* 絵で失敗したら下の図形で出す */ }
+  }
+  if(!bladePix) (P.blades||[]).forEach((bl,i)=>{
     if(bl.x===undefined) return;
     const bx=bl.x*TS-camX, by=bl.y*TS-camY;
     const n=(P.blades.length||1);
@@ -14353,10 +14379,17 @@ function draw(){
       const sx=k.x*TS-camX, sy=k.y*TS-camY;
       const pl=0.6+0.4*Math.sin(performance.now()/170+k.ang);
       ctx.save();
-      ctx.globalAlpha=0.25*pl; ctx.fillStyle='#8fd8ff';
+      ctx.globalAlpha=0.20*pl; ctx.fillStyle='#8fd8ff';     // 足もとの淡い光は残す（撃つ線と同じ色）
       ctx.beginPath(); ctx.arc(sx,sy,TS*0.32,0,7); ctx.fill();
-      ctx.globalAlpha=0.95; ctx.fillStyle='#dff2ff';
-      ctx.beginPath(); ctx.arc(sx,sy,TS*0.14,0,7); ctx.fill();
+      ctx.globalAlpha=1;
+      if(!k.look) k.look=pickKinLook(h.kins);               // 前のセーブから来た眷属にも絵を配る
+      /* 6種のドット絵（鬼火・蝙蝠・梟・目玉・骸骨・海月）。ふわふわ上下させる。
+         絵が読めていないときだけ前の光る丸で出す。 */
+      const bob=Math.round(Math.sin(performance.now()/260+k.ang*3)*TS/16)*1;
+      if(!CharacterArt.put('kin-'+k.look, sx, sy-TS*0.08+bob, TS)){
+        ctx.globalAlpha=0.95; ctx.fillStyle='#dff2ff';
+        ctx.beginPath(); ctx.arc(sx,sy,TS*0.14,0,7); ctx.fill();
+      }
       ctx.restore();
     });
     if(h.barrier>0) uiLater(()=>{             // 重騎士の守護陣
@@ -19246,7 +19279,7 @@ function tickBoonTimers(h, dt, isPlayer){
        2つめを取っても何も現れなかった。 */
     h.kins = h.kins || [];
     while(h.kins.length < kv.length)
-      h.kins.push({ang:rnd()*6.28, cd:rf(0,KIN_CD)});
+      h.kins.push({ang:rnd()*6.28, cd:rf(0,KIN_CD), look:pickKinLook(h.kins)});
     h.kins.length = kv.length;
     h.kins.forEach((k,i)=>{
       // 等間隔に散らす。重なると何体いるのか数えられない
@@ -19770,7 +19803,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20260929b"></script>
+<script src="weapon-art-pixel.js?v=20261009a"></script>
 <script src="game-feel.js?v=20260929c"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>

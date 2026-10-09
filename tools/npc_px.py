@@ -1,4 +1,4 @@
-"""道中の商人と鉱床のドット絵（2026-10-09）。
+"""道中の商人・鉱床・眷属のドット絵（2026-10-09）。
 
 仲間（proto/assets/sprites/characters/allies/*.png）と同じ描き方：
   16×16 ドットを 1ドット＝4px で 64×64 の PNG に。縁は #1f2843、ほぼ平塗り、頭が大きい。
@@ -127,6 +127,137 @@ SPR['mined']=[
 "................",
 ]
 
+# ---------------- 眷属（6種） ----------------
+# 恩寵「眷属」で連れる、主人の周りを回って撃つ小さな使い。前は光る丸だった。
+# 大きさは前の丸（光の輪 直径0.64マス）と同じくらい：幅 8〜14 ドット（1マス＝16ドット）。
+# 1体ごとに出たときに6種から選ぶ（同時に連れている眷属とは重ならないように）。
+#   wisp 鬼火 / bat 蝙蝠 / owl 梟 / eye 目玉 / skull 骸骨 / jelly 海月
+KIN_PAL={'A':'#1f2843',
+ # 鬼火
+ 'w':'#effcff','c':'#8fd8ff','C':'#4aa3d8',
+ # 蝙蝠
+ 'v':'#7a5aa8','V':'#a985d6','u':'#4a3a78','r':'#ff6a7a',
+ # 梟
+ 'o':'#b98a5a','O':'#e0c08a','y':'#ffe07a','b':'#6a4a32',
+ # 目玉
+ 'e':'#f2ece0','E':'#c8bfae','i':'#3a8f7a','k':'#121828','m':'#c65a6a',
+ # 骸骨
+ 's':'#e8e2d0','S':'#b8b0a0','f':'#7fe0ff',
+ # 海月
+ 'j':'#f0b8e8','J':'#c878c8','t':'#ffe6fa','g':'#9a5aa8',
+}
+
+KIN={
+'wisp':[
+"................",
+"................",
+"................",
+"........A.......",
+".......AwA......",
+"......AwcA......",
+".....AwccCA.....",
+"....AwcccccA....",
+"....AcAccAcA....",
+"....AcAccAcA....",
+"....AccccccA....",
+".....ACccCA.....",
+"......AAAA......",
+"................",
+"................",
+"................",
+],
+'bat':[
+"................",
+"................",
+"................",
+"................",
+"...A..A..A..A...",
+"..AVAAvAAvAAVA..",
+".AVVVAvvvvAVVVA.",
+".AVuVAvrvrAVuVA.",
+"..AuVVAvvAVVuA..",
+"...AAuAAAAuAA...",
+".....AA..AA.....",
+"................",
+"................",
+"................",
+"................",
+"................",
+],
+'owl':[
+"................",
+"................",
+"................",
+"................",
+".....A....A.....",
+"....AoAAAAoA....",
+"....AooooooA....",
+"...AOOAooAOOA...",
+"...AykAooAkyA...",
+"...AOOAyyAOOA...",
+"...AoOOOOOOoA...",
+"....AoOOOOoA....",
+".....AyAAyA.....",
+".....AA..AA.....",
+"................",
+"................",
+],
+'eye':[
+"................",
+"................",
+"................",
+"................",
+"......AAAA......",
+"....AAeeeeAA....",
+"..A.AeeeeeeA.A..",
+".AmAeeiiiieeAmA.",
+".AmAeiikkieeAmA.",
+"..AAeiikkieeAA..",
+"....AeeiieeA....",
+"....AEeeeeEA....",
+".....AAEEAA.....",
+"......AAAA......",
+"................",
+"................",
+],
+'skull':[
+"................",
+"................",
+"................",
+".....A.A..A.....",
+"....AfAfAAfA....",
+"....AAssssAA....",
+"...AssssssssA...",
+"...AsAAssAAsA...",
+"...AsAfssAfsA...",
+"...AssssSsssA...",
+"....ASsAAsSA....",
+".....AsSsSA.....",
+"......AAAA......",
+"................",
+"................",
+"................",
+],
+'jelly':[
+"................",
+"................",
+"................",
+"................",
+"......AAAA......",
+"....AAtttjAA....",
+"...AtjjjjjjJA...",
+"...AjjjjjjjJA...",
+"...AjAjjAjjJA...",
+"...AJJJJJJJJA...",
+"....AgAgAgAgA...",
+"....AgAgAgAg....",
+"....A.AgA.Ag....",
+"......A...A.....",
+"................",
+"................",
+],
+}
+
 def render(M,pal,scale=4):
     im=Image.new('RGBA',(16*scale,16*scale),(0,0,0,0)); px=im.load()
     for y,row in enumerate(M):
@@ -146,12 +277,15 @@ def build():
         if g=='deep': mp.update({k:PALS['deep'][k] for k in 'KkL'})
         mp['x']={'raw':'#9aa3b2','fine':'#7fc8e0','deep':'#c98adf'}[g]
         out['ore-'+g+'-mined']=render(SPR['mined'],mp)
+    for n,M in KIN.items(): out['kin-'+n]=render(M, KIN_PAL)
     return out
 
 PATHS={'merchant':'proto/assets/sprites/characters/npc/merchant-right-idle.png'}
 for g in ('raw','fine','deep'):
     PATHS['ore-'+g]='proto/assets/sprites/props/ore/ore-'+g+'.png'
     PATHS['ore-'+g+'-mined']='proto/assets/sprites/props/ore/ore-'+g+'-mined.png'
+
+for n in KIN: PATHS['kin-'+n]='proto/assets/sprites/characters/kin/kin-'+n+'.png'
 
 def b64(im):
     bio=io.BytesIO(); im.save(bio,'PNG',optimize=True)

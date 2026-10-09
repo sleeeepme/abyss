@@ -39,6 +39,12 @@
 | `PROP-ORE-RAW` | `ore-raw` / `ore-raw-mined` | 鉱床（粗鉱） | 置き物 | ![粗鉱](../proto/assets/sprites/props/ore/ore-raw.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-raw-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-raw.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 母岩に食い込んだ鉄の塊（鋼色＋光る面）と錆の筋 |
 | `PROP-ORE-FINE` | `ore-fine` / `ore-fine-mined` | 鉱床（精鉱） | 置き物 | ![精鉱](../proto/assets/sprites/props/ore/ore-fine.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-fine-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-fine.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 母岩から突き出た水色の柱状結晶 |
 | `PROP-ORE-DEEP` | `ore-deep` / `ore-deep-mined` | 鉱床（深鉱） | 置き物 | ![深鉱](../proto/assets/sprites/props/ore/ore-deep.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-deep-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-deep.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 暗い紫の母岩に傾いて生えた紫水晶 |
+| `KIN-WISP` | `kin-wisp` | 眷属（鬼火） | 眷属 | ![眷属・鬼火](../proto/assets/sprites/characters/kin/kin-wisp.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-wisp.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
+| `KIN-BAT` | `kin-bat` | 眷属（蝙蝠） | 眷属 | ![眷属・蝙蝠](../proto/assets/sprites/characters/kin/kin-bat.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-bat.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
+| `KIN-OWL` | `kin-owl` | 眷属（梟） | 眷属 | ![眷属・梟](../proto/assets/sprites/characters/kin/kin-owl.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-owl.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
+| `KIN-EYE` | `kin-eye` | 眷属（目玉） | 眷属 | ![眷属・目玉](../proto/assets/sprites/characters/kin/kin-eye.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-eye.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
+| `KIN-SKULL` | `kin-skull` | 眷属（骸骨） | 眷属 | ![眷属・骸骨](../proto/assets/sprites/characters/kin/kin-skull.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-skull.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
+| `KIN-JELLY` | `kin-jelly` | 眷属（海月） | 眷属 | ![眷属・海月](../proto/assets/sprites/characters/kin/kin-jelly.png) | [64×64 PNG](../proto/assets/sprites/characters/kin/kin-jelly.png) | 正面・浮遊 | 初稿（2026-10-09） | ゲーム反映済み | 恩寵「眷属」で連れる使い。出てくるたびに6種から選ぶ（同時に連れている眷属とは重ならない）。幅8〜14ドット＝前の光る丸と同じくらい |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 初期解放ジョブの色違い
@@ -142,3 +148,4 @@
 - 2026-10-05: 苔玉の亜種を色違いで登録（ユーザー「苔玉の亜種は苔玉の色違いのものを入れておいて。水の層だと青など」）。水の層＝青、根の層＝若葉、跡の層＝灰の石、炉の層＝熾火、白の層＝霜。ゲームでは層ごとの苔玉にそのまま当たる。
 - 2026-10-05: フロストモスを白い体とマゼンタの目に変更（ユーザー「フロストモスは白い体とマゼンタの目で」）。
 - 2026-10-09: 道中の商人を仲間と同じ描き方の人型で、鉱床を等級ごとの素材（粗鉱＝鉄の塊と錆／精鉱＝水色の結晶／深鉱＝紫水晶）で登録（ユーザー「鉱床のデザインも作成して。石の種類に合わせて素材は変えて欲しい」「商人のデザインも仲間と同じようなデザインの人型にしたい」）。格子は `tools/npc_px.py`。
+- 2026-10-09: 眷属を光る丸から6種のドット絵（鬼火・蝙蝠・梟・目玉・骸骨・海月）に。出てくるたびにランダム（ユーザー「眷属のデザインが今は丸なので、今と同じくらいのサイズで6種類くらい作成して、毎回ランダムでデザインが選出されるようにしたい」）。周回刃は盗賊の短剣の技（ダンシングソード）と同じドット絵の短剣に。

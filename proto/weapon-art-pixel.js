@@ -1131,6 +1131,23 @@
     if ((Math.floor(t * 12) & 3) === 0) plus(x, y, P.W, 1, fade);
   }
 
+  /* ---------- 鞘無し（周回刃）：ダンシングソードと同じ短剣を、本体の当たり判定どおりの円に置く ----------
+     o.x,o.y＝主人公の足元（＝円の中心）、o.R＝軌道の半径（ドット）、o.angles＝刃ごとの今の角度。
+     本編の刃は楕円ではなく正円で回る（当たり判定が正円なので、絵も正円にそろえる）。 */
+  function dgbladeAir(t, o) {
+    const R = o.R;
+    for (const a of (o.angles || [])) {
+      smear(o.x, o.y, R, a, -0.6, 2, 1, [P.W, P.fr0, P.fl0], 0, 81, 0.7);
+      for (let k = 1; k <= 2; k++) {
+        const ak = a - k * 0.30;
+        drawDagger(o.x + Math.cos(ak) * R, o.y + Math.sin(ak) * R, ak + Math.PI / 2, k === 1 ? 0.5 : 0.25);
+      }
+      const x = o.x + Math.cos(a) * R, y = o.y + Math.sin(a) * R;
+      drawDagger(x, y, a + Math.PI / 2, 1);
+      if ((Math.floor(t * 12 + a * 3) & 3) === 0) plus(x, y, P.W, 1, 1);
+    }
+  }
+
   /* ---------- 短剣 lv3 ミラージュ：鏡のかけらが回り、姿が揺らぐ ---------- */
   function dgmirageGround(t, o) {
     if (t < 0 || t > o.life + 0.2) return;
@@ -2906,6 +2923,7 @@
       air(t, o) { const L = this.charge; if (t < 0) rockChargeAir(t + L, { ...o, life: L }); this.spots.forEach(([x, y], i) => { if (t < 0) bvRockAir(t + L + i * 0.04, { x, y, life: L + i * 0.04, cx: o.x + 8, cy: o.y - 4 }); else bvRockHitAir(t, { x, y, R: o.R }); }); } }),
     /* ---- 実機だけで使う部品（見本シーンなし） ---- */
 
+    dgblade: { aux: true, span: 1e9, pad: 10, sky: 0, ground: () => {}, air: dgbladeAir },
     bt_charge: { aux: true, span: 5, ext: 44, pad: 8, sky: 20, ground: btChargeGround, air: btChargeAir },
     bt_slam: { aux: true, span: 1.2, pad: 20, sky: 60, ground: btSlamGround, air: btSlamAir },
     bt_cleave: { aux: true, span: 0.8, pad: 16, sky: 30, ground: btCleaveGround, air: btCleaveAir },
@@ -3176,7 +3194,7 @@
     for (const key in o) delete o[key];
     const ang = p.angle || 0;
     Object.assign(o, { x: ox, y: oy, R, ang, arc: d.arc || 0, life: p.life != null ? p.life : (d.life || 0), skyY: 4, charge: 0,
-                       gx: ox + Math.round(Math.cos(ang) * 6), gy: oy - 9, targets: null, healR: d.healR, orbitA: p.orbitA, fall: p.fall,
+                       gx: ox + Math.round(Math.cos(ang) * 6), gy: oy - 9, targets: null, healR: d.healR, orbitA: p.orbitA, fall: p.fall, angles: p.angles,
                        arrows: false, shots: false, kind: p.kind || d.kind, elem: p.elem || d.elem, target: p.target, aura: p.aura, ring: p.ring || 0,
                        wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0,
                        hitR: p.hitR != null && Number.isFinite(p.hitR) ? Math.round(p.hitR * TILE) : null });
