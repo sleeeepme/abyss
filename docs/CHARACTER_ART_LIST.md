@@ -35,6 +35,10 @@
 | `ENEMY-MOSS-BALL-RUIN` | `moss-ball-ruin` | グラウトモス | 敵 | ![苔玉・跡の層・灰の石](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-ruin.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（跡の層・灰の石）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `ENEMY-MOSS-BALL-FURNACE` | `moss-ball-furnace` | エンバーモス | 敵 | ![苔玉・炉の層・熾火](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-furnace.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（炉の層・熾火）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
 | `ENEMY-MOSS-BALL-PALE` | `moss-ball-pale` | フロストモス | 敵 | ![苔玉・白の層・白い体とマゼンタの目](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale-4x.png) | [16×16 PNG](../proto/assets/sprites/enemies/moss-ball/front-idle-v1-pale.png) | 正面・待機1 | 色違い（2026-10-05） | ゲーム反映済み | 苔玉v1の色違い（白の層：白い体とマゼンタの目、2026-10-05 ユーザー指定）。形・濃紺の輪郭は同じで、体の5段と目だけを塗り替え |
+| `NPC-MERCHANT-001` | `merchant` | 道中の商人 | NPC | ![道中の商人・右向き](../proto/assets/sprites/characters/npc/merchant-right-idle.png) | [64×64 PNG](../proto/assets/sprites/characters/npc/merchant-right-idle.png) | 右・待機1 | 初稿（2026-10-09） | ゲーム反映済み | 仲間と同じ16×16ドット・濃紺の輪郭。背中の大荷（巻いた毛布・角灯）、つば広の帽子に金の帯、白い髭、赤い外套、杖。ゲームでは主人公のいる側へ向く。格子の正は `tools/npc_px.py` |
+| `PROP-ORE-RAW` | `ore-raw` / `ore-raw-mined` | 鉱床（粗鉱） | 置き物 | ![粗鉱](../proto/assets/sprites/props/ore/ore-raw.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-raw-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-raw.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 母岩に食い込んだ鉄の塊（鋼色＋光る面）と錆の筋 |
+| `PROP-ORE-FINE` | `ore-fine` / `ore-fine-mined` | 鉱床（精鉱） | 置き物 | ![精鉱](../proto/assets/sprites/props/ore/ore-fine.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-fine-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-fine.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 母岩から突き出た水色の柱状結晶 |
+| `PROP-ORE-DEEP` | `ore-deep` / `ore-deep-mined` | 鉱床（深鉱） | 置き物 | ![深鉱](../proto/assets/sprites/props/ore/ore-deep.png) ![掘った跡](../proto/assets/sprites/props/ore/ore-deep-mined.png) | [64×64 PNG](../proto/assets/sprites/props/ore/ore-deep.png) | 掘る前・掘った跡 | 初稿（2026-10-09） | ゲーム反映済み | 暗い紫の母岩に傾いて生えた紫水晶 |
 | `BOSS-MID-ASH-FROG-001` | `uniqueBoss:5` | 灰の大蛙 | 中ボス | ![灰の大蛙・右向きv4](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft-4x.png) | [32×32 PNG](../proto/assets/sprites/enemies/great-ash-frog/right-idle-v4-draft.png) | 右・待機1 | v4・要確認 | 未反映 | v3の外形・配色・陰影を完全維持し、添付画像に合わせて黒目を2×2pxから縦1×2pxへ修正 |
 
 ## 初期解放ジョブの色違い
@@ -137,3 +141,4 @@
 - 2026-08-27: 初期解放ジョブ6種（剣士・重騎士・盗賊・僧侶・狩人・魔術師）の2人目・3人目用色違いを登録。ゲームでは同職のパーティ内順に通常色・`_2`・`_3`を自動適用する。
 - 2026-10-05: 苔玉の亜種を色違いで登録（ユーザー「苔玉の亜種は苔玉の色違いのものを入れておいて。水の層だと青など」）。水の層＝青、根の層＝若葉、跡の層＝灰の石、炉の層＝熾火、白の層＝霜。ゲームでは層ごとの苔玉にそのまま当たる。
 - 2026-10-05: フロストモスを白い体とマゼンタの目に変更（ユーザー「フロストモスは白い体とマゼンタの目で」）。
+- 2026-10-09: 道中の商人を仲間と同じ描き方の人型で、鉱床を等級ごとの素材（粗鉱＝鉄の塊と錆／精鉱＝水色の結晶／深鉱＝紫水晶）で登録（ユーザー「鉱床のデザインも作成して。石の種類に合わせて素材は変えて欲しい」「商人のデザインも仲間と同じようなデザインの人型にしたい」）。格子は `tools/npc_px.py`。
