@@ -1642,6 +1642,7 @@
 </div></div>
 
 <script src="ads.js?v=20260927a"></script>
+<script src="ads-crazygames.js?v=20261009a"></script>
 <script>
 "use strict";
 /* ==========================================================================
@@ -12970,6 +12971,7 @@ function tick(now){
   // 例外でループが止まると「ゲームオーバー後にフリーズ」になる。必ず次フレームを予約する。
   try{
     const live = S.screen==='game' && S.hero && S.run && W.fl;
+    window.ABYSS_CRAZYGAMES?.syncGameplay(!!live && !gamePaused());
     if(live){ if(!gamePaused()) update(dt); draw(); _canvasDirty=true; }
     else if(_canvasDirty){
       /* ---------- 街やメニューではキャンバスを塗らない ----------
@@ -13034,7 +13036,7 @@ const ART_NAME_DELAY = 0.9;
 let _artNamePend = null;            // {id, t}
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
-  if(ABYSS_ADS.busy) return true;
+  if(ABYSS_ADS.busy || window.ABYSS_CRAZYGAMES?.blocked) return true;
   if(window.ABYSS_SAVE && window.ABYSS_SAVE.paused()) return true;
   /* 窓が閉じているのに止まったままになると、盤面が二度と動かない。
      止めている理由（開いている窓）が消えていたら自分で戻す。 */
@@ -17925,6 +17927,7 @@ function renderGacha(){
       ? '<div class="row"><span class="k">次の帯</span><span>第 '+next.min+' 階層まで潜れば「'+next.nm+'」</span></div>'
       : '<div class="row"><span class="k">次の帯</span><span>最高帯に到達している</span></div>')+
     '<div class="row"><span class="k">補充</span><span>アビスに潜るとリセット</span></div>';
+  syncCrazyAdAvailability();
   const btn=el('btn-gacha');
   const free=(S.gachaFree||0)>0;
   btn.textContent = S.gachaLeft<=0 ? '今日はもう引けない（明日また5回）'
@@ -17940,7 +17943,7 @@ let _adNoticeTimer=null;
 let _adTimer=null, _adDone=null, _adUnder=[], _adSession=null, _demoComplete=null;
 // ローカルの試遊だけ従来のダミーを使う。公開URLでは未接続扱いとし、偽の報酬を出さない。
 const _adDemo = location.protocol==='file:' || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
-if(_adDemo) ABYSS_ADS.setProvider({
+if(_adDemo && !window.ABYSS_CRAZYGAMES?.enabled) ABYSS_ADS.setProvider({
   name:'demo',
   requestRewarded({signal}){
     return new Promise(resolve=>{
@@ -17959,8 +17962,17 @@ if(_adDemo) ABYSS_ADS.setProvider({
     });
   }
 });
+function syncCrazyAdAvailability(){
+  const unavailable=!!window.ABYSS_CRAZYGAMES?.unavailable;
+  for(const id of ['fal-revive','st-heal','d-ad']) el(id).classList.toggle('cg-ad-unavailable',unavailable);
+  el('btn-gacha').classList.toggle('cg-ad-unavailable',unavailable && !(S.gachaFree>0));
+  syncAdBar();
+}
+addEventListener('abyss-ad-state',syncCrazyAdAvailability);
+const cgAdStyle=document.createElement('style');
+cgAdStyle.textContent='.cg-ad-unavailable{display:none!important}';document.head.append(cgAdStyle);
 function openAd(onDone, placement='gacha'){
-  if(_adSession || ABYSS_ADS.busy) return;
+  if(_adSession || ABYSS_ADS.busy || window.ABYSS_CRAZYGAMES?.blocked) return;
   if(!onDone && refreshGacha()<=0) return;
   clearTimeout(_adNoticeTimer); el('ad-notice').hidden=true;
   const session={run:S.run,hero:S.hero,screen:S.screen};
@@ -17968,6 +17980,7 @@ function openAd(onDone, placement='gacha'){
   _adUnder=[...document.querySelectorAll('.modal.on')].filter(m=>m.id!=='m-ad');
   _adUnder.forEach(m=>m.classList.remove('on'));
   const demo=ABYSS_ADS.providerName==='demo', ok=el('ad-ok');
+  el('ad-cancel').textContent=ABYSS_ADS.providerName==='crazygames' ? '受け取りを中止' : 'やめる';
   ok.disabled=true; ok.style.opacity='.45'; ok.hidden=!demo;
   el('ad-title').textContent=demo ? 'SAMPLE AD — テスト広告' : '広告';
   el('ad-description').textContent=demo ? '動作確認用の広告です。広告収益は発生しません。' : '広告を準備しています';
@@ -19857,5 +19870,7 @@ if(typeof tapDash === 'function'){
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261001a"></script>
+<script src="audio.js?v=20261009a"></script>
+<script src="audio-game.js?v=20261002b"></script>
 </body>
 </html>
