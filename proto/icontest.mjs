@@ -97,11 +97,11 @@ R.itemsBorrowed = await pg.evaluate(()=>{
 
 /* ============ 4-b. 技ボタンの白黒アイコンが全部そろっている ============
    ボタンには名札も秒数も出さないので、絵が欠けると何の技か分からなくなる。
-   大技・武器技・衝撃波の全部に 16×16 の格子があること。 */
+   大技・武器技・衝撃波の全部に 15×15 の格子があること。 */
 R.skillIcons = await pg.evaluate(()=>{
   const ids=[...ULTS.map(u=>u.id), ...Object.values(WEAPON_ARTS).flat().map(d=>d.id), 'wave'];
   const missing=ids.filter(id=>!SKILL_ICON_GRID[id]);
-  const badSize=Object.entries(SKILL_ICON_GRID).filter(([k,g])=>g.length!==16 || g.some(r=>r.length!==16)).map(([k])=>k);
+  const badSize=Object.entries(SKILL_ICON_GRID).filter(([k,g])=>g.length!==15 || g.some(r=>r.length!==15)).map(([k])=>k);
   const blank=ids.filter(id=>SKILL_ICON_GRID[id] && !SKILL_ICON_GRID[id].join('').includes('#'));
   const url=skillIconUrl('iai');
   return {count:ids.length, missing, badSize, blank, makesPng: url.indexOf('data:image/png')>=0,
