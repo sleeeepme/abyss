@@ -309,7 +309,7 @@ R.saysName = await pg.evaluate(()=>{
   return out;
 });
 
-// 6-b. 閃いた瞬間は頭上に閃きの灯り（ドット絵）が出る
+// 6-b. 閃いた瞬間は頭上に電球（ピコーン！）が出る。技の名前は上の帯に出す（数字のように浮かせない）
 R.flashFx = await pg.evaluate(()=>{
   TH.dummy('sword');
   S.arts={};
@@ -319,10 +319,12 @@ R.flashFx = await pg.evaluate(()=>{
   const got=tryFlashArt('sword');
   ART_FLASH_P[0]=P0[0];
   const txts=W.pops.filter(p=>p.txt).map(p=>p.txt);
+  const bulb=W.fx.find(f=>f.t==='flashbulb');
   return {got:got&&got.id, txts,
-          bulb: W.pops.some(p=>p.pic==='bulb'),
-          named: txts.includes('居合'),
-          ring: W.fx.some(f=>f.t==='ultring')};
+          bulb: !!bulb,
+          bulbFollowsHero: !!bulb && bulb.ent===P,
+          named: !!_banner && _banner.title==='居合',
+          ring: W.fx.some(f=>f.t==='levelup')};
 });
 
 /* ================= 7. 置き型が主を失っても走り続けない ================= */
@@ -448,13 +450,18 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
   window.artFlashChance=chanceOrig;
   // 閃いた直後は、まだ窓を出さない（演出を見せている最中）
   const openAtOnce=document.getElementById('m-artname').classList.contains('on');
-  const bulbOverhead = W.pops.some(p=>p.pic==='bulb');
-  const ringOut = W.fx.some(f=>f.t==='ultring');
+  const bulbOverhead = W.fx.some(f=>f.t==='flashbulb');
+  const ringOut = W.fx.some(f=>f.t==='levelup');
   // 少しだけ進めても、まだ出ない
   stepSim(0.4,{draw:true});
   const openMidway=document.getElementById('m-artname').classList.contains('on');
-  // 演出が出切ったら開く
-  stepSim(0.8,{draw:true});
+  // 電球がまだ出ているあいだは開かない
+  stepSim(0.7,{draw:true});
+  const openWhileBulb=document.getElementById('m-artname').classList.contains('on');
+  const bulbStill=W.fx.some(f=>f.t==='flashbulb');
+  // 演出が出切ったら開く（ピコーンの一拍だけ時間が緩むぶん、少し長めに回す）
+  stepSim(1.0,{draw:true});
+  const bulbGone=!W.fx.some(f=>f.t==='flashbulb');
   const open=document.getElementById('m-artname').classList.contains('on');
   const shown=document.getElementById('an-input').value;
   const sub=document.getElementById('an-sub').textContent;
@@ -468,12 +475,14 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
           learned:!!def,
           bulbShownFirst: bulbOverhead && ringOut,
           waitsForEffect: !openAtOnce && !openMidway,
+          waitsForBulb: bulbStill && !openWhileBulb,
+          bulbGoneWhenOpened: bulbGone,
           windowOpened: open,
           defaultFilled: !!def && shown===def.nm,
           titleSaysIdea: title.indexOf('技を思いついた！')>=0 && title.indexOf('pi-bulb')>=0,
           pausedWhileOpen: paused,
           resumedAfterClose: resumed,
-          ok: !!def && bulbOverhead && ringOut && !openAtOnce && !openMidway && open
+          ok: !!def && bulbOverhead && ringOut && !openAtOnce && !openMidway && bulbStill && !openWhileBulb && bulbGone && open
               && shown===def.nm && title.indexOf('技を思いついた！')>=0
               && title.indexOf('pi-bulb')>=0 && paused && resumed};
 });
@@ -498,7 +507,7 @@ R.commitReturnsToGame = await pg.evaluate(()=>{
   const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
   tryFlashArt('sword');
   window.artFlashChance=chanceOrig;
-  stepSim(1.2,{draw:true});
+  stepSim(2.0,{draw:true});
   const opened=document.getElementById('m-artname').classList.contains('on');
   document.getElementById('an-input').value='わが新技';
   commitArtRename(false);
@@ -527,7 +536,7 @@ R.renameWindowFreezesBoard = await pg.evaluate(()=>{
   const chanceOrig=window.artFlashChance; window.artFlashChance=()=>1;
   tryFlashArt('sword');
   window.artFlashChance=chanceOrig;
-  stepSim(1.2,{draw:true});              // 演出が出切って窓が開くまで
+  stepSim(2.0,{draw:true});              // 演出が出切って窓が開くまで
   // 窓が開いている状態で tick を回す
   const t0=S.run.elapsed;
   _drawStage='';

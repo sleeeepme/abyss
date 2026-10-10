@@ -4639,10 +4639,11 @@ function tryFlashArt(baseId){
   S.arts = S.arts || {};
   S.arts[baseId] = n+1;
   const def=list[n];
-  artFlashFx(P.x, P.y, def);
+  artFlashFx(P.x, P.y, def, P);
+  if(typeof feelSlow==='function') feelSlow(0.35, 0.35);   // ピコーンの一拍だけ時間を緩める
   const b=BASES.find(x=>x.id===baseId);
   log('<i class="pi pi-bulb"></i> '+(b?b.nm:baseId)+'『'+artName(def)+'』を閃いた');
-  showBanner(artName(def), (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, 2.2);
+  showBanner(artName(def), (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, ART_FLASH_SECS);   // 窓が出る前に引く
   /* ---------- 閃いたその場で名前を付ける ----------
      技は「教わった物」ではなく「自分で見つけた物」なので、
      見つけた瞬間に名前を付けられるのが筋（依頼どおり）。
@@ -4666,7 +4667,7 @@ function tryFlashArtAlly(a, baseId){
   a.arts = a.arts || {};
   a.arts[baseId] = n+1;
   const def=list[n];
-  artFlashFx(a.x, a.y, def);
+  artFlashFx(a.x, a.y, def, a);
   log('<i class="pi pi-bulb"></i> '+a.name+'が『'+artName(def)+'』を閃いた');
   return def;
 }
@@ -10567,11 +10568,87 @@ function sayArt(x, y, nm, col){
 }
 /* 閃いた瞬間。頭上に灯りの印を出して、輪を1つ広げる。
    **ここだけは戦いを止めない**（モーダルを出すと、殴られている最中に手が止まる）。 */
-function artFlashFx(x, y, def){
-  W.pops.push({x, y:y-1.25, pic:'bulb', c:'#ffe066', life:1.5, max:1.5, bold:true});
-  W.pops.push({x, y:y-0.55, txt:artName(def), c:def.col, life:1.5, max:1.5, delay:0.25, bold:true});
-  W.fx.push({t:'ultring', x, y, r:0, max:2.4, life:0.6, maxLife:0.6, col:'#ffe066'});
+/* ---------- 閃きの電球（ピコーン！） ----------
+   頭の上に電球がポンと出て、一拍おいてパッと灯り、光の筋が弾ける。
+   名前を付ける窓は**この演出が終わってから**出す（ART_NAME_DELAY ＝ ART_FLASH_SECS ＋ 少し）。
+   ent を渡すと、その人の頭の上に付いて動く（走りながら閃いても置き去りにしない）。 */
+const ART_FLASH_SECS = 1.35;
+function artFlashFx(x, y, def, ent){
+  W.fx.push({t:'flashbulb', x, y, ent:ent||null, life:ART_FLASH_SECS, max:ART_FLASH_SECS, col:def.col});
+  /* 技の名前は数字のように浮かせない（上へ昇って電球に重なる）。
+     主人公は上の帯（showBanner）に、仲間はログに名前が出る。 */
   W.fx.push({t:'levelup', x, y, life:0.9, max:0.9, col:def.col});
+}
+/* 電球のドット（10×12、1ドット＝TS/16）。g＝ガラス、w＝ガラスの照り、f＝芯、m/M＝口金 */
+const FLASH_BULB = [
+  "...AAAA...",
+  "..AggggA..",
+  ".AwgggggA.",
+  ".AwggfggA.",
+  ".AggfffgA.",
+  ".AgggfggA.",
+  "..AggggA..",
+  "...AggA...",
+  "...AmmA...",
+  "...AMMA...",
+  "...AmmA...",
+  "....AA....",
+];
+const FLASH_BULB_OFF = {A:'#1f2843', g:'#7d879e', w:'#c7cfdc', f:'#97a3b8', m:'#97a3b8', M:'#474e6a'};
+const FLASH_BULB_ON  = {A:'#1f2843', g:'#ffd84a', w:'#fffce8', f:'#fff7c0', m:'#97a3b8', M:'#474e6a'};
+function drawFlashBulb(f, camX, camY){
+  const age = f.max - f.life, d = Math.max(2, Math.round(TS/16));
+  const LIT = 0.22;                                   // ここで灯る（ピコーン）
+  const ex = f.ent ? (f.ent===P ? P.x : f.ent.x) : f.x, ey = f.ent ? (f.ent===P ? P.y : f.ent.y) : f.y;
+  // 出方：下から跳ねて少し行き過ぎて戻る。消え際は薄く
+  const pop = age < 0.14 ? age/0.14 : 1;
+  const over = age < 0.14 ? 0 : Math.max(0, 1 - (age-0.14)/0.12);
+  const lift = Math.round((pop*1.0 + over*0.12) * 4) * d;    // ドットの段で動かす
+  const bob = age > 0.4 ? Math.round(Math.sin((age-0.4)*9) * 0.6) * d : 0;
+  const fade = clamp(f.life/0.25, 0, 1) * clamp(age/0.06, 0, 1);
+  const cx = Math.round(ex*TS - camX), top = Math.round(ey*TS - camY - TS*0.55) - lift + bob - 12*d;   // 頭のすぐ上
+  const x0 = cx - 5*d;
+  const lit = age >= LIT;
+  ctx.save(); ctx.globalAlpha = fade;
+  // 灯った瞬間の光：電球のまわりに淡い円（ドットの段で）
+  if(lit){
+    const k = age - LIT, pulse = 0.5 + 0.5*Math.sin(k*14);
+    ctx.globalAlpha = fade * (k < 0.12 ? 0.55 : 0.18 + 0.12*pulse);
+    ctx.fillStyle = '#ffe066';
+    const R = Math.round((k < 0.12 ? 4 + k/0.12*4 : 7)) ;
+    for(let yy=-R; yy<=R; yy++){
+      const w = Math.floor(Math.sqrt(R*R - yy*yy));
+      ctx.fillRect(cx - w*d, top + (4+yy)*d, (2*w+1)*d, d);
+    }
+    ctx.globalAlpha = fade;
+  }
+  const pal = lit ? FLASH_BULB_ON : FLASH_BULB_OFF;
+  for(let r=0;r<FLASH_BULB.length;r++){
+    const row = FLASH_BULB[r];
+    for(let c=0;c<row.length;c++){
+      const ch=row[c]; if(ch==='.') continue;
+      ctx.fillStyle = pal[ch]; ctx.fillRect(x0 + c*d, top + r*d, d, d);
+    }
+  }
+  // 光の筋：灯った瞬間に8方向へ弾け、そのあと2回またたく
+  if(lit){
+    const k = age - LIT;
+    const on = k < 0.30 || (k > 0.42 && k < 0.58) || (k > 0.70 && k < 0.86);
+    if(on){
+      const reach = k < 0.30 ? 6 + Math.floor(k/0.30*3) : 8;
+      const ccx = cx, ccy = top + 4*d;
+      ctx.fillStyle = k < 0.12 ? '#ffffff' : '#fff1ad';
+      for(let i=0;i<8;i++){
+        const a = i*Math.PI/4 - Math.PI/2, len = (i%2) ? 2 : 3;
+        for(let j=0;j<len;j++){
+          const rr = reach + j;
+          const px = Math.round(Math.cos(a)*rr), py = Math.round(Math.sin(a)*rr);
+          ctx.fillRect(ccx + px*d - (d>>1), ccy + py*d, d, d);
+        }
+      }
+    }
+  }
+  ctx.restore();
 }
 
 /* ---------- 経験値の分配 ----------
@@ -13032,7 +13109,7 @@ let _paused=false;
    閃いたその瞬間に窓を出すと、頭上の印も広がる輪も一瞬で窓に隠れる。
    **まず見せて、それから訊く。** 演出が出切るまで待ってから開く。
    artFlashFx の輪は 0.6 秒なので、それより少し長く取る。 */
-const ART_NAME_DELAY = 0.9;
+const ART_NAME_DELAY = 1.5;   // 閃きの電球（ART_FLASH_SECS 1.35秒）が消えてから名前の窓を出す
 let _artNamePend = null;            // {id, t}
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
@@ -14946,6 +15023,8 @@ function draw(){
     ctx.strokeText(txt,tx,ty); ctx.fillText(txt,tx,ty);
   });
   ctx.globalAlpha=1;
+  // 閃きの電球（ピコーン！）。数字より上に出す
+  for(const f of W.fx) if(f.t==='flashbulb' && f.life>0) drawFlashBulb(f, camX, camY);
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
   _drawStage='空気';
   drawAir(Z, _drawDt);
