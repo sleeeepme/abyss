@@ -289,16 +289,18 @@ R.hud = await pg.evaluate(() => {
   updateHUD();
   const shownWith = el('wavebtn').classList.contains('on');
   const readyMark = el('wavebtn').classList.contains('ready');
-  P.waveCd = 3; updateHUD();
-  const cdText = el('wave-cd').textContent;
+  /* 待ちは秒数ではなく、外周の円ゲージ（--gp）で見せる。半分待ったら半周 */
+  P.waveCdMax = WAVE_CD; P.waveCd = WAVE_CD/2; updateHUD();
+  const gp = parseFloat(el('wavebtn').style.getPropertyValue('--gp'));
   const notReady = !el('wavebtn').classList.contains('ready');
-  return {hiddenWithout, shownWith, readyMark, cdText, notReady,
+  const noText = el('wavebtn').textContent.trim()==='';
+  return {hiddenWithout, shownWith, readyMark, gp, notReady, noText,
           hiddenUntilLearned: hiddenWithout,
           appearsWhenLearned: shownWith,
           marksReady: readyMark,
-          showsCountdown: /^\d+s$/.test(cdText) && notReady,
+          showsGauge: gp>=170 && gp<=190 && notReady,
           ok: hiddenWithout && shownWith && readyMark
-              && /^\d+s$/.test(cdText) && notReady};
+              && gp>=170 && gp<=190 && notReady && noText};
 });
 
 /* --- 9. 錠は隠さず見せる（死に戻る理由になるので） --- */

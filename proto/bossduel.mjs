@@ -201,14 +201,14 @@ const allyDodge = (moveId, noDodge) => run(5, `
     if(boss.cast===c){ const inside=bossMoveHits(boss, c, a.x, a.y, a.r); if(!inside) wasOut=true; else if(wasOut) reentered=true; outBefore=!inside; }
   }
   ${noDodge ? 'allyDodgeSpot=window.__ads;' : ''}
-  return {inAtStart, outBefore, reentered, hit: a.hpNow<hp0, mode:a.mode};
+  return ${noDodge ? '{inAtStart, gotHit: a.hpNow<hp0}' : '{inAtStart, outBefore, stayedOut: !reentered, unhurt: a.hpNow>=hp0, mode:a.mode}'};
 `);
 {
   const slam=await allyDodge('slam'), cleave=await allyDodge('cleave'), beam=await allyDodge('beam'), ctrl=await allyDodge('slam', true);
   R.allyDodge={slam, cleave, beam, ctrl,
-    ok: slam.inAtStart && slam.outBefore && !slam.hit && !slam.reentered
-     && cleave.inAtStart && !cleave.hit && beam.inAtStart && !beam.hit
-     && ctrl.inAtStart && ctrl.hit};
+    ok: slam.inAtStart && slam.outBefore && slam.unhurt && slam.stayedOut
+     && cleave.inAtStart && cleave.unhurt && beam.inAtStart && beam.unhurt
+     && ctrl.inAtStart && ctrl.gotHit};
 }
 
 const allOk = Object.values(R).every(r=>r.ok) && !errs.length;

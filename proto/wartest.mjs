@@ -422,7 +422,7 @@ R.renameArt = await pg.evaluate(()=>{
   // ボタンの名札にも出る
   S.artPick={sword:d.id};
   updateHUD();
-  const onButton = el('art-nm').textContent==='わが一閃';
+  const onButton = el('artbtn').getAttribute('aria-label')==='わが一閃';   // ボタンは絵だけ。名前は読み上げ用に持つ
   openArtRename(d.id);
   commitArtRename(true);                 // 元に戻す
   const restored=artName(d);

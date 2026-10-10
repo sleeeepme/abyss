@@ -65,7 +65,7 @@ R.cooldown = await pg.evaluate(async ()=>{
   const btn=document.getElementById('ultbtn');
   return {start:+start.toFixed(1), later:+later.toFixed(1), ticks: later<start,
           shown:btn.classList.contains('on'), ready:btn.classList.contains('ready'),
-          label:document.getElementById('ult-nm').textContent};
+          label:btn.getAttribute('aria-label'), iconOnly: btn.textContent.trim()===''};
 });
 R.levelCost = await pg.evaluate(()=>{
   const curve=[1,2,3,4].map(lv=>ultUpCost(lv));

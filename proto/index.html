@@ -129,7 +129,7 @@
   #ultbtn{position:absolute;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));
     width:74px;height:74px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
+    --pf:rgba(16,20,28,.82);background:none;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     /* #hud は pointer-events:none なので、押せるものは自分で auto に戻す。
        これが抜けていて、大技ボタンは**見えているのに押せなかった**
@@ -179,11 +179,16 @@
   #m-debug .sw{flex:0 0 auto;width:auto;padding:6px 14px;font-size:12px;margin:0}
   #guardbtn.held{--pf:rgba(40,64,96,.9);--pb:#8fc7ff;
     filter:drop-shadow(0 0 4px #8fc7ff)}
-  #ultbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
-  #ultbtn i{font-style:normal;font-size:24px;line-height:1}
-  #ultbtn b{font-size:12px;font-weight:700;letter-spacing:.06em;margin-top:2px}
-  #ultbtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
-    font-weight:700;margin-top:1px}
+  /* ---------- リキャストは外周の円ゲージで見せる（2026-10-10） ----------
+     秒数の文字はやめて、ボタンの縁そのものが時計回りに満ちていく。
+     縁は2ドットの太さ（--pxring）、塗りは conic-gradient、どこまで満ちたかは --gp（角度）。
+     満ちたら技の色で縁全体が光る（.ready）。中は白黒のアイコンだけ（名札は出さない）。 */
+  #ultbtn,#wavebtn,#artbtn{--gp:0deg;--pb:conic-gradient(#cfd6e4 var(--gp),#2b3244 var(--gp))}
+  #ultbtn.ready,#wavebtn.ready,#artbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
+  .skico{display:block;width:32px;height:32px;background:center/100% 100% no-repeat;
+    image-rendering:pixelated;image-rendering:crisp-edges;opacity:.42}
+  #ultbtn .skico{width:48px;height:48px}
+  #ultbtn.ready .skico,#wavebtn.ready .skico,#artbtn.ready .skico{opacity:1}
   /* ---------- 通常技のボタン（衝撃波） ----------
      大技の**すぐ上**に置く。左右に並べると親指の可動域から外れるし、
      反対側は盾（押しているあいだ構える）で埋まっている。
@@ -191,14 +196,11 @@
   #wavebtn{position:absolute;right:24px;bottom:calc(162px + env(safe-area-inset-bottom));
     width:58px;height:58px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
+    --pf:rgba(16,20,28,.82);background:none;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #wavebtn.on{display:flex}
-  #wavebtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
-  #wavebtn i{font-style:normal;font-size:20px;line-height:1}
-  #wavebtn s{text-decoration:none;font-size:12px;font-variant-numeric:tabular-nums;
-    font-weight:700;margin-top:1px}
+
   /* ---------- 武器技のボタン ----------
      3つ目の技ボタン。同じ列（右の親指の通り道）に、衝撃波のさらに上へ積む。
      大技＞武器技＞衝撃波 の順で大きさを変えてあるのは、
@@ -209,22 +211,10 @@
   #artbtn{position:absolute;right:22px;bottom:calc(228px + env(safe-area-inset-bottom));
     width:62px;height:62px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
-    --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;
+    --pf:rgba(16,20,28,.82);background:none;border:none;
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #artbtn.on{display:flex}
-  #artbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
-  #artbtn i{font-style:normal;font-size:19px;line-height:1}
-  /* 名前変更で長い名前を付けられる（最大12文字）が、このボタンは直径62px。
-     以前は text-overflow:ellipsis で切っていたが、「…」がこの極小ドット
-     フォントでは短い横棒に潰れて見え、名付けた技の後ろに謎の下線が
-     付いたように見えた（報告：固有名詞の後ろに_）。
-     切り捨てず、文字数に応じて fitArtNameSize() が font-size を縮めて
-     必ず全部入るようにする——overflow:hidden は万一のための安全網。 */
-  #artbtn b{font-size:10px;font-weight:700;letter-spacing:.02em;margin-top:1px;
-    max-width:58px;overflow:hidden;white-space:nowrap}
-  #artbtn s{text-decoration:none;font-size:11px;font-variant-numeric:tabular-nums;
-    font-weight:700;margin-top:1px}
   #adbar b{color:var(--dim);font-weight:600;letter-spacing:.14em;font-size:12px;
     border:1px solid var(--line);padding:1px 5px;margin-right:8px}
   /* バナーに隠れないよう、対象画面の下だけ余白を足す */
@@ -688,10 +678,10 @@
   #ultbtn::before,#guardbtn::before,#wavebtn::before,#artbtn::before,#bagbtn::before,#statbtn::before,#mapbtn::before,#stick::before,#knob::before,.hub-ava .glyph::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pf,transparent);-webkit-mask:var(--pxdisk) 0 0/100% 100% no-repeat;mask:var(--pxdisk) 0 0/100% 100% no-repeat}
   #ultbtn::after,#guardbtn::after,#wavebtn::after,#artbtn::after,#bagbtn::after,#statbtn::after,#mapbtn::after,#stick::after,#knob::after,.hub-ava .glyph::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pb,transparent);-webkit-mask:var(--pxring) 0 0/100% 100% no-repeat;mask:var(--pxring) 0 0/100% 100% no-repeat}
   .hub-ava .glyph{position:relative}
-  #ultbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h17v1h-17zM8 3h21v1h-21zM7 4h23v1h-23zM6 5h25v1h-25zM5 6h27v1h-27zM4 7h29v1h-29zM3 8h31v1h-31zM3 9h31v1h-31zM2 10h33v1h-33zM2 11h33v1h-33zM1 12h35v1h-35zM1 13h35v1h-35zM1 14h35v1h-35zM0 15h37v1h-37zM0 16h37v1h-37zM0 17h37v1h-37zM0 18h37v1h-37zM0 19h37v1h-37zM0 20h37v1h-37zM0 21h37v1h-37zM1 22h35v1h-35zM1 23h35v1h-35zM1 24h35v1h-35zM2 25h33v1h-33zM2 26h33v1h-33zM3 27h31v1h-31zM3 28h31v1h-31zM4 29h29v1h-29zM5 30h27v1h-27zM6 31h25v1h-25zM7 32h23v1h-23zM8 33h21v1h-21zM10 34h17v1h-17zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h3v1h-3zM22 1h3v1h-3zM10 2h2v1h-2zM25 2h2v1h-2zM8 3h2v1h-2zM27 3h2v1h-2zM7 4h1v1h-1zM29 4h1v1h-1zM6 5h1v1h-1zM30 5h1v1h-1zM5 6h1v1h-1zM31 6h1v1h-1zM4 7h1v1h-1zM32 7h1v1h-1zM3 8h1v1h-1zM33 8h1v1h-1zM3 9h1v1h-1zM33 9h1v1h-1zM2 10h1v1h-1zM34 10h1v1h-1zM2 11h1v1h-1zM34 11h1v1h-1zM1 12h1v1h-1zM35 12h1v1h-1zM1 13h1v1h-1zM35 13h1v1h-1zM1 14h1v1h-1zM35 14h1v1h-1zM0 15h1v1h-1zM36 15h1v1h-1zM0 16h1v1h-1zM36 16h1v1h-1zM0 17h1v1h-1zM36 17h1v1h-1zM0 18h1v1h-1zM36 18h1v1h-1zM0 19h1v1h-1zM36 19h1v1h-1zM0 20h1v1h-1zM36 20h1v1h-1zM0 21h1v1h-1zM36 21h1v1h-1zM1 22h1v1h-1zM35 22h1v1h-1zM1 23h1v1h-1zM35 23h1v1h-1zM1 24h1v1h-1zM35 24h1v1h-1zM2 25h1v1h-1zM34 25h1v1h-1zM2 26h1v1h-1zM34 26h1v1h-1zM3 27h1v1h-1zM33 27h1v1h-1zM3 28h1v1h-1zM33 28h1v1h-1zM4 29h1v1h-1zM32 29h1v1h-1zM5 30h1v1h-1zM31 30h1v1h-1zM6 31h1v1h-1zM30 31h1v1h-1zM7 32h1v1h-1zM29 32h1v1h-1zM8 33h2v1h-2zM27 33h2v1h-2zM10 34h2v1h-2zM25 34h2v1h-2zM12 35h3v1h-3zM22 35h3v1h-3zM15 36h7v1h-7z'/%3E%3C/svg%3E")}
+  #ultbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h17v1h-17zM8 3h21v1h-21zM7 4h23v1h-23zM6 5h25v1h-25zM5 6h27v1h-27zM4 7h29v1h-29zM3 8h31v1h-31zM3 9h31v1h-31zM2 10h33v1h-33zM2 11h33v1h-33zM1 12h35v1h-35zM1 13h35v1h-35zM1 14h35v1h-35zM0 15h37v1h-37zM0 16h37v1h-37zM0 17h37v1h-37zM0 18h37v1h-37zM0 19h37v1h-37zM0 20h37v1h-37zM0 21h37v1h-37zM1 22h35v1h-35zM1 23h35v1h-35zM1 24h35v1h-35zM2 25h33v1h-33zM2 26h33v1h-33zM3 27h31v1h-31zM3 28h31v1h-31zM4 29h29v1h-29zM5 30h27v1h-27zM6 31h25v1h-25zM7 32h23v1h-23zM8 33h21v1h-21zM10 34h17v1h-17zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h5v1h-5zM22 2h5v1h-5zM8 3h4v1h-4zM25 3h4v1h-4zM7 4h3v1h-3zM27 4h3v1h-3zM6 5h2v1h-2zM29 5h2v1h-2zM5 6h2v1h-2zM30 6h2v1h-2zM4 7h2v1h-2zM31 7h2v1h-2zM3 8h2v1h-2zM32 8h2v1h-2zM3 9h2v1h-2zM32 9h2v1h-2zM2 10h2v1h-2zM33 10h2v1h-2zM2 11h2v1h-2zM33 11h2v1h-2zM1 12h2v1h-2zM34 12h2v1h-2zM1 13h2v1h-2zM34 13h2v1h-2zM1 14h2v1h-2zM34 14h2v1h-2zM0 15h2v1h-2zM35 15h2v1h-2zM0 16h2v1h-2zM35 16h2v1h-2zM0 17h2v1h-2zM35 17h2v1h-2zM0 18h2v1h-2zM35 18h2v1h-2zM0 19h2v1h-2zM35 19h2v1h-2zM0 20h2v1h-2zM35 20h2v1h-2zM0 21h2v1h-2zM35 21h2v1h-2zM1 22h2v1h-2zM34 22h2v1h-2zM1 23h2v1h-2zM34 23h2v1h-2zM1 24h2v1h-2zM34 24h2v1h-2zM2 25h2v1h-2zM33 25h2v1h-2zM2 26h2v1h-2zM33 26h2v1h-2zM3 27h2v1h-2zM32 27h2v1h-2zM3 28h2v1h-2zM32 28h2v1h-2zM4 29h2v1h-2zM31 29h2v1h-2zM5 30h2v1h-2zM30 30h2v1h-2zM6 31h2v1h-2zM29 31h2v1h-2zM7 32h3v1h-3zM27 32h3v1h-3zM8 33h4v1h-4zM25 33h4v1h-4zM10 34h5v1h-5zM22 34h5v1h-5zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E")}
   #guardbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h13v1h-13zM8 2h17v1h-17zM7 3h19v1h-19zM5 4h23v1h-23zM4 5h25v1h-25zM4 6h25v1h-25zM3 7h27v1h-27zM2 8h29v1h-29zM2 9h29v1h-29zM1 10h31v1h-31zM1 11h31v1h-31zM1 12h31v1h-31zM0 13h33v1h-33zM0 14h33v1h-33zM0 15h33v1h-33zM0 16h33v1h-33zM0 17h33v1h-33zM0 18h33v1h-33zM0 19h33v1h-33zM1 20h31v1h-31zM1 21h31v1h-31zM1 22h31v1h-31zM2 23h29v1h-29zM2 24h29v1h-29zM3 25h27v1h-27zM4 26h25v1h-25zM4 27h25v1h-25zM5 28h23v1h-23zM7 29h19v1h-19zM8 30h17v1h-17zM10 31h13v1h-13zM13 32h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h3v1h-3zM20 1h3v1h-3zM8 2h2v1h-2zM23 2h2v1h-2zM7 3h1v1h-1zM25 3h1v1h-1zM5 4h2v1h-2zM26 4h2v1h-2zM4 5h1v1h-1zM28 5h1v1h-1zM4 6h1v1h-1zM28 6h1v1h-1zM3 7h1v1h-1zM29 7h1v1h-1zM2 8h1v1h-1zM30 8h1v1h-1zM2 9h1v1h-1zM30 9h1v1h-1zM1 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM31 11h1v1h-1zM1 12h1v1h-1zM31 12h1v1h-1zM0 13h1v1h-1zM32 13h1v1h-1zM0 14h1v1h-1zM32 14h1v1h-1zM0 15h1v1h-1zM32 15h1v1h-1zM0 16h1v1h-1zM32 16h1v1h-1zM0 17h1v1h-1zM32 17h1v1h-1zM0 18h1v1h-1zM32 18h1v1h-1zM0 19h1v1h-1zM32 19h1v1h-1zM1 20h1v1h-1zM31 20h1v1h-1zM1 21h1v1h-1zM31 21h1v1h-1zM1 22h1v1h-1zM31 22h1v1h-1zM2 23h1v1h-1zM30 23h1v1h-1zM2 24h1v1h-1zM30 24h1v1h-1zM3 25h1v1h-1zM29 25h1v1h-1zM4 26h1v1h-1zM28 26h1v1h-1zM4 27h1v1h-1zM28 27h1v1h-1zM5 28h2v1h-2zM26 28h2v1h-2zM7 29h1v1h-1zM25 29h1v1h-1zM8 30h2v1h-2zM23 30h2v1h-2zM10 31h3v1h-3zM20 31h3v1h-3zM13 32h7v1h-7z'/%3E%3C/svg%3E")}
-  #wavebtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h13v1h-13zM7 2h15v1h-15zM5 3h19v1h-19zM4 4h21v1h-21zM3 5h23v1h-23zM3 6h23v1h-23zM2 7h25v1h-25zM1 8h27v1h-27zM1 9h27v1h-27zM1 10h27v1h-27zM0 11h29v1h-29zM0 12h29v1h-29zM0 13h29v1h-29zM0 14h29v1h-29zM0 15h29v1h-29zM0 16h29v1h-29zM0 17h29v1h-29zM1 18h27v1h-27zM1 19h27v1h-27zM1 20h27v1h-27zM2 21h25v1h-25zM3 22h23v1h-23zM3 23h23v1h-23zM4 24h21v1h-21zM5 25h19v1h-19zM7 26h15v1h-15zM8 27h13v1h-13zM11 28h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h3v1h-3zM18 1h3v1h-3zM7 2h1v1h-1zM21 2h1v1h-1zM5 3h2v1h-2zM22 3h2v1h-2zM4 4h1v1h-1zM24 4h1v1h-1zM3 5h1v1h-1zM25 5h1v1h-1zM3 6h1v1h-1zM25 6h1v1h-1zM2 7h1v1h-1zM26 7h1v1h-1zM1 8h1v1h-1zM27 8h1v1h-1zM1 9h1v1h-1zM27 9h1v1h-1zM1 10h1v1h-1zM27 10h1v1h-1zM0 11h1v1h-1zM28 11h1v1h-1zM0 12h1v1h-1zM28 12h1v1h-1zM0 13h1v1h-1zM28 13h1v1h-1zM0 14h1v1h-1zM28 14h1v1h-1zM0 15h1v1h-1zM28 15h1v1h-1zM0 16h1v1h-1zM28 16h1v1h-1zM0 17h1v1h-1zM28 17h1v1h-1zM1 18h1v1h-1zM27 18h1v1h-1zM1 19h1v1h-1zM27 19h1v1h-1zM1 20h1v1h-1zM27 20h1v1h-1zM2 21h1v1h-1zM26 21h1v1h-1zM3 22h1v1h-1zM25 22h1v1h-1zM3 23h1v1h-1zM25 23h1v1h-1zM4 24h1v1h-1zM24 24h1v1h-1zM5 25h2v1h-2zM22 25h2v1h-2zM7 26h1v1h-1zM21 26h1v1h-1zM8 27h3v1h-3zM18 27h3v1h-3zM11 28h7v1h-7z'/%3E%3C/svg%3E")}
-  #artbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h17v1h-17zM6 3h19v1h-19zM5 4h21v1h-21zM4 5h23v1h-23zM3 6h25v1h-25zM2 7h27v1h-27zM2 8h27v1h-27zM1 9h29v1h-29zM1 10h29v1h-29zM1 11h29v1h-29zM0 12h31v1h-31zM0 13h31v1h-31zM0 14h31v1h-31zM0 15h31v1h-31zM0 16h31v1h-31zM0 17h31v1h-31zM0 18h31v1h-31zM1 19h29v1h-29zM1 20h29v1h-29zM1 21h29v1h-29zM2 22h27v1h-27zM2 23h27v1h-27zM3 24h25v1h-25zM4 25h23v1h-23zM5 26h21v1h-21zM6 27h19v1h-19zM7 28h17v1h-17zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h3v1h-3zM19 1h3v1h-3zM7 2h2v1h-2zM22 2h2v1h-2zM6 3h1v1h-1zM24 3h1v1h-1zM5 4h1v1h-1zM25 4h1v1h-1zM4 5h1v1h-1zM26 5h1v1h-1zM3 6h1v1h-1zM27 6h1v1h-1zM2 7h1v1h-1zM28 7h1v1h-1zM2 8h1v1h-1zM28 8h1v1h-1zM1 9h1v1h-1zM29 9h1v1h-1zM1 10h1v1h-1zM29 10h1v1h-1zM1 11h1v1h-1zM29 11h1v1h-1zM0 12h1v1h-1zM30 12h1v1h-1zM0 13h1v1h-1zM30 13h1v1h-1zM0 14h1v1h-1zM30 14h1v1h-1zM0 15h1v1h-1zM30 15h1v1h-1zM0 16h1v1h-1zM30 16h1v1h-1zM0 17h1v1h-1zM30 17h1v1h-1zM0 18h1v1h-1zM30 18h1v1h-1zM1 19h1v1h-1zM29 19h1v1h-1zM1 20h1v1h-1zM29 20h1v1h-1zM1 21h1v1h-1zM29 21h1v1h-1zM2 22h1v1h-1zM28 22h1v1h-1zM2 23h1v1h-1zM28 23h1v1h-1zM3 24h1v1h-1zM27 24h1v1h-1zM4 25h1v1h-1zM26 25h1v1h-1zM5 26h1v1h-1zM25 26h1v1h-1zM6 27h1v1h-1zM24 27h1v1h-1zM7 28h2v1h-2zM22 28h2v1h-2zM9 29h3v1h-3zM19 29h3v1h-3zM12 30h7v1h-7z'/%3E%3C/svg%3E")}
+  #wavebtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h13v1h-13zM7 2h15v1h-15zM5 3h19v1h-19zM4 4h21v1h-21zM3 5h23v1h-23zM3 6h23v1h-23zM2 7h25v1h-25zM1 8h27v1h-27zM1 9h27v1h-27zM1 10h27v1h-27zM0 11h29v1h-29zM0 12h29v1h-29zM0 13h29v1h-29zM0 14h29v1h-29zM0 15h29v1h-29zM0 16h29v1h-29zM0 17h29v1h-29zM1 18h27v1h-27zM1 19h27v1h-27zM1 20h27v1h-27zM2 21h25v1h-25zM3 22h23v1h-23zM3 23h23v1h-23zM4 24h21v1h-21zM5 25h19v1h-19zM7 26h15v1h-15zM8 27h13v1h-13zM11 28h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29' shape-rendering='crispEdges'%3E%3Cpath d='M11 0h7v1h-7zM8 1h13v1h-13zM7 2h4v1h-4zM18 2h4v1h-4zM5 3h3v1h-3zM21 3h3v1h-3zM4 4h3v1h-3zM22 4h3v1h-3zM3 5h2v1h-2zM24 5h2v1h-2zM3 6h2v1h-2zM24 6h2v1h-2zM2 7h2v1h-2zM25 7h2v1h-2zM1 8h2v1h-2zM26 8h2v1h-2zM1 9h2v1h-2zM26 9h2v1h-2zM1 10h2v1h-2zM26 10h2v1h-2zM0 11h2v1h-2zM27 11h2v1h-2zM0 12h2v1h-2zM27 12h2v1h-2zM0 13h2v1h-2zM27 13h2v1h-2zM0 14h2v1h-2zM27 14h2v1h-2zM0 15h2v1h-2zM27 15h2v1h-2zM0 16h2v1h-2zM27 16h2v1h-2zM0 17h2v1h-2zM27 17h2v1h-2zM1 18h2v1h-2zM26 18h2v1h-2zM1 19h2v1h-2zM26 19h2v1h-2zM1 20h2v1h-2zM26 20h2v1h-2zM2 21h2v1h-2zM25 21h2v1h-2zM3 22h2v1h-2zM24 22h2v1h-2zM3 23h2v1h-2zM24 23h2v1h-2zM4 24h3v1h-3zM22 24h3v1h-3zM5 25h3v1h-3zM21 25h3v1h-3zM7 26h4v1h-4zM18 26h4v1h-4zM8 27h13v1h-13zM11 28h7v1h-7z'/%3E%3C/svg%3E")}
+  #artbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h17v1h-17zM6 3h19v1h-19zM5 4h21v1h-21zM4 5h23v1h-23zM3 6h25v1h-25zM2 7h27v1h-27zM2 8h27v1h-27zM1 9h29v1h-29zM1 10h29v1h-29zM1 11h29v1h-29zM0 12h31v1h-31zM0 13h31v1h-31zM0 14h31v1h-31zM0 15h31v1h-31zM0 16h31v1h-31zM0 17h31v1h-31zM0 18h31v1h-31zM1 19h29v1h-29zM1 20h29v1h-29zM1 21h29v1h-29zM2 22h27v1h-27zM2 23h27v1h-27zM3 24h25v1h-25zM4 25h23v1h-23zM5 26h21v1h-21zM6 27h19v1h-19zM7 28h17v1h-17zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h5v1h-5zM19 2h5v1h-5zM6 3h3v1h-3zM22 3h3v1h-3zM5 4h2v1h-2zM24 4h2v1h-2zM4 5h2v1h-2zM25 5h2v1h-2zM3 6h2v1h-2zM26 6h2v1h-2zM2 7h2v1h-2zM27 7h2v1h-2zM2 8h2v1h-2zM27 8h2v1h-2zM1 9h2v1h-2zM28 9h2v1h-2zM1 10h2v1h-2zM28 10h2v1h-2zM1 11h2v1h-2zM28 11h2v1h-2zM0 12h2v1h-2zM29 12h2v1h-2zM0 13h2v1h-2zM29 13h2v1h-2zM0 14h2v1h-2zM29 14h2v1h-2zM0 15h2v1h-2zM29 15h2v1h-2zM0 16h2v1h-2zM29 16h2v1h-2zM0 17h2v1h-2zM29 17h2v1h-2zM0 18h2v1h-2zM29 18h2v1h-2zM1 19h2v1h-2zM28 19h2v1h-2zM1 20h2v1h-2zM28 20h2v1h-2zM1 21h2v1h-2zM28 21h2v1h-2zM2 22h2v1h-2zM27 22h2v1h-2zM2 23h2v1h-2zM27 23h2v1h-2zM3 24h2v1h-2zM26 24h2v1h-2zM4 25h2v1h-2zM25 25h2v1h-2zM5 26h2v1h-2zM24 26h2v1h-2zM6 27h3v1h-3zM22 27h3v1h-3zM7 28h5v1h-5zM19 28h5v1h-5zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E")}
   #bagbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
   #statbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
   #mapbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
@@ -999,9 +989,9 @@
   <div id="foottag"></div>
   <div id="durtag"></div>
   <div id="guardbtn"><i class="pi pi-shield"></i></div>
-  <div id="ultbtn"><i id="ult-icon">✹</i><b id="ult-nm"></b><s id="ult-cd"></s></div>
-  <div id="wavebtn"><i>〓</i><s id="wave-cd"></s></div>
-  <div id="artbtn"><i id="art-icon">✳</i><b id="art-nm"></b><s id="art-cd"></s></div>
+  <div id="ultbtn" role="button"><i id="ult-icon" class="skico"></i></div>
+  <div id="wavebtn" role="button" aria-label="衝撃波"><i id="wave-icon" class="skico"></i></div>
+  <div id="artbtn" role="button"><i id="art-icon" class="skico"></i></div>
   <div id="prompt"></div>
   <div id="bagbtn"><i class="pi pi-bag"></i><span id="bagcount">0</span></div>
   <div id="statbtn"><i class="pi pi-person"></i></div>
@@ -9317,7 +9307,7 @@ function fireWave(){
   if(frozenNow()){ log('凍りついて動けない'); return false; }
   if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
   const st = stats(S.hero);
-  P.waveCd = WAVE_CD;
+  P.waveCd = WAVE_CD; P.waveCdMax = WAVE_CD;
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const half = WAVE_ARC/2;
   W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:FEEL_ATTACK_SECONDS, max:FEEL_ATTACK_SECONDS,
@@ -9561,7 +9551,7 @@ function firePlayerArt(){
   if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
   /* リキャストは**枠の側**に持つ。技を持ち替えた瞬間に戻る作りにすると、
      「切る→持ち替える→また切る」で待ち時間が消える。 */
-  P.artCd = artCooldown(def, false);
+  P.artCd = artCooldown(def, false); P.artCdMax = P.artCd;
   return fireArt(def, S.hero);
 }
 
@@ -9601,7 +9591,7 @@ function fireUltCore(){
      各技の mult に個別に掛けると、技を足すたびに掛け忘れが出る。 */
   const UP=ultPowerMul();
   const st = UP===1 ? base : Object.assign({}, base, {atk: base.atk*UP});
-  P.ultCd = ultCooldown(u);
+  P.ultCd = ultCooldown(u); P.ultCdMax = P.ultCd;
   feelUltimate(P,u.col);
   sayArt(P.x, P.y, u.nm, u.col);        // 技名を頭上に（大技も武器技も同じ作法）
   const ang = Math.atan2(P.diry||0, P.dirx||1);
@@ -15895,10 +15885,9 @@ function updateHUD(){
     ub.classList.add('on');
     ub.classList.toggle('ready', ready);
     hset('ultbtn.col', ready ? u.col : '', v=>ub.style.color=v);
-    hset('ult-icon.t', u.icon, v=>el('ult-icon').textContent=v);
-    hset('ult-nm.t', u.nm, v=>el('ult-nm').textContent=v);
-    // Math.ceil なので実際には1秒に1回しか値が変わらない——差分チェックが素直に効く。
-    hset('ult-cd.t', ready ? 'Lv.'+ultLv(u.id) : Math.ceil(P.ultCd)+'s', v=>el('ult-cd').textContent=v);
+    hset('ult-icon.bg', u.id, v=>el('ult-icon').style.backgroundImage=skillIconUrl(v));
+    hset('ultbtn.lbl', u.nm+' Lv.'+ultLv(u.id), v=>ub.setAttribute('aria-label', v));   // 名前は読み上げ用にだけ持つ
+    skillGauge(ub, 'ultbtn.gp', P.ultCd, P.ultCdMax || ultCooldown(u));
   }else ub.classList.remove('on');
 
   /* 通常技のボタン。覚えるまでは出さない——押せないボタンを常に置いておくより、
@@ -15910,7 +15899,8 @@ function updateHUD(){
     wb.classList.add('on');
     wb.classList.toggle('ready', wr);
     hset('wavebtn.col', wr ? '#8fd8ff' : '', v=>wb.style.color=v);
-    hset('wave-cd.t', wr ? '' : Math.ceil(P.waveCd)+'s', v=>el('wave-cd').textContent=v);
+    hset('wave-icon.bg', 'wave', v=>el('wave-icon').style.backgroundImage=skillIconUrl(v));
+    skillGauge(wb, 'wavebtn.gp', P.waveCd, P.waveCdMax || WAVE_CD);
   }else wb.classList.remove('on');
 
   /* 武器技のボタン。**閃くまでは出さない**（衝撃波と同じ作法）。
@@ -15924,11 +15914,9 @@ function updateHUD(){
     ab.classList.add('on');
     ab.classList.toggle('ready', ar);
     hset('artbtn.col', ar ? ad.col : '', v=>ab.style.color=v);
-    hset('art-icon.t', ad.icon, v=>el('art-icon').textContent=v);
-    const anm=artName(ad);
-    hset('art-nm.t', anm, v=>el('art-nm').textContent=v);
-    hset('art-nm.sz', fitArtNameSize(anm), v=>el('art-nm').style.fontSize=v+'px');
-    hset('art-cd.t', ar ? '' : Math.ceil(P.artCd)+'s', v=>el('art-cd').textContent=v);
+    hset('art-icon.bg', ad.id, v=>el('art-icon').style.backgroundImage=skillIconUrl(v));
+    hset('artbtn.lbl', artName(ad), v=>ab.setAttribute('aria-label', v));   // 名付けた名前は読み上げ用にだけ持つ
+    skillGauge(ab, 'artbtn.gp', P.artCd, P.artCdMax || artCooldown(ad, false));
   }else ab.classList.remove('on');
 
   // 地図のトグル。出ているあいだは縁を光らせる（押したかどうかが読めるように）
@@ -17974,6 +17962,61 @@ function artName(def){
   if(!def) return '';
   const v = S.artName && S.artName[def.id];
   return (v && v.trim()) ? v : def.nm;
+}
+/* ---------- 技ボタンのアイコン（16×16、白黒） ----------
+   ボタンには名札も秒数も出さないので、**何をする技か**はこの絵だけで伝える。
+   見本（ユーザー添付のドット絵アイコン集）にならって、白一色・太めの線・はっきりした形。
+   キーは大技の id・武器技の id・'wave'（衝撃波）。'#' が白、'.' が透明。
+   1ドット＝1px の PNG を作って、CSS で 2倍（武器技・衝撃波）／3倍（大技）に拡大して出す。 */
+const SKILL_ICON_GRID={
+  iai:["................","............##..","...........###..","..........###...",".........###....","........###.....","##.....###......","......###.......","####.###........","....###.........","##.#####........","....###.........","...#..#.........","..#.............",".#..............","................"],
+  swspin:["....######......","..##......##....",".#..........#...",".#.......#..##..","#.......###.#...","#......###......","#.....###.......","#....###.......#","....###........#","..#####........#","...###.........#","..#..#........#.",".#...........#..","..##.......##...","....#######.....","................"],
+  swmulti:["................","..........#.....",".......#...#....","....#...#...#...",".....#...#...#..","......#...#...#.",".......#...#...#","........#...#...",".........#...#..","..........#...#.","...........#....","................","..#.#.#.........","................","................","................"],
+  gtspin:["....########....","..##........##..",".#............#.","#.......####...#","#......####....#","#.....####......","#....####.......","#...####.......#","..######.......#","...####........#","..##..#........#",".##............#","...........#..#.",".##.......###.#.","...#########.#..","................"],
+  gtquake:["................","................","#......#......#.",".#.....#.....#..","..#....#....#...","..#...#.#...#...","...#..#.#..#....","....#.#..#.#....","....#.#..##.....",".....##..#......","......####......","......####......",".....######.....","################","................","................"],
+  gtupper:["......####......",".....#....#.....",".....#.##.#.....",".....#....#.....","......####......","..#.........#...","..#...##....#...","..#..####...#...","....######......","...########.....",".....####.......",".....####.......",".....####.......","..#..####..#....","...#.####.#.....","################"],
+  dgslash:["................","......#.....#...",".......#.....#..","........#.....#.","................","..#.....#.......","...#.....#......","....#.....#.....","...........#..##",".............###","............###.","........#.###...",".........###....","........#.#.....",".......#...#....","................"],
+  dgdance:[".....#.#.#......","...#.......#....","..#..........##.",".#..........###.","#..........#....","......##........","#....####......#",".....####.......","#.....##.......#","................",".###..........#.","###..........#..",".#..........#...","....#.......#...","......#.#.#.....","................"],
+  dgmirage:["...........#.#..","...###....#...#.","..#####........#","..#####...#...#.","...###.....#.#..","..#####...#...#.",".#######.#.....#",".#.###.#.#.....#","...###....#...#.","...#.#...#.#.#.#","...#.#...#.....#","..##.##..#.#.#.#","................","................","................","................"],
+  axtoma:["................","................","...........#....","........#####...",".......#######..","......########..","####..#####.##..","..........###...","######...###....",".........##.....","####....##......","........#.......","................","................","................","................"],
+  axspin:["....#######.....","..##.......##...",".#....###....#..","#....#####....#.","#...######....#.","#..#######.....#","#..##..#.......#","#.......#......#","#........#.....#",".#........#...#.",".#.........#..#.","..##.......###..","....#######.##..","..........#.....","................","................"],
+  axspiral:["................","..######........",".#......#.......","#..####..#......","#.#....#.#..###.","#.#.##.#.#.#####","#.#.#..#.#.#####","#.#..##..#..#...","#..#....#....#..",".#..####......#.","..#............#","...##...........",".....####.......","................","................","................"],
+  spswing:["................","....########....","..##........##..",".#............#.","#..............#","#.......#......#","........##......",".......####.....","........##......",".......#........","......#.........",".....#..........","....#...........","...#............","..#.............","................"],
+  splance:["................","................","................","...........#....","...........##...","###.........###.","................","##############.#","................","###.........###.","...........##...","...........#....","................","................","................","................"],
+  spdragoon:[".......#........",".......#........",".......#........","..#....#....#...","..#....#....#...","..#....#....#...",".......#........",".......#........","......###.......","......###.......",".......#........","...#.......#....",".#...#...#...#..","#..#.......#..#.","................","################"],
+  bwrain:["..#.......#.....","..#...#...#...#.","..#...#...#...#.","..#...#...#...#.","..#...#...#...#.",".###..#..###..#.","..#..###..#..###","......#.......#.","..#.......#.....","..#...#...#...#.","..#...#...#...#.",".###..#..###..#.","..#..###..#..###","......#.......#.","................","################"],
+  bwrapid:["..##............","...##.......#...","....#.......##..","....#..#######..","....#.......##..","....#.......#...","....#.......#...","....#..#########","....#.......#...","....#.......#...","....#.......##..","....#..#######..","....#.......##..","...##.......#...","..##............","................"],
+  bwburst:["................","................","..#.............",".##..#..........",".#.#.##.........","#..#.#.#....#...","#.#..#.#....##..","#.#.#..#########",".#.#..#.....##..","..#.##......#...","...##...........","................","................","................","................","................"],
+  mcdouble:["................","..####......#...",".######..#..#..#",".######...#.#.#.",".######.........","..####...##...##","....##..........","....##....#.#.#.","....##...#..#..#","....##......#...","....##..........","....##..........","....##..........","...####.........","................","................"],
+  mcheal:["................","..####..........",".######...###...",".######...###...",".######.#######.","..####..#######.","....##..#######.","....##....###...","....##....###...","....##..........","....##..........","....##..........","....##..........","...####.........","................","................"],
+  mcshield:["................",".##############.",".#............#.",".#.....##.....#.",".#.....##.....#.",".#...######...#.",".#...######...#.",".#.....##.....#.",".#.....##.....#.","..#....##....#..","..#..........#..","...#........#...","....#......#....",".....##..##.....",".......##.......","................"],
+  stflame:[".......#........",".......##.......","......###.......","......####...#..",".....#####..##..","....######.###..","...###########..","...####.######..","..####..#######.","..###....######.","..###.....#####.","..###..#..#####.","...##.###.####..","....#######.#...",".....######.....","................"],
+  sticicle:["................","................","........#.......",".......###......","#.#.#.#####.....","...........#....","#.#.#.#####.....",".......###......","........#.......","..........#.....",".........###....","...#.#.#######..",".........###....","..........#.....","................","................"],
+  stbolt:["........#####...",".......#####....","......#####.....",".....#####......","....#####.......","...##########...","......#####.....",".....#####......","....####........","...###..........","..##............",".#..............","................","#.#.#.#.#.#.#.#.","................","................"],
+  quake:[".......##.......",".......##.......",".......##.......",".....######.....","......####......",".......##.......","..#..........#..","...#...##...#...","#.....####.....#","################","#......##......#",".....#....#.....","....#......#....","...#..#..#..#...","..#..#....#..#..","................"],
+  blink:["..........###...","..........###...","........####....",".......#######..","######.#.###..#.","..........###...","####......####..",".........##..##.","##.....###....##",".......##.......","................","................","................","................","................","................"],
+  blaze:["........#.......",".......##.......","......####......","......####.#....",".....######.....",".....##.###.....","....###..###....","....##....##....","....###..###....","....##.##.##....","....###..###....","....########....","...##########...","..############..","################","................"],
+  ward:["....########....","..##........##..",".#............#.","#..............#","################","................","................","..##...##...##..",".####.####.####.",".####.####.####.","..##...##...##..",".####.####.####.","######..####..##","######..####..##","................","................"],
+  ruin:["################","#.#..#.##.#..#.#","......#..#......","..#.........#...","..##.......##...","...##.......##..","..##...#...##...",".##....##..#....","..#...##........",".#.....##.......","#.....##........","......#.........",".....#..........","................","#.#.#.#.#.#.#.#.","................"],
+  aegis:["................","##..##..##..##..","##..##..##..##..","################","#..#...#...#...#","################","#...#...#...#..#","################","#..#...#...#...#","################","#...#...#...#..#","################","#..#...#...#...#","################","................","................"],
+  rally:["................","..###....###....",".#####..#####...","################","######.#########","######.#########","####.....#######","######.#########",".#####.########.","..############..","...##########...","....########....",".....######.....","......####......",".......##.......","................"],
+  bloom:["............#...","..#........###..",".###........#...","..#....###......",".......####.....","...###..####....","..#####..##.....","..######.#......","...#####.#..#...",".....###.#.###..",".........#..#...",".........#......","........###.....","......#######...",".....#########..","................"],
+  wave:["................","........#.......",".........#...#..","....#.....#...#.",".....#....#...#.","......#...#....#","##.....#...#...#","###....#...#...#","###....#...#...#","##.....#...#...#","......#...#....#",".....#....#...#.","....#.....#...#.",".........#...#..","........#.......","................"]
+};
+const _skillIconUrl={};
+function skillIconUrl(id){
+  if(_skillIconUrl[id]!==undefined) return _skillIconUrl[id];
+  const g=SKILL_ICON_GRID[id];
+  if(!g){ _skillIconUrl[id]=''; return ''; }
+  const cv=document.createElement('canvas'); cv.width=16; cv.height=16;
+  const c=cv.getContext('2d'); c.fillStyle='#f4f4f4';
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++) if(g[y][x]==='#') c.fillRect(x,y,1,1);
+  return (_skillIconUrl[id]='url('+cv.toDataURL()+')');
+}
+/* 外周の円ゲージ。満ちた割合（0〜1）を角度にして --gp へ。3度刻みで丸めて、書き込みを減らす */
+function skillGauge(btn, key, cd, max){
+  const p = max>0 ? clamp(1 - (cd||0)/max, 0, 1) : 1;
+  hset(key, Math.round(p*120)*3, v=>btn.style.setProperty('--gp', v+'deg'));
 }
 /* #artbtn の名札は直径62pxの丸ボタンの中、幅58pxしかない。
    名前変更で最大12文字まで付けられるので、既定の10pxだと長い名前は

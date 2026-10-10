@@ -95,6 +95,19 @@ R.itemsBorrowed = await pg.evaluate(()=>{
   return {empty, duped, ok: empty.length===0 && duped.length===0};
 });
 
+/* ============ 4-b. 技ボタンの白黒アイコンが全部そろっている ============
+   ボタンには名札も秒数も出さないので、絵が欠けると何の技か分からなくなる。
+   大技・武器技・衝撃波の全部に 16×16 の格子があること。 */
+R.skillIcons = await pg.evaluate(()=>{
+  const ids=[...ULTS.map(u=>u.id), ...Object.values(WEAPON_ARTS).flat().map(d=>d.id), 'wave'];
+  const missing=ids.filter(id=>!SKILL_ICON_GRID[id]);
+  const badSize=Object.entries(SKILL_ICON_GRID).filter(([k,g])=>g.length!==16 || g.some(r=>r.length!==16)).map(([k])=>k);
+  const blank=ids.filter(id=>SKILL_ICON_GRID[id] && !SKILL_ICON_GRID[id].join('').includes('#'));
+  const url=skillIconUrl('iai');
+  return {count:ids.length, missing, badSize, blank, makesPng: url.indexOf('data:image/png')>=0,
+          ok: missing.length===0 && badSize.length===0 && blank.length===0 && url.indexOf('data:image/png')>=0};
+});
+
 /* ============ 5. 画面の文字に絵文字が残っていない ============
    絵柄のある絵文字だけを見る。矢印や記号（→ ★ ✹ ✳ ❦）は文字として使っているので
    外す——技の印は端末に依らない記号で揃えてあり、置き換えの対象ではない。
