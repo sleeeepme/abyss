@@ -4642,8 +4642,8 @@ function tryFlashArt(baseId){
   artFlashFx(P.x, P.y, def, P);
   if(typeof feelSlow==='function') feelSlow(0.35, 0.35);   // ピコーンの一拍だけ時間を緩める
   const b=BASES.find(x=>x.id===baseId);
-  log('<i class="pi pi-bulb"></i> '+(b?b.nm:baseId)+'『'+artName(def)+'』を閃いた');
-  showBanner(artName(def), (b?b.nm:'')+'　lv'+(n+1)+'の技を閃いた', def.col, ART_FLASH_SECS);   // 窓が出る前に引く
+  /* 電球が出ているあいだは文字を出さない。ログは名前の窓が開くときに書く（tickArtRename） */
+  _artFlashLog = '<i class="pi pi-bulb"></i> '+(b?b.nm:baseId)+'『'+artName(def)+'』を閃いた';
   /* ---------- 閃いたその場で名前を付ける ----------
      技は「教わった物」ではなく「自分で見つけた物」なので、
      見つけた瞬間に名前を付けられるのが筋（依頼どおり）。
@@ -8077,6 +8077,7 @@ function resLine(res){
 function startRun(depth){
   S.runs++;
   _artNamePend=null;        // 前の探索で閃いて、訊きそびれた分は持ち越さない
+  _artFlashLog=null;
   if(!S.hero) S.hero=newHero();
   const d = depth||S.startDepth||1;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
@@ -10574,10 +10575,9 @@ function sayArt(x, y, nm, col){
    ent を渡すと、その人の頭の上に付いて動く（走りながら閃いても置き去りにしない）。 */
 const ART_FLASH_SECS = 1.35;
 function artFlashFx(x, y, def, ent){
+  /* 出すのは電球だけ。足もとの波紋・技の名前・上の帯は出さない（2026-10-10 ユーザー指定）。
+     主人公の技の名前は、このあと開く名前の窓とログで分かる。 */
   W.fx.push({t:'flashbulb', x, y, ent:ent||null, life:ART_FLASH_SECS, max:ART_FLASH_SECS, col:def.col});
-  /* 技の名前は数字のように浮かせない（上へ昇って電球に重なる）。
-     主人公は上の帯（showBanner）に、仲間はログに名前が出る。 */
-  W.fx.push({t:'levelup', x, y, life:0.9, max:0.9, col:def.col});
 }
 /* 電球のドット（10×12、1ドット＝TS/16）。g＝ガラス、w＝ガラスの照り、f＝芯、m/M＝口金 */
 const FLASH_BULB = [
@@ -10610,16 +10610,24 @@ function drawFlashBulb(f, camX, camY){
   const x0 = cx - 5*d;
   const lit = age >= LIT;
   ctx.save(); ctx.globalAlpha = fade;
-  // 灯った瞬間の光：電球のまわりに淡い円（ドットの段で）
+  /* 灯ったら電球のまわりを明るくする。ドットの段の円を3重に、光を足す合成（lighter）で重ねる。
+     灯った瞬間は大きく強く、そのあとは少し小さくして呼吸させる。 */
   if(lit){
-    const k = age - LIT, pulse = 0.5 + 0.5*Math.sin(k*14);
-    ctx.globalAlpha = fade * (k < 0.12 ? 0.55 : 0.18 + 0.12*pulse);
-    ctx.fillStyle = '#ffe066';
-    const R = Math.round((k < 0.12 ? 4 + k/0.12*4 : 7)) ;
-    for(let yy=-R; yy<=R; yy++){
-      const w = Math.floor(Math.sqrt(R*R - yy*yy));
-      ctx.fillRect(cx - w*d, top + (4+yy)*d, (2*w+1)*d, d);
-    }
+    const k = age - LIT, pulse = 0.5 + 0.5*Math.sin(k*12);
+    const burst = k < 0.15 ? 1 - k/0.15 : 0;
+    const disk = (R, a)=>{
+      ctx.globalAlpha = fade * a;
+      for(let yy=-R; yy<=R; yy++){
+        const w = Math.floor(Math.sqrt(R*R - yy*yy));
+        ctx.fillRect(cx - w*d, top + (4+yy)*d, (2*w+1)*d, d);
+      }
+    };
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#ffd860';
+    disk(Math.round(15 + burst*5), 0.10 + 0.04*pulse + burst*0.10);
+    disk(Math.round(11 + burst*3), 0.14 + 0.05*pulse + burst*0.12);
+    disk(7, 0.22 + 0.08*pulse + burst*0.20);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = fade;
   }
   const pal = lit ? FLASH_BULB_ON : FLASH_BULB_OFF;
@@ -13111,6 +13119,7 @@ let _paused=false;
    artFlashFx の輪は 0.6 秒なので、それより少し長く取る。 */
 const ART_NAME_DELAY = 1.5;   // 閃きの電球（ART_FLASH_SECS 1.35秒）が消えてから名前の窓を出す
 let _artNamePend = null;            // {id, t}
+let _artFlashLog = null;            // 閃いたログ。電球が消えて窓が開くときに書く
 function pauseGame(on){ _paused = !!on; }
 function gamePaused(){
   if(ABYSS_ADS.busy || window.ABYSS_CRAZYGAMES?.blocked) return true;
@@ -17926,6 +17935,7 @@ function tickArtRename(dt){
   _artNamePend.t -= dt;
   if(_artNamePend.t > 0) return;
   const id=_artNamePend.id; _artNamePend=null;
+  if(_artFlashLog){ log(_artFlashLog); _artFlashLog=null; }
   openArtRename(id, true);
 }
 /* flashed: 閃いたその場で開いたのか、ステータス画面の ✎ から開いたのか。

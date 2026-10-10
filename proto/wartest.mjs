@@ -309,7 +309,7 @@ R.saysName = await pg.evaluate(()=>{
   return out;
 });
 
-// 6-b. 閃いた瞬間は頭上に電球（ピコーン！）が出る。技の名前は上の帯に出す（数字のように浮かせない）
+// 6-b. 閃いた瞬間は頭上に電球（ピコーン！）だけが出る。波紋・技の名前・上の帯は出さない
 R.flashFx = await pg.evaluate(()=>{
   TH.dummy('sword');
   S.arts={};
@@ -323,8 +323,9 @@ R.flashFx = await pg.evaluate(()=>{
   return {got:got&&got.id, txts,
           bulb: !!bulb,
           bulbFollowsHero: !!bulb && bulb.ent===P,
-          named: !!_banner && _banner.title==='居合',
-          ring: W.fx.some(f=>f.t==='levelup')};
+          noBanner: !_banner || _banner.title!=='居合',
+          noNamePop: !txts.includes('居合'),
+          noRing: !W.fx.some(f=>f.t==='levelup' || f.t==='ultring')};
 });
 
 /* ================= 7. 置き型が主を失っても走り続けない ================= */
@@ -451,7 +452,7 @@ R.flashOpensRenameWindow = await pg.evaluate(()=>{
   // 閃いた直後は、まだ窓を出さない（演出を見せている最中）
   const openAtOnce=document.getElementById('m-artname').classList.contains('on');
   const bulbOverhead = W.fx.some(f=>f.t==='flashbulb');
-  const ringOut = W.fx.some(f=>f.t==='levelup');
+  const ringOut = !W.fx.some(f=>f.t==='levelup');   // 波紋は出さない
   // 少しだけ進めても、まだ出ない
   stepSim(0.4,{draw:true});
   const openMidway=document.getElementById('m-artname').classList.contains('on');
