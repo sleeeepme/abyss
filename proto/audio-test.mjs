@@ -48,8 +48,9 @@ await test('real attack hooks emit without audio consuming gameplay RNG',async()
 await test('parry emits and rejected consumables remain silent',async()=>{
  const x=await page.evaluate(()=>{const A=ABYSS_AUDIO;A.stop();A.resetStats();useConsum(null);const failed=A.inspect().counters.requested;feelPerfect('PARRY','#fff');return {failed,queued:A.inspect().queued};});assert.equal(x.failed,0);assert.equal(x.queued,1);
 });
-await test('in-game manager pauses/resumes and iframe settings propagate',async()=>{
- await page.evaluate(()=>pauseGame(false));await page.click('#abyss-audio-toggle');assert.equal(await page.evaluate(()=>_paused),true);const f=page.frameLocator('#abyss-audio-panel iframe');await f.locator('#control-master').fill('0.19');await page.waitForFunction(()=>ABYSS_AUDIO.settings().master===.19);await page.locator('#abyss-audio-panel > button').click();assert.equal(await page.evaluate(()=>_paused),false);
+await test('game has no audio test button or embedded panel',async()=>{
+ assert.equal(await page.locator('#abyss-audio-toggle, #abyss-audio-panel').count(),0);
+ await page.evaluate(()=>pauseGame(false));
 });
 await test('muted game runs and save still works',async()=>{await page.evaluate(()=>{ABYSS_AUDIO.configure({...ABYSS_AUDIO.settings(),enabled:false});ABYSS_SAVE.request();ABYSS_SAVE.frame();});await page.waitForTimeout(350);assert.equal(await page.evaluate(()=>ABYSS_AUDIO.inspect().active.length),0);assert.equal(await page.evaluate(()=>ABYSS_SAVE.info().failed),false);});
 await test('feel regression matches the pre-audio baseline',async()=>{
