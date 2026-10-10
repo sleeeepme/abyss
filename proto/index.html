@@ -9726,6 +9726,59 @@ const ALLY_ENGAGE = 5.5;
 /* 交戦中に立ってよい、主人公からの最大距離。
    敵を見失う距離（ALLY_FOLLOW_DIST*1.6 = 5.12）より内側に取る。 */
 const ALLY_LEASH = ALLY_FOLLOW_DIST*1.6*0.85;
+/* ---------- 仲間もボスの予兆を見て避ける ----------
+   主人公と同じ赤い予兆（当たり判定＝bossMoveHits）の中にいたら、一拍おいて外へ出る。
+   一拍（0.10〜0.28秒、個体ごとに固定）を置くのは、人が見て反応する速さに寄せるため——
+   予兆が出た瞬間に全員がぴったり同時に散ると、機械に見える。
+   逃げ先は「範囲の外・立てる床・まっすぐ歩いて通れる」点のうち、近くて主人公にも近い所。
+   体で溜める大技（叩きつけ・薙ぎ払い・突進・貫き・落石）が対象。散弾と波動は弾と輪なので、ここでは見ない。 */
+const ALLY_DODGE_REACT  = [0.10, 0.28];
+const ALLY_DODGE_MARGIN = 0.35;           // 範囲の縁からさらに離す余白（マス）
+function bossDangerAt(x, y, r){
+  for(const e of (W.enemies||[])){
+    if(!e.boss || e.dead || !e.cast || !DUEL_BODY[e.cast.id]) continue;
+    if(bossMoveHits(e, e.cast, x, y, r)) return e;
+  }
+  return null;
+}
+function dodgeLineClear(x0, y0, x1, y1){
+  const L=Math.hypot(x1-x0, y1-y0), n=Math.max(1, Math.ceil(L/0.25));
+  for(let i=1;i<=n;i++){ const t=i/n; if(!standable(x0+(x1-x0)*t, y0+(y1-y0)*t)) return false; }
+  return true;
+}
+function allyDodgeSpot(a, dt){
+  const r = (a.r||0.3) + ALLY_DODGE_MARGIN;
+  const e = bossDangerAt(a.x, a.y, r);
+  if(!e){
+    // 逃げ先へ向かっている途中で範囲を抜けたら、そこで止める（予兆が続いていても戻らない）
+    if(a.dodge && a.dodge.cast && a.dodge.spot && Math.hypot(a.dodge.spot.x-a.x, a.dodge.spot.y-a.y)>0.15
+       && W.enemies.some(b=>b.cast===a.dodge.cast)) return a.dodge.spot;
+    a.dodge=null; return null;
+  }
+  if(!a.dodge || a.dodge.cast!==e.cast){
+    const f=((a.seed||0)/6.28)%1;
+    a.dodge={cast:e.cast, wait:ALLY_DODGE_REACT[0]+(ALLY_DODGE_REACT[1]-ALLY_DODGE_REACT[0])*f, spot:null};
+  }
+  if(a.dodge.wait>0){ a.dodge.wait-=dt; return null; }
+  // 逃げ先がまだ無いか、別の予兆に呑まれたら探し直す
+  if(!a.dodge.spot || bossDangerAt(a.dodge.spot.x, a.dodge.spot.y, r)){
+    let best=null, bestC=Infinity;
+    for(let k=0;k<16;k++){
+      const ang=k*Math.PI/8;
+      for(let d=0.8; d<=5.0; d+=0.6){
+        const x=a.x+Math.cos(ang)*d, y=a.y+Math.sin(ang)*d;
+        if(!standable(x,y) || bossDangerAt(x,y,r)) continue;
+        if(!dodgeLineClear(a.x,a.y,x,y)) break;           // その向きは壁で塞がっている
+        const c = d + 0.35*Math.hypot(x-P.x, y-P.y);
+        if(c<bestC){ bestC=c; best={x,y}; }
+        break;                                             // その向きで最初に抜けた所だけ見る
+      }
+    }
+    a.dodge.spot=best;
+  }
+  return a.dodge.spot;
+}
+
 function allyUpdate(a, dt){
   if(a.dead) return;
   const st = allyStats(a);
@@ -9903,6 +9956,16 @@ function allyUpdate(a, dt){
     a.dirx=dx/d; a.diry=dy/d;
   }
 
+  /* ボスの予兆の中にいたら、何をしていても外へ出るのを先にする（全速力で） */
+  const dodge = allyDodgeSpot(a, dt);
+  if(dodge){
+    const gx=dodge.x-a.x, gy=dodge.y-a.y, gd=Math.hypot(gx,gy)||1e-6;
+    mvx=gx/gd; mvy=gy/gd; goal=dodge; a.mode='dodge';
+  }else if((mvx||mvy) && bossDangerAt(a.x+mvx*0.6, a.y+mvy*0.6, (a.r||0.3)+ALLY_DODGE_MARGIN*0.5)
+           && !bossDangerAt(a.x, a.y, a.r||0.3)){
+    mvx=0; mvy=0;                    // 外にいるうちは、予兆の中へ自分から入っていかない
+  }
+
   /* 分離。どれだけ目標が同じでも、互いに重なることだけは許さない。
      これが無いと「同じ座標に2人いる」が必ず起きる。 */
   const sep = separation(a);
@@ -9913,7 +9976,7 @@ function allyUpdate(a, dt){
      生の合成ベクトルをそのまま使うと、細かい左右の切り返しがそのまま震えに見える。
      時定数 0.1 秒ほどで追従させれば、見た目は滑らかなまま反応は落ちない。 */
   {
-    const k = 1 - Math.exp(-dt/ALLY_TURN_TAU);
+    const k = dodge ? 1 : 1 - Math.exp(-dt/ALLY_TURN_TAU);   // 避けるときは均さずにすぐ向きを変える
     a.svx = (a.svx||0) + (mvx-(a.svx||0))*k;
     a.svy = (a.svy||0) + (mvy-(a.svy||0))*k;
     if(Math.abs(a.svx)<1e-3) a.svx=0;

@@ -183,6 +183,34 @@ R.hud = await run(5, `
     ok: hidden && parseFloat(w1)===90 && hot.includes('hot') && parseFloat(w2)===50 && down.includes('down') && nm.includes('崩れ')};
 `);
 
+/* ============ 7. 仲間もボスの予兆を見て避ける ============ */
+const allyDodge = (moveId, noDodge) => run(5, `
+  const a=makeAlly(5, S.hero, JOBS[0]); a.hpNow=allyStats(a).maxHp; S.hero.party=[a];
+  ${noDodge ? 'window.__ads=allyDodgeSpot; allyDodgeSpot=()=>null;' : ''}
+  boss.atkV=40;
+  // 主人公は範囲の外（左）に、仲間はボスのすぐ右に置く
+  P.x=boss.x-(BOSS_MOVES.slam.rad+boss.r+2.0); P.y=boss.y;
+  a.x=boss.x+boss.r+0.6; a.y=boss.y+0.2;
+  bossBeginCast(boss, '${moveId}', ${moveId==='cleave'||moveId==='beam'||moveId==='charge' ? 'a' : 'a'}, false);
+  boss.cast.t=boss.cast.max=0.9;
+  const inAtStart=bossMoveHits(boss, boss.cast, a.x, a.y, a.r);
+  const hp0=a.hpNow; let outBefore=false, reentered=false, wasOut=false;
+  for(let i=0;i<70 && boss.cast;i++){
+    const c=boss.cast;
+    stepSim(1/60);
+    if(boss.cast===c){ const inside=bossMoveHits(boss, c, a.x, a.y, a.r); if(!inside) wasOut=true; else if(wasOut) reentered=true; outBefore=!inside; }
+  }
+  ${noDodge ? 'allyDodgeSpot=window.__ads;' : ''}
+  return {inAtStart, outBefore, reentered, hit: a.hpNow<hp0, mode:a.mode};
+`);
+{
+  const slam=await allyDodge('slam'), cleave=await allyDodge('cleave'), beam=await allyDodge('beam'), ctrl=await allyDodge('slam', true);
+  R.allyDodge={slam, cleave, beam, ctrl,
+    ok: slam.inAtStart && slam.outBefore && !slam.hit && !slam.reentered
+     && cleave.inAtStart && !cleave.hit && beam.inAtStart && !beam.hit
+     && ctrl.inAtStart && ctrl.hit};
+}
+
 const allOk = Object.values(R).every(r=>r.ok) && !errs.length;
 console.log(JSON.stringify({allOk, errs, R}, null, 2));
 await b.close();
