@@ -587,12 +587,15 @@ R.mirrorsIndistinguishable = await pg.evaluate(()=>{
 });
 
 // 26-c. 51階から先へは降りられない。帰る道だけが残る。
+//       穴は帰還ポータルを兼ねなくなった——帰るのは穴のそばのポータル（門番を倒すと開く）。
 R.bottomStopsDescent = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={}; startRun(51); S.hero.party=[]; P.invuln=1e9;
   openStairs();
   const atBottom={title:el('st-title').textContent,
                   downHidden: el('st-down').style.display==='none',
-                  retShown:   el('st-ret').style.display!=='none'};
+                  holeHasNoReturn: el('st-ret').style.display==='none',
+                  portalBesideHole: !!W.portal && Math.hypot(W.portal.x-W.fl.stair.x, W.portal.y-W.fl.stair.y)<3,
+                  portalClosedWhileBoss: !!W.portal && !W.portal.open};
   // 押しても降りない（結線側にも歯止めがある）
   const d0=S.run.depth;
   el('st-down').click();
@@ -607,7 +610,7 @@ R.bottomStopsDescent = await pg.evaluate(()=>{
   return {atBottom, at50, stayed, depth:d0,
           canDescend50: canDescendFrom(50), stopsAt51: !canDescendFrom(51),
           portalAt51: returnPortalAt(51),
-          ok: atBottom.downHidden && atBottom.retShown && stayed
+          ok: atBottom.downHidden && atBottom.holeHasNoReturn && atBottom.portalBesideHole && stayed
               && at50.downShown && returnPortalAt(51) && !canDescendFrom(51)};
 });
 
@@ -796,6 +799,41 @@ R.formHpBudget = await pg.evaluate(()=>{
           firstIsShorter: first<second,          // 顔見せの方を短くする
           withinBudget: Math.abs(ratio-1.05)<0.02,
           ok: first<second && Math.abs(ratio-1.05)<0.02};
+});
+
+/* 27. 帰還ポータルは穴とは別の物。ボスを倒すと穴のそばに現れ、帰るのはそちら。
+       穴は降りるだけ（帰還ボタンを出さない）。 */
+R.portalApartFromHole = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; S.greatDown={};
+  startRun(5); S.hero.party=[]; P.invuln=1e9;
+  const st=W.fl.stair, p=W.portal;
+  const closedFirst = !!p && !p.open && S.run.bossAlive;
+  const besideHole = !!p && Math.hypot(p.x-st.x, p.y-st.y)>=1.6 && Math.hypot(p.x-st.x, p.y-st.y)<3;
+  const standOn = !!p && standable(p.x, p.y);
+  const boss=W.enemies.find(e=>e.boss);
+  while(!boss.dead){ boss.hp=0; killEnemy(boss); }
+  document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on')); setScreen('game');
+  const opensOnKill = p.open===true;
+  // 穴：降りるだけ
+  P.x=st.x; P.y=st.y; interact();
+  const hole={title:el('st-title').textContent, down:el('st-down').style.display!=='none',
+              noReturn:el('st-ret').style.display==='none'};
+  el('m-stairs').classList.remove('on'); setScreen('game');
+  // ポータル：帰るだけ
+  P.x=p.x; P.y=p.y; interact();
+  const portal={title:el('st-title').textContent, noDown:el('st-down').style.display==='none',
+                ret:el('st-ret').style.display!=='none', noHeal:el('st-heal').style.display==='none'};
+  S.run.gold=40; S.gold=0;
+  el('st-ret').click(); document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on'));
+  const wentHome = !S.run;
+  // ポータル階でない階にはポータルが無い
+  S.hero=newHero(); startRun(3);
+  const noneOff = W.portal===null;
+  return {hole, portal, closedFirst, besideHole, standOn, opensOnKill, wentHome, noneOff,
+          holeOnlyDescends: hole.title==='降りる穴' && hole.down && hole.noReturn,
+          portalOnlyReturns: portal.title==='帰還ポータル' && portal.noDown && portal.ret && portal.noHeal,
+          ok: closedFirst && besideHole && standOn && opensOnKill && wentHome && noneOff
+              && hole.down && hole.noReturn && portal.ret && portal.noDown};
 });
 
 await b.close();

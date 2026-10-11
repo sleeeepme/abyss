@@ -358,4 +358,40 @@ R.departureArrives = await pg.evaluate(()=>{
   return {dove, cleaned, ok: dove && cleaned};
 });
 
+/* 5-g. 中継地点（帰還ポータルの階）を選んだときは、門ではなく**広場の真ん中からワープ**する。
+        集まる → 魔法陣と光の柱 → 一人ずつ消える → 白く飛ばして、その階の帰還ポータルの前へ。 */
+R.warpGathers = await pg.evaluate(()=>{
+  HUB_ANIM_INSTANT=false;
+  S.run=null; S.hero.party=[];
+  const a=TH.ally(8,'knight',12); uniqueAllyName(a,party()); S.hero.party.push(a);
+  S.beacons=[10]; S.greatDown={10:1}; S.startDepth=10;
+  el('hub-avatars').dataset.hubKey='';
+  setScreen('town'); renderTown();
+  el('btn-dive').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const listShowsPortalFloor = !!el('startdepth').querySelector('[data-depth="10"]')
+                            && !el('startdepth').querySelector('[data-depth="11"]');
+  el('ds-go').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const avas=[...document.querySelectorAll('#hub-avatars .hub-ava')];
+  const stillTown = S.screen==='town' && !S.run;
+  // 全員が広場の真ん中（HUB_WALK の中心）のまわりへ向かう。門の列（left:50% の縦一列）ではない
+  const nearCenter = avas.length>0 && avas.every(b=>
+    Math.abs(parseFloat(b.style.left)-HUB_WALK.cx)<=10 && Math.abs(parseFloat(b.style.top)-HUB_WALK.cy)<=6);
+  const notMarching = !avas.some(b=>b.style.top===HUB_CAVE_TOP+'%');
+  const circleShown = el('hub-warp-lo').style.display==='block' && el('hub-warp-hi').style.display==='block';
+  return {n:avas.length, listShowsPortalFloor, stillTown, nearCenter, notMarching, circleShown,
+          ok: listShowsPortalFloor && stillTown && nearCenter && notMarching && circleShown};
+});
+await pg.waitForTimeout(2600);        // 光に消えて、白が抜けるまで
+R.warpArrivesAtPortal = await pg.evaluate(()=>{
+  const dove = S.screen==='game' && !!S.run && S.run.depth===10;
+  const p = W.portal;
+  const atPortal = !!p && p.open && Math.hypot(P.x-p.x, P.y-p.y) <= 1.5;
+  const cleaned = !el('hubui').classList.contains('hub-leaving')
+               && el('hub-warp-lo').style.display==='none';
+  HUB_ANIM_INSTANT=true;
+  if(dove) setScreen('town');
+  S.run=null; S.hero.party=[]; S.beacons=[]; S.greatDown={}; S.startDepth=1;
+  return {dove, atPortal, cleaned, ok: dove && atPortal && cleaned};
+});
+
 await done(b, errs, R);

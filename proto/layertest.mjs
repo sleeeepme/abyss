@@ -425,18 +425,25 @@ R.portal = await pg.evaluate(()=>{
     S.hero=newHero(); S.upg={hp:8}; S.gold=0; S.stash=[];
     startRun(d); S.hero.party=[];
     S.run.gold=100; S.run.loot=[];
+    /* 帰る窓は、ポータル階では穴のそばの帰還ポータル、それ以外の階では穴（脱出の権利だけ） */
     openStairs();
+    const holeNoReturn = document.getElementById('st-ret').style.display==='none';
+    TH.close('m-stairs');
+    if(W.portal){ S.run.bossAlive=false; W.portal.open=true; P.x=W.portal.x; P.y=W.portal.y; openPortal(); }
+    else openStairs();
     const button = document.getElementById('st-ret').style.display!=='none' ? '出る' : '出ない';
     TH.close('m-stairs');
     returnToTown();
     const went = S.run ? '潜ったまま' : '帰った';
     TH.close('m-ret');
-    return {button, went, gold:S.gold};
+    return {button, went, gold:S.gold, holeNoReturn};
   };
   const d7=at(7), d10=at(10), d12=at(12), d15=at(15);
   return {d7, d10, d12, d15, every:PORTAL_EVERY, next:nextPortalDepth(7),
           hiddenOffPortal: d7.button==='出ない' && d12.button==='出ない',
           shownOnPortal:   d10.button==='出る'   && d15.button==='出る',
+          // 穴は降りるだけ。ポータル階でも穴に「帰る」は出さない
+          holeNeverReturns: d10.holeNoReturn && d15.holeNoReturn,
           // ボタンを消すだけでなく、呼ばれても帰らない（入口は1ヶ所）
           blockedOffPortal: d7.went==='潜ったまま' && d12.went==='潜ったまま',
           worksOnPortal:    d10.went==='帰った' && d15.went==='帰った' && d10.gold>0,
@@ -462,10 +469,11 @@ R.returnNoAutoResume = await pg.evaluate(()=>{
   const startDepthUnchanged = S.startDepth===1;
   renderTown();
   const html = document.getElementById('startdepth').innerHTML;
-  const noResumeButtonInUi = !html.includes('data-resume="1"') && !html.includes('data-depth="16"');
+  const noResumeButtonInUi = !html.includes('data-resume="1"') && !html.includes('data-depth="15"') && !html.includes('data-depth="16"');
   // 大ボス撃破の恒久中継地点は引き続き機能する（撤廃したのは通常帰還の分だけ）
   grantBeacon(15);
-  const greatBossBeaconStillWorks = unlockedDepths().includes(16);
+  // 戻る先は倒した階そのもの（その階の帰還ポータルへワープ）
+  const greatBossBeaconStillWorks = unlockedDepths().includes(15);
   return {noResumeField, noAutoBeacon, stillOnlyFloor1, startDepthUnchanged, noResumeButtonInUi,
           greatBossBeaconStillWorks,
           ok: noResumeField && noAutoBeacon && stillOnlyFloor1 && startDepthUnchanged

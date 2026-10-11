@@ -284,31 +284,32 @@ R.beacon = await pg.evaluate(()=>{
   S.beacons=[];
   return {deepOnly, after, twice, saved, bossesOnRevisit:bossAgain,
           closedUntilKilled: deepOnly.length===1 && deepOnly[0]===1,
-          opensAt11: after.includes(11),
+          /* 戻る先は倒した階そのもの（その階の帰還ポータルへワープする）。以前は +1 階だった */
+          opensAt10: after.includes(10),
           everyTen: after.length===2,
           bossGoneOnRevisit: bossAgain===0,
           noDuplicate: twice.length===after.length,
-          ok: deepOnly.length===1 && after.includes(11)
+          ok: deepOnly.length===1 && after.includes(10)
               && bossAgain===0 && twice.length===after.length};
 });
 
-// 4-b. 中継地点は10階ごと（11/21/31/41）
+// 4-b. 中継地点は10階ごと（10/20/30/40。その階の帰還ポータルへ戻る）
 R.beaconSteps = await pg.evaluate(()=>{
   TH.run(1,{seed:5});
   S.beacons=[10,20,30,40];
   const list=unlockedDepths();
   S.beacons=[];
-  return {list, expected:[1,11,21,31,41],
-          matches: JSON.stringify(list)===JSON.stringify([1,11,21,31,41]),
-          ok: JSON.stringify(list)===JSON.stringify([1,11,21,31,41])};
+  return {list, expected:[1,10,20,30,40],
+          matches: JSON.stringify(list)===JSON.stringify([1,10,20,30,40]),
+          ok: JSON.stringify(list)===JSON.stringify([1,10,20,30,40])};
 });
 
 /* 4-c. 救済措置: 中継地点から始めると、歩かずに来たぶんの能力強化が渡る。
    Lv.1・素手で第11階層に放り込まれても、できるのは死ぬことだけ。 */
 R.beaconOutfit = await pg.evaluate(()=>{
-  S.hero=null; S.beacons=[10]; S.upg={}; S.carry=[]; S.legacyBoons=[];
-  S.startDepth=11;
-  startRun(11);
+  S.hero=null; S.beacons=[10]; S.greatDown={10:1}; S.upg={}; S.carry=[]; S.legacyBoons=[];
+  S.startDepth=10;
+  startRun(10);                 // 第10階層の帰還ポータルの前に出る。支給は降りた先（11階）に合わせる
   const h=S.hero;
   const want=beaconLevel(11);
   const gearGiven=['weapon','armor'].filter(sl=>!!h.equip[sl]);
@@ -326,7 +327,7 @@ R.beaconOutfit = await pg.evaluate(()=>{
   strong.lv=40; strong.str=44; strong.dex=44; strong.vit=44;
   strong.equip.weapon=genBaseItem('great',40,3); strong.equip.weapon.ident=true;
   const keptWeapon=strong.equip.weapon;
-  startRun(11);
+  startRun(10);
   const keptLv=S.hero.lv===40, keptGear=S.hero.equip.weapon===keptWeapon;
   S.beacons=[]; S.startDepth=1;
   return {want, heroLv:h.lv, gearGiven, survives, lvOK, keptLv, keptGear,
@@ -345,7 +346,7 @@ R.beaconHelpText = await pg.evaluate(()=>{
   if(!S.hero) S.hero=newHero();
   setScreen('town');
   const locked=el('startdepth').textContent.replace(/\s+/g,' ').trim();
-  S.beacons=[10]; S.startDepth=11;
+  S.beacons=[10]; S.startDepth=10;
   setScreen('town');
   const open=el('startdepth').textContent.replace(/\s+/g,' ');
   S.beacons=[]; S.startDepth=1; setScreen('town');
