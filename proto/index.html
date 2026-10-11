@@ -17528,14 +17528,22 @@ function hubWarpCanvasSetup(){
   const sc=Math.max(1, Math.round((bg && parseFloat(bg.style.width)/HUB_BG.fw) || 3));
   const pw=plaza.clientWidth||1, ph=plaza.clientHeight||1;
   const W=Math.ceil(pw/sc), H=Math.ceil(ph/sc);
-  [lo,hi].forEach(c=>{ c.width=W; c.height=H; c.style.width=(W*sc)+'px'; c.style.height=(H*sc)+'px'; c.style.display='block'; });
+  [lo,hi].forEach(c=>{ c.width=W; c.height=H; c.style.width=(W*sc)+'px'; c.style.height=(H*sc)+'px'; c.style.top='0px'; c.style.display='block'; });
+  /* 光の柱は**背景の絵の天井（#hubbg の上端）まで**伸ばす（ユーザー要望）。
+     広場（.hub-plaza）は上の名札の列の下から始まるので、柱を描く側の canvas だけ
+     上へはみ出させ、背景の上端に合わせる。背景が画面より上に切れている（cover）ときは
+     画面の上端で #scr-town の overflow:hidden に切られる——見えるのは画面の天井まで。 */
+  const pr=plaza.getBoundingClientRect(), br=bg ? bg.getBoundingClientRect() : pr;
+  const up=Math.max(0, Math.ceil((pr.top-br.top)/sc));      // 背景の上端が広場より何ドット上か
+  hi.height=H+up; hi.style.height=((H+up)*sc)+'px'; hi.style.top=(-up*sc)+'px';
   /* 中心は広場の床の真ん中（HUB_WALK）。.hub-ava は中心で位置を取り、足は中心より約10px下 */
-  return {lo, hi, W, H, sc, cx:Math.round(W*HUB_WALK.cx/100), cy:Math.round((ph*HUB_WALK.cy/100+10)/sc)};
+  return {lo, hi, W, H, sc, up, cx:Math.round(W*HUB_WALK.cx/100), cy:Math.round((ph*HUB_WALK.cy/100+10)/sc)};
 }
 function hubWarpDraw(g, t){
-  const {lo,hi,W,H,cx,cy}=g;
+  const {lo,hi,W,H,cx,cy,up}=g;
   const a=lo.getContext('2d'), b=hi.getContext('2d');
-  a.clearRect(0,0,W,H); b.clearRect(0,0,W,H);
+  a.clearRect(0,0,W,H); b.clearRect(0,0,W,H+up);
+  const cyH=cy+up;          // 柱の canvas は背景の天井まで上へ伸ばしてあるので、そのぶん下げる
   const px=(c,x,y,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x),Math.round(y),1,1); };
   const ell=(c,rx,ry,col,step)=>{
     const n=Math.max(24,Math.round((rx+ry)*4));
@@ -17566,12 +17574,13 @@ function hubWarpDraw(g, t){
   const b0=HUB_WARP.beam[0], b1=HUB_WARP.beam[1];
   const bk=clamp((t-b0)/(b1-b0),0,1);
   if(bk>0){
-    const top=Math.round(cy-(cy+4)*Math.min(1,bk*1.6));
+    // 足元から背景の天井（この canvas の上端＝0）まで伸びる
+    const top=Math.max(0, Math.round(cyH-cyH*Math.min(1,bk*1.6)));
     const bands=[[9,0.18],[6,0.35],[3,0.7]];
     bands.forEach(([w,al])=>{
       const ww=Math.max(1,Math.round(w*bk));
       b.globalAlpha=al; b.fillStyle='#dff6ff';
-      b.fillRect(cx-ww, top, ww*2+1, cy-top+2);
+      b.fillRect(cx-ww, top, ww*2+1, cyH-top+2);
     });
     b.globalAlpha=1;
   }
@@ -17580,7 +17589,7 @@ function hubWarpDraw(g, t){
     for(let i=0;i<16;i++){
       const ph=((t/1000)*0.9+i*0.137)%1;
       const x=cx+Math.round(Math.sin(i*2.3)*18*e);
-      const y=cy-ph*40;
+      const y=cyH-ph*40;
       b.globalAlpha=0.9*(1-ph); px(b,x,y, i%3?'#bff0ff':'#ffffff');
     }
     b.globalAlpha=1;
