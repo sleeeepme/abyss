@@ -215,6 +215,22 @@
     color:#8b93a7;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
     pointer-events:auto;user-select:none;z-index:6}
   #artbtn.on{display:flex}
+  /* ---------- 連携攻撃のボタン ----------
+     連携値が満ちたときだけ出る。右の列（大技・衝撃波・武器技）はもう埋まっているので、
+     大技の**左隣**に置く——右手の親指が一番届く所で、出た瞬間に目に入る。
+     出ている間はずっと金色で光り、少し脈打つ（押せる状態しか存在しないボタン）。
+     縁と面のドットの型は武器技のボタンと同じ物を使う（JS で写す）。 */
+  #linkbtn{position:absolute;right:100px;bottom:calc(92px + env(safe-area-inset-bottom));
+    width:64px;height:64px;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    --pf:rgba(40,28,8,.88);background:none;border:none;--pb:currentColor;
+    color:#ffc24a;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+    pointer-events:auto;user-select:none;z-index:6;
+    filter:drop-shadow(0 0 5px #ffc24a);animation:linkBtnBeat 1.1s ease-in-out infinite}
+  #linkbtn.on{display:flex}
+  #linkbtn .skico{width:36px;height:36px;opacity:1}
+  @keyframes linkBtnBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @media (prefers-reduced-motion: reduce){ #linkbtn{animation:none} }
   #adbar b{color:var(--dim);font-weight:600;letter-spacing:.14em;font-size:12px;
     border:1px solid var(--line);padding:1px 5px;margin-right:8px}
   /* バナーに隠れないよう、対象画面の下だけ余白を足す */
@@ -285,7 +301,7 @@
   /* ボタン・バッジは自前の背景板を持つので縁取りは要らない。
      #hud の縁取りをそのまま継承すると、丸背景の上でアイコンや数字が
      二重に縁取られて潰れて見える。ここだけ打ち消す。 */
-  #guardbtn,#ultbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn{text-shadow:none}
+  #guardbtn,#ultbtn,#wavebtn,#artbtn,#linkbtn,#bagbtn,#statbtn,#mapbtn{text-shadow:none}
   #topbar{display:flex;gap:10px;align-items:flex-start}
   #bars{flex:1;max-width:230px}
   /* ドットの画面なので、ゲージの角は丸めない（丸めるとそこだけ解像度が違って見える） */
@@ -297,6 +313,11 @@
      幅は updateHUD が毎フレーム計算するので、CSSのwidth遷移は掛けない。 */
   #hpghost{position:absolute;left:0;top:0;height:100%;background:#fff;transition:none;width:100%}
   #xpfill{background:var(--xp);}
+  /* 連携値。経験値の下にもう1本、金色で。満ちたら明滅して「押せる」を知らせる */
+  #linkbar{margin-top:3px}
+  #linkfill{background:#c99a3a}
+  #linkbar.full #linkfill{background:#ffc24a;animation:linkPulse .9s ease-in-out infinite}
+  @keyframes linkPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.6)}}
   .bar.thin{height:5px}
   #stat{font-size:12px;color:var(--dim);margin-top:2px}
   /* 層の名前が1行増えるので行間を詰める。行数が増えても高さは元のまま */
@@ -667,20 +688,20 @@
      円は大きさごとのドットの円（SVG マスク）：中身 ::before（--pf）、縁 ::after（--pb）。光は drop-shadow でドットの形のまま。 */
   :root{--pxr1:polygon(0 2px,2px 2px,2px 0,calc(100% - 2px) 0,calc(100% - 2px) 2px,100% 2px,100% calc(100% - 2px),calc(100% - 2px) calc(100% - 2px),calc(100% - 2px) 100%,2px 100%,2px calc(100% - 2px),0 calc(100% - 2px));--pxr2:polygon(0 4px,2px 4px,2px 2px,4px 2px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 4px) calc(100% - 2px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 2px),2px calc(100% - 2px),2px calc(100% - 4px),0 calc(100% - 4px));--pxr3:polygon(0 6px,2px 6px,2px 4px,2px 2px,6px 2px,6px 0,calc(100% - 6px) 0,calc(100% - 6px) 2px,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 6px,100% 6px,100% calc(100% - 6px),calc(100% - 2px) calc(100% - 6px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 6px) calc(100% - 2px),calc(100% - 6px) 100%,6px 100%,6px calc(100% - 2px),4px calc(100% - 2px),2px calc(100% - 2px),2px calc(100% - 6px),0 calc(100% - 6px));--pxr2r:polygon(0 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,calc(100% - 2px) 2px,calc(100% - 2px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) calc(100% - 2px),calc(100% - 4px) calc(100% - 2px),calc(100% - 4px) 100%,0 100%)}
   :where(.item,.boon){clip-path:var(--pxr2r)}
-  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox){clip-path:var(--pxr2)}
+  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#linkbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox){clip-path:var(--pxr2)}
   :where(#gravehint,#intruder,#statusbar span,#foottag){clip-path:var(--pxr3)}
   :where(#nm-input,#an-input,#bagcount,.hub-badge){clip-path:var(--pxr1)}
-  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox,#gravehint,#intruder,#statusbar span,#foottag,.item,.boon){position:relative}
+  :where(#dbgbtn,.card,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#linkbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob),#targetinfo,.fgwho,#potnote,#durtag,#prompt,#toast,.hub-id,#adbox,#gravehint,#intruder,#statusbar span,#foottag,.item,.boon){position:relative}
   .item::before,.boon::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
   .item::after,.boon::after{content:"";position:absolute;left:0;top:-2px;bottom:-2px;border-left:3px solid;border-left-color:inherit;pointer-events:none}
-  #dbgbtn::before,.card::before,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob)::before,#targetinfo::before,.fgwho::before,#potnote::before,#durtag::before,#prompt::before,#toast::before,.hub-id::before,#adbox::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
+  #dbgbtn::before,.card::before,button:not(.hub-ava,.hub-corner,.hub-mini,#ultbtn,#guardbtn,#wavebtn,#artbtn,#linkbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob)::before,#targetinfo::before,.fgwho::before,#potnote::before,#durtag::before,#prompt::before,#toast::before,.hub-id::before,#adbox::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
   #gravehint::before,#intruder::before,#statusbar span::before,#foottag::before{content:"";position:absolute;inset:0;border:inherit;border-radius:0;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/4px 2px no-repeat,linear-gradient(#000 0 0) right top/4px 2px no-repeat,linear-gradient(#000 0 0) left bottom/4px 2px no-repeat,linear-gradient(#000 0 0) right bottom/4px 2px no-repeat,linear-gradient(#000 0 0) left top/2px 4px no-repeat,linear-gradient(#000 0 0) right top/2px 4px no-repeat,linear-gradient(#000 0 0) left bottom/2px 4px no-repeat,linear-gradient(#000 0 0) right bottom/2px 4px no-repeat;mask:linear-gradient(#000 0 0) left top/4px 2px no-repeat,linear-gradient(#000 0 0) right top/4px 2px no-repeat,linear-gradient(#000 0 0) left bottom/4px 2px no-repeat,linear-gradient(#000 0 0) right bottom/4px 2px no-repeat,linear-gradient(#000 0 0) left top/2px 4px no-repeat,linear-gradient(#000 0 0) right top/2px 4px no-repeat,linear-gradient(#000 0 0) left bottom/2px 4px no-repeat,linear-gradient(#000 0 0) right bottom/2px 4px no-repeat}
   .hub-corner,.hub-mini{isolation:isolate}
   .hub-corner::before,.hub-mini::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--pf);border:2px solid var(--pb);clip-path:var(--pxr2);pointer-events:none}
   .hub-corner::after,.hub-mini::after{content:"";position:absolute;inset:2px;z-index:-1;border:2px solid var(--pb);pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
-  #ultbtn,#guardbtn,#wavebtn,#artbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob,.hub-ava .glyph{isolation:isolate;border-radius:0}
-  #ultbtn::before,#guardbtn::before,#wavebtn::before,#artbtn::before,#bagbtn::before,#statbtn::before,#mapbtn::before,#stick::before,#knob::before,.hub-ava .glyph::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pf,transparent);-webkit-mask:var(--pxdisk) 0 0/100% 100% no-repeat;mask:var(--pxdisk) 0 0/100% 100% no-repeat}
-  #ultbtn::after,#guardbtn::after,#wavebtn::after,#artbtn::after,#bagbtn::after,#statbtn::after,#mapbtn::after,#stick::after,#knob::after,.hub-ava .glyph::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pb,transparent);-webkit-mask:var(--pxring) 0 0/100% 100% no-repeat;mask:var(--pxring) 0 0/100% 100% no-repeat}
+  #ultbtn,#guardbtn,#wavebtn,#artbtn,#linkbtn,#bagbtn,#statbtn,#mapbtn,#stick,#knob,.hub-ava .glyph{isolation:isolate;border-radius:0}
+  #ultbtn::before,#guardbtn::before,#wavebtn::before,#artbtn::before,#linkbtn::before,#bagbtn::before,#statbtn::before,#mapbtn::before,#stick::before,#knob::before,.hub-ava .glyph::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pf,transparent);-webkit-mask:var(--pxdisk) 0 0/100% 100% no-repeat;mask:var(--pxdisk) 0 0/100% 100% no-repeat}
+  #ultbtn::after,#guardbtn::after,#wavebtn::after,#artbtn::after,#linkbtn::after,#bagbtn::after,#statbtn::after,#mapbtn::after,#stick::after,#knob::after,.hub-ava .glyph::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pb,transparent);-webkit-mask:var(--pxring) 0 0/100% 100% no-repeat;mask:var(--pxring) 0 0/100% 100% no-repeat}
   .hub-ava .glyph{position:relative}
   #ultbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h17v1h-17zM8 3h21v1h-21zM7 4h23v1h-23zM6 5h25v1h-25zM5 6h27v1h-27zM4 7h29v1h-29zM3 8h31v1h-31zM3 9h31v1h-31zM2 10h33v1h-33zM2 11h33v1h-33zM1 12h35v1h-35zM1 13h35v1h-35zM1 14h35v1h-35zM0 15h37v1h-37zM0 16h37v1h-37zM0 17h37v1h-37zM0 18h37v1h-37zM0 19h37v1h-37zM0 20h37v1h-37zM0 21h37v1h-37zM1 22h35v1h-35zM1 23h35v1h-35zM1 24h35v1h-35zM2 25h33v1h-33zM2 26h33v1h-33zM3 27h31v1h-31zM3 28h31v1h-31zM4 29h29v1h-29zM5 30h27v1h-27zM6 31h25v1h-25zM7 32h23v1h-23zM8 33h21v1h-21zM10 34h17v1h-17zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 37 37' shape-rendering='crispEdges'%3E%3Cpath d='M15 0h7v1h-7zM12 1h13v1h-13zM10 2h5v1h-5zM22 2h5v1h-5zM8 3h4v1h-4zM25 3h4v1h-4zM7 4h3v1h-3zM27 4h3v1h-3zM6 5h2v1h-2zM29 5h2v1h-2zM5 6h2v1h-2zM30 6h2v1h-2zM4 7h2v1h-2zM31 7h2v1h-2zM3 8h2v1h-2zM32 8h2v1h-2zM3 9h2v1h-2zM32 9h2v1h-2zM2 10h2v1h-2zM33 10h2v1h-2zM2 11h2v1h-2zM33 11h2v1h-2zM1 12h2v1h-2zM34 12h2v1h-2zM1 13h2v1h-2zM34 13h2v1h-2zM1 14h2v1h-2zM34 14h2v1h-2zM0 15h2v1h-2zM35 15h2v1h-2zM0 16h2v1h-2zM35 16h2v1h-2zM0 17h2v1h-2zM35 17h2v1h-2zM0 18h2v1h-2zM35 18h2v1h-2zM0 19h2v1h-2zM35 19h2v1h-2zM0 20h2v1h-2zM35 20h2v1h-2zM0 21h2v1h-2zM35 21h2v1h-2zM1 22h2v1h-2zM34 22h2v1h-2zM1 23h2v1h-2zM34 23h2v1h-2zM1 24h2v1h-2zM34 24h2v1h-2zM2 25h2v1h-2zM33 25h2v1h-2zM2 26h2v1h-2zM33 26h2v1h-2zM3 27h2v1h-2zM32 27h2v1h-2zM3 28h2v1h-2zM32 28h2v1h-2zM4 29h2v1h-2zM31 29h2v1h-2zM5 30h2v1h-2zM30 30h2v1h-2zM6 31h2v1h-2zM29 31h2v1h-2zM7 32h3v1h-3zM27 32h3v1h-3zM8 33h4v1h-4zM25 33h4v1h-4zM10 34h5v1h-5zM22 34h5v1h-5zM12 35h13v1h-13zM15 36h7v1h-7z'/%3E%3C/svg%3E")}
   #guardbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h13v1h-13zM8 2h17v1h-17zM7 3h19v1h-19zM5 4h23v1h-23zM4 5h25v1h-25zM4 6h25v1h-25zM3 7h27v1h-27zM2 8h29v1h-29zM2 9h29v1h-29zM1 10h31v1h-31zM1 11h31v1h-31zM1 12h31v1h-31zM0 13h33v1h-33zM0 14h33v1h-33zM0 15h33v1h-33zM0 16h33v1h-33zM0 17h33v1h-33zM0 18h33v1h-33zM0 19h33v1h-33zM1 20h31v1h-31zM1 21h31v1h-31zM1 22h31v1h-31zM2 23h29v1h-29zM2 24h29v1h-29zM3 25h27v1h-27zM4 26h25v1h-25zM4 27h25v1h-25zM5 28h23v1h-23zM7 29h19v1h-19zM8 30h17v1h-17zM10 31h13v1h-13zM13 32h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h3v1h-3zM20 1h3v1h-3zM8 2h2v1h-2zM23 2h2v1h-2zM7 3h1v1h-1zM25 3h1v1h-1zM5 4h2v1h-2zM26 4h2v1h-2zM4 5h1v1h-1zM28 5h1v1h-1zM4 6h1v1h-1zM28 6h1v1h-1zM3 7h1v1h-1zM29 7h1v1h-1zM2 8h1v1h-1zM30 8h1v1h-1zM2 9h1v1h-1zM30 9h1v1h-1zM1 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM31 11h1v1h-1zM1 12h1v1h-1zM31 12h1v1h-1zM0 13h1v1h-1zM32 13h1v1h-1zM0 14h1v1h-1zM32 14h1v1h-1zM0 15h1v1h-1zM32 15h1v1h-1zM0 16h1v1h-1zM32 16h1v1h-1zM0 17h1v1h-1zM32 17h1v1h-1zM0 18h1v1h-1zM32 18h1v1h-1zM0 19h1v1h-1zM32 19h1v1h-1zM1 20h1v1h-1zM31 20h1v1h-1zM1 21h1v1h-1zM31 21h1v1h-1zM1 22h1v1h-1zM31 22h1v1h-1zM2 23h1v1h-1zM30 23h1v1h-1zM2 24h1v1h-1zM30 24h1v1h-1zM3 25h1v1h-1zM29 25h1v1h-1zM4 26h1v1h-1zM28 26h1v1h-1zM4 27h1v1h-1zM28 27h1v1h-1zM5 28h2v1h-2zM26 28h2v1h-2zM7 29h1v1h-1zM25 29h1v1h-1zM8 30h2v1h-2zM23 30h2v1h-2zM10 31h3v1h-3zM20 31h3v1h-3zM13 32h7v1h-7z'/%3E%3C/svg%3E")}
@@ -975,6 +996,7 @@
     <div id="bars">
       <div class="bar"><i id="hpghost" style="width:100%"></i><i id="hpfill" style="width:100%"></i></div>
       <div class="bar thin"><i id="xpfill" style="width:0%"></i></div>
+      <div class="bar thin" id="linkbar" aria-label="連携値"><i id="linkfill" style="width:0%"></i></div>
       <div id="stat"></div>
     </div>
     <div id="depth"><b id="dnum">1F</b><span id="dsub"></span></div>
@@ -998,6 +1020,7 @@
   <div id="ultbtn" role="button"><i id="ult-icon" class="skico"></i></div>
   <div id="wavebtn" role="button" aria-label="衝撃波"><i id="wave-icon" class="skico"></i></div>
   <div id="artbtn" role="button"><i id="art-icon" class="skico"></i></div>
+  <div id="linkbtn" role="button" aria-label="連携攻撃"><i id="link-icon" class="skico"></i></div>
   <div id="prompt"></div>
   <div id="bagbtn"><i class="pi pi-bag"></i><span id="bagcount">0</span></div>
   <div id="statbtn"><i class="pi pi-person"></i></div>
@@ -4975,6 +4998,7 @@ function hitEnemyByAlly(a, st, e, mult){
   // 背面（BACK_MUL）。敵が主人公を追っているあいだ、仲間は自然に背を取る
   const dmg = Math.max(1, Math.round(st.atk*mult*backAttackMul(e, a.x, a.y)*duelVuln(e)));
   e.hp -= dmg; e.hit = Math.max(e.hit, 0.12);
+  linkGain(LINK.hitAlly);
   if(isDuelBoss(e) && e.hp>0) addBreak(e, DUEL.pt.hit*DUEL.pt.allyMul);   // 仲間の手数も崩しに
   if(e.parts) partHit(e, dmg, a.x, a.y);                // 仲間の一撃も、仲間の側の脚に入る
   pop(e.x, e.y-0.3, dmg, jobDef(a.job).col);
@@ -8333,6 +8357,7 @@ function tickDropIn(dt){
 }
 /* 落ちている最中の見た目。null＝普通。hide＝まだ画面の上。y＝持ち上げる量（px）、shadow＝影の大きさ、sq＝縦のつぶれ */
 function dropInPose(e){
+  if(_linkNow){ const lp=linkPose(e); if(lp) return lp; }   // 連携攻撃：跳んで消えて、降ってくる
   const d=W.dropIn; if(!d) return null;
   const pi = e===P ? -1 : party().indexOf(e);
   const m = d.list.find(x=>x.pi===pi); if(!m) return null;
@@ -8424,6 +8449,7 @@ function rememberFloor(){
 }
 function enterFloor(depth, opt){
   opt = opt || {};
+  _linkNow = null;                    // 連携攻撃の演出は階をまたがない
   rememberFloor();                    // 離れる階の記憶を先に控える（上の注記）
   const lseed = layoutSeed(depth);
   RNG = mulberry32(lseed);
@@ -8977,6 +9003,7 @@ function hitEnemy(e, st, mult, opt){
   const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm*duelVuln(e)), src.lv,
                           {ailMul: playerAilMul(st)});
   e.hp-=r.total; e.hit=0.12;
+  linkGain(src===S.hero ? LINK.hitHero : LINK.hitAlly);   // 連携値（連携攻撃そのものの当たりでは溜まらない——linkGain が弾く）
   if(e.parts){ const at=opt.at||(src===S.hero?P:src); partHit(e, r.total, at.x, at.y); }   // 部位破壊（ヴェラ第二形態の脚）
   feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
@@ -9444,6 +9471,7 @@ function waveReady(){
   return S.screen==='game' && !!S.run && !!S.hero && (P.waveCd||0)<=0;
 }
 function fireWave(){
+  if(_linkNow) return false;
   if(!waveReady()) return false;
   if(frozenNow()){ log('凍りついて動けない'); return false; }
   if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
@@ -9686,6 +9714,7 @@ function artReady(){
   return !!playerArt() && S.screen==='game' && !!S.run && !!S.hero && (P.artCd||0)<=0;
 }
 function firePlayerArt(){
+  if(_linkNow) return false;
   const def=playerArt();
   if(!def || !artReady()) return false;
   if(frozenNow()){ log('凍りついて動けない'); return false; }
@@ -9717,7 +9746,343 @@ function ultPartyArt(id, r, src){
   others.forEach((m,i)=>feelPixelArt(id+'_on', m.x, m.y, {ent:m, delay:0.1+i*0.05}));
 }
 /* 大技の当たりを崩し・妨害に数えるため、中身を包む（どの技でも1回の大技につき1度） */
+/* ---------- 連携攻撃（連携値） ----------
+   ユーザー要望：
+     ・「連携値」という数値を持ち、**時間の経過と攻撃**で溜まる。5〜10分くらいで満タン。
+     ・満タンになると連携ボタンが出て、押すと発動。発動したら値は0に戻り、ボタンも消える。
+     ・弓の届く範囲（BASES の弓の reach）にいる敵**全員**に大ダメージ。
+     ・ペルソナの総攻撃のように、仲間全員が土煙の中でボコスカ殴る演出。
+     ・連携攻撃のあいだは無敵。仲間の数だけヒット数が増える。
+
+   溜まり方（LINK）：
+     時間だけなら 10 分（LINK.perSec）。戦っていると攻撃が上乗せされて 5〜6 分ほどで満ちる
+     （_linkbal.mjs で自動操縦を回して測った値に合わせてある——下の注記）。
+     攻撃の1発は主人公のほうを重く、仲間は軽くしてある。仲間の数で溜まる速さまで
+     倍々に変わると、ソロでは永遠に溜まらず、大所帯では毎部屋撃てる技になる。
+     撃破は1体ずつ少し、精鋭・ボスはそれより多め。
+     **連携攻撃そのものの当たりでは溜めない**（撃ったら空になる、の約束を崩さない）。
+
+   値は主人公（S.hero.link）に持たせる。帰還しても残り、死ねば新しいキャラと一緒に0から。
+   街では増えない（update が回るのは探索の中だけ）。
+
+   演出（LINK.dur 秒、盤面は止める）：
+     0      発動。名前の帯が横切る。全員が跳び上がって画面から消える
+     0.25〜 敵の固まりごとに土煙の雲が膨らむ。雲の縁から拳・足・星が飛び出し、
+            仲間の絵が入れ替わり立ち替わり顔を出す
+     0.45〜1.95  ヒット。主人公 LINK.heroHits 回＋仲間1人につき LINK.allyHits 回を、
+            全員で順番に打つ。1ヒットごとに**範囲の敵全員**に当たる
+     2.0    雲が弾ける（白い閃光）
+     2.2〜  全員が元の場所へ降ってくる
+   止めている間は敵も弾も動かないので、無敵の約束はそれで守られる。
+   終わった直後は一瞬だけ無敵を残す（降りた瞬間に隣の敵に殴られないように）。 */
+/* 演出の状態は W ではなくここに置く。W は探索の途中保存でまるごと文字列にされるので、
+   敵や仲間への参照を抱えた物を入れると、読み戻したときに別物の写しを殴り続ける。 */
+let _linkNow = null;
+const LINK = {
+  max: 100,
+  perSec: 100/600,        // 時間だけで10分
+  hitHero: 0.035,         // 主人公の1発
+  hitAlly: 0.018,         // 仲間の1発
+  kill: 0.22, killElite: 0.55, killBoss: 3,
+  dur: 2.6, intro: 0.35, cloudIn: [0.2, 0.45], hitFrom: 0.45, hitTo: 1.95, burst: [2.0, 2.2],
+  heroHits: 4, allyHits: 3,
+  mult: 1.6,              // 1ヒットの倍率（主人公は hitEnemy、仲間は hitEnemyByAlly にそのまま渡す）
+  after: 0.6,             // 降りたあとに残す無敵（秒）
+  col: '#ffc24a',
+};
+function linkRange(){
+  const b=BASES.find(x=>x.id==='bow');
+  return b ? b.reach : 5.8;
+}
+function linkVal(){ return S.hero ? clamp(S.hero.link||0, 0, LINK.max) : 0; }
+function linkReady(){ return !!S.hero && linkVal() >= LINK.max; }
+/* 溜める入口はここだけ。満ちた瞬間に一度だけ知らせる。 */
+function linkGain(v){
+  if(!S.hero || !S.run || _linkNow || !(v>0)) return;
+  const before=S.hero.link||0;
+  if(before >= LINK.max) return;
+  S.hero.link = Math.min(LINK.max, before+v);
+  if(S.hero.link >= LINK.max){
+    log('<span style="color:'+LINK.col+'">連携値が満ちた——連携攻撃が使える</span>');
+    if(typeof feelSpray==='function') feelSpray(P.x, P.y-0.3, LINK.col, 12, 1.0, 'spark');
+  }
+}
+/* 範囲の敵。中心は主人公、半径は弓の届く距離（体の大きさぶん足す——大きいボスの縁にも届く）。 */
+function linkTargets(){
+  const R=linkRange();
+  return W.enemies.filter(e=>!e.dead && e.hp>0 && Math.hypot(e.x-P.x, e.y-P.y) <= R + (e.r||0));
+}
+/* 近い敵を1つの雲にまとめる。雲が敵の数だけ並ぶと、ただの煙の列に見える。 */
+function linkClouds(tg){
+  const cl=[];
+  tg.forEach(e=>{
+    const c=cl.find(c=>Math.hypot(c.x-e.x, c.y-e.y) < 1.8);
+    if(c){ c.es.push(e); c.x=c.es.reduce((s,q)=>s+q.x,0)/c.es.length; c.y=c.es.reduce((s,q)=>s+q.y,0)/c.es.length; }
+    else cl.push({x:e.x, y:e.y, es:[e]});
+  });
+  // 多すぎるときは近い順に吸わせて、6つまでに絞る
+  while(cl.length>6){
+    let bi=0, bj=1, bd=1e9;
+    for(let i=0;i<cl.length;i++) for(let j=i+1;j<cl.length;j++){
+      const d=Math.hypot(cl[i].x-cl[j].x, cl[i].y-cl[j].y); if(d<bd){ bd=d; bi=i; bj=j; }
+    }
+    const a=cl[bi], b=cl.splice(bj,1)[0];
+    a.es.push(...b.es);
+    a.x=a.es.reduce((s,q)=>s+q.x,0)/a.es.length; a.y=a.es.reduce((s,q)=>s+q.y,0)/a.es.length;
+  }
+  cl.forEach((c,i)=>{
+    const spread=Math.max(0, ...c.es.map(e=>Math.hypot(e.x-c.x, e.y-c.y)+(e.r||0.34)));
+    c.r = clamp(0.75 + spread*0.85 + 0.12*c.es.length, 0.85, 2.4);
+    c.seed = i*7.31 + 1.7;
+  });
+  return cl;
+}
+function fireLink(){
+  if(!linkReady() || !S.run || !W.fl || _linkNow || W.dropIn) return false;
+  if(S.screen!=='game') return false;
+  const tg=linkTargets();
+  if(!tg.length){
+    log('連携攻撃：届く所に敵がいない');
+    W.pops.push({x:P.x, y:P.y-0.6, txt:'敵がいない', c:'#8b93a7', life:0.8});
+    return false;
+  }
+  /* 出るのは生きている仲間全員。落ちている最中（縁・淵）の者は加われない */
+  const actors=[{who:'hero'}].concat(livingParty().filter(a=>!a.fallAnim).map(a=>({who:'ally', a})));
+  actors.forEach((ac,i)=>{ ac.n = ac.who==='hero' ? LINK.heroHits : LINK.allyHits; ac.i=i; });
+  // ヒットの順番：全員で代わる代わる（1人が全部打ってから次、にはしない）
+  const order=[], left=actors.map(ac=>ac.n);
+  while(left.some(n=>n>0)) actors.forEach((ac,i)=>{ if(left[i]>0){ left[i]--; order.push(ac); } });
+  const N=order.length;
+  const hits=order.map((ac,k)=>({ac, at: LINK.hitFrom + (LINK.hitTo-LINK.hitFrom)*(k+0.5)/N}));
+  const clouds=linkClouds(tg);
+  actors.forEach((ac,i)=>{ ac.cloud = i % clouds.length; ac.face={}; });
+  S.hero.link = 0;
+  P.guard=false;
+  _linkNow = {t:0, tg, actors, hits, done:0, clouds, burstDone:false, sum:new Map(), later:[]};
+  sayArt(P.x, P.y, '連携攻撃', LINK.col);
+  log('<span style="color:'+LINK.col+'">連携攻撃！</span> '+actors.length+'人で'+N+'ヒット');
+  if(typeof feelKick==='function') feelKick(2.2, 0.16);
+  updateHUD();
+  return true;
+}
+/* 1ヒット。範囲にいた敵のうち、まだ立っている全員に当てる。 */
+function doLinkHit(h){
+  const L=_linkNow; if(!L) return;
+  const live=L.tg.filter(e=>!e.dead && e.hp>0);
+  if(!live.length) return;
+  /* 1ヒットごとの数字は出さない（雲の上が数字で埋まって、殴っている絵が見えなくなる）。
+     減った分は敵ごとに足しておき、雲が弾けたときに合計を1つだけ大きく出す。 */
+  const hp0=new Map(live.map(e=>[e, e.hp])), np=W.pops.length;
+  if(h.ac.who==='hero'){
+    const st=stats(S.hero);
+    live.forEach(e=>{ if(!e.dead) hitEnemy(e, st, LINK.mult, {link:true}); });
+  }else{
+    const a=h.ac.a;
+    if(!a || a.dead) return;
+    const st=allyStats(a);
+    live.forEach(e=>{ if(!e.dead) hitEnemyByAlly(a, st, e, LINK.mult); });
+  }
+  hp0.forEach((v,e)=>{ L.sum.set(e, (L.sum.get(e)||0) + Math.max(0, v-Math.max(0,e.hp))); });
+  /* このヒットで出た文字は雲の上に積まない。ダメージの数字は捨て（合計を後で出す）、
+     撃破の EXP・G・SP などは、雲が弾けたあとに順に出す。 */
+  const added=W.pops.splice(np);
+  added.forEach(p=>{ if(p.reward || p.txt!==undefined || p.pic) L.later.push(p); });
+  // 当たった場所に星。雲の縁のどこか
+  const c=L.clouds[h.ac.cloud] || L.clouds[0];
+  const ang=rnd()*Math.PI*2, rr=c.r*(0.35+rnd()*0.55);
+  W.fx.push({t:'linkstar', x:c.x+Math.cos(ang)*rr, y:c.y+Math.sin(ang)*rr*0.8, life:0.22, max:0.22});
+  if(typeof feelKick==='function') feelKick(1.0, 0.06);
+}
+/* update() の頭で呼ぶ。演出の最中は true を返し、盤面（敵・弾・自分）を止める。 */
+function tickLink(dt){
+  const L=_linkNow; if(!L) return false;
+  L.t += dt;
+  while(L.done < L.hits.length && L.hits[L.done].at <= L.t){ doLinkHit(L.hits[L.done]); L.done++; }
+  // 全員倒れたら、殴り続ける間を縮めて弾けるところへ進める
+  if(L.t < LINK.burst[0] && L.done < L.hits.length && !L.tg.some(e=>!e.dead && e.hp>0)){
+    L.done = L.hits.length; L.t = Math.max(L.t, LINK.burst[0]-0.05);
+  }
+  if(!L.burstDone && L.t >= LINK.burst[0]){
+    L.burstDone = true;
+    W.fx.push({t:'linkburst', life:0.25, max:0.25});
+    // 敵ごとの合計ダメージ。大きく、少し長く
+    L.sum.forEach((v,e)=>{ if(v>0) W.pops.push({x:e.x, y:e.y-0.2, v:Math.round(v), c:LINK.col, life:1.3, max:1.3, bold:true}); });
+    L.later.forEach((p,i)=>{ p.delay=(p.delay||0)+0.35+i*0.05; W.pops.push(p); });
+    L.later=[];
+    L.clouds.forEach(c=>{ if(typeof feelSpray==='function') feelSpray(c.x, c.y, '#efe9de', 16, 1.4, 'dust'); });
+    if(typeof feelKick==='function') feelKick(2.6, 0.18);
+  }
+  W.fx = W.fx.filter(x=>{ x.life-=dt; return x.life>0; });
+  W.pops.forEach(p=>{ if(p.delay>0) p.delay-=dt; else p.life-=dt; });
+  W.pops = W.pops.filter(p=>p.life>0);
+  if(typeof updateFeel==='function') updateFeel(dt);
+  if(L.t >= LINK.dur){
+    _linkNow = null;
+    P.invuln = Math.max(P.invuln||0, LINK.after);
+    livingParty().forEach(a=>{ a.iframe = Math.max(a.iframe||0, LINK.after); });
+    L.actors.forEach(ac=>{
+      const e = ac.who==='hero' ? P : ac.a;
+      if(e && typeof feelSpray==='function') feelSpray(e.x, e.y+0.2, '#a89c88', 6, 0.8, 'dust');
+    });
+  }
+  return true;
+}
+/* 跳び上がる／消えている／降ってくる、の姿勢。dropInPose の頭から呼ぶ。 */
+function linkPose(e){
+  const L=_linkNow; if(!L) return null;
+  const isActor = e===P ? true : L.actors.some(ac=>ac.a===e);
+  if(!isActor) return null;
+  const t=L.t;
+  if(t < LINK.intro){
+    const k=t/LINK.intro;
+    return {y:-TS*2.6*k*k, shadow:1-k, sq: 1+0.25*k};
+  }
+  if(t < LINK.burst[1]) return {hide:true};
+  const k=clamp((t-LINK.burst[1])/(LINK.dur-LINK.burst[1]), 0, 1);
+  if(k<0.8){ const f=k/0.8; return {y:-TS*3*(1-f)*(1-f), shadow:f, sq:1}; }
+  const l=(k-0.8)/0.2;
+  return {y:0, shadow:1, sq:1-0.22*Math.sin(l*Math.PI)};
+}
+
+/* ---------- 連携攻撃の絵 ----------
+   土煙の雲は q（1ドット）単位で、小さな画用紙に塗ってから拡大して置く
+   （ctx.arc の滑らかな円だと、ここだけドット絵から浮く）。
+   雲は7つの小さな膨らみ＋真ん中の大きな膨らみの和で、膨らみは揺れ続ける。
+   縁は暗い線、上半分は明るく、下は影色。 */
+let _linkPad=null;
+const LINK_FIST = ['.####.','######','######','#####.','.###..'];   // 拳
+const LINK_BOOT = ['...##.','...##.','...##.','######','#####.'];   // 足
+const LINK_STAR = ['...#...','...#...','..###..','#######','..###..','...#...','...#...'];   // 星
+/* 小さな絵を q 単位で置く。暗い縁取りを先に塗ってから中を塗る——白い雲の上でも読める */
+function linkSpr(spr, x, y, q, col, flip){
+  const w=spr[0].length, hgt=spr.length;
+  const on=(i,j)=> j>=0 && j<hgt && i>=0 && i<w && spr[j][flip?w-1-i:i]==='#';
+  const X=i=>Math.round(x+(i-w/2)*q), Y=j=>Math.round(y+(j-hgt/2)*q);
+  ctx.fillStyle='#2b2733';
+  for(let j=-1;j<=hgt;j++) for(let i=-1;i<=w;i++){
+    if(on(i,j)) continue;
+    if(on(i+1,j)||on(i-1,j)||on(i,j+1)||on(i,j-1)) ctx.fillRect(X(i), Y(j), q, q);
+  }
+  ctx.fillStyle=col;
+  for(let j=0;j<hgt;j++) for(let i=0;i<w;i++) if(on(i,j)) ctx.fillRect(X(i), Y(j), q, q);
+}
+function drawLinkCloud(c, camX, camY, t, grow, q){
+  const R=c.r*TS*grow;
+  if(R<2) return;
+  const G=Math.ceil(R*2.7/q)+2, h=G/2;
+  if(!_linkPad) _linkPad=document.createElement('canvas');
+  if(_linkPad.width<G || _linkPad.height<G){ _linkPad.width=Math.max(G,_linkPad.width); _linkPad.height=Math.max(G,_linkPad.height); }
+  const pc=_linkPad.getContext('2d');
+  const img=pc.createImageData(G,G), d=img.data;
+  const rq=R/q;
+  const puffs=[{x:0,y:0,r:rq*0.72}];
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2 + c.seed + Math.sin(t*3+i)*0.15;
+    puffs.push({x:Math.cos(a)*rq*0.62, y:Math.sin(a)*rq*0.5, r:rq*(0.42+0.07*Math.sin(t*11+i*1.9+c.seed))});
+  }
+  const ins=(x,y)=>{ for(const p of puffs){ const dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return true; } return false; };
+  for(let j=0;j<G;j++) for(let i=0;i<G;i++){
+    const x=i-h+0.5, y=j-h+0.5;
+    if(!ins(x,y)) continue;
+    const edge=!ins(x+1,y)||!ins(x-1,y)||!ins(x,y+1)||!ins(x,y-1);
+    let col;
+    if(edge) col=[43,39,51];
+    else if(y > rq*0.18) col=[196,188,174];
+    else if(x+y < -rq*0.55) col=[255,251,240];
+    else col=[236,231,220];
+    const o=(j*G+i)*4; d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255;
+  }
+  pc.clearRect(0,0,_linkPad.width,_linkPad.height);
+  pc.putImageData(img,0,0);
+  const cx=Math.round(c.x*TS-camX), cy=Math.round(c.y*TS-camY-TS*0.25);
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(_linkPad, 0,0,G,G, Math.round(cx-h*q), Math.round(cy-h*q), G*q, G*q);
+  ctx.restore();
+  return {cx, cy, R};
+}
+function drawLinkAttack(camX, camY){
+  const L=_linkNow; if(!L) return;
+  const t=L.t, q=Math.max(1, Math.round(TS/16));
+  const [c0,c1]=LINK.cloudIn, [b0,b1]=LINK.burst;
+  let grow = t<c0 ? 0 : t<c1 ? (()=>{ const k=(t-c0)/(c1-c0); return 1.15*k - 0.15*k*k*k; })() : 1;
+  if(t>=b0) grow = 1 + (t-b0)/(b1-b0)*0.5;
+  const alpha = t<b0 ? 1 : clamp(1-(t-b0)/(b1-b0), 0, 1);
+  if(grow<=0 || alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  const slot=Math.floor(t/0.07);
+  L.clouds.forEach((c,ci)=>{
+    const g=drawLinkCloud(c, camX, camY, t, grow, q);
+    if(!g || t>=b0) return;
+    // 縁から飛び出す拳・足・星。0.07秒ごとに出る場所を変える（チラチラ動いて見える）
+    const nLimb = 3 + Math.min(3, Math.round(g.R/TS));
+    for(let k=0;k<nLimb;k++){
+      const s=Math.sin((slot+k*13)*12.9898+ci*78.233)*43758.5453, rr=s-Math.floor(s);
+      const a=rr*Math.PI*2, dist=g.R*(0.95+0.2*((rr*7)%1));
+      const x=g.cx+Math.cos(a)*dist, y=g.cy+Math.sin(a)*dist*0.8;
+      const kind=(slot+k+ci)%3;
+      if(kind===2) linkSpr(LINK_STAR, x, y, q, '#ffe08a');
+      else{
+        // 腕／脚（雲の中から伸びる2ドット幅の線）
+        ctx.fillStyle='#2b2733';
+        for(let m=1;m<=3;m++) ctx.fillRect(Math.round(x-Math.cos(a)*m*q*1.6)-q, Math.round(y-Math.sin(a)*m*q*1.3)-q, q*2, q*2);
+        ctx.fillStyle=kind===0?'#f3d7b4':'#6b4a33';
+        for(let m=1;m<=3;m++) ctx.fillRect(Math.round(x-Math.cos(a)*m*q*1.6)-Math.floor(q/2), Math.round(y-Math.sin(a)*m*q*1.3)-Math.floor(q/2), q, q);
+        linkSpr(kind===0?LINK_FIST:LINK_BOOT, x, y, q, kind===0?'#f3d7b4':'#6b4a33', Math.cos(a)<0);
+      }
+    }
+  });
+  // 雲から顔を出す仲間。0.16秒ごとに出る場所を変え、7割の時間だけ見せる
+  L.actors.forEach((ac,i)=>{
+    if(t<LINK.cloudIn[1] || t>=b0) return;
+    const c=L.clouds[ac.cloud]; if(!c) return;
+    const per=0.15, ph=(t+i*0.061)/per, k=Math.floor(ph);
+    if((ph-k) > 0.85) return;
+    const s=Math.sin((k+i*31)*91.7+c.seed)*43758.5453, rr=s-Math.floor(s);
+    const a=rr*Math.PI*2, R=c.r*TS*grow;
+    const x=Math.round(c.x*TS-camX+Math.cos(a)*R*0.82), y=Math.round(c.y*TS-camY-TS*0.25+Math.sin(a)*R*0.66);
+    const e = ac.who==='hero' ? P : ac.a;
+    const key = ac.who==='hero' ? CharacterArt.heroKey(S.hero) : CharacterArt.allyKey(ac.a);
+    ac.face._artFace = Math.cos(a)>0 ? -1 : 1;     // 雲の中心を向く
+    const rot=Math.sin(t*40+i)*0.18;
+    if(!CharacterArt.put(key, x, y, TS*1.1, ac.face, 0, 0, 1, 1, rot)){
+      ctx.fillStyle=ac.who==='hero'?'#ffffff':jobDef(e.job).col;
+      ctx.fillRect(x-TS*0.2, y-TS*0.2, TS*0.4, TS*0.4);
+    }
+  });
+  // 当たりの星（白と黄の十字が一瞬だけ）
+  W.fx.forEach(f=>{
+    if(f.t!=='linkstar') return;
+    const p=1-f.life/f.max, x=Math.round(f.x*TS-camX), y=Math.round(f.y*TS-camY-TS*0.25);
+    const n=Math.round((2+p*3));
+    ctx.fillStyle = p<0.5 ? '#ffffff' : '#ffe08a';
+    for(let m=-n;m<=n;m++){ ctx.fillRect(x+m*q, y, q, q); ctx.fillRect(x, y+m*q, q, q); }
+    if(p<0.6) for(let m=-Math.floor(n/2);m<=Math.floor(n/2);m++){ ctx.fillRect(x+m*q, y+m*q, q, q); ctx.fillRect(x+m*q, y-m*q, q, q); }
+  });
+  ctx.restore();
+}
+/* 画面側：発動の帯と、弾けた瞬間の白。ビネットの後に描く（揺れに乗せない）。 */
+function drawLinkScreen(){
+  const L=_linkNow;
+  const bf=W.fx.find(f=>f.t==='linkburst');
+  if(bf){ ctx.fillStyle='rgba(255,250,236,'+(0.55*bf.life/bf.max)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
+  if(!L || L.t>0.85) return;
+  const t=L.t, w=innerWidth, h=innerHeight;
+  const inK=clamp(t/0.14,0,1), outK=clamp((t-0.6)/0.25,0,1);
+  const bandH=Math.round(Math.min(64, h*0.09)), y=Math.round(h*0.36);
+  const x0=Math.round(-w + w*inK*(1-0) + w*outK);
+  ctx.save();
+  ctx.globalAlpha = 1-outK;
+  ctx.fillStyle='rgba(12,10,16,.82)'; ctx.fillRect(x0, y, w, bandH);
+  ctx.fillStyle=LINK.col; ctx.fillRect(x0, y, w, 3); ctx.fillRect(x0, y+bandH-3, w, 3);
+  ctx.font='bold '+Math.round(bandH*0.5)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.strokeStyle='#1a1208'; ctx.lineWidth=4; ctx.lineJoin='round';
+  const tx=x0+w/2, ty=y+bandH/2;
+  ctx.strokeText('連携攻撃！', tx, ty); ctx.fillStyle='#fff3cf'; ctx.fillText('連携攻撃！', tx, ty);
+  ctx.restore();
+}
+
 function fireUlt(){
+  if(_linkNow) return false;          // 連携攻撃の最中は他の技を出さない
   const prev=duelCtx; duelCtx={kind:'ult', hit:[]};
   try{ return fireUltCore(); } finally{ duelCtx=prev; }
 }
@@ -10989,6 +11354,7 @@ function tickPotNote(dt){
 /* 精鋭の性質「影の」。こちらの攻撃をたまにすり抜ける。
    当てても通らないことがある相手は、手数で押す戦い方を否定する。 */
 function eliteEvades(e){
+  if(_linkNow) return false;          // 連携攻撃は土煙の中で殴るので、かわす隙が無い
   const v=affOf(e,'evasive');
   if(!v) return false;
   if(rnd()>=v) return false;
@@ -11031,6 +11397,7 @@ function killEnemy(e, byAlly){
     }
   }
   e.dead=true; S.run.kills++;
+  linkGain(e.boss ? LINK.killBoss : e.elite ? LINK.killElite : LINK.kill);
   burstEnemyPixels(e);
   countMossKill(e);                 // 苔玉は層ごとに数える（口座側）
   scheduleRise(e);                  // 亡者は倒しても起き上がる
@@ -12769,7 +13136,7 @@ function touchStart(ev){
   for(const t of ev.changedTouches){
     // HUD のボタン上から始まった指はスティックにもガードにもしない
     // 🐞（#dbgbtn）が抜けていた。押した指がスティックとして握られたまま残る
-    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')) continue;
+    if(t.target && t.target.closest && t.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#linkbtn,#guardbtn,#dbgbtn,#partybar')) continue;
     if(tapHitsNpc(t.clientX, t.clientY)){ openAllyInspect(); continue; }
     { const hitAlly=tapHitsAlly(t.clientX, t.clientY);
       if(hitAlly){ openAllyEquip(hitAlly, 'game'); continue; } }
@@ -12811,7 +13178,7 @@ function touchEnd(ev){
      残さないと「触れているのに動けない」になる。 */
   if(stickId===null){
     const t=[...(ev.touches||[])].find(x=>
-      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#guardbtn,#dbgbtn,#partybar')));
+      !(x.target && x.target.closest && x.target.closest('button,#prompt,#bagbtn,#statbtn,#mapbtn,#ultbtn,#wavebtn,#artbtn,#linkbtn,#guardbtn,#dbgbtn,#partybar')));
     if(t){
       stickId=t.identifier; stickOx=t.clientX; stickOy=t.clientY;
       stickEl.style.display='block';
@@ -12837,6 +13204,13 @@ bindTap(el('ultbtn'), ()=>{ fireUlt(); });
 /* 通常技のボタン。大技と同じ作法で、押した瞬間にその場で完結する。 */
 bindTap(el('wavebtn'), ()=>{ fireWave(); });
 bindTap(el('artbtn'),  ()=>{ firePlayerArt(); });
+/* 連携攻撃。満ちたときにしか出ていないボタンなので、押せば必ず何かが起きる
+   （範囲に敵がいなければ、そう言って値は残す）。 */
+bindTap(el('linkbtn'), ()=>{ fireLink(); });
+/* 面と縁のドットの型は武器技のボタンから写す（同じ大きさの丸）。 */
+{ const ab=el('artbtn'), lb=el('linkbtn');
+  if(ab && lb){ const cs=getComputedStyle(ab);
+    ['--pxdisk','--pxring'].forEach(k=>{ const v=cs.getPropertyValue(k); if(v) lb.style.setProperty(k, v.trim()); }); } }
 
 /* 盾のボタンは「押しているあいだ」構える。bindTap（離したら発火）では
    構えっぱなしにできないので、押下と離しを直に拾う。
@@ -13011,6 +13385,7 @@ function nearForge(){
    保険が二重なのは、詰みだけは絶対に起こしてはいけない事故だからで、
    ここを二度と壊さないための冗長さは安い。 */
 function interact(){
+  if(_linkNow) return;
   if(onStair()){
     if(S.run.bossAlive){ log('ボスを倒すまで進めない'); return; }
     openStairs(); return;
@@ -13505,6 +13880,7 @@ function update(dt){
      （tickBossFormFx の中で W.fx と演出時間だけを送っている） */
   if(tickBossFormFx(dt)) return;
   if(tickDropIn(dt)) return;          // 階に入ったときの落下のあいだは盤面を止める
+  if(tickLink(dt)) return;            // 連携攻撃の演出のあいだも盤面を止める（＝全員無敵）
   updateFeel(dt);
   tickArtRename(dt);      // 閃きの演出が出切ったら名前の窓を開く
   tickFallWatchdog(dt);
@@ -13518,6 +13894,7 @@ function update(dt){
   tickArts(dt);                     // 焦土・聖域などの置き型
   const st=stats(S.hero);
   S.run.elapsed+=dt;
+  linkGain(dt*LINK.perSec);         // 連携値は時間でも溜まる（探索の中だけ）
   tickLight(dt);                    // 灯りが減り、明るさ1の時間を数える
 
   // 主人公の状態異常（火傷・出血の継続ダメージ、凍傷の減速、感電の被ダメ増）
@@ -14391,6 +14768,9 @@ function draw(){
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;
+    /* 連携攻撃の土煙に呑まれている相手は描かない。雲の上に名前・HP帯・予兆の輪が
+       浮くと、「中でボコボコにされている」が読めなくなる。 */
+    if(_linkNow && _linkNow.t>=LINK.cloudIn[0]+0.08 && _linkNow.t<LINK.burst[1] && _linkNow.tg.includes(e)) return;
     // まだ開いていないタイルの上にいる相手は描かない（床と足並みを揃える）
     if(!tileSeen(e.x, e.y)) return;
     /* 暗幕のあいだは、明かりの外にいる相手も見えない。
@@ -15310,6 +15690,7 @@ function draw(){
   if(typeof drawFeelWeaponArts==='function')drawFeelWeaponArts(camX,camY);
   _drawStage='ヒット効果';
   drawFeelHits(camX,camY);
+  drawLinkAttack(camX,camY);          // 連携攻撃の土煙。数字はこの上に出す
   // ダメージ数値
   ctx.font=(TS*0.46)+'px '+FONT; ctx.textAlign='center';
   W.pops.forEach(p=>{
@@ -15334,6 +15715,7 @@ function draw(){
   ctx.restore(); // Camera shake affects the world, never the HUD / minimap.
   drawFeelTiltShift();
   drawFeelVignette();
+  drawLinkScreen();                   // 連携攻撃の名前の帯と、弾けた瞬間の白
   // 控えておいた名前・HP帯・予兆は、ビネットのあとに描く（描いた時のカメラの揺れ込みの位置で）
   if(_uiQ){
     const uq=_uiQ; _uiQ=null;
@@ -16161,6 +16543,14 @@ function updateHUD(){
     hset('artbtn.lbl', artName(ad), v=>ab.setAttribute('aria-label', v));   // 名付けた名前は読み上げ用にだけ持つ
     skillGauge(ab, 'artbtn.gp', P.artCd, P.artCdMax || artCooldown(ad, false));
   }else ab.classList.remove('on');
+
+  /* 連携値のゲージと、満ちたときだけ出る連携ボタン（演出の最中は消す） */
+  const lv=linkVal(), lfull=linkReady();
+  hset('linkfill.w', (lv/LINK.max*100).toFixed(1)+'%', v=>el('linkfill').style.width=v);
+  hset('linkbar.full', lfull, v=>el('linkbar').classList.toggle('full', v));
+  const lbOn = lfull && !_linkNow;
+  hset('linkbtn.on', lbOn, v=>el('linkbtn').classList.toggle('on', v));
+  hset('link-icon.bg', 'link', v=>el('link-icon').style.backgroundImage=skillIconUrl(v));
 
   // 地図のトグル。出ているあいだは縁を光らせる（押したかどうかが読めるように）
   el('mapbtn').classList.toggle('on', !!S.mapOn);
@@ -18400,7 +18790,8 @@ const SKILL_ICON_GRID={
   aegis:["##.##.###.##.##","##.##.###.##.##","###############","###############",".#############.",".#############.",".#############.",".###.#####.###.",".###..###..###.",".###..###..###.",".###..###..###.",".###..###..###.",".###..###..###.","###############","..............."],
   rally:["...............",".###.......###.","#####.....#####","######.#.######","#######.#######","#######.#######","#####.....#####",".######.######.","..#####.#####..","...#########...","....#######....",".....#####.....","......###......",".......#.......","..............."],
   bloom:["...............","..#.........#..",".###.......###.","..#.........#..",".......#.......","..###..#..###..",".#####.#.#####.",".######.######.","..###########..","....##.#.##....",".......#.......",".......#.......","...#########...",".#############.","..............."],
-  wave:["...........#...","............#..",".......#.....#.","........#.....#","...#.....#....#","....#....#....#",".##.#.....#....","####.#....#....",".##.#.....#....","....#....#....#","...#.....#....#","........#.....#",".......#.....#.","............#..","...........#..."]
+  wave:["...........#...","............#..",".......#.....#.","........#.....#","...#.....#....#","....#....#....#",".##.#.....#....","####.#....#....",".##.#.....#....","....#....#....#","...#.....#....#","........#.....#",".......#.....#.","............#..","...........#..."],
+  link:[".............##",".#..##..##..###","###########.##.",".###########...",".############..",".######.#####..",".#####...####..",".###.......###.",".#####...#####.","..#####.#####..","..###########..",".###########...","###..##..##.#..","##.........###.","............#.."]
 };
 const _skillIconUrl={};
 function skillIconUrl(id){

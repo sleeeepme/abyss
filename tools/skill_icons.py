@@ -580,6 +580,23 @@ ICONS['wave']=F('''
 .......#.....#.
 ............#..
 ...........#...''')
+# 連携攻撃：みんなでボコスカ殴る土煙の雲。四隅から拳・足・星が飛び出し、真ん中に当たった瞬間の黒い星
+ICONS['link']=F('''
+.............##
+.#..##..##..###
+###########.##.
+.###########...
+.############..
+.######.#####..
+.#####...####..
+.###.......###.
+.#####...#####.
+..#####.#####..
+..###########..
+.###########...
+###..##..##.#..
+##.........###.
+............#..''')
 
 SYM={'gtquake': 'H', 'gtupper': 'H', 'dgmirage': 'H', 'splance': 'V', 'spdragoon': 'H', 'bwrain': 'H', 'bwrapid': 'V', 'mcdouble': 'H', 'mcshield': 'H', 'stflame': 'H', 'bwburst': 'V', 'sticicle': 'V', 'quake': 'H', 'blaze': 'H', 'ward': 'H', 'ruin': 'H', 'aegis': 'H', 'rally': 'H', 'bloom': 'H', 'wave': 'V'}
 
@@ -592,7 +609,7 @@ for k,s in SYM.items():
 
 
 NAMES={'iai':'居合','swspin':'回転斬り','swmulti':'多段斬り','gtspin':'大回転斬り','gtquake':'地走り','gtupper':'レイジングアッパー',
-'dgslash':'乱斬り','dgdance':'ダンシングソード','dgmirage':'ミラージュ','axtoma':'トマホーク','axspin':'スピンアクス','axspiral':'スパイラルホーク',
+'dgslash':'乱斬り','dgdance':'ダンシングソード','dgmirage':'ミラージュ','axtoma':'トマホーク','axspin':'スピンアクス','axspiral':'スパイラルホーク','link':'連携攻撃',
 'spswing':'スウィング','splance':'ショットランス','spdragoon':'ドラグーン','bwrain':'アローレイン','bwrapid':'連射','bwburst':'バーストショット',
 'mcdouble':'ダブルアタック','mcheal':'癒し打ち','mcshield':'ホーリーシールド','stflame':'フレイム','sticicle':'アイシクルエッジ','stbolt':'ライトニング',
 'quake':'地脈断','blink':'縮地','blaze':'灼髄','ward':'守護','ruin':'裂天','aegis':'鉄壁','rally':'回帰','bloom':'命脈','wave':'衝撃波'}
