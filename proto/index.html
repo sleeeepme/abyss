@@ -9947,12 +9947,13 @@ function linkPose(e){
 /* ---------- 一斉攻撃の絵 ----------
    土煙の雲は q（1ドット）単位で、小さな画用紙に塗ってから拡大して置く
    （ctx.arc の滑らかな円だと、ここだけドット絵から浮く）。
-   雲は7つの小さな膨らみ＋真ん中の大きな膨らみの和で、膨らみは揺れ続ける。
-   縁は暗い線、上半分は明るく、下は影色。 */
+   雲は4つの塊（＋真ん中を埋める塊）の和で、塊は揺れ続ける。
+   縁取りは無し。塊ごとに左上の縁が明るく、右下が影色。 */
 let _linkPad=null;
 /* ---------- 一斉攻撃の煙 ----------
-   煙そのものは最初の形に戻した（ユーザー要望「煙は最初のものは良かったので一度戻して」）：
-   大きな真ん中の塊＋周りの7つの塊を1つの雲にまとめ、暗い縁取り、上は明るく下は影色。
+   煙そのものは最初の形の3色（光・地・影）に戻したうえで、
+   ユーザー要望「煙の塊はアウトラインを消して4個くらいで構成させて」により
+   縁取りを外し、塊を周りの4つ（＋外からは見えない真ん中の埋め）にした。
    周りの飾りは 2026-10-12 の形のまま：縁取りなしの衝撃の棘・星・粒・短い線（拳・足はやめた）。
    見本に寄せた塊ごとの陰影版（a96fe8a）と、網掛けで透かす版（040d077）は履歴に残っている。 */
 function drawLinkCloud(c, camX, camY, t, grow, q){
@@ -9964,20 +9965,26 @@ function drawLinkCloud(c, camX, camY, t, grow, q){
   const pc=_linkPad.getContext('2d');
   const img=pc.createImageData(G,G), d=img.data;
   const rq=R/q;
-  const puffs=[{x:0,y:0,r:rq*0.72}];
-  for(let i=0;i<7;i++){
-    const a=i/7*Math.PI*2 + c.seed + Math.sin(t*3+i)*0.15;
-    puffs.push({x:Math.cos(a)*rq*0.62, y:Math.sin(a)*rq*0.5, r:rq*(0.42+0.07*Math.sin(t*11+i*1.9+c.seed))});
-  }
-  const ins=(x,y)=>{ for(const p of puffs){ const dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return true; } return false; };
+  // 4つの塊：奥に上、真ん中の左右、手前に下。奥から順に並べ、手前の塊が上に重なる。
+  // 塊ごとに陰影を付ける（下側が影、左上が光）ので、縁取りが無くても塊の境目が見える。
+  const fx = c.seed>Math.PI ? -1 : 1;   // 雲ごとに左右を入れ替えて、同じ形が並ばないように
+  const P4=[[0.06,-0.4,0.54],[-0.52,-0.02,0.47],[0.52,-0.06,0.5],[-0.04,0.3,0.52]];
+  const puffs=P4.map(([px,py,pr],i)=>({
+    x:(px+Math.sin(t*3+i*1.7+c.seed)*0.03)*fx*rq,
+    y:(py+Math.cos(t*2.6+i*2.3+c.seed)*0.025)*rq,
+    r:rq*pr*(1+0.06*Math.sin(t*11+i*1.9+c.seed))}));
+  const front=(x,y)=>{ for(let k=puffs.length-1;k>=0;k--){ const p=puffs[k], dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return p; } return null; };
   for(let j=0;j<G;j++) for(let i=0;i<G;i++){
     const x=i-h+0.5, y=j-h+0.5;
-    if(!ins(x,y)) continue;
-    const edge=!ins(x+1,y)||!ins(x-1,y)||!ins(x,y+1)||!ins(x,y-1);
+    const p=front(x,y);
+    if(!p) continue;
+    const lx=(x-p.x)/p.r, ly=(y-p.y)/p.r;
     let col;
-    if(edge) col=[43,39,51];
-    else if(y > rq*0.18) col=[196,188,174];
-    else if(x+y < -rq*0.55) col=[255,251,240];
+    // 影は右下の三日月、光は左上の縁に沿う三日月（平らな切り口だと板のように見え、
+    // 真ん中に丸い光を置くと目玉のように見える）
+    const sx=lx+0.2, sy=ly+0.32, hx=lx+0.52, hy=ly+0.6;
+    if(sx*sx+sy*sy > 0.86*0.86) col=[196,188,174];
+    else if(hx*hx+hy*hy < 0.6*0.6) col=[255,251,240];
     else col=[236,231,220];
     const o=(j*G+i)*4; d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255;
   }
