@@ -9966,30 +9966,43 @@ function linkSpr(spr, x, y, q, col, flip){
   ctx.fillStyle=col;
   for(let j=0;j<hgt;j++) for(let i=0;i<w;i++) if(on(i,j)) ctx.fillRect(X(i), Y(j), q, q);
 }
+/* 雲は 4〜5 個の煙の塊。**縁取りは付けない**（ユーザー要望）。
+   濃さは塊ごとに3段：芯は網掛けで半分抜き、中ほどはべた、外周は薄い網掛け。
+   塊が重なる真ん中も網掛けにして、中で殴り合っている姿（敵・仲間）が透けて見えるようにする。
+   網掛けは 4×4 の Bayer 表で抜く——ドットが市松に並ぶので、ドット絵の中で浮かない。 */
+const LINK_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+function linkPuffs(c, t, rq){
+  const n = 4 + (Math.floor(c.seed*10)%2);          // 4 か 5
+  const out=[];
+  for(let i=0;i<n;i++){
+    const a=i/n*Math.PI*2 + c.seed*1.3 + Math.sin(t*2.2+i*1.7)*0.12;
+    const dist=rq*(0.40+0.06*Math.sin(c.seed*5+i*2.3));
+    const r=rq*(0.46+0.10*Math.sin(c.seed*3+i*1.9) + 0.05*Math.sin(t*9+i*1.3+c.seed));
+    out.push({x:Math.cos(a)*dist, y:Math.sin(a)*dist*0.78, r});
+  }
+  return out;
+}
 function drawLinkCloud(c, camX, camY, t, grow, q){
   const R=c.r*TS*grow;
   if(R<2) return;
-  const G=Math.ceil(R*2.7/q)+2, h=G/2;
+  const G=Math.ceil(R*2.6/q)+2, h=G/2;
   if(!_linkPad) _linkPad=document.createElement('canvas');
   if(_linkPad.width<G || _linkPad.height<G){ _linkPad.width=Math.max(G,_linkPad.width); _linkPad.height=Math.max(G,_linkPad.height); }
   const pc=_linkPad.getContext('2d');
   const img=pc.createImageData(G,G), d=img.data;
   const rq=R/q;
-  const puffs=[{x:0,y:0,r:rq*0.72}];
-  for(let i=0;i<7;i++){
-    const a=i/7*Math.PI*2 + c.seed + Math.sin(t*3+i)*0.15;
-    puffs.push({x:Math.cos(a)*rq*0.62, y:Math.sin(a)*rq*0.5, r:rq*(0.42+0.07*Math.sin(t*11+i*1.9+c.seed))});
-  }
-  const ins=(x,y)=>{ for(const p of puffs){ const dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return true; } return false; };
+  const puffs=linkPuffs(c, t, rq);
+  const HI=[250,246,236], BASE=[228,221,208], SH=[178,168,152];
   for(let j=0;j<G;j++) for(let i=0;i<G;i++){
     const x=i-h+0.5, y=j-h+0.5;
-    if(!ins(x,y)) continue;
-    const edge=!ins(x+1,y)||!ins(x-1,y)||!ins(x,y+1)||!ins(x,y-1);
-    let col;
-    if(edge) col=[43,39,51];
-    else if(y > rq*0.18) col=[196,188,174];
-    else if(x+y < -rq*0.55) col=[255,251,240];
-    else col=[236,231,220];
+    let m=9, mp=null;
+    for(const p of puffs){ const dn=Math.hypot(x-p.x, y-p.y)/p.r; if(dn<m){ m=dn; mp=p; } }
+    if(m>1) continue;
+    const centre = Math.hypot(x, y/0.8) < rq*0.30;
+    const dens = m>0.80 ? 0.35 : (m<0.42 || centre) ? 0.5 : 1;
+    if(LINK_BAYER[j&3][i&3] >= dens*16) continue;
+    const lx=(x-mp.x)/mp.r, ly=(y-mp.y)/mp.r;
+    const col = ly>0.30 ? SH : (lx+ly < -0.55 ? HI : BASE);
     const o=(j*G+i)*4; d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255;
   }
   pc.clearRect(0,0,_linkPad.width,_linkPad.height);
@@ -9999,6 +10012,24 @@ function drawLinkCloud(c, camX, camY, t, grow, q){
   ctx.drawImage(_linkPad, 0,0,G,G, Math.round(cx-h*q), Math.round(cy-h*q), G*q, G*q);
   ctx.restore();
   return {cx, cy, R};
+}
+/* 仲間の絵を置く。本編の仲間と同じ描き方（drawFeelCharacterSprite）を先に試し、
+   だめなら素の絵、それも無ければ描かない（色の四角を出すと、煙の上に謎の箱が浮く）。 */
+function linkPutActor(ac, x, y, size, face, rot){
+  const e = ac.who==='hero' ? P : ac.a;
+  const key = ac.who==='hero' ? CharacterArt.heroKey(S.hero) : CharacterArt.allyKey(ac.a);
+  if(!e || !key) return;
+  const draw = typeof drawFeelCharacterSprite==='function' ? drawFeelCharacterSprite : null;
+  const keep = e._artFace;
+  if(draw && safeFeelDraw(draw,[key,x,y,size,e,face,0,1,1,rot])){ e._artFace=keep; return; }
+  e._artFace=keep;
+  ac.face._artFace = face<0 ? -1 : 1;
+  CharacterArt.put(key, x, y, size, ac.face, 0, 0, 1, 1, rot);
+}
+/* 縁から顔を出している最中か（それ以外の時間は雲の中で殴っている）。 */
+function linkPeeking(t, i){
+  const ph=(t+i*0.061)/0.15;
+  return Math.floor(ph)%5 < 3 && (ph-Math.floor(ph)) < 0.85;
 }
 function drawLinkAttack(camX, camY){
   const L=_linkNow; if(!L) return;
@@ -10010,6 +10041,18 @@ function drawLinkAttack(camX, camY){
   if(grow<=0 || alpha<=0) return;
   ctx.save(); ctx.globalAlpha*=alpha;
   const slot=Math.floor(t/0.07);
+  /* 雲の中の殴り合い。仲間は雲の真ん中あたりで小刻みに位置を変えながら殴る
+     （この上に網掛けの煙が乗るので、半分透けて見える）。縁から顔を出している間は描かない。 */
+  if(t>=LINK.cloudIn[0] && t<b0) L.actors.forEach((ac,i)=>{
+    if(linkPeeking(t,i)) return;
+    const c=L.clouds[ac.cloud]; if(!c) return;
+    const k=Math.floor((t+i*0.037)/0.09);
+    const s1=Math.sin((k+i*17)*12.9898+c.seed)*43758.5453, r1=s1-Math.floor(s1);
+    const s2=Math.sin((k+i*29)*78.233+c.seed)*43758.5453, r2=s2-Math.floor(s2);
+    const R=c.r*TS*grow;
+    const x=Math.round(c.x*TS-camX+(r1-0.5)*R*0.9), y=Math.round(c.y*TS-camY-TS*0.25+(r2-0.5)*R*0.6);
+    linkPutActor(ac, x, y, TS*0.95, (k%2) ? -1 : 1, Math.sin(t*30+i)*0.22);   // 左右に向きを変えながら殴る
+  });
   L.clouds.forEach((c,ci)=>{
     const g=drawLinkCloud(c, camX, camY, t, grow, q);
     if(!g || t>=b0) return;
@@ -10035,19 +10078,13 @@ function drawLinkAttack(camX, camY){
   L.actors.forEach((ac,i)=>{
     if(t<LINK.cloudIn[1] || t>=b0) return;
     const c=L.clouds[ac.cloud]; if(!c) return;
+    if(!linkPeeking(t,i)) return;
     const per=0.15, ph=(t+i*0.061)/per, k=Math.floor(ph);
-    if((ph-k) > 0.85) return;
     const s=Math.sin((k+i*31)*91.7+c.seed)*43758.5453, rr=s-Math.floor(s);
     const a=rr*Math.PI*2, R=c.r*TS*grow;
     const x=Math.round(c.x*TS-camX+Math.cos(a)*R*0.82), y=Math.round(c.y*TS-camY-TS*0.25+Math.sin(a)*R*0.66);
-    const e = ac.who==='hero' ? P : ac.a;
-    const key = ac.who==='hero' ? CharacterArt.heroKey(S.hero) : CharacterArt.allyKey(ac.a);
-    ac.face._artFace = Math.cos(a)>0 ? -1 : 1;     // 雲の中心を向く
     const rot=Math.sin(t*40+i)*0.18;
-    if(!CharacterArt.put(key, x, y, TS*1.1, ac.face, 0, 0, 1, 1, rot)){
-      ctx.fillStyle=ac.who==='hero'?'#ffffff':jobDef(e.job).col;
-      ctx.fillRect(x-TS*0.2, y-TS*0.2, TS*0.4, TS*0.4);
-    }
+    linkPutActor(ac, x, y, TS*1.1, Math.cos(a)>0 ? -1 : 1, rot);   // 雲の中心を向く
   });
   // 当たりの星（白と黄の十字が一瞬だけ）
   W.fx.forEach(f=>{
@@ -14770,7 +14807,9 @@ function draw(){
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;
     /* 連携攻撃の土煙に呑まれている相手は描かない。雲の上に名前・HP帯・予兆の輪が
        浮くと、「中でボコボコにされている」が読めなくなる。 */
-    if(_linkNow && _linkNow.t>=LINK.cloudIn[0]+0.08 && _linkNow.t<LINK.burst[1] && _linkNow.tg.includes(e)) return;
+    /* 煙は網掛けで透けるので、体は描く（中で殴られているのが見える）。
+       名前・HP帯・予兆の輪だけを伏せる。小刻みに揺らして殴られている感じを出す。 */
+    const engulfed = !!(_linkNow && _linkNow.t>=LINK.cloudIn[0]+0.08 && _linkNow.t<LINK.burst[1] && _linkNow.tg.includes(e));
     // まだ開いていないタイルの上にいる相手は描かない（床と足並みを揃える）
     if(!tileSeen(e.x, e.y)) return;
     /* 暗幕のあいだは、明かりの外にいる相手も見えない。
@@ -14825,10 +14864,10 @@ function draw(){
     drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?Math.max(0,e.fade/0.3):1);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
-    if(e.boss && e.cast) uiLater(()=>drawBossCast(e, sx, sy, R));
+    if(e.boss && e.cast && !engulfed) uiLater(()=>drawBossCast(e, sx, sy, R));
     // 予兆リング（攻撃が来る合図）。ボスは出さない——大きい体の中に小さな赤い輪が出るだけで
     // 読めず、「ボスの周りの円」として邪魔になっていた（報告）。ボスの技は drawBossCast が形で予告する。
-    if(e.tele>0 && !e.boss){
+    if(e.tele>0 && !e.boss && !engulfed){
       const p=1-e.tele/e.arch.tele;
       uiLater(()=>{
         ctx.strokeStyle='rgba(255,110,80,'+(0.4+p*0.55)+')'; ctx.lineWidth=2+p*3;
@@ -14880,6 +14919,7 @@ function draw(){
     /* 灯りの外は黒い影だけ。名前・HP帯・印も出さない（何がいるかは近づくまで分からない） */
     if(litSt==='shadow'){ drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody); ctx.globalAlpha=1; return; }
     drawBody();
+    if(engulfed){ ctx.globalAlpha=1; return; }       // 連携攻撃の煙の中：体だけ（名前・HP帯・印は出さない）
     if(!e.dead) drawFeelFlash(e,sx,sy,spr?R*2.6:e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1));
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
     if((e.boss||e.looksBoss) && !e.dead && !spriteDrawn){
