@@ -260,6 +260,18 @@
   .item .nm{font-weight:700;font-size:12px}
   .item .af{color:var(--dim);font-size:12px}
   .item.eq{outline:1px solid #3d7a5c}
+  /* レア度の札：左の帯ではなく、札そのもの（縁と地）をレア度の色にする（2026-10-12 ユーザー要望） */
+  .item.rc{border-width:2px;border-color:color-mix(in srgb,var(--rc) 62%,var(--line));padding-left:10px;
+    background:color-mix(in srgb,var(--rc) 11%,var(--panel))}
+  .item.rc:active{background:color-mix(in srgb,var(--rc) 20%,var(--panel))}
+  .item.rc::after{display:none}
+  .item.rc::before{-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;
+    mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
+  /* 数値のアイコン。16×16 の絵なので 16px で出す（12px に縮めると線が潰れる） */
+  .item .sti{font-size:16px;vertical-align:-4px;margin-right:2px}
+  .item .stl{display:inline-flex;flex-wrap:wrap;gap:2px 9px;align-items:center}
+  .item .nm .sti{margin-right:4px}
+  .item .stl>span{white-space:nowrap}
   .empty{color:var(--dim);font-size:12px;padding:10px 0}
   /* ---------- 一覧の中に置く見出し ----------
      .grid は auto-fill の格子なので、見出しを素の div で入れると
@@ -2782,6 +2794,23 @@ function doRepairAll(h, mid){
   c.list.forEach(it=>{ it.dur = it.durMax; });
   return {ok:true, need:c.need, fixed:c.list.length, names};
 }
+/* 装備の札の数値・属性のアイコン（2026-10-12 ユーザー要望で文字から差し替え）。
+   名前は読み上げ用の aria-label と、長押しで出る title に残す。 */
+const DT_IC={slash:'d_slash', pierce:'d_pierce', blunt:'d_blunt', fire:'fire', shock:'d_shock', frost:'d_frost', arcane:'d_arcane'};
+/* 武器の属性のアイコン（名前の頭に置く）。武器でない物は空 */
+function itemTypeIc(it){
+  if(!it || !it.ident || !it.atk || isConsum(it)) return '';
+  const b=weaponShape(it), d=DTYPE[b.dt]||DTYPE.blunt, stt=d.status&&STATUS[d.status];
+  return stIc(DT_IC[b.dt]||'d_blunt', d.nm+(stt?'（'+stt.nm+'を蓄積）':''));
+}
+function stIc(name, label){ return `<i class="pi sti pi-${name}" role="img" aria-label="${label}" title="${label}"></i>`; }
+/* 耐久をアイコン＋数字で（札の中用）。色の付け方は durLine と同じ */
+function durIcon(it){
+  if(!it.durMax) return '';
+  const p=it.dur/it.durMax;
+  const col = p<=0 ? '#c4433f' : p<0.25 ? '#d97a2b' : p<0.6 ? '#d6b34a' : '#7b8398';
+  return `<span style="color:${col}">${stIc('forge','耐久')}${Math.max(0,it.dur)}/${it.durMax}</span>`;
+}
 function durLine(it){
   if(!it.durMax) return '';
   const p=it.dur/it.durMax;
@@ -2797,15 +2826,18 @@ function affLines(it){
   if(!it.ident) return ['？？？　　街に持ち帰ると鑑定される'];
   const b=weaponShape(it);      // レジェンドの上書き（射程・属性・飛び道具）を含んだ形
   const L=[];
+  /* 2026-10-12 ユーザー要望で情報を削った：
+     属性・攻撃力・速度・射程・防御・耐久はアイコン＋数字。「飛び道具」は使えば分かるので出さない。
+     片手は出さず、両手だけ書く（盾が持てないことに関わるので）。
+     属性は名前の頭にアイコンで出す（itemTypeIc。攻撃力の剣の絵と並べると、刺突の槍と見分けにくかった）。
+     状態異常の蓄積（出血など）は属性で決まる（DTYPE.status）ので、属性のアイコンの名前に含めて、札には書かない。 */
   if(it.atk){
-    const d=DTYPE[b.dt]||DTYPE.blunt;
-    L.push(`<b style="color:${d.col}">${d.nm}</b>　攻撃力 ${it.atk}　速度 ${it.spd.toFixed(2)}`);
-    L.push('射程 '+(b.reach||1.45).toFixed(2)+'　'+(b.hands===2?'両手':'片手')
-           +(b.proj?'　飛び道具':'')
-           +(d.status?`　<span style="color:${STATUS[d.status].col}">${STATUS[d.status].nm}蓄積</span>`:''));
+    L.push(`<span class="stl"><span>${stIc('st_atk','攻撃力')}${it.atk}</span><span>${stIc('st_spd','速度')}${it.spd.toFixed(2)}</span>`
+      +`<span>${stIc('st_reach','射程')}${(b.reach||1.45).toFixed(2)}</span>`
+      +(b.hands===2?'<span>両手</span>':'')+'</span>');
   }
-  if(it.block) L.push('ガード軽減 '+it.block+'%　パリイ受付 '+(b.parry||0.2).toFixed(2)+'秒');
-  if(it.def) L.push('防御力 '+it.def);
+  if(it.block) L.push(`<span class="stl"><span>${stIc('st_guard','ガード軽減')}${it.block}%</span><span>${stIc('swords','パリイ受付')}${(b.parry||0.2).toFixed(2)}秒</span></span>`);
+  if(it.def) L.push(`<span class="stl"><span>${stIc('shield','防御力')}${it.def}</span></span>`);
   it.aff.forEach(a=>{
     // 装飾品の付帯は専用の書き方をする（状態異常や隊の強化は %v では書けない）
     if(a.t==='c'){ L.push(charmAffLine(a)); return; }
@@ -2821,7 +2853,7 @@ function affLines(it){
     L.push(`<span style="color:${RARCOL[LEGEND_RAR]}">★ ${LG.desc}</span>`);
     L.push('<span style="color:var(--dim);font-size:12px">壊れない／死んでも失わない／玉鋼で鍛える</span>');
   }
-  if(it.durMax) L.push(durLine(it));
+  if(it.durMax) L.push(durIcon(it));
   // 潜在は耐久のすぐ下（レジェンドは付帯しないのでここには来ない）
   const pot=potentialOf(it);
   if(pot) L.push(potentialLine(pot));
@@ -12895,9 +12927,9 @@ function renderKeep(){
     .slice().sort((a,b)=>itemValue(b)-itemValue(a))
     .map(it=>{
       const on=_keepSel.has(it.uid);
-      return `<div class="item" data-keep="${it.uid}"
-        style="border-left-color:${RARCOL[it.rar]};${on?'':'opacity:.45'}">
-        <div class="nm" style="color:${RARCOL[it.rar]}">${on?'◆ ':'　'}${itemName(it)}</div>
+      return `<div class="item rc" data-keep="${it.uid}"
+        style="--rc:${RARCOL[it.rar]};${on?'':'opacity:.45'}">
+        <div class="nm" style="color:${RARCOL[it.rar]}">${on?'◆ ':'　'}${itemTypeIc(it)}${itemName(it)}</div>
         <div class="af">${SLOTNM[it.slot]} ・ ${itemSubLine(it)}</div>
         <div class="af">${affLines(it).join('<br>')}</div>
         <div class="af" style="color:${on?'#7fe0c0':'#d6b34a'}">
@@ -13493,8 +13525,8 @@ function renderMerchant(){
         }
         const col=isConsum(it) ? ((consumDef(it.consum)||{}).col||'#7fe0c0') : RARCOL[it.rar];
         const afford=g>=it.price;
-        return `<div class="item" data-mbuy="${it.uid}" style="border-left-color:${col};opacity:${afford?1:0.5}">
-          <div class="nm" style="color:${col}">${itemName(it)}</div>
+        return `<div class="item rc" data-mbuy="${it.uid}" style="--rc:${col};opacity:${afford?1:0.5}">
+          <div class="nm" style="color:${col}">${itemTypeIc(it)}${itemName(it)}</div>
           <div class="af">${itemSubLine(it)}</div>
           <div class="af">${affLines(it).join('<br>')}</div>
           <div class="af" style="color:${afford?'#d6b34a':'#e0705a'}">${it.price} G</div>
@@ -17074,10 +17106,10 @@ function itemHTML(it, showEq, opt){
   const col = isConsum(it) ? ((consumDef(it.consum)||{}).col || '#7fe0c0') : RARCOL[it.rar];
   const eqd = showEq && S.hero && S.hero.equip[it.slot]===it;
   const locked = opt.lockUnident && !it.ident;
-  return '<div class="item'+(eqd?' eq':'')+(locked?' locked':'')+'" data-uid="'+it.uid+'" '+
-    'style="border-left-color:'+col+'">'+
-    '<div class="nm" style="color:'+col+'">'+itemName(it)+'</div>'+
-    '<div class="af">'+itemSubLine(it)+(eqd?' ・装備中':'')+(locked?' ・装備不可':'')+'</div>'+
+  return '<div class="item rc'+(eqd?' eq':'')+(locked?' locked':'')+'" data-uid="'+it.uid+'" '+
+    'style="--rc:'+col+'">'+
+    '<div class="nm" style="color:'+col+'">'+itemTypeIc(it)+itemName(it)+'</div>'+
+    '<div class="af">'+itemSubLine(it)+(locked?' ・装備不可':'')+'</div>'+
     '<div class="af">'+affLines(it).join('<br>')+'</div>'+
     (opt.compare ? compareHTML(it) : '')+'</div>';
 }
@@ -17092,10 +17124,10 @@ function compareHTML(it){
   const after=stats(S.hero);
   S.hero.equip[it.slot]=backup;
   const rows=[
-    ['攻撃', Math.round(after.atk)-Math.round(before.atk)],
-    ['防御', Math.round(after.def)-Math.round(before.def)],
-    ['HP',   after.maxHp-before.maxHp],
-    ['攻速', +(after.aspd-before.aspd).toFixed(2)],
+    [stIc('st_atk','攻撃'), Math.round(after.atk)-Math.round(before.atk)],
+    [stIc('shield','防御'), Math.round(after.def)-Math.round(before.def)],
+    ['HP ',  after.maxHp-before.maxHp],
+    [stIc('st_spd','攻速'), +(after.aspd-before.aspd).toFixed(2)],
   ].filter(r=>r[1]!==0);
   if(!rows.length) return '<div class="af" style="color:#7b8398">増減なし</div>';
   /* **上がる値だけ太字にする。** 色（緑／赤）だけだと、
@@ -17103,8 +17135,8 @@ function compareHTML(it){
      太さが付くと、得の側が先に目に入る。下がる値は太らせない——
      両方太いと、また探すことになる。 */
   return '<div class="af">'+rows.map(([k,v])=>
-    v>0 ? `<span style="color:#4a9d6e">${k} <b>+${v}</b></span>`
-        : `<span style="color:#c4433f">${k} ${v}</span>`).join('　')+'</div>';
+    v>0 ? `<span style="color:#4a9d6e">${k}<b>+${v}</b></span>`
+        : `<span style="color:#c4433f">${k}${v}</span>`).join('　')+'</div>';
 }
 /* 店の品揃え。到達最深度に応じて質が上がる＝潜るほど買える物が良くなる */
 function rerollShop(){
@@ -17571,8 +17603,8 @@ bindRowTap(el('scr-mem'), '[data-mem]', t=>{
 });
 function shopHTML(it){
   const col=RARCOL[it.rar], afford=S.gold>=it.price;
-  return `<div class="item" data-buy="${it.uid}" style="border-left-color:${col};opacity:${afford?1:0.5}">
-    <div class="nm" style="color:${col}">${itemName(it)}</div>
+  return `<div class="item rc" data-buy="${it.uid}" style="--rc:${col};opacity:${afford?1:0.5}">
+    <div class="nm" style="color:${col}">${itemTypeIc(it)}${itemName(it)}</div>
     <div class="af">${itemSubLine(it)}</div>
     <div class="af">${affLines(it).join('<br>')}</div>
     <div class="af" style="color:${afford?'#d6b34a':'#5c6479'};font-weight:700">${it.price} G</div>
@@ -18339,8 +18371,8 @@ function renderAllyEquip(){
     }).join('　');
   };
   el('ae-worn').innerHTML = worn.length
-    ? worn.map(it=>`<div class="item" data-aeoff="${it.uid}" style="border-left-color:${RARCOL[it.rar]}">
-        <div class="nm" style="color:${RARCOL[it.rar]}">${itemName(it)}</div>
+    ? worn.map(it=>`<div class="item rc" data-aeoff="${it.uid}" style="--rc:${RARCOL[it.rar]}">
+        <div class="nm" style="color:${RARCOL[it.rar]}">${itemTypeIc(it)}${itemName(it)}</div>
         <div class="af">${SLOTNM[it.slot]} ・ ${itemSubLine(it)}</div>
         <div class="af">${affLines(it).join('<br>')}</div>
         <div class="af aediff">${aeOffDiff(it)}</div></div>`).join('')
@@ -18379,8 +18411,8 @@ function renderAllyEquip(){
   el('ae-note').innerHTML = `武器は<b>${(BASES.find(b=>b.id===j.weapon)||{}).nm}</b>のみ。防具と装飾品は自由。`
     + '<span style="color:var(--dim)">　未鑑定・破損した物は渡せない</span>';
   el('ae-src').innerHTML = src.length
-    ? src.map(it=>`<div class="item" data-aeon="${it.uid}" style="border-left-color:${RARCOL[it.rar]}">
-        <div class="nm" style="color:${RARCOL[it.rar]}">${itemName(it)}</div>
+    ? src.map(it=>`<div class="item rc" data-aeon="${it.uid}" style="--rc:${RARCOL[it.rar]}">
+        <div class="nm" style="color:${RARCOL[it.rar]}">${itemTypeIc(it)}${itemName(it)}</div>
         <div class="af">${SLOTNM[it.slot]} ・ ${itemSubLine(it)}</div>
         <div class="af">${affLines(it).join('<br>')}</div>
         <div class="af aediff">${aeDiff(it)}</div></div>`).join('')
@@ -18662,9 +18694,9 @@ function repairables(){
 function repairAllCost(){ return repairables().reduce((a,it)=>a+repairCost(it),0); }
 function repairHTML(it){
   const col=RARCOL[it.rar], cost=repairCost(it), afford=S.gold>=cost;
-  return `<div class="item" data-fix="${it.uid}" style="border-left-color:${col};opacity:${afford?1:0.5}">
+  return `<div class="item rc" data-fix="${it.uid}" style="--rc:${col};opacity:${afford?1:0.5}">
     <div class="nm" style="color:${col}">${itemName(it)}</div>
-    <div class="af">${durLine(it)}</div>
+    <div class="af">${durIcon(it)}</div>
     <div class="af" style="color:${afford?'#d6b34a':'#5c6479'};font-weight:700">修理 ${cost} G</div>
   </div>`;
 }
