@@ -249,4 +249,33 @@ R.dbgAddAllyCloses = await pg.evaluate(()=>{
   return {openedFirst, closedAfter, ok: openedFirst && closedAfter};
 });
 
+// 眷属はボタン1回につき1体。通常の更新で実体が生まれ、上限で止まる。
+R.dbgKin = await pg.evaluate(()=>{
+  TH.run(1,{seed:9}); S.hero.boons=[]; S.hero.equip.weapon=null;
+  W.enemies=[];
+  const tap=()=>el('dbg-kin').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  openDebug(); tap(); stepSim(0.1);
+  const one=kinCount(S.hero)===1 && S.hero.kins.length===1;
+  const closed=!el('m-debug').classList.contains('on');
+  for(let i=0;i<KIN_MAX+1;i++) tap();
+  stepSim(0.1);
+  const capped=kinCount(S.hero)===KIN_MAX && S.hero.kins.length===KIN_MAX && S.hero.boons.length===KIN_MAX;
+  return {one,closed,capped,ok:one && closed && capped};
+});
+// 武器由来の眷属も上限に含める。冒険者がいない場合も安全に終了する。
+R.dbgKinWeaponCap = await pg.evaluate(()=>{
+  S.hero.boons=[];
+  const weapon=LEGENDS.find(l=>l.kin);
+  S.hero.equip.weapon=makeLegend(weapon.id);
+  const initial=kinCount(S.hero);
+  for(let i=0;i<KIN_MAX+1;i++) el('dbg-kin').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  const capped=kinCount(S.hero)===KIN_MAX && S.hero.boons.length===KIN_MAX-initial;
+  const hero=S.hero;
+  try{
+    S.hero=null;
+    el('dbg-kin').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  }finally{ S.hero=hero; }
+  return {initial,capped,ok:initial>0 && capped};
+});
+
 await done(b, errs, R);

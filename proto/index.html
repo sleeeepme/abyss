@@ -1209,6 +1209,10 @@
     <button class="sw ghost" id="dbg-blade">実行</button>
   </div>
   <div class="row">
+    <div><b>眷属を +1体</b><s>主人公に眷属の恩寵を付与する（最大3体）</s></div>
+    <button class="sw ghost" id="dbg-kin">実行</button>
+  </div>
+  <div class="row">
     <div><b>レジェンド武器を全開放</b><s>24本すべてを倉庫の専用棚へ。玉鋼も999個入れる</s></div>
     <button class="sw ghost" id="dbg-legend">実行</button>
   </div>
@@ -20854,6 +20858,14 @@ bindTap(el('dbg-blade'), ()=>{
   if(bladeCount() >= BLADE_MAX){ log('<i class="pi pi-bug"></i> 鞘無しは上限（'+BLADE_MAX+'本）'); return; }
   S.hero.boons.push({id:'orbit', rar:'common'});
   log('<i class="pi pi-bug"></i> 鞘無し '+bladeCount()+' 本');
+  el('m-debug').classList.remove('on'); last=performance.now();
+});
+bindTap(el('dbg-kin'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  if(kinCount(S.hero) >= KIN_MAX){ log('<i class="pi pi-bug"></i> 眷属は上限（'+KIN_MAX+'体）'); return; }
+  S.hero.boons.push({id:'kin', rar:'common'});
+  log('<i class="pi pi-bug"></i> 眷属 '+kinCount(S.hero)+' 体');
+  updateHUD();
   el('m-debug').classList.remove('on'); last=performance.now();
 });
 /* 24本を一度に並べる。1%を引き当てるまで潜らないと、
