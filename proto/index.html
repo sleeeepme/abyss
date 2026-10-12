@@ -9950,61 +9950,35 @@ function linkPose(e){
    雲は7つの小さな膨らみ＋真ん中の大きな膨らみの和で、膨らみは揺れ続ける。
    縁は暗い線、上半分は明るく、下は影色。 */
 let _linkPad=null;
-/* ---------- 一斉攻撃の煙（2026-10-12 描き直し） ----------
-   ユーザー要望：煙にも周りの飾りにも**縁取りを付けない**。拳・足（茶色）は何か分からないのでやめる。
-   陰影は見本（もこもこの雲のドット絵／ケンカ雲のイラスト）のように、
-   **塊ごとに丸く**付ける：左上が白く、右下へ向かって青みの灰色で沈む。
-   手前の塊（下にある塊ほど手前）の縁の外側には、奥の塊に落ちる影を細く入れて、
-   塊と塊の境目を線ではなく陰影で見せる。
-   周りには見本2のように、**尖った衝撃の棘**・星・小さな丸・短い線を出す。どれも縁取りなし。 */
-const LINK_SMOKE = {hi:[251,252,252], l1:[228,237,239], l2:[200,214,219], l3:[163,180,191]};
-function linkPuffs(c, t, rq){
-  const n = 4 + (Math.floor(c.seed*10)%2);          // 4 か 5
-  const out=[];
-  for(let i=0;i<n;i++){
-    const a=i/n*Math.PI*2 + c.seed*1.3 + Math.sin(t*2.2+i*1.7)*0.10;
-    const dist=rq*(0.40+0.06*Math.sin(c.seed*5+i*2.3));
-    const r=rq*(0.47+0.10*Math.sin(c.seed*3+i*1.9) + 0.04*Math.sin(t*9+i*1.3+c.seed));
-    out.push({x:Math.cos(a)*dist, y:Math.sin(a)*dist*0.78, r});
-  }
-  out.push({x:0, y:rq*0.05, r:rq*0.5});              // 真ん中を埋める塊（穴が空いて見えないように）
-  // 離れて漂う小さな塊（見本1の左上の粒）。外へゆっくり流れる
-  const drift = 1 + 0.15*((t*0.8)%1);
-  out.push({x:Math.cos(c.seed*4)*rq*1.05*drift, y:Math.sin(c.seed*4)*rq*0.85*drift, r:rq*0.17, tiny:true});
-  // 下にある塊ほど手前（奥から順に並べておく）
-  out.sort((p,q)=>(p.y+p.r*0.3)-(q.y+q.r*0.3));
-  return out;
-}
+/* ---------- 一斉攻撃の煙 ----------
+   煙そのものは最初の形に戻した（ユーザー要望「煙は最初のものは良かったので一度戻して」）：
+   大きな真ん中の塊＋周りの7つの塊を1つの雲にまとめ、暗い縁取り、上は明るく下は影色。
+   周りの飾りは 2026-10-12 の形のまま：縁取りなしの衝撃の棘・星・粒・短い線（拳・足はやめた）。
+   見本に寄せた塊ごとの陰影版（a96fe8a）と、網掛けで透かす版（040d077）は履歴に残っている。 */
 function drawLinkCloud(c, camX, camY, t, grow, q){
   const R=c.r*TS*grow;
   if(R<2) return;
-  const G=Math.ceil(R*2.9/q)+2, h=G/2;
+  const G=Math.ceil(R*2.7/q)+2, h=G/2;
   if(!_linkPad) _linkPad=document.createElement('canvas');
   if(_linkPad.width<G || _linkPad.height<G){ _linkPad.width=Math.max(G,_linkPad.width); _linkPad.height=Math.max(G,_linkPad.height); }
   const pc=_linkPad.getContext('2d');
   const img=pc.createImageData(G,G), d=img.data;
   const rq=R/q;
-  const puffs=linkPuffs(c, t, rq);
-  const K=LINK_SMOKE;
+  const puffs=[{x:0,y:0,r:rq*0.72}];
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2 + c.seed + Math.sin(t*3+i)*0.15;
+    puffs.push({x:Math.cos(a)*rq*0.62, y:Math.sin(a)*rq*0.5, r:rq*(0.42+0.07*Math.sin(t*11+i*1.9+c.seed))});
+  }
+  const ins=(x,y)=>{ for(const p of puffs){ const dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return true; } return false; };
   for(let j=0;j<G;j++) for(let i=0;i<G;i++){
     const x=i-h+0.5, y=j-h+0.5;
-    // 手前から探して、最初に入った塊がこの点の持ち主
-    let k=-1;
-    for(let n=puffs.length-1;n>=0;n--){ const p=puffs[n]; if(Math.hypot(x-p.x,y-p.y)<=p.r){ k=n; break; } }
-    if(k<0) continue;
-    const p=puffs[k];
-    const lx=(x-p.x)/p.r, ly=(y-p.y)/p.r, dn=Math.hypot(lx,ly);
-    // 光は左上から。右下へ向かうほど沈む。外周の右下側はいちばん暗い
-    const v = lx*0.55 + ly*0.85;
-    let col = v < -0.38 ? K.hi : v < 0.22 ? K.l1 : v < 0.62 ? K.l2 : K.l3;
-    if(dn>0.86 && v>0.05) col=K.l3;
-    else if(dn>0.86 && v>-0.4 && col===K.hi) col=K.l1;
-    // 手前の塊の縁のすぐ外（奥の塊の上）に落ちる影
-    for(let n=k+1;n<puffs.length;n++){
-      const f=puffs[n]; if(f.tiny) continue;
-      const dd=Math.hypot(x-f.x,y-f.y)-f.r;
-      if(dd>0 && dd<1.6 && (y-f.y) < f.r*0.2){ col = col===K.hi ? K.l1 : col===K.l1 ? K.l2 : K.l3; break; }
-    }
+    if(!ins(x,y)) continue;
+    const edge=!ins(x+1,y)||!ins(x-1,y)||!ins(x,y+1)||!ins(x,y-1);
+    let col;
+    if(edge) col=[43,39,51];
+    else if(y > rq*0.18) col=[196,188,174];
+    else if(x+y < -rq*0.55) col=[255,251,240];
+    else col=[236,231,220];
     const o=(j*G+i)*4; d[o]=col[0]; d[o+1]=col[1]; d[o+2]=col[2]; d[o+3]=255;
   }
   pc.clearRect(0,0,_linkPad.width,_linkPad.height);
@@ -18847,7 +18821,7 @@ const SKILL_ICON_GRID={
   rally:["...............",".###.......###.","#####.....#####","######.#.######","#######.#######","#######.#######","#####.....#####",".######.######.","..#####.#####..","...#########...","....#######....",".....#####.....","......###......",".......#.......","..............."],
   bloom:["...............","..#.........#..",".###.......###.","..#.........#..",".......#.......","..###..#..###..",".#####.#.#####.",".######.######.","..###########..","....##.#.##....",".......#.......",".......#.......","...#########...",".#############.","..............."],
   wave:["...........#...","............#..",".......#.....#.","........#.....#","...#.....#....#","....#....#....#",".##.#.....#....","####.#....#....",".##.#.....#....","....#....#....#","...#.....#....#","........#.....#",".......#.....#.","............#..","...........#..."],
-  link:[".......#.......","#.....###......",".#.....#......#","..#..........#.","...#.##..##.#..","....####.###...","...##########..","...##########.#","..############.","...##########..","...#########...","...####.###.#..","..#..........#.",".#.....#......#","......###......"]
+  link:[".......#.......",".#.....#.....#.","..#....#....#..","...............","......###......","....#######....","...#########...","##.#########.##","...#########...","...#########...","....##.#.##....","...............","..#....#....#..",".#.....#.....#.",".......#......."]
 };
 const _skillIconUrl={};
 function skillIconUrl(id){
