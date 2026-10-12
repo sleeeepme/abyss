@@ -74,6 +74,8 @@ try{
   await page.evaluate(()=>adCallbacks.adError({code:'adsDisabledBasicLaunch'}));
   await page.waitForFunction(()=>!ABYSS_ADS.busy);
   assert.equal(await page.locator('#st-heal').evaluate(n=>getComputedStyle(n).display),'none');
+  await page.evaluate(()=>{S.gachaFree=0;renderGacha();});
+  assert.equal(await page.locator('#btn-gacha').evaluate(n=>getComputedStyle(n).display),'none');
   await page.evaluate(()=>{S.gachaFree=1;renderGacha();});
   assert.equal(await page.locator('#btn-gacha').evaluate(n=>getComputedStyle(n).display!=='none'),true);
   await page.close();

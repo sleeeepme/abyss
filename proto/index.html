@@ -19046,13 +19046,13 @@ function renderGacha(){
       ? '<div class="row"><span class="k">次の帯</span><span>第 '+next.min+' 階層まで潜れば「'+next.nm+'」</span></div>'
       : '<div class="row"><span class="k">次の帯</span><span>最高帯に到達している</span></div>')+
     '<div class="row"><span class="k">補充</span><span>アビスに潜るとリセット</span></div>';
-  syncCrazyAdAvailability();
   const btn=el('btn-gacha');
   const free=(S.gachaFree||0)>0;
   btn.textContent = S.gachaLeft<=0 ? '今日はもう引けない（明日また5回）'
                   : free ? '引く（今日の無料ぶん）'
                   : '広告を見て引く';
   btn.className = S.gachaLeft>0 ? 'primary' : 'ghost';
+  syncCrazyAdAvailability();
   el('carry').innerHTML = S.carry.length? S.carry.map(carryHTML).join('')
     : '<div class="empty">まだ何もない</div>';
 }
@@ -19090,6 +19090,16 @@ function syncCrazyAdAvailability(){
 addEventListener('abyss-ad-state',syncCrazyAdAvailability);
 const cgAdStyle=document.createElement('style');
 cgAdStyle.textContent='.cg-ad-unavailable{display:none!important}';document.head.append(cgAdStyle);
+function adFailureMessage(){
+  const info=window.ABYSS_CRAZYGAMES?.inspect();
+  if(ABYSS_ADS.providerName==='none') return 'このページでは広告がまだ接続されていません。回数は消費していません';
+  if(info?.state==='disabled') return 'この公開先では広告を配信できません。回数は消費していません';
+  if(info?.state==='basic') return '試験公開中は広告を利用できません。回数は消費していません';
+  if(info?.failure==='adblock') return '広告がブロックされています。回数は消費していません';
+  if(info?.failure==='unfilled') return '現在、再生できる広告がありません。回数は消費していません';
+  if(info?.failure==='initialization') return '広告の読み込みに失敗しました。通信状況を確認して再読み込みしてください。回数は消費していません';
+  return '広告を再生できませんでした。回数は消費していません';
+}
 function openAd(onDone, placement='gacha'){
   if(_adSession || ABYSS_ADS.busy || window.ABYSS_CRAZYGAMES?.blocked) return;
   if(!onDone && refreshGacha()<=0) return;
@@ -19114,7 +19124,7 @@ function openAd(onDone, placement='gacha'){
     if(rewarded){ done(); return; }
     if(valid && result.status!=='cancelled'){
       const notice=el('ad-notice');
-      notice.textContent='広告を再生できませんでした。回数は消費していません';
+      notice.textContent=adFailureMessage();
       notice.hidden=false;
       _adNoticeTimer=setTimeout(()=>{notice.hidden=true;},5000);
     }

@@ -75,6 +75,11 @@ localhost の公式SDKは5秒の「A rewarded ad would appear here」表示で�
 実動画や収益は発生しない。無料ガチャ枠が残っている場合、最初の1回は広告を通らない。
 URLに指定しなければ、従来のオフライン用ダミーを維持する。
 スマホなど別IPのローカル確認は `?ads=crazygames&useLocalSdk=true` で公式SDKのlocal環境を明示できる。
+GitHub Pagesでの試遊も同じ指定が必要。`?ads=crazygames` だけではSDKの環境が disabled になる。
+確認用URL： https://sleeeepme.github.io/abyss/proto/index.html?ads=crazygames&useLocalSdk=true
+2026-10-09、この公開URLで公式local表示→ガチャ結果→回数1回消費を新規ブラウザで確認した。
+同じオリジン・パスのクエリ変更なので保存先は変わらない。本番のCrazyGames提出URLには useLocalSdk=true を付けない。
+
 
 - SDK完了通知 `adFinished` のみ報酬に変換。`requestAd()` 自体のPromise解決では付与しない。
 - `unfilled` / `adblock` / `adCooldown` は広告利用不可として復帰。
