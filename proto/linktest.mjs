@@ -1,5 +1,5 @@
-/* 連携攻撃（連携値）の回帰テスト。
-   ・時間と攻撃で溜まる（撃破でも）。連携攻撃そのものの当たりでは溜まらない
+/* 一斉攻撃（連携値）の回帰テスト。
+   ・時間と攻撃で溜まる（撃破でも）。一斉攻撃そのものの当たりでは溜まらない
    ・満ちたときだけボタンが出る。押すと0に戻り、ボタンも消える
    ・弓の届く範囲の敵全員に当たり、範囲の外には当たらない
    ・演出のあいだは無敵（盤面が止まる）
@@ -73,7 +73,7 @@ R.fire = await pg.evaluate(()=>{
   const ended = !_linkNow;
   const hitAll = es.every(e=>e.hp < 1e6);
   const farUntouched = far ? far.hp===1e6 : true;
-  // 連携攻撃そのものの当たりでは溜まらない（終わった直後は時間ぶんしか無い）
+  // 一斉攻撃そのものの当たりでは溜まらない（終わった直後は時間ぶんしか無い）
   const noSelfCharge = S.hero.link < 0.5;
   return {fired, inRange, resetToZero, btnGone, midRunning, unhurtMid, ended, hitAll, farUntouched, noSelfCharge,
           rangeIsBow: Math.abs(R0 - BASES.find(x=>x.id==='bow').reach) < 1e-9};
