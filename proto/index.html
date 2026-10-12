@@ -8450,6 +8450,7 @@ function rememberFloor(){
 function enterFloor(depth, opt){
   opt = opt || {};
   _linkNow = null;                    // 一斉攻撃の演出は階をまたがない
+  _linkCombo = null;
   rememberFloor();                    // 離れる階の記憶を先に控える（上の注記）
   const lseed = layoutSeed(depth);
   RNG = mulberry32(lseed);
@@ -9778,6 +9779,10 @@ function ultPartyArt(id, r, src){
 /* 演出の状態は W ではなくここに置く。W は探索の途中保存でまるごと文字列にされるので、
    敵や仲間への参照を抱えた物を入れると、読み戻したときに別物の写しを殴り続ける。 */
 let _linkNow = null;
+/* 「◯HIT！」の表示。一斉攻撃の演出（_linkNow）が終わったあとも残るので、別に持つ。
+   t は発動からの秒数。合計ダメージの数字が消えるころ（LINK.comboAt）に、
+   メッセージ欄のあたり（#log の位置）へ大きく出す。 */
+let _linkCombo = null;
 const LINK = {
   max: 100,
   perSec: 100/600,        // 時間だけで10分
@@ -9788,6 +9793,7 @@ const LINK = {
   heroHits: 4, allyHits: 3,
   mult: 1.6,              // 1ヒットの倍率（主人公は hitEnemy、仲間は hitEnemyByAlly にそのまま渡す）
   after: 0.6,             // 降りたあとに残す無敵（秒）
+  comboAt: 3.3, comboFor: 1.3,   // 「◯HIT！」を出す時刻（発動から。合計ダメージは 2.0 秒に出て 1.3 秒で消える）と長さ
   col: '#ffc24a',
   // 画面の揺れ（px）。殴っている間はずっと小さく揺らし、1発ごとに強く、弾けたときに最も強く
   shakeRumble: 1.6, shakeHit: 3.2, shakeBurst: 7,
@@ -9863,7 +9869,8 @@ function fireLink(){
   P.guard=false;
   _linkNow = {t:0, tg, actors, hits, done:0, clouds, burstDone:false, sum:new Map(), later:[]};
   sayArt(P.x, P.y, '一斉攻撃', LINK.col);
-  log('<span style="color:'+LINK.col+'">一斉攻撃！</span> '+actors.length+'人で'+N+'ヒット');
+  // 「◯人で◯ヒット」の文は出さない。ヒット数は、合計ダメージが出終わってから「◯HIT！」で見せる
+  _linkCombo = {n:N, t:0};
   if(typeof feelKick==='function') feelKick(2.2, 0.16);
   updateHUD();
   return true;
@@ -9897,6 +9904,33 @@ function doLinkHit(h){
   if(typeof feelKick==='function') feelKick(LINK.shakeHit, 0.1);
 }
 /* update() の頭で呼ぶ。演出の最中は true を返し、盤面（敵・弾・自分）を止める。 */
+function tickLinkCombo(dt){
+  if(!_linkCombo) return;
+  _linkCombo.t += dt;
+  if(_linkCombo.t > LINK.comboAt + LINK.comboFor) _linkCombo = null;
+}
+/* 「◯HIT！」。メッセージ欄（#log）のすぐ上の中央に、ぽんと大きくなって出て、最後に薄れる。 */
+function drawLinkCombo(){
+  const C=_linkCombo; if(!C) return;
+  const k=C.t-LINK.comboAt;
+  if(k<0 || k>LINK.comboFor) return;
+  const w=innerWidth, h=innerHeight;
+  const size = Math.round(Math.min(34, w*0.085));
+  // メッセージ欄のすぐ上に出す（欄の文字と重ねない。欄が空なら欄のあった所）
+  const lg=el('log'), r=lg && lg.getBoundingClientRect();
+  const y = r && r.bottom>0 ? Math.min(r.top, r.bottom-18) - size*0.55 : h-190;
+  const pop = k<0.1 ? 1.7-0.7*(k/0.1) : k<0.18 ? 1-0.08*Math.sin((k-0.1)/0.08*Math.PI) : 1;
+  const fade = clamp((LINK.comboFor-k)/0.3, 0, 1);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  ctx.translate(Math.round(w/2), Math.round(y)); ctx.scale(pop, pop);
+  ctx.font='bold '+size+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineJoin='round'; ctx.strokeStyle='#1a1208'; ctx.lineWidth=6;
+  const txt=C.n+'HIT！';
+  ctx.strokeText(txt, 0, 0);
+  ctx.fillStyle='#ffd86a'; ctx.fillText(txt, 0, 0);
+  ctx.restore();
+}
 function tickLink(dt){
   const L=_linkNow; if(!L) return false;
   L.t += dt;
@@ -10156,6 +10190,7 @@ function drawLinkSpeedLines(t){
   ctx.restore();
 }
 function drawLinkScreen(){
+  drawLinkCombo();
   const L=_linkNow;
   const bf=W.fx.find(f=>f.t==='linkburst');
   if(bf){ ctx.fillStyle='rgba(255,250,236,'+(0.55*bf.life/bf.max)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
@@ -13975,6 +14010,7 @@ function update(dt){
      （tickBossFormFx の中で W.fx と演出時間だけを送っている） */
   if(tickBossFormFx(dt)) return;
   if(tickDropIn(dt)) return;          // 階に入ったときの落下のあいだは盤面を止める
+  tickLinkCombo(dt);                  // 「◯HIT！」は演出が終わったあとも時計を進める
   if(tickLink(dt)) return;            // 一斉攻撃の演出のあいだも盤面を止める（＝全員無敵）
   updateFeel(dt);
   tickArtRename(dt);      // 閃きの演出が出切ったら名前の窓を開く
