@@ -9789,6 +9789,9 @@ const LINK = {
   mult: 1.6,              // 1ヒットの倍率（主人公は hitEnemy、仲間は hitEnemyByAlly にそのまま渡す）
   after: 0.6,             // 降りたあとに残す無敵（秒）
   col: '#ffc24a',
+  // 画面の揺れ（px）。殴っている間はずっと小さく揺らし、1発ごとに強く、弾けたときに最も強く
+  shakeRumble: 1.6, shakeHit: 3.2, shakeBurst: 7,
+  lines: [0.35, 2.3],     // 画面端の効果線を出す時間（秒）
 };
 function linkRange(){
   const b=BASES.find(x=>x.id==='bow');
@@ -9891,7 +9894,7 @@ function doLinkHit(h){
   const c=L.clouds[h.ac.cloud] || L.clouds[0];
   const ang=rnd()*Math.PI*2, rr=c.r*(0.35+rnd()*0.55);
   W.fx.push({t:'linkstar', x:c.x+Math.cos(ang)*rr, y:c.y+Math.sin(ang)*rr*0.8, life:0.22, max:0.22});
-  if(typeof feelKick==='function') feelKick(1.0, 0.06);
+  if(typeof feelKick==='function') feelKick(LINK.shakeHit, 0.1);
 }
 /* update() の頭で呼ぶ。演出の最中は true を返し、盤面（敵・弾・自分）を止める。 */
 function tickLink(dt){
@@ -9910,8 +9913,10 @@ function tickLink(dt){
     L.later.forEach((p,i)=>{ p.delay=(p.delay||0)+0.35+i*0.05; W.pops.push(p); });
     L.later=[];
     L.clouds.forEach(c=>{ if(typeof feelSpray==='function') feelSpray(c.x, c.y, '#efe9de', 16, 1.4, 'dust'); });
-    if(typeof feelKick==='function') feelKick(2.6, 0.18);
+    if(typeof feelKick==='function') feelKick(LINK.shakeBurst, 0.34);
   }
+  // 殴っている間は画面をずっと小さく揺らす（1発ごとの強い揺れは doLinkHit で）
+  if(L.t>=LINK.hitFrom && L.t<LINK.burst[0] && typeof feelKick==='function') feelKick(LINK.shakeRumble, 0.08);
   W.fx = W.fx.filter(x=>{ x.life-=dt; return x.life>0; });
   W.pops.forEach(p=>{ if(p.delay>0) p.delay-=dt; else p.life-=dt; });
   W.pops = W.pops.filter(p=>p.life>0);
@@ -10118,10 +10123,43 @@ function drawLinkAttack(camX, camY){
   ctx.restore();
 }
 /* 画面側：発動の帯と、弾けた瞬間の白。ビネットの後に描く（揺れに乗せない）。 */
+/* 画面端の効果線（集中線）。画面の外から中心へ向かう細い三角を、縁取りなしでドット単位に塗る。
+   中心（雲）は空けておき、線は端の帯にだけ出す。0.06 秒ごとに並びを引き直してちらつかせ、
+   弾けた瞬間は長く太くする。画面の揺れ（beginFeelWorld）は世界だけに掛かり、この線は揺れない。 */
+function drawLinkSpeedLines(t){
+  const [a0,a1]=LINK.lines;
+  if(t<a0 || t>a1) return;
+  const w=innerWidth, h=innerHeight, q=Math.max(1, Math.round(TS/16));
+  const [b0,b1]=LINK.burst;
+  const fadeIn=clamp((t-a0)/0.12,0,1), fadeOut=clamp((a1-t)/0.15,0,1);
+  const burst = t>=b0-0.02 && t<b1+0.05;
+  // 動きを減らす設定のときは、並びを引き直さない（ちらつかせない）
+  const still = typeof FEEL_REDUCED!=='undefined' && FEEL_REDUCED.matches;
+  const slot= still ? 0 : Math.floor(t/0.06);
+  const hs=(a,b)=>{ const v=Math.sin(a*12.9898+b*78.233+slot*3.17)*43758.5453; return v-Math.floor(v); };
+  const cx=w/2, cy=h*0.46, m=Math.min(w,h);
+  const N = burst ? 40 : 30;
+  ctx.save();
+  ctx.globalAlpha = fadeIn*fadeOut*(burst?1:0.85);
+  for(let i=0;i<N;i++){
+    // 画面の周囲を等間隔に回り、少しずらす
+    const a=(i+hs(i,1)*0.8)/N*Math.PI*2;
+    const ux=Math.cos(a), uy=Math.sin(a);
+    // 画面の外側の点（中心からの直線が画面の枠を越える所）
+    const k=Math.min(Math.abs((ux>0?w-cx:cx)/(ux||1e-6)), Math.abs((uy>0?h-cy:cy)/(uy||1e-6)));
+    const x0=cx+ux*(k+q*2), y0=cy+uy*(k+q*2);
+    const len=m*(burst ? 0.16+hs(i,2)*0.16 : 0.07+hs(i,2)*0.13);
+    const base=q*(burst ? 4+Math.round(hs(i,3)*3) : 2+Math.round(hs(i,3)*3));
+    const col = hs(i,4)<0.7 ? '#fff7dc' : '#ffe9ad';
+    linkSpike(x0, y0, a+Math.PI, len+q*2, base, q, col);
+  }
+  ctx.restore();
+}
 function drawLinkScreen(){
   const L=_linkNow;
   const bf=W.fx.find(f=>f.t==='linkburst');
   if(bf){ ctx.fillStyle='rgba(255,250,236,'+(0.55*bf.life/bf.max)+')'; ctx.fillRect(0,0,innerWidth,innerHeight); }
+  if(L) drawLinkSpeedLines(L.t);
   if(!L || L.t>0.85) return;
   const t=L.t, w=innerWidth, h=innerHeight;
   const inK=clamp(t/0.14,0,1), outK=clamp((t-0.6)/0.25,0,1);
