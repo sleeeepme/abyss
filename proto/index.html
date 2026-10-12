@@ -265,10 +265,12 @@
     background:color-mix(in srgb,var(--rc) 11%,var(--panel))}
   .item.rc:active{background:color-mix(in srgb,var(--rc) 20%,var(--panel))}
   .item.rc::after{display:none}
+  /* 左に帯が無くなったので、左の2つの角も右と同じ1段の角丸に（ユーザー要望） */
+  .item.rc{clip-path:var(--pxr2)}
   .item.rc::before{-webkit-mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat;
     mask:linear-gradient(#000 0 0) left top/2px 2px no-repeat,linear-gradient(#000 0 0) right top/2px 2px no-repeat,linear-gradient(#000 0 0) left bottom/2px 2px no-repeat,linear-gradient(#000 0 0) right bottom/2px 2px no-repeat}
   /* 数値のアイコン。16×16 の絵なので 16px で出す（12px に縮めると線が潰れる） */
-  .item .sti{font-size:16px;vertical-align:-4px;margin-right:2px}
+  .item .sti{font-size:16px;vertical-align:-4px;margin-right:2px;filter:grayscale(1) brightness(1.12)}   /* 白黒で（ユーザー要望）。色はレア度・数値の色に任せる */
   .item .stl{display:inline-flex;flex-wrap:wrap;gap:2px 9px;align-items:center}
   .item .nm .sti{margin-right:4px}
   .item .stl>span{white-space:nowrap}
