@@ -1639,11 +1639,34 @@ let occCv=null, occX=null, occImg=null, occU=null;
 const OCC_HERO_A=.8;          // 主人公に重ねる立ち物の濃さ（1で完全に隠れる）
 /* キャラの足もと（ドット）。主人公・仲間は絵の真ん中から 0.3 マス下（足もとの影と同じ）、大きい敵は体の大きさで */
 function occFoot(e){ const r=Number.isFinite(e.r)?e.r:.3; return (e._dwy+Math.max(.3,r*.85))*Q; }
+/* 2026-10-12 ユーザー報告「鍾乳石に近づいた時にたまに鍾乳石の一部が増える」。
+   前は全員を描き終えてから、1人ずつの範囲に立ち物を描き戻していた。そのため、鍾乳石の奥に仲間（や敵）が、
+   手前に主人公がいて範囲が重なると、仲間のぶんの描き戻しが手前の主人公の上にまで乗り、
+   鍾乳石の根元が主人公の頭の上へ伸びたように見えた（ついてくる仲間が奥に回った時にだけ起きるので「たまに」）。
+   今は1人を描いた直後に、その1人のぶんだけを描き戻す（CAVE.occludeOne）。あとから描く手前のキャラは、
+   描き戻した鍾乳石の上に乗る。最後の一括（drawPlayerLight の前）は、直後に描き戻せなかった者の取りこぼしだけを拾う。 */
+let occSerial=-1, occCount=0;
+function occludeOne(e,camX,camY){
+  if(!occD||!lastT||!G||!CAVE.on||!e||e.dead||!Number.isFinite(e._dwx)) return 0;
+  const serial=(typeof _drawSerial!=='undefined')?_drawSerial:null;
+  if(serial!==null&&e._drawn!==serial) return 0;
+  if(serial!==null&&e._occS===serial) return 0;           // このフレームはもう描き戻した
+  if(serial!==occSerial){ occSerial=serial; occCount=0; }
+  e._occS=serial;
+  const n=occludeEnts([e],camX,camY); occCount+=n; CAVE.occDrawn=occCount; return n;
+}
+CAVE.occludeOne=occludeOne;
 function drawOccluders(camX,camY){
   if(!occD||!lastT||!G||!CAVE.on) return 0;
-  const ps=TS/Q, ox=lastT.bx0, oy=lastT.by0, serial=(typeof _drawSerial!=='undefined')?_drawSerial:null;
+  const serial=(typeof _drawSerial!=='undefined')?_drawSerial:null;
+  if(serial!==occSerial){ occSerial=serial; occCount=0; }
   const ents=[P, ...(W.enemies||[]), ...((typeof livingParty==='function'&&livingParty())||[]), W.npc]
-    .filter(e=>e && !e.dead && Number.isFinite(e._dwx) && (serial===null||e._drawn===serial));
+    .filter(e=>e && !e.dead && Number.isFinite(e._dwx) && (serial===null||(e._drawn===serial&&e._occS!==serial)));
+  ents.forEach(e=>{ e._occS=serial; });
+  occCount+=occludeEnts(ents,camX,camY); CAVE.occDrawn=occCount; return occCount;
+}
+function occludeEnts(ents,camX,camY){
+  const ps=TS/Q, ox=lastT.bx0, oy=lastT.by0;
   let n=0;
   for(const e of ents){
     const r=Number.isFinite(e.r)?e.r:.3, foot=occFoot(e), hw=Math.max(.6,r*1.8), up=Math.max(.95,r*2.4);
@@ -1663,7 +1686,7 @@ function drawOccluders(camX,camY){
     ctx.drawImage(occCv,0,0,w,h,(ox+x0)*ps-camX,(oy+y0)*ps-camY,w*ps,h*ps);
     ctx.restore(); n++;
   }
-  CAVE.occDrawn=n; return n;
+  return n;
 }
 CAVE.drawOccluders=drawOccluders;
 function dpf(x,y,c){ x=Math.round(x)-DB0x; y=Math.round(y)-DB0y; if(x>=0&&y>=0&&x<bw&&y<bh){ const k=y*bw+x; buf[k]=c; if(occGY!==null) occD[k]=occGY; } }

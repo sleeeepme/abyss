@@ -39,9 +39,9 @@ R.buttonOnlyWhenFull = await pg.evaluate(()=>{
   const hiddenBelow = !el('linkbtn').classList.contains('on');
   S.hero.link=100; updateHUD();
   const shownAtMax = el('linkbtn').classList.contains('on');
-  const barFull = el('linkbar').classList.contains('full');
+  const noGauge = !el('linkbar') && !el('linkfill');          // ゲージは出さない（ユーザー指定）
   const hasIcon = /url\(/.test(el('link-icon').style.backgroundImage) && !!SKILL_ICON_GRID.link;
-  return {hiddenBelow, shownAtMax, barFull, hasIcon};
+  return {hiddenBelow, shownAtMax, noGauge, hasIcon};
 });
 
 // 4. 範囲に敵がいなければ出ない（値は残る）

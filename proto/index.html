@@ -314,10 +314,6 @@
   #hpghost{position:absolute;left:0;top:0;height:100%;background:#fff;transition:none;width:100%}
   #xpfill{background:var(--xp);}
   /* 連携値。経験値の下にもう1本、金色で。満ちたら明滅して「押せる」を知らせる */
-  #linkbar{margin-top:3px}
-  #linkfill{background:#c99a3a}
-  #linkbar.full #linkfill{background:#ffc24a;animation:linkPulse .9s ease-in-out infinite}
-  @keyframes linkPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.6)}}
   .bar.thin{height:5px}
   #stat{font-size:12px;color:var(--dim);margin-top:2px}
   /* 層の名前が1行増えるので行間を詰める。行数が増えても高さは元のまま */
@@ -996,7 +992,6 @@
     <div id="bars">
       <div class="bar"><i id="hpghost" style="width:100%"></i><i id="hpfill" style="width:100%"></i></div>
       <div class="bar thin"><i id="xpfill" style="width:0%"></i></div>
-      <div class="bar thin" id="linkbar" aria-label="連携値"><i id="linkfill" style="width:0%"></i></div>
       <div id="stat"></div>
     </div>
     <div id="depth"><b id="dnum">1F</b><span id="dsub"></span></div>
@@ -14891,7 +14886,10 @@ function draw(){
   _uiQ = [];
   // 敵（アーキタイプごとに形を変える。色だけだと種類が判別できない）
   _drawStage='敵';
-  W.enemies.forEach(e=>{
+  /* 立ち物（鍾乳石・柱）の描き戻しは、1人描くたびにその1人のぶんだけ（cave-look.js の occludeOne）。
+     全員を描いてからまとめて戻すと、奥の仲間のぶんが手前の主人公の上にまで乗る。 */
+  const occOne=(e)=>{ if(window.CAVE&&CAVE.on&&CAVE.occludeOne) try{ CAVE.occludeOne(e,camX,camY); }catch(err){ console.error(err); } };
+  const drawEnemyOne=(e)=>{
     if(e.dead && e.pixelBurst) return;
     // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
     const motion=finiteXY(feelEntityOffset(e));
@@ -15103,7 +15101,8 @@ function draw(){
       }
     }
     ctx.globalAlpha=1;
-  });
+  };
+  W.enemies.forEach(e=>{ drawEnemyOne(e); ctx.globalAlpha=1; occOne(e); });
 
   // --- 仲間と仲間候補 ---
   // 仲間は「六角形＋ジョブ色」。敵（三角・四角・ひし形・円）とは形が被らないので、
@@ -15115,7 +15114,8 @@ function draw(){
      まとめて描く1パスにするしかない。 */
   _drawStage='仲間';
   const allyBars=[];
-  const drawMate=(a, isNpc)=>{
+  const drawMate=(a, isNpc)=>{ drawMate0(a, isNpc); ctx.globalAlpha=1; occOne(a); };
+  const drawMate0=(a, isNpc)=>{
     const motion=finiteXY(feelEntityOffset(a));
     const sx=a.x*TS-camX+motion.x, sy=a.y*TS-camY+motion.y;
     if(sx<-60||sy<-60||sx>innerWidth+60||sy>innerHeight+60) return;
@@ -15807,6 +15807,7 @@ function draw(){
   }
   ctx.restore();
   ctx.globalAlpha=1;
+  occOne(P);                          // 主人公のぶんの立ち物の描き戻し
   drawPlayerLight(camX,camY);
   // ランタンの網（?lantern=net のときだけ）の暗がりはキャラまで描いた所で重ねる
   if(lanternNet && typeof drawFeelDarkness==='function') drawFeelDarkness();
@@ -16678,10 +16679,10 @@ function updateHUD(){
     skillGauge(ab, 'artbtn.gp', P.artCd, P.artCdMax || artCooldown(ad, false));
   }else ab.classList.remove('on');
 
-  /* 連携値のゲージと、満ちたときだけ出る連携ボタン（演出の最中は消す） */
-  const lv=linkVal(), lfull=linkReady();
-  hset('linkfill.w', (lv/LINK.max*100).toFixed(1)+'%', v=>el('linkfill').style.width=v);
-  hset('linkbar.full', lfull, v=>el('linkbar').classList.toggle('full', v));
+  /* 満ちたときだけ出る一斉攻撃のボタン（演出の最中は消す）。
+     連携値のゲージは出さない（2026-10-12 ユーザー指定「ゲージは増やしたくないから総攻撃用のゲージは表示しないで」）。
+     値は裏で溜まり、満ちたらボタンが出る。 */
+  const lfull=linkReady();
   const lbOn = lfull && !_linkNow;
   hset('linkbtn.on', lbOn, v=>el('linkbtn').classList.toggle('on', v));
   hset('link-icon.bg', 'link', v=>el('link-icon').style.backgroundImage=skillIconUrl(v));
