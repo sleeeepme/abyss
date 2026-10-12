@@ -9966,19 +9966,37 @@ function drawLinkCloud(c, camX, camY, t, grow, q){
   const img=pc.createImageData(G,G), d=img.data;
   const rq=R/q;
   // 4つの塊：奥に上、真ん中の左右、手前に下。奥から順に並べ、手前の塊が上に重なる。
-  // 塊ごとに陰影を付ける（下側が影、左上が光）ので、縁取りが無くても塊の境目が見える。
+  // 塊は円ではなく、縁が小さな膨らみの連なりになった「もくもく」の形にする：
+  // 中心から見た角度ごとに半径を変え、膨らみと膨らみの間は内側へ切れ込む。
+  // 陰影もこの縁に沿わせる（縁までの割合で測る）ので、縁取りが無くても塊の境目が見える。
   const fx = c.seed>Math.PI ? -1 : 1;   // 雲ごとに左右を入れ替えて、同じ形が並ばないように
-  const P4=[[0.06,-0.4,0.54],[-0.52,-0.02,0.47],[0.52,-0.06,0.5],[-0.04,0.3,0.52]];
-  const puffs=P4.map(([px,py,pr],i)=>({
-    x:(px+Math.sin(t*3+i*1.7+c.seed)*0.03)*fx*rq,
-    y:(py+Math.cos(t*2.6+i*2.3+c.seed)*0.025)*rq,
-    r:rq*pr*(1+0.06*Math.sin(t*11+i*1.9+c.seed))}));
-  const front=(x,y)=>{ for(let k=puffs.length-1;k>=0;k--){ const p=puffs[k], dx=x-p.x, dy=y-p.y; if(dx*dx+dy*dy<=p.r*p.r) return p; } return null; };
+  const P4=[[0.06,-0.4,0.56,6],[-0.52,-0.02,0.5,5],[0.52,-0.06,0.52,5],[-0.04,0.3,0.55,6]];
+  const puffs=P4.map(([px,py,pr,n],i)=>{
+    const amp=[]; for(let k=0;k<n;k++) amp.push(0.55+0.45*(0.5+0.5*Math.sin(c.seed*7.3+i*3.1+k*2.39)) + 0.12*Math.sin(t*7+k*1.3+i));
+    return {x:(px+Math.sin(t*3+i*1.7+c.seed)*0.03)*fx*rq,
+            y:(py+Math.cos(t*2.6+i*2.3+c.seed)*0.025)*rq,
+            r:rq*pr*(1+0.05*Math.sin(t*11+i*1.9+c.seed)), n, amp,
+            ph:c.seed*1.7+i*0.9+t*0.5};
+  });
+  // 角度 th での縁の半径（r に対する割合）
+  const rim=(p,th)=>{
+    const u=((th/(Math.PI*2)+1)*p.n + p.ph) % p.n, k=Math.floor(u), f=u-k;
+    return 0.74 + 0.26*p.amp[k]*Math.sqrt(Math.sin(Math.PI*f));
+  };
+  const front=(x,y)=>{
+    for(let k=puffs.length-1;k>=0;k--){
+      const p=puffs[k], dx=x-p.x, dy=y-p.y, dd=Math.hypot(dx,dy);
+      if(dd>p.r*1.01) continue;
+      const e=dd/(p.r*rim(p,Math.atan2(dy,dx)));
+      if(e<=1) return {p, lx:dx/(dd||1)*e, ly:dy/(dd||1)*e};
+    }
+    return null;
+  };
   for(let j=0;j<G;j++) for(let i=0;i<G;i++){
     const x=i-h+0.5, y=j-h+0.5;
-    const p=front(x,y);
-    if(!p) continue;
-    const lx=(x-p.x)/p.r, ly=(y-p.y)/p.r;
+    const hit=front(x,y);
+    if(!hit) continue;
+    const lx=hit.lx, ly=hit.ly;
     let col;
     // 影は右下の三日月、光は左上の縁に沿う三日月（平らな切り口だと板のように見え、
     // 真ん中に丸い光を置くと目玉のように見える）
