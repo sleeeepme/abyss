@@ -9950,6 +9950,7 @@ function linkPose(e){
    雲は4つの塊（＋真ん中を埋める塊）の和で、塊は揺れ続ける。
    縁取りは無し。塊ごとに左上の縁が明るく、右下が影色。 */
 let _linkPad=null;
+const LINK_DITHER=2;   // 煙の塊の端の網掛けの幅（ドット）
 /* ---------- 一斉攻撃の煙 ----------
    煙そのものは最初の形の3色（光・地・影）に戻したうえで、
    ユーザー要望「煙の塊はアウトラインを消して4個くらいで構成させて」により
@@ -9983,18 +9984,22 @@ function drawLinkCloud(c, camX, camY, t, grow, q){
     const u=((th/(Math.PI*2)+1)*p.n + p.ph) % p.n, k=Math.floor(u), f=u-k;
     return 0.74 + 0.26*p.amp[k]*Math.sqrt(Math.sin(Math.PI*f));
   };
-  const front=(x,y)=>{
+  // 塊の端（縁から内側 LINK_DITHER ドット）は網掛け：市松の片方だけ塗り、
+  // 抜けたドットには奥の塊（無ければ背景）が見える。
+  const front=(x,y,odd)=>{
     for(let k=puffs.length-1;k>=0;k--){
       const p=puffs[k], dx=x-p.x, dy=y-p.y, dd=Math.hypot(dx,dy);
       if(dd>p.r*1.01) continue;
-      const e=dd/(p.r*rim(p,Math.atan2(dy,dx)));
-      if(e<=1) return {p, lx:dx/(dd||1)*e, ly:dy/(dd||1)*e};
+      const er=p.r*rim(p,Math.atan2(dy,dx)), e=dd/er;
+      if(e>1) continue;
+      if(odd && er-dd < LINK_DITHER) continue;
+      return {p, lx:dx/(dd||1)*e, ly:dy/(dd||1)*e};
     }
     return null;
   };
   for(let j=0;j<G;j++) for(let i=0;i<G;i++){
     const x=i-h+0.5, y=j-h+0.5;
-    const hit=front(x,y);
+    const hit=front(x,y,(i+j)&1);
     if(!hit) continue;
     const lx=hit.lx, ly=hit.ly;
     let col;
