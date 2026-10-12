@@ -1,0 +1,209 @@
+{
+  "state": "running",
+  "active": [],
+  "queued": 0,
+  "counters": {
+    "requested": 261,
+    "played": 32,
+    "dropped": 229,
+    "stolen": 2,
+    "peakEvents": 2,
+    "peakPulse": 2,
+    "peakNoise": 1
+  },
+  "history": [
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857632
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857614
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857614
+    },
+    {
+      "id": "slash",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857614
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857549
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857531
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857531
+    },
+    {
+      "id": "slash",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857531
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "1秒の発音上限",
+      "time": 1790939857472
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "1秒の発音上限",
+      "time": 1790939857454
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "カテゴリ連打制限",
+      "time": 1790939857454
+    },
+    {
+      "id": "magic",
+      "result": "play",
+      "why": "再生",
+      "time": 1790939857454
+    },
+    {
+      "id": "critical",
+      "result": "play",
+      "why": "再生",
+      "time": 1790939857454
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857392
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857373
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857373
+    },
+    {
+      "id": "slash",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857373
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857313
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857295
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857295
+    },
+    {
+      "id": "slash",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857295
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857231
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857213
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "カテゴリ連打制限",
+      "time": 1790939857213
+    },
+    {
+      "id": "magic",
+      "result": "play",
+      "why": "再生",
+      "time": 1790939857213
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857152
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857134
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857134
+    },
+    {
+      "id": "slash",
+      "result": "skip",
+      "why": "同じ音の間隔",
+      "time": 1790939857134
+    },
+    {
+      "id": "defeat",
+      "result": "skip",
+      "why": "小音量",
+      "time": 1790939857071
+    },
+    {
+      "id": "magic",
+      "result": "skip",
+      "why": "重要音／発音枠を保護",
+      "time": 1790939857053
+    },
+    {
+      "id": "hit",
+      "result": "skip",
+      "why": "同じ音の間隔",
+      "time": 1790939857053
+    }
+  ],
+  "fault": ""
+}

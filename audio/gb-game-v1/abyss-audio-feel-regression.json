@@ -1,0 +1,171 @@
+{
+  "results": [
+    {
+      "name": "Tap starts one dash and cooldown rejects repeat",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Held movement direction wins over attack facing",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Dash stops with radius clearance before wall",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Dash stops before pit even in a floor without pit metadata",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Pointer tap works; drag and cancellation do not dash",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Menu blocks dash and does not advance cooldown",
+      "pass": true
+    },
+    {
+      "name": "Touch drag releases; HUD buttons never acquire the stick",
+      "pass": true
+    },
+    {
+      "name": "Light stops on wall face and illuminated pixels do not leak behind it",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Kill shows credited XP and G; death emits original colored pixels only once",
+      "pass": true
+    },
+    {
+      "name": "Damage produces readable player pop and shake",
+      "pass": true
+    },
+    {
+      "name": "Latest log only, bottom placement, no prompt overlap",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "World/effect rendering restores main context and transform",
+      "pass": true
+    },
+    {
+      "name": "Water and root layers draw; particles reset at floor transition",
+      "pass": true
+    },
+    {
+      "name": "Particle budget and lifetime stay bounded",
+      "pass": true
+    },
+    {
+      "name": "Just dodge cancels one hit, expires, and does not alter armor durability",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Outside just window, an incoming hit still deals damage",
+      "pass": true
+    },
+    {
+      "name": "Parry success triggers slowdown without damage",
+      "pass": true
+    },
+    {
+      "name": "Critical hit flashes enemy and shakes harder without moving its position",
+      "pass": true
+    },
+    {
+      "name": "Repeated impacts only offset rendering and settle after 0.2 seconds",
+      "pass": true
+    },
+    {
+      "name": "Walking keeps the render anchor fixed and emits dust",
+      "pass": true
+    },
+    {
+      "name": "Moving ally advances its animation phase without render bob",
+      "pass": true
+    },
+    {
+      "name": "Ground shadows stay compact under actors regardless of light direction",
+      "pass": true
+    },
+    {
+      "name": "Actor occlusion removes light only behind the caster",
+      "pass": true
+    },
+    {
+      "name": "Water footsteps spawn droplets and ripples; rendering stays valid",
+      "pass": true
+    },
+    {
+      "name": "Decoration is stable, irregular and does not consume combat RNG",
+      "pass": true
+    },
+    {
+      "name": "Ultimate triggers enhanced effects and respects cooldown",
+      "pass": true
+    },
+    {
+      "name": "Slow motion expires in real time and preserves expedition clock",
+      "pass": true
+    },
+    {
+      "name": "Boss cinematic zoom finishes and rewards are granted only once",
+      "pass": true
+    },
+    {
+      "name": "Drop rises and lands before it becomes collectible",
+      "pass": true
+    },
+    {
+      "name": "Final boss clear dialog waits for cinematic and returns once",
+      "pass": true
+    },
+    {
+      "name": "All damage-type trails and enemy magic render without context leakage",
+      "pass": true
+    },
+    {
+      "name": "All 24 weapon arts render through the production effect module",
+      "pass": true
+    },
+    {
+      "name": "Reported multi-hit arts paint beyond the activation spark immediately",
+      "pass": true
+    },
+    {
+      "name": "All 24 weapon arts reach their real fireArt and draw paths",
+      "pass": true
+    },
+    {
+      "name": "Persistent weapon arts use approved renderers without duplicate transients",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "Weapon-art activation fades iai and mirage actors and suppresses legacy placeholders",
+      "pass": true
+    },
+    {
+      "name": "Production draw reaches external feel hooks for world, actors and drops",
+      "pass": true
+    },
+    {
+      "name": "Blurred ambient appears through furnace but not in pale layer",
+      "pass": false,
+      "error": "assertion failed"
+    },
+    {
+      "name": "30 draw frames (ms)",
+      "ms": 49
+    }
+  ],
+  "errors": []
+}

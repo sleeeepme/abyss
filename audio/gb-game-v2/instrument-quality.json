@@ -1,0 +1,146 @@
+{
+  "checks": "20 buffers finite/unclipped; GB track allocation and legal noise clocks; UI/back bit-identical to v1",
+  "files": [
+    {
+      "id": "slash",
+      "seconds": 0.13,
+      "peak": 0.27151745557785034,
+      "rms": 0.1150749276784708,
+      "sha256": "1c1c0dbc73d9eb3b15c98c5fd21099cbf7187d32956dd03814e45a5982649799"
+    },
+    {
+      "id": "blunt",
+      "seconds": 0.15,
+      "peak": 0.5351405739784241,
+      "rms": 0.14166604090825471,
+      "sha256": "7700cd1344f069a5f5912474c70b0d63046a31a87976b4462321b600c97299a9"
+    },
+    {
+      "id": "arrow",
+      "seconds": 0.1,
+      "peak": 0.24505619704723358,
+      "rms": 0.08795657474441688,
+      "sha256": "cfcc6b20f75aa0b5c2ae21aa3593764288099e2f4a9f61109cec22367eeff223"
+    },
+    {
+      "id": "magic",
+      "seconds": 0.23,
+      "peak": 0.3253733813762665,
+      "rms": 0.10082506524498551,
+      "sha256": "c8ca53cbfcb022f229ff5419001854f73f57b944de77b59393ac4f96b10b21aa"
+    },
+    {
+      "id": "hit",
+      "seconds": 0.075,
+      "peak": 0.27151745557785034,
+      "rms": 0.11133112892298623,
+      "sha256": "0359867c98a893b1b2bfe13e777789edcf5a05fe2f12e841da19985d4b45e3d0"
+    },
+    {
+      "id": "critical",
+      "seconds": 0.22,
+      "peak": 0.45037785172462463,
+      "rms": 0.07613871931788165,
+      "sha256": "7e080e869fe1dde0ff93fa1d8e478ecfd29f23a918635622364aa49a96c2bfc2"
+    },
+    {
+      "id": "hurt",
+      "seconds": 0.19,
+      "peak": 0.49298131465911865,
+      "rms": 0.11583165353469693,
+      "sha256": "bc8b8698b201b726ca110d65b5b0bd86dd129b769e53edc66138df76a7efa23a"
+    },
+    {
+      "id": "guard",
+      "seconds": 0.17002083333333334,
+      "peak": 0.4863761365413666,
+      "rms": 0.10277756193570117,
+      "sha256": "9f761da526ae3f55266a112de097f9a6d55531aba45e4894b6a3006aa14b95d8"
+    },
+    {
+      "id": "parry",
+      "seconds": 0.3,
+      "peak": 0.49282461404800415,
+      "rms": 0.05497964644648617,
+      "sha256": "b756e85f5438b4dcc005bd13f7a81f8cd9ecefcd533bd2265866cb65313e24cd"
+    },
+    {
+      "id": "dash",
+      "seconds": 0.08502083333333334,
+      "peak": 0.24378253519535065,
+      "rms": 0.10667602788135291,
+      "sha256": "1aa75184eba9b4be17cc84f288b9e30c3b418c06b742ed49c068db3af96abfd0"
+    },
+    {
+      "id": "skill",
+      "seconds": 0.32,
+      "peak": 0.4552081823348999,
+      "rms": 0.10544849189687187,
+      "sha256": "c806c0c49b01c8e9092ee1ea97d49d0c8abb8814d0ce14ea195d90b03cec0ce4"
+    },
+    {
+      "id": "defeat",
+      "seconds": 0.27,
+      "peak": 0.4299300014972687,
+      "rms": 0.09601064516753235,
+      "sha256": "6c6a7b5dff1848b35ad5e36ef3632a45b4e4c7d725961a59fcbc8aca58d244e2"
+    },
+    {
+      "id": "boss",
+      "seconds": 0.82,
+      "peak": 0.6275596022605896,
+      "rms": 0.11901090183226441,
+      "sha256": "f38df3208921d8ac0f910250cf7b46236eba0eb893cf874dc7dae4229e7e1dd8"
+    },
+    {
+      "id": "death",
+      "seconds": 0.52,
+      "peak": 0.538336455821991,
+      "rms": 0.09254600083434643,
+      "sha256": "06651b50ab4e236825b77fd617d5f20112b31aa01a464e3f2048874b99cec73d"
+    },
+    {
+      "id": "pickup",
+      "seconds": 0.12,
+      "peak": 0.23961813747882843,
+      "rms": 0.05455843102713595,
+      "sha256": "9613edb241035786f047a00961f6f119de046b64c699eca6eb565dcb64f1f345"
+    },
+    {
+      "id": "heal",
+      "seconds": 0.25,
+      "peak": 0.23741059005260468,
+      "rms": 0.06971605829494767,
+      "sha256": "c7f825a65f21002adbbedcaadb42f172952fa5a584abb0d9e289249b95a971b2"
+    },
+    {
+      "id": "level",
+      "seconds": 1.28,
+      "peak": 0.36837729811668396,
+      "rms": 0.09655295881127901,
+      "sha256": "7099bef816f264b6a38f1bba66b5369d121258605f9066fea814a9335f3d6bba"
+    },
+    {
+      "id": "floor",
+      "seconds": 0.3,
+      "peak": 0.34507790207862854,
+      "rms": 0.0753854025321959,
+      "sha256": "910b01d5ea54c53513fca3934e3c203fae234c5fd203ea3756cbd79fd35e40ad"
+    },
+    {
+      "id": "ui",
+      "seconds": 0.1,
+      "peak": 0.21957436203956604,
+      "rms": 0.09088487432694643,
+      "sha256": "6d62b3fde4fbea63ea8f2a8cc5b9e8d8700bc39c11a894e45c6b1e863bf75f66"
+    },
+    {
+      "id": "back",
+      "seconds": 0.08502083333333334,
+      "peak": 0.21823695302009583,
+      "rms": 0.09699019038749186,
+      "sha256": "729e5121b33509c0402aab1b3b1ca704f93a8b8a90771be2069d216120fd3cd8"
+    }
+  ],
+  "scope": "Raw instruments before the game mixer; subjective listening and real GB hardware not verified."
+}

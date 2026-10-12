@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ABYSS — Sound studies 01</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1218;--panel:#151d27;--line:#2a3644;--text:#e8edf3;--muted:#9facbd;--mint:#b5e9d0;--violet:#c9b6ee;--gold:#e5cf91}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}main{max-width:1140px;padding:52px 28px 35px;margin:auto}.eyebrow{letter-spacing:.23em;font-size:11px;color:var(--mint)}h1{font-size:clamp(29px,5vw,46px);letter-spacing:-.045em;margin:12px 0}header p{color:var(--muted);font-size:14px;line-height:1.9;max-width:730px}.toolbar{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin:28px 0;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}button,a.download{font:inherit;color:inherit;border:1px solid var(--line);background:#1c2836;border-radius:7px;cursor:pointer;padding:9px 15px;text-decoration:none}button:hover,a.download:hover{background:#2b3a4d}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--mint);outline-offset:4px}.toolbar label{font-size:13px;display:flex;gap:10px;align-items:center}input{accent-color:var(--mint)}#status{font-size:12px;color:var(--mint);min-width:150px}.row-head{display:flex;align-items:center;justify-content:space-between;margin-top:29px;margin-bottom:13px;gap:12px}.row-head h2{font-size:19px;margin:0}.row-head p{font-size:12px;color:var(--muted);margin:6px 0 0}.row-head button{font-size:12px;white-space:nowrap}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{border:1px solid var(--line);background:var(--panel);padding:20px;border-radius:12px;transition:border-color .1s}.card.active{border-color:var(--accent)}.card h3{font-size:15px;margin:0;color:var(--accent)}.tag{font-size:10px;color:var(--muted);letter-spacing:.07em;margin-top:7px}.desc{font-size:12px;line-height:1.8;color:#b7c3d1;min-height:43px;margin:16px 0 0}.wave{height:44px;width:100%;display:block;margin:13px 0;color:var(--accent);opacity:.7}.actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.play{color:var(--accent);min-width:103px}.download{font-size:11px!important;padding:8px 10px!important;background:transparent!important}.seconds{font-variant-numeric:tabular-nums;font-size:11px;color:var(--muted)}footer{margin-top:34px;border-top:1px solid var(--line);padding-top:18px;font-size:12px;line-height:1.9;color:var(--muted)}footer a{color:var(--mint)}@media(max-width:650px){main{padding:28px 18px}.grid{grid-template-columns:1fr}.desc{min-height:0}.card{padding:17px}.toolbar{gap:14px}.row-head{align-items:flex-start}.wave{height:32px}}
+</style></head><body><main>
+<header><div class="eyebrow">ABYSS / SOUND STUDIES / 01</div><h1>同じアクション、3つの音源。</h1><p>斬撃・魔法攻撃・UI決定音を、制限なし／SFC／GBの3方式で制作。<br>各音を再生するか、行ごとの連続試聴で質感の違いを比較できます。</p></header>
+<div class="toolbar"><button id="stop">■ 停止</button><label>試聴音量 <input id="volume" type="range" min="0" max="100" value="60"><span id="vol-value">60%</span></label><span id="status" role="status" aria-live="polite">再生する音を選んでください</span></div>
+<div id="sounds"></div>
+<footer>全9音：16-bit PCM WAV。制限なし＝48 kHz・ステレオ、SFC＝32 kHz・ステレオ、GB＝48 kHz・モノラル出力。<br>SFCはBRRサンプル＋エコー、GBは矩形波＋LFSRノイズによる仕様ベースの試作です。実機録音・完全なエミュレーションではありません。<br>音量は種類ごとに近づけています。UI音は戦闘音より控えめに設定。音はすべて独自に合成しています。</footer>
+</main><script>
+const sounds=__SOUND_DATA__;
+const kinds={slash:['斬撃','風切りから刃の接触へ。短く、鋭く。'],magic:['魔法攻撃','小さな溜め、魔弾の発射、光の余韻。'],ui:['UI決定音','2音で伝える、操作の確定。']};
+const styles={unrestricted:['制限なし','FULL-RANGE / LAYERED','#b5e9d0'],sfc:['SFC音源','BRR SAMPLES / 32 kHz','#c9b6ee'],gb:['GB音源','PULSE + NOISE / MONO','#e5cf91']};
+const desc={
+'slash-unrestricted':'空気の流れ、金属の響き、低い衝撃を重ねた斬撃。','slash-sfc':'短い風切り・金属サンプルと、丸みのある響き。','slash-gb':'ざらついたノイズと急降下する矩形波。',
+'magic-unrestricted':'音程が上がる溜めから、厚い魔弾と左右に散る光へ。','magic-sfc':'波形サンプルの音程変化と、結晶音のエコー。','magic-gb':'階段状の上昇音から、短い魔弾と3音のきらめき。',
+'ui-unrestricted':'透明な倍音を持つ、柔らかな2音の決定音。','ui-sfc':'短い結晶サンプルによる、丸い2音の決定音。','ui-gb':'矩形波1声の、明快で小さな2音の決定音。'};
+for(const [kind,[label,summary]] of Object.entries(kinds)){
+ const section=document.createElement('section');
+ section.innerHTML=`<div class="row-head"><div><h2>${label}</h2><p>${summary}</p></div><button data-sequence="${kind}">3方式を順に聴く →</button></div><div class="grid"></div>`;
+ for(const s of sounds.filter(s=>s.kind===kind)){
+  const [name,tag,color]=styles[s.style];const card=document.createElement('article');card.className='card';card.id=s.id;card.style.setProperty('--accent',color);
+  const lines=s.waveform.map((v,i)=>`<line x1="${i*3+1}" x2="${i*3+1}" y1="${22-v*29}" y2="${22+v*29}"/>`).join('');
+  card.innerHTML=`<h3>${name}</h3><div class="tag">${tag}</div><p class="desc">${desc[s.id]}</p><svg class="wave" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"><g stroke="currentColor" stroke-width="1.6">${lines}</g></svg><div class="actions"><button class="play" data-play="${s.id}" aria-label="${label}・${name}を再生">▶ 再生</button><span class="seconds">${s.seconds.toFixed(2)} s</span><a class="download" href="${s.url}" download="${s.file}" aria-label="${label}・${name}のWAVを保存">WAV ↓</a></div>`;
+  section.querySelector('.grid').append(card);
+ }document.querySelector('#sounds').append(section);
+}
+let current=null,token=0,cancelPending=null;
+const status=document.querySelector('#status');
+function stop(){token++;if(current){current.pause();current.currentTime=0;current=null;}if(cancelPending){cancelPending();cancelPending=null;}document.querySelectorAll('.card').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.play').forEach(x=>x.textContent='▶ 再生');status.textContent='停止しました';}
+async function playOne(id,run){
+ if(run!==token)return;const s=sounds.find(x=>x.id===id);const card=document.getElementById(id);
+ current=new Audio(s.url);const audio=current;audio.volume=Number(document.querySelector('#volume').value)/100;
+ card.classList.add('active');card.querySelector('.play').textContent='● 再生中';status.textContent=`${kinds[s.kind][0]} / ${styles[s.style][0]}`;
+ await new Promise(resolve=>{
+  let done=false;const finish=()=>{if(done)return;done=true;card.classList.remove('active');card.querySelector('.play').textContent='▶ 再生';if(current===audio)current=null;cancelPending=null;resolve();};
+  cancelPending=finish;audio.onended=finish;audio.onerror=()=>{status.textContent='再生できませんでした。WAVを保存してお試しください';finish();};
+  audio.play().catch(()=>{status.textContent='再生できませんでした。WAVを保存してお試しください';finish();});
+ });
+}
+document.querySelector('#stop').onclick=stop;
+document.querySelector('#volume').oninput=e=>{document.querySelector('#vol-value').textContent=e.target.value+'%';if(current)current.volume=Number(e.target.value)/100;};
+document.querySelectorAll('[data-play]').forEach(b=>b.onclick=async()=>{stop();const run=token;await playOne(b.dataset.play,run);if(run===token&&!status.textContent.startsWith('再生でき'))status.textContent='再生が終わりました';});
+document.querySelectorAll('[data-sequence]').forEach(b=>b.onclick=async()=>{stop();const run=token;for(const s of sounds.filter(x=>x.kind===b.dataset.sequence)){if(run!==token)return;await playOne(s.id,run);if(run!==token)return;await new Promise(r=>setTimeout(r,450));}if(run===token&&!status.textContent.startsWith('再生でき'))status.textContent='3方式の比較が終わりました';});
+</script></body></html>

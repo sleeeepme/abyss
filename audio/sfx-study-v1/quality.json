@@ -1,0 +1,70 @@
+{
+  "signal_checks": [
+    {
+      "file": "slash-unrestricted.wav",
+      "pass": true,
+      "peak_dbfs": -5.26,
+      "dc_max": 2e-07,
+      "last_10ms_rms_dbfs": -200.0
+    },
+    {
+      "file": "slash-sfc.wav",
+      "pass": true,
+      "peak_dbfs": -4.19,
+      "dc_max": 1e-07,
+      "last_10ms_rms_dbfs": -93.33
+    },
+    {
+      "file": "slash-gb.wav",
+      "pass": true,
+      "peak_dbfs": -9.14,
+      "dc_max": 3.5e-05,
+      "last_10ms_rms_dbfs": -200.0
+    },
+    {
+      "file": "magic-unrestricted.wav",
+      "pass": true,
+      "peak_dbfs": -4.73,
+      "dc_max": 0.0,
+      "last_10ms_rms_dbfs": -86.18
+    },
+    {
+      "file": "magic-sfc.wav",
+      "pass": true,
+      "peak_dbfs": -6.35,
+      "dc_max": 2e-07,
+      "last_10ms_rms_dbfs": -200.0
+    },
+    {
+      "file": "magic-gb.wav",
+      "pass": true,
+      "peak_dbfs": -5.63,
+      "dc_max": 7.72e-05,
+      "last_10ms_rms_dbfs": -200.0
+    },
+    {
+      "file": "ui-unrestricted.wav",
+      "pass": true,
+      "peak_dbfs": -12.06,
+      "dc_max": 6e-06,
+      "last_10ms_rms_dbfs": -76.91
+    },
+    {
+      "file": "ui-sfc.wav",
+      "pass": true,
+      "peak_dbfs": -12.3,
+      "dc_max": 6.5e-06,
+      "last_10ms_rms_dbfs": -75.68
+    },
+    {
+      "file": "ui-gb.wav",
+      "pass": true,
+      "peak_dbfs": -13.92,
+      "dc_max": 6.64e-05,
+      "last_10ms_rms_dbfs": -73.55
+    }
+  ],
+  "brr_structure_checks": "4/4 passed",
+  "subjective_listening": "Not performed by an audio-listening tool; user audition pending.",
+  "hardware_validation": "Not performed; this is hardware-informed synthesis, not emulator output."
+}

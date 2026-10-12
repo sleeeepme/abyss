@@ -1,0 +1,13 @@
+{
+  "project_id": "appgprj_6abf03a65c2c8191b4a371c101451f73",
+  "url": "https://abyss-sfx-study.yoshida-dais-4036.chatgpt.site",
+  "audience": "owner-private",
+  "checkout_path": "/private/tmp/abyss-sfx-study-site",
+  "commit_sha": "cde4d4ecb48a08cb0d8ae724c8556926af0c9c91",
+  "deployment_id": "appgdep_6abfad9ff2088191af0723289caeea9e",
+  "status": "succeeded",
+  "source": "index.html",
+  "manager_path": "/play/sound-admin.html",
+  "game_path": "/play/index.html",
+  "audio_revision": "v2"
+}

@@ -1,0 +1,52 @@
+{
+  "decoded": [
+    {
+      "id": "slash-unrestricted",
+      "seconds": 0.68,
+      "channels": 2
+    },
+    {
+      "id": "slash-sfc",
+      "seconds": 0.62,
+      "channels": 2
+    },
+    {
+      "id": "slash-gb",
+      "seconds": 0.32,
+      "channels": 1
+    },
+    {
+      "id": "magic-unrestricted",
+      "seconds": 1.22,
+      "channels": 2
+    },
+    {
+      "id": "magic-sfc",
+      "seconds": 1.13,
+      "channels": 2
+    },
+    {
+      "id": "magic-gb",
+      "seconds": 0.62,
+      "channels": 1
+    },
+    {
+      "id": "ui-unrestricted",
+      "seconds": 0.38,
+      "channels": 2
+    },
+    {
+      "id": "ui-sfc",
+      "seconds": 0.35,
+      "channels": 2
+    },
+    {
+      "id": "ui-gb",
+      "seconds": 0.25,
+      "channels": 1
+    }
+  ],
+  "controls": "play, stop, volume, sequence, interrupt passed",
+  "mobile_overflow": false,
+  "page_errors": []
+}

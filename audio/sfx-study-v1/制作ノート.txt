@@ -1,0 +1,76 @@
+ABYSS 効果音試作 01 — 2026-10-02
+
+内容
+斬撃 / 魔法攻撃 / UI決定音 × 制限なし / SFC / GB = 9音。
+index.html は音声を内包する単独の比較ページ。ネット接続不要。
+compare-*.wav は「制限なし → SFC → GB」の順。間隔は0.55秒。
+すべてオリジナルの手続き合成。ゲームからの抽出音・既存録音は未使用。
+今回の作業は試作音源の作成まで。本編への接続は行っていない。
+
+学習して適用した技法
+1. 音量の時間変化と、音色・音程の時間変化を別々に設計する。
+   風切りには帯域を絞ったノイズ、刃の響きには非整数倍音を持つ短い振動を使う。
+2. 魔法は発射の瞬間を明確にし、前の溜めと後の余韻を分ける。
+   制限なし版はFMと加算合成。左右の結晶音と短い反射で広がりを作る。
+3. UIは情報を短く伝える。完全5度の2音を共通モチーフにし、戦闘音より低い音量とする。
+4. 同じ音を低ビット化するだけでは音源の特徴を再現できない。
+   各音源の発音方式から別々に構成する。
+
+参照した資料
+・Gordon Reid, Synth Secrets / Synthesizing Bells, Sound On Sound
+  https://www.soundonsound.com/techniques/synthesizing-bells
+  金属音の加算合成と、成分ごとに異なる減衰の考え方を参照。
+・Gordon Reid, Envelopes, Gates & Triggers, Sound On Sound
+  https://www.soundonsound.com/techniques/envelopes-gates-triggers
+  音量・フィルター等に適用する時間変化の基礎を参照。
+・gbdev / Pan Docs, Audio Registers / Audio Details
+  https://gbdev.io/pandocs/Audio_Registers.html
+  https://gbdev.io/pandocs/Audio_details.html
+  サイト本文への直接アクセスが403のため、公式リポジトリの原文も確認。
+  https://raw.githubusercontent.com/gbdev/pandocs/master/src/Audio_Registers.md
+  https://raw.githubusercontent.com/gbdev/pandocs/master/src/Audio_details.md
+・SNESdev Wiki, BRR samples / S-DSP registers
+  https://snes.nesdev.org/wiki/BRR_samples
+  https://snes.nesdev.org/wiki/S-DSP_registers
+・snesbrr のエンコード実装（形式の確認のみ、コード転用なし）
+  https://github.com/boldowa/snesbrr/blob/master/src/brr/BrrCodec.cpp
+
+制限なし版
+48 kHz / 16-bit / stereo WAV。発音数・サンプルメモリ・レトロ音源の制約なし。
+風切り、金属成分、低い衝撃、FM魔弾、結晶音を用途に応じて合成。
+短い左右の反射を加える。48 kHz・16-bitは今回の納品形式であり、音源方式の制限ではない。
+
+SFC版の実装と限界
+32 kHz / 16-bit / stereo WAV。
+4種類の自作素材を実際にBRRフィルター0の9-byte / 16-sampleブロックへ変換し、
+復号したサンプルをピッチ変更して再生。sfc-bank/ にBRR素材を同梱。
+orbは先頭へループ、他はワンショット。サンプルの公称レートは16 kHz。
+ピッチはDSPレジスターの刻みに量子化。最大同時発音は斬撃3、魔法4、UI2。
+エコーは96msの共通ディレイに8-tap FIR、feedback 0.32。エコーバッファは12,288 bytes相当。
+素材容量はmanifest.jsonに記録。音声RAM全体を満たすドライバー実装・SPC/ROMは含まない。
+Gaussian補間テーブル・DSP ADSR・整数演算・エコーの全回路は再現していない。
+補間は短い平滑化フィルター、包絡はソフトウェアで近似。実機互換性の保証なし。
+
+GB版の実装と限界
+48 kHz / 16-bit / mono WAV（保存形式。GBが48 kHz PCM音源という意味ではない）。
+矩形波は12.5 / 25 / 50% dutyを使用。周波数を11-bitレジスター相当へ量子化。
+音量は15段階＋無音、減衰は64Hzの包絡ステップ。周波数指示は128Hz刻みの仮想ドライバー。
+ノイズはPan Docs記載のLFSRによる15-bit / 7-bitモード。NR43の実在する分周設定を使用。
+矩形波2ch＋ノイズ1chの範囲に収め、今回の音には波形メモリchを使わない。
+残響なし。最大同時発音は斬撃2、魔法3、UI1。
+192 kHzで合成後、出力フィルターと4倍ダウンサンプリングで48 kHzへ。
+CPUクロック、レジスター書き込みの副作用、初回波形の位相、モデルごとのアナログ回路は近似。
+実機録音・サイクル精密エミュレーションではない。
+
+出力処理
+DC除去、ファイル両端の短いフェード、種類別の活動区間RMS調整。
+活動区間RMSは知覚ラウドネスの完全な一致ではない。最終的な好み・採否は試聴で判断する。
+ピーク上限-3 dBFS。UIを控えめにする。すべて16-bit PCM WAV。
+試聴ページの初期音量は60%。WAV自体には試聴スライダーの音量を焼き込まない。
+
+再生成
+Python 3 と numpy が必要。追加の音声素材やネット接続は不要。
+python3 audio/sfx-study-v1/build.py
+乱数seedは20261002で固定。build.pyが正本。preview.template.htmlが試聴ページの正本。
+音源・manifest・index.html・ZIPを再生成する。
+品質確認の結果はquality.jsonを参照。聴感の自動採点や実機確認を実施したとは扱わない。

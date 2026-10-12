@@ -1,0 +1,21 @@
+{
+  "passed": 15,
+  "results": [
+    "locked audio drops events without backlog",
+    "gesture starts audio; all 20 original buffers are finite and bounded",
+    "featured revision buttons play the new parry",
+    "100 simultaneous hits coalesce and hurt wins",
+    "important cue steals lower priority voice with bounded channels",
+    "fanfare retains final cadence at short tail and yields to danger",
+    "distance, cooldown, mute and untrusted settings clamp",
+    "5-second crowd mix never exceeds event/pulse/noise budgets",
+    "mobile layout fits viewport and settings survive reload",
+    "game adopts manager settings; blocked actions do not make combat sounds",
+    "real attack hooks emit without audio consuming gameplay RNG",
+    "parry emits and rejected consumables remain silent",
+    "in-game manager pauses/resumes and iframe settings propagate",
+    "muted game runs and save still works",
+    "feel regression matches the pre-audio baseline"
+  ],
+  "pageErrors": []
+}
