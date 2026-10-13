@@ -1,0 +1,125 @@
+{
+  "wisp": {
+    "body_size": [
+      6,
+      8
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": false,
+    "body_edits_native_coordinates": [
+      [
+        5,
+        8
+      ],
+      [
+        10,
+        8
+      ]
+    ],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  },
+  "bat": {
+    "body_size": [
+      12,
+      5
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": true,
+    "body_edits_native_coordinates": [],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  },
+  "owl": {
+    "body_size": [
+      8,
+      8
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": true,
+    "body_edits_native_coordinates": [],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  },
+  "eye": {
+    "body_size": [
+      12,
+      8
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": true,
+    "body_edits_native_coordinates": [],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  },
+  "skull": {
+    "body_size": [
+      8,
+      8
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": true,
+    "body_edits_native_coordinates": [],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  },
+  "jelly": {
+    "body_size": [
+      8,
+      8
+    ],
+    "effect_canvas": [
+      24,
+      24
+    ],
+    "body_offset": [
+      4,
+      4
+    ],
+    "body_pixels_unchanged": true,
+    "body_edits_native_coordinates": [],
+    "rim_width_native_px": 1,
+    "edge_alpha_max": 0,
+    "partial_alpha_only_in_effect": true
+  }
+}

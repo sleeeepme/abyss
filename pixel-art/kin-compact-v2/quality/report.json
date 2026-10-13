@@ -1,0 +1,128 @@
+{
+  "wisp": {
+    "name": "鬼火",
+    "old_size": [
+      8,
+      10
+    ],
+    "new_size": [
+      6,
+      8
+    ],
+    "bbox": [
+      5,
+      4,
+      11,
+      12
+    ],
+    "colors": 4,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  },
+  "bat": {
+    "name": "蝙蝠",
+    "old_size": [
+      14,
+      7
+    ],
+    "new_size": [
+      12,
+      5
+    ],
+    "bbox": [
+      2,
+      5,
+      14,
+      10
+    ],
+    "colors": 5,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  },
+  "owl": {
+    "name": "梟",
+    "old_size": [
+      10,
+      10
+    ],
+    "new_size": [
+      8,
+      8
+    ],
+    "bbox": [
+      4,
+      5,
+      12,
+      13
+    ],
+    "colors": 4,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  },
+  "eye": {
+    "name": "目玉",
+    "old_size": [
+      14,
+      10
+    ],
+    "new_size": [
+      12,
+      8
+    ],
+    "bbox": [
+      2,
+      5,
+      14,
+      13
+    ],
+    "colors": 6,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  },
+  "skull": {
+    "name": "骸骨",
+    "old_size": [
+      10,
+      10
+    ],
+    "new_size": [
+      8,
+      8
+    ],
+    "bbox": [
+      4,
+      4,
+      12,
+      12
+    ],
+    "colors": 4,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  },
+  "jelly": {
+    "name": "海月",
+    "old_size": [
+      10,
+      10
+    ],
+    "new_size": [
+      8,
+      8
+    ],
+    "bbox": [
+      4,
+      5,
+      12,
+      13
+    ],
+    "colors": 5,
+    "original_matches_current_png": true,
+    "center_preserved": true,
+    "runtime_exact_integer_4x": true
+  }
+}
