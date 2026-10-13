@@ -98,6 +98,11 @@
     if(!d||!d.s||!d.p||!d.w||!d.ui||!d.feel)throw Error('保存項目が足りません');
     if(typeof d.s.name!=='string'||d.s.name.length>100||!Number.isSafeInteger(d.rng)||!Number.isSafeInteger(d.itemId))throw Error('進行情報が不正です');
     for(const k of ['gold','shards','deaths','runs','deepest'])if(!Number.isFinite(d.s[k])||d.s[k]<0)throw Error('進行値が不正です');
+    if(d.s.deathPressure!==undefined){
+      const pressure=d.s.deathPressure;
+      if(!pressure || typeof pressure!=='object' || Array.isArray(pressure)
+        || Object.entries(pressure).some(([k,n])=>!/^([1-9][0-9]*)$/.test(k) || Number(k)>100 || !Number.isSafeInteger(n) || n<0 || n>d.s.deaths))throw Error('死の蓄積が不正です');
+    }
     for(const k of ['stash','legendStash','carry','tavern','fallen'])if(!Array.isArray(d.s[k]))throw Error('持ち物が不正です');
     if(d.s.hero&&(!Number.isFinite(d.s.hero.hpNow)||!d.s.hero.equip||!Array.isArray(d.s.hero.party)||!Array.isArray(d.s.hero.boons)))throw Error('主人公の状態が不正です');
     if(d.s.run){
@@ -213,6 +218,7 @@
     const keepDebug=S.debug;
     for(const [i,target] of [S,P,W].entries()){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,roots[i]);}
     if(keepDebug)S.debug=keepDebug;
+    S.deathPressure=S.deathPressure||{}; // 旧セーブは未蓄積から開始
     W.pops=[];RNG=mulberry32(d.rng);genItem._n=d.itemId;
     _intrF=null;_intrKey='';_fallen=null;_fallenQueue=d.ui.fallenQueue||[];
     _deathPool=d.ui.deathPool;_deathBase=d.ui.deathBase;_deathCap=d.ui.deathCap;

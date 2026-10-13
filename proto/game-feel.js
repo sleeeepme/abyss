@@ -6,6 +6,9 @@ const FEEL_ATTACK_SECONDS=.48;
 const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSlowScale:.22,
   normalMoveSpeed:3,recoilSeconds:.2,recoilDistance:.09,bossRecoilDistance:.035,
   itemOutlinePeriod:1.8,itemOutlineMinAlpha:.25,
+  enemyLevelOrangeFrom:5,enemyLevelRedFrom:10,
+  enemyLevelNormalColor:'#98a1b2',enemyLevelYellowColor:'#ffe066',
+  enemyLevelOrangeColor:'#ff9a5a',enemyLevelRedColor:'#ff625a',
   characterIdleSeconds:1.28,characterMoveThreshold:.16,
   tiltBlur:5,tiltFocus:.50,tiltBand:.40,tiltFade:.30,
   vignetteDarkness:.90,vignetteClear:.15,
@@ -13,6 +16,12 @@ const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSl
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
   motion:new WeakMap(),motes:[],ripples:[],hits:[],weaponArts:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
 const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
+// 死亡強化の加算Lvで色分け。実Lvや主人公とのLv差では判定しない。
+function feelEnemyLevelColor(bonus=deathPressureLevel(S.run?.depth||1)){
+  if(bonus>=FEEL_TUNING.enemyLevelRedFrom) return FEEL_TUNING.enemyLevelRedColor;
+  if(bonus>=FEEL_TUNING.enemyLevelOrangeFrom) return FEEL_TUNING.enemyLevelOrangeColor;
+  return bonus>0 ? FEEL_TUNING.enemyLevelYellowColor : FEEL_TUNING.enemyLevelNormalColor;
+}
 // Deterministic decoration noise is independent of combat / loot RNG.
 function feelHash(x,y,s=0){let n=Math.imul(x+17,374761393)^Math.imul(y+31,668265263)^Math.imul((S.run?.depth||1)+s,1274126177);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967296;}
 function feelDecorAt(x,y,Z){return feelHash(x,y)<(Z.id==='root'?.30:Z.id==='stone'?.23:.16);}

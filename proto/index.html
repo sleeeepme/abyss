@@ -1182,6 +1182,7 @@
   <div class="card" id="ev-body" style="text-align:left;line-height:1.9"></div>
   <div style="height:14px"></div>
   <button class="primary" id="ev-yes">やる</button>
+  <button class="ghost" id="ev-offer" hidden>100SPを捧げる</button>
   <div style="height:8px"></div>
   <button class="ghost" id="ev-no">やめる</button>
 </div></div>
@@ -3360,18 +3361,21 @@ function upgLv(id){ return S.upg[id]||0; }
    1体あたりの単価が上がるからではない。 */
 const SP_MOB = 1, SP_ELITE = 2, SP_UNIQ = 3;
 const SP_MID = 5, SP_GREAT = 10, SP_FINAL = 20;
+// 死亡強化だけを報酬にも反映。通常の深度・呪いによるLv加算とは分ける。
 function shardDrop(e, depth){
+  const bonus=deathPressureLevel(depth);
+
   /* 侵入者は先に見る。倒した瞬間に入る経路が1本になったので、
      ここで返さないと「基本分＋侵入者分」で二重に入る。
      **この敵が何SPか**を答える場所は、ここ1ヶ所に保つ。 */
-  if(e.intruder) return INTRUDER_SHARDS;
+  if(e.intruder) return INTRUDER_SHARDS+bonus;
   /* 磯虫は1体ずつは出さず、群れを散らした最後の1体で群れの頭数の3割ぶんをまとめて出す */
-  if(e.swarmling) return (typeof packCleared==='function' && packCleared(e)) ? Math.max(SP_MOB, Math.round(SP_MOB*(e._packN||10)*SLATER_REWARD)) : 0;
-  if(e.boss) return e.tier==='final' ? SP_FINAL
-           : e.tier==='great' ? SP_GREAT : SP_MID;
-  if(e.uniq)  return SP_UNIQ;
-  if(e.elite) return SP_ELITE;
-  return SP_MOB;
+  if(e.swarmling) return (typeof packCleared==='function' && packCleared(e)) ? Math.max(SP_MOB, Math.round((SP_MOB+bonus)*(e._packN||10)*SLATER_REWARD)) : 0;
+  if(e.boss) return (e.tier==='final' ? SP_FINAL
+           : e.tier==='great' ? SP_GREAT : SP_MID)+bonus;
+  if(e.uniq)  return SP_UNIQ+bonus;
+  if(e.elite) return SP_ELITE+bonus;
+  return SP_MOB+bonus;
 }
 /* SPを口座へ入れる。**床には落とさない。**
    経験値・金と同じで、倒した瞬間に入る。
@@ -6151,6 +6155,7 @@ const S={
   stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1,
   // 生きて帰った最深。到達（deepest）とは別に持つ——加護が掛かるのはこちら側
   deepestBack:0, deaths:0, runs:0, abyssCall:false,
+  deathPressure:{},      // 階ごとの死亡蓄積。泉へのSP奉納で全階リセット
   mapOn:false,           // 地図は既定で出さない（🗺 のトグル）
   bossClear:0,           // 倒したボスの最深階。能力強化の段はこれで開く
   /* ---------- 生成の塩 ----------
@@ -7655,10 +7660,45 @@ function uniqMul(depth){
 const ENEMY_STEP = 5;            // この階数ごとに一段乗る
 const ENEMY_HARD_FROM = 15;      // ここから曲線を吊り上げる
 const ENEMY_STEP_LV = 3;         // 一段ぶんのレベル
+// 10回ごとに1死亡ぶんの進行を 1, 1/2, 1/3…へ鈍化。端数は次の段へ持ち越す。
+const DEATH_PRESSURE_STEP = 10;
+const SPRING_OFFER_COST = 100;
+function deathPressureLevel(depth){
+  const n=(S.deathPressure||{})[depth]||0;
+  const blocks=Math.floor(n/DEATH_PRESSURE_STEP);
+  let progress=0;
+  for(let i=1;i<=blocks;i++) progress+=DEATH_PRESSURE_STEP/i;
+  progress+=(n%DEATH_PRESSURE_STEP)/(blocks+1);
+  return Math.floor(progress+1e-9);
+}
+function recordDeathPressure(depth){
+  S.deathPressure=S.deathPressure||{};
+  for(let d=1;d<=depth;d++) S.deathPressure[d]=(S.deathPressure[d]||0)+1;
+}
 function enemyLevelAt(depth){
-  const base = depth + Math.floor(depth/8);
+  const base = depth + Math.floor(depth/8) + deathPressureLevel(depth);
   if(depth < ENEMY_HARD_FROM) return base;
   return base + (Math.floor((depth-ENEMY_HARD_FROM)/ENEMY_STEP)+1)*ENEMY_STEP_LV;
+}
+// 現在の階もその場で解除。被ダメージ割合・各種倍率・第二形態の控えを保つ。
+function clearDeathPressure(){
+  const bonus=S.run ? deathPressureLevel(S.run.depth) : 0;
+  if(bonus) for(const e of W.enemies){
+    const old=e.lv, lv=Math.max(1,old-bonus);
+    const hpMul=(26+lv*11)/(26+old*11), atkMul=(5+lv*2.6)/(5+old*2.6);
+    const resizeHp=(o,maxKey,hpKey)=>{
+      const max=o[maxKey], ratio=o[hpKey]/max;
+      o[maxKey]=Math.max(1,Math.round(max*hpMul));
+      if(hpKey in o) o[hpKey]=Math.max(0,Math.min(o[maxKey],o[maxKey]*ratio));
+    };
+    e.lv=lv; e.atkV*=atkMul;
+    if(!e.undying){
+      e.def*=lv/old; resizeHp(e,'maxHp','hp');
+      if(e.form2){ e.form2.atkV*=atkMul; e.form2.def*=lv/old; resizeHp(e.form2,'maxHp','hp'); }
+      if(e.parts) for(const part of e.parts) resizeHp(part,'max','hp');
+    }
+  }
+  S.deathPressure={};
 }
 
 /* ---------- 序盤の牙 ----------
@@ -12036,6 +12076,7 @@ function killEnemy(e, byAlly){
      経験値も金も落とし物も、**最初の1回だけ**。 */
   if(e.noXp && e.noDrop) return;
   const st=stats(S.hero);
+  const rewardDepth=S.run.depth+deathPressureLevel(S.run.depth);
   const cfg = e.boss ? BOSS_STATS[e.tier] : null;
   /* ---------- 第50階層の主が呼ぶ雑魚は経験値3倍 ----------
      「削って終わり」ではなく、**戦いながらレベルを上げる**階にしたい。
@@ -12081,7 +12122,7 @@ function killEnemy(e, byAlly){
     // 確定ドロップ。ボスに挑む理由は恩寵だけでなく物としても要る。
     for(let i=0;i<cfg.drops;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
-                    it:genItem(S.run.depth+cfg.ilvl, st.mf+40, S.run.depth)});
+                    it:genItem(rewardDepth+cfg.ilvl, st.mf+40, S.run.depth)});
     S.run.bossAlive=false;
     openReturnPortal();   // 穴のそばに帰還ポータルが現れる（穴とは別の物）
     /* ---------- 段（tier）の解禁は「倒したこと」で記録する ----------
@@ -12142,7 +12183,7 @@ function killEnemy(e, byAlly){
     S.run.intrNext=intrClock()+INTRUDER_RESPAWN;
     for(let i=0;i<3;i++)
       W.drops.push({x:e.x+rf(-0.8,0.8), y:e.y+rf(-0.8,0.8),
-                    it:genItem(S.run.depth+5, st.mf+30, S.run.depth)});
+                    it:genItem(rewardDepth+5, st.mf+30, S.run.depth)});
     openBoonPick('unique', e.name);
     return;
   }
@@ -12154,7 +12195,7 @@ function killEnemy(e, byAlly){
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.7,max:0.7});
     for(let i=0;i<2;i++)
       W.drops.push({x:e.x+rf(-0.6,0.6), y:e.y+rf(-0.6,0.6),
-                    it:genItem(S.run.depth+4, st.mf+25, S.run.depth)});
+                    it:genItem(rewardDepth+4, st.mf+25, S.run.depth)});
     openBoonPick('unique', e.name);
     return;
   }
@@ -12174,8 +12215,8 @@ function killEnemy(e, byAlly){
   let rate = (0.075 + (e.elite?0.12:0)) * (e.swarmling?SLATER_REWARD:1);
   // 盗賊の「物色」: 仲間がとどめを刺したときに追加のドロップ
   if(byAlly && jobDef(byAlly.job).sk.id==='scavenge' && rnd()<0.18)
-    W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-1,4), st.mf+40, S.run.depth)});
-  if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(S.run.depth+ri(-2,3), st.mf, S.run.depth)});
+    W.drops.push({x:e.x,y:e.y,it:genItem(rewardDepth+ri(-1,4), st.mf+40, S.run.depth)});
+  if(rnd()<rate) W.drops.push({x:e.x,y:e.y,it:genItem(rewardDepth+ri(-2,3), st.mf, S.run.depth)});
 
   /* ---------- 最初の1体は必ず武器を落とす ----------
      素手で始まる探索の一番最初に、拾える物が1つも出ないことが普通に起きる
@@ -12184,7 +12225,7 @@ function killEnemy(e, byAlly){
      確率ではなく確定にする。数はここだけの1本で、以降は通常の抽選に戻る。 */
   if(S.run.kills===1)
     W.drops.push({x:e.x+rf(-0.3,0.3), y:e.y+rf(-0.3,0.3),
-                  it:genWeapon(S.run.depth+ri(-1,2), st.mf, S.run.depth)});
+                  it:genWeapon(rewardDepth+ri(-1,2), st.mf, S.run.depth)});
 
   /* ---------- レジェンド ----------
      40階以降の黄色個体だけが落とす。1%。**掘って出す物ではなく、出会う物**。
@@ -13170,6 +13211,7 @@ function die(){
     return;
   }
   S.deaths++;
+  recordDeathPressure(S.run.depth);
   /* ---------- アビスの口が呼ぶ ----------
      決まった回数だけ死んだ代は、街へ帰さずに**第51階層へ直に落とす。**
      勝てる相手ではない。だが「いつか行く場所」を数字ではなく1度見せておくと、
@@ -13242,7 +13284,7 @@ function die(){
      「どこに何が残ったか」が埋もれていた（報告：文字情報が多すぎる）。
      残すのは**この探索で何が起きたか**だけにする。
      規則は遺体を回収する場面と「遊び方」に書いてある。 */
-  let html='';
+  let html='<div style="color:#e0705a;line-height:1.9">第1〜'+S.run.depth+'階層に死の蓄積 — この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</div>';
   html += S.grave
     ? '<div style="color:#7fe0c0;line-height:1.9">'
       + `遺体が<b>第${S.grave.depth}階層</b>に残った</div>`
@@ -14107,7 +14149,7 @@ function spawnTrialEnemy(){
   if(!W.fl || !S.run) return;
   const depth=S.run.depth;
   const fams=floorFamilies(depth);
-  const lv=depth+Math.floor(depth/6)+1;
+  const lv=depth+Math.floor(depth/6)+1+deathPressureLevel(depth);
   for(let i=0;i<24;i++){
     const ang=rnd()*Math.PI*2, r=rf(TRIAL_SPAWN_MIN, TRIAL_SPAWN_MAX);
     const x=P.x+Math.cos(ang)*r, y=P.y+Math.sin(ang)*r;
@@ -15589,7 +15631,7 @@ function draw(){
          名前と Lv がどちらも読めない二重の文字列になる。 */
       const nameTag=(y,col,sc)=>{
         label(e.name, sx, y, col, sc);
-        label('Lv.'+e.lv, sx, y+Math.max(9,TS*0.36*sc)*1.05, '#98a1b2', sc*0.82);
+        label('Lv.'+e.lv, sx, y+Math.max(9,TS*0.36*sc)*1.05, feelEnemyLevelColor(), sc*0.82);
       };
       if(e.intruder)
         nameTag(sy+R+TS*0.42, '#ff6a5a', 1);
@@ -20820,12 +20862,22 @@ function openEvent(){
   const d=eventDef(ev.id);
   S.screen='event';
   el('hud').classList.remove('on');
-  el('ev-title').textContent = d.icon+' '+d.nm;
+  el('ev-title').innerHTML = d.icon+' '+d.nm;
   el('ev-title').style.color = d.col;
   el('ev-sub').textContent = d.sub;
 
   // 実行できない条件はここで潰しておく（押しても何も起きないボタンを作らない）
   let body=d.body, can=true, why='';
+  const offer=el('ev-offer');
+  offer.hidden=ev.id!=='spring';
+  if(ev.id==='spring'){
+    const active=Object.values(S.deathPressure||{}).some(n=>n>0);
+    offer.disabled=!active || (S.shards||0)<SPRING_OFFER_COST;
+    offer.textContent=SPRING_OFFER_COST+'SPを捧げる（蓄積リセット）';
+    body+='<br><br><b>死の蓄積：この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</b>'
+      +'<br>100SPを捧げると全階の蓄積を解除。泉は消費され、回復はしない。'
+      +'<br>所持 '+(S.shards||0)+'SP'+(!active?' ／ 蓄積なし':(S.shards||0)<SPRING_OFFER_COST?' ／ SP不足':'');
+  }
   if(ev.id==='urn'){
     const un=(S.run.loot||[]).filter(it=>!it.ident);
     if(!un.length){ can=false; why='未鑑定の装備を持っていない。'; }
@@ -20858,7 +20910,7 @@ function resolveEvent(){
                     it:genItem(S.run.depth+ri(0,5), st.mf+30, S.run.depth)});
     // 代償。音を聞きつけた敵が周りに湧く。
     const fams=floorFamilies(S.run.depth);
-    const lv=S.run.depth+Math.floor(S.run.depth/8);
+    const lv=S.run.depth+Math.floor(S.run.depth/8)+deathPressureLevel(S.run.depth);
     for(let i=0;i<4;i++){
       const a=pick(ARCH), fam=pick(fams.length?fams:[FAMILY[0]]);
       const ang=i/4*Math.PI*2;
@@ -20929,6 +20981,19 @@ bindTap(el('ev-yes'), ()=>{
   if(ev.id==='urn' && !(S.run.loot||[]).some(it=>!it.ident)){ closeEvent(); return; }
   resolveEvent();
 });
+function offerAtSpring(){
+  const ev=nearEvent();
+  if(!S.hero || !S.run || !ev || ev.id!=='spring' || S.screen!=='event') return;
+  if((S.shards||0)<SPRING_OFFER_COST || !Object.values(S.deathPressure||{}).some(n=>n>0)) return;
+  S.shards-=SPRING_OFFER_COST;
+  clearDeathPressure();
+  ev.used=true;
+  log('100SPを泉に捧げた — 全階の死の蓄積が消えた');
+  W.fx.push({t:'grave',x:P.x,y:P.y,life:0.7,max:0.7});
+  closeEvent();
+  if(window.ABYSS_SAVE) ABYSS_SAVE.request();
+}
+bindTap(el('ev-offer'), offerAtSpring);
 bindTap(el('ev-no'), closeEvent);
 bindTap(el('tr-yes'), startTrial);
 bindTap(el('tr-no'),  closeTrial);
@@ -21299,7 +21364,7 @@ bindTap(el('dbg-reset'), ()=>{
   if(window.ABYSS_SAVE && !window.ABYSS_SAVE.clear()) return;
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
-  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
@@ -21620,7 +21685,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261009a"></script>
-<script src="game-feel.js?v=20261013-kin-layer"></script>
+<script src="game-feel.js?v=20261013-level-color"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
 <script src="cave-look.js?v=20261008a"></script>
@@ -21672,7 +21737,7 @@ if(typeof tapDash === 'function'){
 }
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
-<script src="save-load.js?v=20261001a"></script>
+<script src="save-load.js?v=20261013pressure"></script>
 <script src="audio.js?v=20261009a"></script>
 <script src="audio-game.js?v=20261010a"></script>
 </body>
