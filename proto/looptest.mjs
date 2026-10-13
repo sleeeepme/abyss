@@ -403,7 +403,7 @@ R.shardBuys = await pg.evaluate(()=>{
   S.hero=null; S.run=null; S.upg={}; S.gold=99999; S.shards=0;
   const u=UPGRADES.find(x=>x.id==='hp');
   const cost=upgCost(u,0);
-  setScreen('town'); setScreen('upg');
+  setScreen('town'); setScreen('upg'); upgSelect('hp');
   const row=()=>document.querySelector('[data-upg="hp"]');
   row().dispatchEvent(new MouseEvent('click',{bubbles:true}));  // 秘石ゼロ・金だけ潤沢
   const blocked=upgLv('hp')===0 && S.gold===99999;

@@ -16,6 +16,7 @@ R.upgListed = await pg.evaluate(()=>{
   S.upg={}; S.shards=99999;
   setScreen('upg');
   const shown=el('upgrades').textContent.includes(u.nm);
+  upgSelect('ally');
   document.querySelector('[data-upg="ally"]').dispatchEvent(new MouseEvent('click',{bubbles:true}));
   const lv1=upgLv('ally');
   const cost=upgCost(u,0);

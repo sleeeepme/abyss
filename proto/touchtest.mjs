@@ -43,6 +43,7 @@ await pg.evaluate(()=>{ S.gold=9999; S.shards=999; S.deepest=20;
   rerollShop(); renderTown(); });
 await tap('#btn-go-upg');
 const g0=await pg.evaluate(()=>({gold:S.gold, shards:S.shards}));
+await tap('[data-upgsel="hp"]');   // スキルツリー：ノードを選んでから札のボタンで強化
 await tap('[data-upg="hp"]');
 R.upgradeByTap = await pg.evaluate(g=>upgLv('hp')===1 && S.shards<g.shards && S.gold===g.gold, g0);
 
@@ -63,6 +64,10 @@ R.equipByTap = await pg.evaluate(u=>Object.values(S.hero.equip).some(i=>i&&i.uid
 await tap('#scr-stash [data-back]');
 await tap('#btn-go-upg');
 const before = await pg.evaluate(()=>({g:S.shards, lv:upgLv('atk')}));
+await pg.locator('[data-upgsel="atk"]').scrollIntoViewIfNeeded();
+const box0 = await pg.locator('[data-upgsel="atk"]').boundingBox();
+await pg.touchscreen.tap(box0.x+box0.width/2, box0.y+box0.height/2).catch(()=>{});
+await pg.waitForTimeout(300);
 await pg.locator('[data-upg="atk"]').scrollIntoViewIfNeeded();
 const box = await pg.locator('[data-upg="atk"]').boundingBox();
 await pg.touchscreen.tap(box.x+box.width/2, box.y+box.height/2).catch(()=>{});

@@ -1946,6 +1946,307 @@
   function sRegenGround(t, o) { if (t >= 0 && t < 0.3) ellRing(o.x, o.y + 1, 6 + t * 12, 2 + t * 5, P.hl1, 1 - t / 0.3); }
   function sRegenAir(t, o) { for (let i = 0; i < 3; i++) { const b = t - i * 0.08; if (b < 0 || b > 0.6) continue; healCross(o.x + (i - 1) * 5, o.y - 8 - b * 16, b < 0.2 ? P.hl0 : P.hl1, 1 - b / 0.6); } }
 
+  /* ============ スキル技 2026-10-13 追加の10種（ショックの仲間） ============
+     実機で使う部品（*_idle・*_boom・付いて回る印など）は aux にして図鑑には出さず、
+     図鑑の見本（s_chain など）はそれを組み合わせて段取りを見せる。 */
+  const SK_SHOCK = [P.W, P.sh1, P.sh3];
+  // 稲妻の折れ線。芯は白、脇に黄、外に橙。12fps×2 で形が変わる
+  function zap(x0, y0, x1, y1, seed, t, lv = 1, cols = SK_SHOCK) {
+    const L = Math.hypot(x1 - x0, y1 - y0) || 1, n = Math.max(2, Math.round(L / 6));
+    const nx = -(y1 - y0) / L, ny = (x1 - x0) / L, ph = Math.floor(t * ANIM_FPS * 2);
+    let lx = x0, ly = y0;
+    for (let i = 1; i <= n; i++) {
+      const f = i / n, j = i === n ? 0 : (hash(i + ph * 31, seed) * 2 - 1) * Math.min(5, L * 0.14);
+      const x = x0 + (x1 - x0) * f + nx * j, y = y0 + (y1 - y0) * f + ny * j;
+      line(lx + nx, ly + ny, x + nx, y + ny, cols[2], lv * 0.8);
+      line(lx - nx * 0.6, ly - ny * 0.6, x - nx * 0.6, y - ny * 0.6, cols[1], lv);
+      line(lx, ly, x, y, cols[0], lv);
+      lx = x; ly = y;
+    }
+  }
+  const CHAIN_HOP = 0.07;
+  function chainPts(o) {
+    if (o.pts) return o.pts.map(q => [q[0], q[1] - 6]);           // 実機：足元の座標で来るので胸の高さへ
+    return [[o.x, o.y - 6], ...(o.targets || []).map(e => [e[0], e[1] - 5])];
+  }
+  function sChainGround(t, o) {
+    const pts = chainPts(o);
+    for (let i = 1; i < pts.length; i++) { const b = t - i * CHAIN_HOP; if (b >= 0 && b < 0.3) lightPool(pts[i][0], pts[i][1] + 5, 9, 0.5 * (1 - b / 0.3), 'shock'); }
+  }
+  function sChainAir(t, o) {
+    if (t < 0) return;
+    const pts = chainPts(o);
+    for (let i = 1; i < pts.length; i++) {
+      const b = t - (i - 1) * CHAIN_HOP;
+      if (b >= 0 && b < 0.26 && ((Math.floor(b * 24) & 3) !== 3)) zap(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], 800 + i, t, b < 0.16 ? 1 : 0.5);
+      spark(pts[i][0], pts[i][1], t - i * CHAIN_HOP, RAMP.shock, 810 + i, 6);
+    }
+  }
+
+  /* ブーメラン：回る三日月の刃。x,y が刃の今の位置（実機は W.arts の位置） */
+  function boomerBlade(x, y, t, big = 1) {
+    const a = Math.floor(t * 16) * (TAU / 8), L = Math.round(5 * big);
+    for (let k = 0; k < 2; k++) {
+      const aa = a + k * 1.9, ux = Math.cos(aa), uy = Math.sin(aa) * 0.8;
+      for (let s = 0; s <= L; s++) {
+        const c = s === L ? P.W : s > L - 2 ? P.fr0 : P.fl0;
+        px(x + ux * s, y + uy * s, c); px(x + ux * s + uy * 0.9, y + uy * s - ux * 0.9, s > 1 ? P.fl1 : P.fl0);
+      }
+    }
+    px(x, y, P.W);
+  }
+  function sBoomerBladeAir(t, o) {
+    boomerBlade(o.x, o.y - 6, t, o.big || 1);
+    for (let i = 1; i <= 3; i++) px(o.x - Math.cos(o.ang) * i * 3, o.y - 6 - Math.sin(o.ang) * i * 3, i === 1 ? P.fl0 : P.fl1, 1 - i / 4);
+  }
+  const BOOMER_T = 0.45;
+  function boomerAt(t, o) {
+    const p = t < BOOMER_T ? easeOut(t / BOOMER_T) : 1 - easeIn(clamp((t - BOOMER_T) / BOOMER_T));
+    return [o.x + Math.cos(o.ang) * o.R * p, o.y + Math.sin(o.ang) * o.R * p * 0.9];
+  }
+  function sBoomerGround(t, o) { if (t >= 0 && t < BOOMER_T * 2) { const [x, y] = boomerAt(t, o); dust(x, y, (t * 3) % 0.4, 2, 820 + Math.floor(t * 6), 3, 0.4); } }
+  function sBoomerAir(t, o) {
+    if (t < 0 || t > BOOMER_T * 2) return;
+    const [x, y] = boomerAt(t, o);
+    boomerBlade(x, y - 6, t);
+    for (let i = 1; i <= 4; i++) { const [tx, ty] = boomerAt(Math.max(0, t - i * 0.03), o); px(tx, ty - 6, i < 2 ? P.fr0 : P.fl1, 1 - i / 5); }
+  }
+
+  /* フロストノヴァ：足元から氷の輪が広がり、輪の上に氷柱が立つ */
+  function sNovaGround(t, o) {
+    if (t < 0 || t > 0.8) return;
+    groundRing(o.x, o.y, t, o.R, 0.32, RAMP.frost, 0.62);
+    groundRing(o.x, o.y, t - 0.06, o.R * 0.7, 0.3, RAMP.frost, 0.62);
+    lightPool(o.x, o.y, o.R * 0.9, 0.5 * (1 - t / 0.8), 'frost');
+    if (t < 0.6) { const n = 14, lv = t < 0.4 ? 0.8 : 0.8 * (1 - (t - 0.4) / 0.2); for (let i = 0; i < n; i++) { const a = i / n * TAU + 0.2, d = o.R * (0.35 + 0.6 * hash(i, 830)); px(o.x + Math.cos(a) * d, o.y + Math.sin(a) * d * 0.62, P.fr1, lv); } }
+  }
+  function sNovaAir(t, o) {
+    if (t < 0 || t > 0.9) return;
+    const n = 12, r = o.R * easeOut(clamp(t / 0.32));
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU + hash(i, 831) * 0.3, b = t - 0.32 * (0.9 + hash(i, 832) * 0.1);
+      if (b < -0.25) continue;
+      const x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r * 0.62;
+      const grow = clamp((t / 0.32 - 0.1) * 1.4), fade = t > 0.6 ? (t - 0.6) / 0.3 : 0;
+      if (fade < 1 && !(fade > 0 && ((i + Math.floor(t * 24)) & 1))) iceSpike(x, y, 6 + hash(i, 833) * 4, 1 + (i & 1), grow, P.fr2, P.fr1);
+    }
+    if (t < 0.12) { plus(o.x, o.y - 6, P.W, 4); disc(o.x, o.y - 6, 2, P.fr0); }
+  }
+  /* 凍った敵：体を囲む氷の箱（網掛けで中が透ける）＋縁のきらめき。o.R は敵の体の半径（ドット） */
+  function sFrozenAir(t, o) {
+    const w = Math.max(6, Math.round(o.R * 1.1)), h = Math.round(w * 1.5), x0 = Math.round(o.x - w), y0 = Math.round(o.y - h - 2), x1 = Math.round(o.x + w), y1 = Math.round(o.y + 2);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const edge = x === x0 || x === x1 || y === y0 || y === y1;
+      if (edge) px(x, y, (x + y) & 1 ? P.fr1 : P.fr0, 0.95);
+      else if (((x + y) & 1) === 0 && ((x * 3 + y * 5) % 7 !== 0)) px(x, y, (y - y0) < 3 ? P.fr0 : P.fr2, 0.42);
+    }
+    line(x0 + 2, y0 + 2, x0 + 2, y0 + Math.round(h * 0.45), P.W, 0.9); line(x0 + 3, y0 + 2, x0 + 4, y0 + 2, P.W, 0.9);
+    const tw = Math.floor(t * 6) % 5; if (tw < 2) plus(x1 - 2, y0 + 2 + tw * 3, P.W, 1);
+  }
+
+  /* マイン：足元に置く小さな地雷。点滅は張っている合図（張る前はゆっくり） */
+  function sMineIdleGround(t, o) {
+    const x = Math.round(o.x), y = Math.round(o.y);
+    ellipse(x, y + 1, 4, 2, P.st3); ellipse(x, y, 4, 2, P.st1); hline(x - 3, x + 3, y - 1, P.st0);
+    const per = o.armed ? 0.35 : 0.9, on = (t % per) < per * 0.45;
+    px(x - 4, y, P.st4); px(x + 4, y, P.st4);
+    if (on) { px(x, y - 1, P.fi1); px(x, y - 2, P.W); if (o.armed) { px(x - 1, y - 1, P.fi3); px(x + 1, y - 1, P.fi3); } }
+    else px(x, y - 1, P.fi4);
+    if (o.armed && on) ellRing(x, y, 7, 3, P.fi3, 0.35, 8, t * 2);
+  }
+  function sMineBoomGround(t, o) {
+    if (t < 0 || t > 0.9) return;
+    groundRing(o.x, o.y, t, o.R, 0.3, RAMP.fire, 0.55);
+    cracks(o.x, o.y, t, 6, o.R * 0.6, 840, 0.1, 0.8, P.fi1, P.fi3);
+    lightPool(o.x, o.y, o.R, 0.7 * (1 - t / 0.9), 'fire');
+  }
+  function sMineBoomAir(t, o) {
+    if (t < 0 || t > 0.9) return;
+    const p = clamp(t / 0.5), n = 12;
+    for (let i = 0; i < n; i++) {
+      const a = hash(i, 841) * TAU, d = o.R * 0.75 * easeOut(p) * (0.4 + 0.6 * hash(i, 842));
+      const ci = Math.min(6, Math.floor(p * 5 + hash(i, 843) * 2)), s = Math.max(1, Math.round(4 * (1 - p) + 1));
+      if (ci >= 6) continue;
+      flamePuff(Math.round(o.x + Math.cos(a) * d), Math.round(o.y + Math.sin(a) * d * 0.6 - 4 - p * 8), s, ci, (i & 1) ? 1 : -1);
+    }
+    if (t < 0.08) { disc(o.x, o.y - 5, 6, P.W); disc(o.x, o.y - 5, 8, P.fi1, 0.5); }
+    dust(o.x, o.y - 2, t - 0.15, 7, 844, o.R * 0.6, 0.7);
+    spark(o.x, o.y - 6, t, RAMP.fire, 845, 10, 1.2);
+  }
+  function sMineGround(t, o) { const m = { x: o.x + 30, y: o.y + 2, R: T16(1.9), armed: t > 0.2 }; if (t < 0.7) sMineIdleGround(t, m); else sMineBoomGround(t - 0.7, m); }
+  function sMineAir(t, o) { if (t >= 0.7) sMineBoomAir(t - 0.7, { x: o.x + 30, y: o.y + 2, R: T16(1.9) }); }
+
+  /* 呪印：前方の扇に紫の刻印が走り、当たった敵の頭上に印が付く */
+  const MARK_GLYPH = [[0, 1, 1, 1, 0], [1, 0, 1, 0, 1], [1, 1, 1, 1, 1], [1, 0, 1, 0, 1], [0, 1, 1, 1, 0]];
+  function markGlyph(x, y, c, lv = 1) { for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) if (MARK_GLYPH[j][i]) px(x - 2 + i, y - 2 + j, c, lv); }
+  function sMarkGround(t, o) {
+    if (t < 0 || t > 0.5) return;
+    const half = (o.arc || 1.75) / 2, d = o.R * easeOut(clamp(t / 0.25)), lv = t < 0.3 ? 0.7 : 0.7 * (1 - (t - 0.3) / 0.2);
+    for (let k = -4; k <= 4; k++) { const a = o.ang + k / 4 * half; for (let s = 6; s < d; s += 5) px(o.x + Math.cos(a) * s, o.y + Math.sin(a) * s * 0.7, (s / 5 + k) & 1 ? P.ar1 : P.ar2, lv); }
+  }
+  function sMarkAir(t, o) {
+    if (t < 0) return;
+    (o.targets || []).forEach((e, i) => { const b = t - 0.12 - i * 0.03; if (b >= 0) sMarkedAir(b, { x: e[0], y: e[1], R: 6 }); });
+  }
+  function sMarkedAir(t, o) {
+    const y = Math.round(o.y - o.R * 2 - 8 + (Math.floor(t * 4) & 1)), x = Math.round(o.x);
+    if (t < 0.12) { markGlyph(x, y, P.W); ring(x, y, 5 - Math.round(t * 20), P.ar0); return; }
+    markGlyph(x, y, (Math.floor(t * 6) % 4) ? P.ar1 : P.ar0);
+    const a = t * 3; px(x + Math.cos(a) * 5, y + Math.sin(a) * 2, P.ar2); px(x - Math.cos(a) * 5, y - Math.sin(a) * 2, P.ar2);
+  }
+  function sBurstArcGround(t, o) { groundRing(o.x, o.y, t, o.R, 0.3, RAMP.arcane, 0.6); lightPool(o.x, o.y, o.R, 0.6 * (1 - t / 0.6), 'arcane'); }
+  function sBurstArcAir(t, o) {
+    if (t < 0 || t > 0.6) return;
+    if (t < 0.07) { disc(o.x, o.y - 6, 5, P.W); ring(o.x, o.y - 6, 7, P.ar0); }
+    for (let i = 0; i < 10; i++) {                                         // 割れて飛ぶ紫の欠片
+      const a = i / 10 * TAU + hash(i, 851), d = o.R * 0.8 * easeOut(clamp(t / 0.35)), lv = 1 - t / 0.6;
+      const x = o.x + Math.cos(a) * d, y = o.y - 6 + Math.sin(a) * d * 0.6;
+      line(x, y, x - Math.cos(a) * 2, y - Math.sin(a) * 1.4, i & 1 ? P.ar0 : P.ar1, lv);
+    }
+  }
+
+  /* グラビティ：渦。腕が内へ巻き込み、粒が吸い込まれる。最後に弾ける（sBurstArc） */
+  function sVortexGround(t, o) {
+    const R = o.R, life = o.life || 2.2, end = clamp((life - t) / 0.3), lv = Math.min(clamp(t / 0.2), end);
+    if (lv <= 0) return;
+    ellipse(o.x, o.y, 5, 3, P.ar4, lv); ellipse(o.x, o.y, 3, 2, P.ink, lv);
+    const tq = q12(t);
+    for (let k = 0; k < 4; k++) for (let s = 0; s < 26; s++) {                                  // 4本の腕
+      const f = s / 26, r = 4 + f * R * 0.9, a = k * TAU / 4 - tq * 5 + f * 3.2;
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.55, f < 0.3 ? P.ar0 : f < 0.65 ? P.ar1 : P.ar2, lv * (1 - f * 0.6));
+    }
+    ellRing(o.x, o.y, R, R * 0.55, P.ar2, lv * 0.5, 12, tq);
+  }
+  function sVortexAir(t, o) {
+    const life = o.life || 2.2; if (t < 0 || t > life) return;
+    for (let i = 0; i < 14; i++) {                                         // 吸い込まれていく粒
+      const per = 0.7, b = (t + hash(i, 861) * per) % per, f = 1 - b / per, a = hash(i, 862) * TAU - b * 6;
+      const r = 4 + f * o.R;
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.55 - 3 - f * 4, f > 0.6 ? P.ar2 : P.ar0);
+    }
+  }
+  function sVortexSceneGround(t, o) { if (t < 2.2) sVortexGround(t, { ...o, x: o.x + 44, life: 2.2 }); else sBurstArcGround(t - 2.2, { x: o.x + 44, y: o.y, R: T16(2.2) }); }
+  function sVortexSceneAir(t, o) { if (t >= 0 && t < 2.2) sVortexAir(t, { ...o, x: o.x + 44, life: 2.2 }); else sBurstArcAir(t - 2.2, { x: o.x + 44, y: o.y, R: T16(2.2) }); }
+
+  /* タレット：石の台に浮かぶ水色の結晶。撃つたびに強く光る */
+  function sTurretGround(t, o) {
+    const x = Math.round(o.x), y = Math.round(o.y), up = clamp(t / 0.25), end = o.life ? clamp((o.life - t) / 0.3) : 1;
+    if (up <= 0 || end <= 0) return;
+    ellipse(x, y + 1, 5, 2, P.st4, end); ellipse(x, y, 5, 2, P.st2, end);
+    for (let j = 0; j < Math.round(7 * up); j++) hline(x - 2, x + 2, y - 1 - j, j === 0 ? P.st3 : (j & 1) ? P.st1 : P.st2, end);
+    lightPool(x, y, 8, 0.35 * end, 'frost');
+  }
+  function sTurretAir(t, o) {
+    const x = Math.round(o.x), y = Math.round(o.y), up = clamp(t / 0.25), end = o.life ? clamp((o.life - t) / 0.3) : 1;
+    if (up < 1 || end <= 0) return;
+    const fy = y - 12 + (Math.floor(t * 3) & 1), hot = (o.shotAge != null && o.shotAge < 0.12);
+    px(x, fy - 3, P.W, end); hline(x - 1, x + 1, fy - 2, P.cy0, end); hline(x - 2, x + 2, fy - 1, hot ? P.W : P.cy1, end);
+    hline(x - 2, x + 2, fy, P.cy1, end); hline(x - 1, x + 1, fy + 1, P.cy2, end); px(x, fy + 2, P.cy2, end);
+    if (hot) plus(x, fy - 1, P.W, 3);
+  }
+  function sTurretShotAir(t, o) {
+    if (t < 0 || t > 0.22 || o.tx == null) return;
+    const fx = o.x, fy = o.y - 13, p = clamp(t / 0.08);
+    const ex = fx + (o.tx - fx) * p, ey = fy + (o.ty - 5 - fy) * p;
+    if (t < 0.12) { line(fx, fy, ex, ey, P.cy1, 0.7); line(fx + (ex - fx) * 0.5, fy + (ey - fy) * 0.5, ex, ey, P.W); }
+    spark(o.tx, o.ty - 5, t - 0.08, RAMP.cyan, 870, 5, 0.8);
+  }
+  function sTurretSceneGround(t, o) { sTurretGround(t, { x: o.x + 20, y: o.y + 4 }); }
+  function sTurretSceneAir(t, o) {
+    const T = { x: o.x + 20, y: o.y + 4 }, e = (o.targets || [])[0];
+    const k = t > 0.3 ? Math.floor((t - 0.3) / 0.45) : -1, b = t - 0.3 - k * 0.45;
+    sTurretAir(t, { ...T, shotAge: k >= 0 ? b : null });
+    if (k >= 0 && e) sTurretShotAir(b, { ...T, tx: (o.targets[k % o.targets.length] || e)[0], ty: (o.targets[k % o.targets.length] || e)[1] });
+  }
+
+  /* デコイ：光でできた身代わり。頭上の「！」と広がる輪で、敵の目を引いていると分かる */
+  function sDecoyGround(t, o) {
+    const end = o.life ? clamp((o.life - t) / 0.25) : 1, lv = Math.min(clamp(t / 0.15), end); if (lv <= 0) return;
+    const per = 0.8, b = t % per;
+    ellRing(o.x, o.y, 4 + b / per * 16, (4 + b / per * 16) * 0.5, P.ho1, lv * (1 - b / per));
+    ellipse(o.x, o.y + 1, 4, 2, P.ho3, lv * 0.6);
+  }
+  function sDecoyAir(t, o) {
+    const end = o.life ? clamp((o.life - t) / 0.25) : 1, lv = Math.min(clamp(t / 0.15), end); if (lv <= 0) return;
+    const x = Math.round(o.x), y = Math.round(o.y), fl = Math.floor(t * 12) & 1;
+    // 人の形（頭・肩・胴・脚）。網掛けで半分透ける
+    disc(x, y - 13, 2, P.ho0, lv * 0.85); hline(x - 3, x + 3, y - 10, P.ho1, lv * 0.8);
+    for (let j = 0; j < 6; j++) hline(x - 2, x + 2, y - 9 + j, j & 1 ? P.ho1 : P.ho0, lv * 0.7);
+    px(x - 1, y - 3, P.ho1, lv * 0.7); px(x + 1, y - 3, P.ho1, lv * 0.7); px(x - 1, y - 2, P.ho2, lv * 0.7); px(x + 1, y - 2, P.ho2, lv * 0.7);
+    if (fl) { px(x - 3, y - 9, P.W, lv); px(x + 3, y - 9, P.W, lv); }
+    const by = y - 21 - (Math.floor(t * 3) & 1);                           // 頭上の「！」
+    for (let j = 0; j < 4; j++) px(x, by + j, P.W, lv); px(x, by + 5, P.W, lv);
+    px(x - 1, by, P.ho1, lv); px(x + 1, by, P.ho1, lv);
+  }
+  function sBurstHolyGround(t, o) { groundRing(o.x, o.y, t, o.R, 0.3, RAMP.holy, 0.55); lightPool(o.x, o.y, o.R, 0.5 * (1 - t / 0.6), 'holy'); }
+  function sBurstHolyAir(t, o) {
+    if (t < 0 || t > 0.6) return;
+    if (t < 0.1) { disc(o.x, o.y - 8, 6, P.W); }
+    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU, d = o.R * 0.8 * easeOut(clamp(t / 0.3)); px(o.x + Math.cos(a) * d, o.y - 8 + Math.sin(a) * d * 0.6, i & 1 ? P.ho0 : P.W, 1 - t / 0.6); }
+    spark(o.x, o.y - 8, t, RAMP.holy, 880, 8, 1);
+  }
+  function sDecoySceneGround(t, o) { const D = { x: o.x + 26, y: o.y + 2, life: 1.6 }; if (t >= 0 && t < 1.6) sDecoyGround(t, D); else if (t >= 1.6) sBurstHolyGround(t - 1.6, { ...D, R: T16(2.4) }); }
+  function sDecoySceneAir(t, o) { const D = { x: o.x + 26, y: o.y + 2, life: 1.6 }; if (t >= 0 && t < 1.6) sDecoyAir(t, D); else if (t >= 1.6) sBurstHolyAir(t - 1.6, { ...D, R: T16(2.4) }); }
+
+  /* メテオ：狙った場所に赤い予兆の円 → 空から燃える岩 → 大きな爆発 */
+  function sMeteorFallGround(t, o) {
+    const L = o.life || 1.0; if (t < 0 || t > L) return;
+    teleCircle(o.x, o.y, o.R, clamp(t / L));
+  }
+  function sMeteorFallAir(t, o) {
+    const L = o.life || 1.0; if (t < L - 0.45 || t > L) return;
+    const p = clamp((t - (L - 0.45)) / 0.45), sx = o.x + 46 * (1 - p), sy = o.y - 8 - 110 * (1 - p);
+    for (let i = 1; i <= 8; i++) { const q = Math.max(0, p - i * 0.035); const tx = o.x + 46 * (1 - q), ty = o.y - 8 - 110 * (1 - q); flamePuff(Math.round(tx), Math.round(ty), Math.max(1, 4 - (i >> 1)), Math.min(5, i >> 1), 0); }
+    disc(sx, sy, 5, P.st2); disc(sx - 1, sy - 1, 3, P.st1); px(sx - 2, sy - 2, P.st0); ring(sx, sy, 5, P.fi3);
+  }
+  function sMeteorBoomGround(t, o) {
+    if (t < 0 || t > 1.2) return;
+    groundRing(o.x, o.y, t, o.R * 1.1, 0.35, RAMP.fire, 0.6);
+    groundRing(o.x, o.y, t - 0.08, o.R * 0.75, 0.3, RAMP.fire, 0.6);
+    cracks(o.x, o.y, t, 9, o.R * 0.8, 890, 0.15, 1.2, P.fi1, P.fi3);
+    lightPool(o.x, o.y, o.R * 1.1, 0.9 * (1 - t / 1.2), 'fire');
+  }
+  function sMeteorBoomAir(t, o) {
+    if (t < 0 || t > 1.0) return;
+    sMineBoomAir(t, { x: o.x, y: o.y, R: o.R * 1.3 });
+    if (t < 0.1) { disc(o.x, o.y - 8, 10, P.W); }
+    dust(o.x, o.y - 4, t - 0.1, 10, 891, o.R * 0.9, 0.9, null, 1.4);
+  }
+  function sEmbersGround(t, o) {
+    const L = o.life || 2.5, lv = clamp((L - t) / 0.5) * 0.7; if (lv <= 0) return;
+    for (let i = 0; i < 16; i++) { const a = hash(i, 895) * TAU, r = Math.sqrt(hash(i, 896)) * o.R * 0.9, f = (Math.floor(t * 8) + i) % 5;
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.6, f === 0 ? P.fi1 : f < 3 ? P.fi3 : P.fi4, lv); }
+  }
+  function sEmbersAir(t, o) {
+    const L = o.life || 2.5; if (t > L) return;
+    for (let i = 0; i < 6; i++) { const b = (t + hash(i, 897)) % 0.8, a = hash(i, 898) * TAU, r = Math.sqrt(hash(i, 899)) * o.R * 0.8;
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.6 - b * 16, b < 0.3 ? P.fi1 : P.fi3, 1 - b / 0.8); }
+  }
+  function sMeteorSceneGround(t, o) { const M = { x: o.x + 54, y: o.y, R: T16(2.6), life: 1.0 }; if (t < 1.0) sMeteorFallGround(t, M); else { sMeteorBoomGround(t - 1.0, M); sEmbersGround(t - 1.0, { ...M, life: 1.4 }); } }
+  function sMeteorSceneAir(t, o) { const M = { x: o.x + 54, y: o.y, R: T16(2.6), life: 1.0 }; if (t < 1.0) sMeteorFallAir(t, M); else sMeteorBoomAir(t - 1.0, M); }
+
+  /* トルネード：前へ進む竜巻。上ほど広い輪が回り、足元に土煙、まわりを砂粒が回る */
+  function sTornadoGround(t, o) {
+    const end = o.life ? clamp((o.life - t) / 0.3) : 1; if (end <= 0) return;
+    dust(o.x, o.y, (t % 0.45), 4, 900 + Math.floor(t / 0.45), 7, 0.45, null, 1, end);
+    ellRing(o.x, o.y, 7, 3, P.du1, end * 0.6, 10, q12(t) * 6);
+  }
+  function sTornadoAir(t, o) {
+    const end = o.life ? clamp((o.life - t) / 0.3) : 1, lv = Math.min(clamp(t / 0.15), end); if (lv <= 0) return;
+    const R = o.R || 18, tq = q12(t * 2) / 2;
+    for (let j = 0; j < 9; j++) {
+      const h = j * 3.4, w = 2 + j * (R * 0.06 + 0.9), sway = Math.sin(t * 5 + j * 0.6) * j * 0.35;
+      const y = o.y - 2 - h, x = o.x + sway;
+      ellRing(x, y, w, Math.max(1, w * 0.3), j < 2 ? P.du0 : (j & 1) ? P.W : P.bw0, lv * (j > 6 ? 0.75 : 1), 6, tq * 3 + j * 0.35);
+    }
+    for (let i = 0; i < 8; i++) {                                          // 巻き上がる砂粒
+      const b = (t * 0.9 + hash(i, 905)) % 1, a = t * 9 + i * 1.7, r = 3 + b * R * 0.55;
+      px(o.x + Math.cos(a) * r, o.y - 3 - b * 28 + Math.sin(a) * r * 0.25, b < 0.5 ? P.du0 : P.du1, lv);
+    }
+  }
+  function sTornadoSceneGround(t, o) { const p = clamp(t / 2.0); sTornadoGround(t, { x: o.x + 10 + p * 90, y: o.y, R: T16(1.3), life: 2.0 }); }
+  function sTornadoSceneAir(t, o) { const p = clamp(t / 2.0); if (t >= 0) sTornadoAir(t, { x: o.x + 10 + p * 90, y: o.y, R: T16(1.3), life: 2.0 }); }
+
   /* ============ 効いている間の足元の輪（守護・鉄壁・生気・聖域・恩寵） ============ */
   const AURA_COL = { ward: [P.hl1, P.hl0], aegis: [P.ag1, P.ag0], bloom: [P.lf2, P.lf1], sanct: [P.ho1, P.ho0], grace: [P.hl0, P.W] };
   function auraGround(t, o) {
@@ -2875,6 +3176,75 @@
       ground: (t, o) => { const ts = t + 0.1; auraGround(ts, { x: o.x, y: o.y, aura: 'ward' }); ['aegis', 'bloom', 'sanct', 'grace'].forEach((k, i) => o.allies && o.allies[i] && auraGround(ts + i * 0.2, { x: o.allies[i][0], y: o.allies[i][1], aura: k })); },
       air: (t, o) => { const ts = t + 0.1; auraAir(ts, { x: o.x, y: o.y, aura: 'ward' }); ['aegis', 'bloom', 'sanct', 'grace'].forEach((k, i) => o.allies && o.allies[i] && auraAir(ts + i * 0.2, { x: o.allies[i][0], y: o.allies[i][1], aura: k })); }
     },
+    /* ---- スキル技（2026-10-13 追加）。図鑑の見本と、実機の部品（aux） ---- */
+    s_chain: {
+      group: 'skill', label: 'チェインライトニング', who: 'スキル・敵から敵へ跳ねる雷', caster: 'mage', ramp: 'shock', castAt: 0.3, span: 0.7, loop: 1.6, charge: 0.15, recover: [0.3, 0.6], pose: 'thrust', status: 'shock',
+      cx: 22, cy: 70, ang: 0, R: T16(5.5), enemies: [[64, 60], [96, 80], [124, 56], [140, 86]],
+      hits: (o, e, i) => [{ t: (i + 1) * CHAIN_HOP, k: 1 }], ground: sChainGround, air: sChainAir
+    },
+    s_boomer: {
+      group: 'skill', label: 'ブーメラン', who: 'スキル・行って戻る刃（往復で2回当たる）', caster: 'warrior', castAt: 0.3, span: 0.95, loop: 1.9, charge: 0.15, recover: [0.85, 1.0], pose: 'melee', swings: [0],
+      cx: 24, cy: 70, ang: 0, R: T16(5.0), enemies: [[70, 70], [104, 72]],
+      hits: (o, e) => { const f = (e[0] - o.x) / o.R, a = Math.asin(Math.sqrt(clamp(f))) ; const t1 = BOOMER_T * (1 - Math.sqrt(1 - clamp(f))); return [{ t: t1, k: 1 }, { t: BOOMER_T * 2 - t1 * 0.8, k: -1 }]; },
+      ground: sBoomerGround, air: sBoomerAir
+    },
+    s_boomer_blade: { aux: true, span: 9, ground: () => {}, air: sBoomerBladeAir },
+    s_nova: {
+      group: 'skill', label: 'フロストノヴァ', who: 'スキル・周りを凍らせて止める', caster: 'mage', ramp: 'frost', castAt: 0.35, span: 0.9, loop: 2.0, charge: 0.2, recover: [0.3, 0.6], pose: 'high', status: 'chill',
+      cx: 80, cy: 66, ang: 0, R: T16(2.6), enemies: [[48, 58], [114, 62], [96, 86], [60, 84]],
+      hits: (o, e) => [{ t: 0.25, k: 0 }], ground: sNovaGround, air: sNovaAir
+    },
+    s_frozen: { aux: true, span: 1e9, ground: () => {}, air: sFrozenAir },
+    s_mine: {
+      group: 'skill', label: 'マイン', who: 'スキル・足元に罠を置く（踏んだ敵の周りが爆ぜる）', caster: 'warrior', ramp: 'fire', castAt: 0.3, span: 1.6, loop: 2.4, charge: 0.1, recover: [0.2, 0.4], pose: 'idle', status: 'burn',
+      cx: 60, cy: 70, ang: 0, R: T16(1.9), enemies: [[92, 66], [104, 78]],
+      hits: () => [{ t: 0.72, k: 2 }], ground: sMineGround, air: sMineAir
+    },
+    s_mine_idle: { aux: true, span: 1e9, ground: sMineIdleGround, air: () => {} },
+    s_mine_boom: { aux: true, span: 0.95, ground: sMineBoomGround, air: sMineBoomAir },
+    s_mark: {
+      group: 'skill', label: '呪印', who: 'スキル・印の付いた敵は脆くなり、倒れると周りへ爆ぜて印を移す', caster: 'mage', ramp: 'arcane', castAt: 0.3, span: 1.4, loop: 2.2, charge: 0.2, recover: [0.3, 0.6], pose: 'thrust', status: 'arcane',
+      cx: 30, cy: 70, ang: 0, R: T16(4.2), arc: 1.75, enemies: [[72, 60], [90, 76], [100, 62]],
+      hits: (o, e, i) => [{ t: 0.12 + i * 0.03, k: 0 }], ground: sMarkGround, air: sMarkAir
+    },
+    s_marked: { aux: true, span: 1e9, ground: () => {}, air: sMarkedAir },
+    s_burst_arc: { aux: true, span: 0.65, ground: sBurstArcGround, air: sBurstArcAir },
+    s_vortex: {
+      group: 'skill', label: 'グラビティ', who: 'スキル・渦で敵を寄せ集め、最後に弾ける', caster: 'mage', ramp: 'arcane', castAt: 0.35, span: 2.9, loop: 3.4, charge: 0.25, recover: [0.3, 0.6], pose: 'high', life: 2.2,
+      cx: 30, cy: 68, ang: 0, R: T16(3.6), enemies: [[100, 52], [124, 70], [96, 88]],
+      hits: () => [{ t: 2.2, k: 2 }], ground: sVortexSceneGround, air: sVortexSceneAir
+    },
+    s_vortex_live: { aux: true, span: 1e9, ground: sVortexGround, air: sVortexAir },
+    s_turret: {
+      group: 'skill', label: 'タレット', who: 'スキル・その場に砲台を置き、近くの敵を撃たせる', caster: 'warrior', ramp: 'cyan', castAt: 0.3, span: 2.5, loop: 2.6, charge: 0.1, recover: [0.2, 0.4], pose: 'idle',
+      cx: 40, cy: 70, ang: 0, R: T16(6.0), enemies: [[104, 58], [120, 80]],
+      hits: (o, e, i) => [0, 1, 2, 3].filter(k => k % 2 === i).map(k => ({ t: 0.38 + k * 0.45, k: 1 })), ground: sTurretSceneGround, air: sTurretSceneAir
+    },
+    s_turret_live: { aux: true, span: 1e9, ground: sTurretGround, air: sTurretAir },
+    s_turret_shot: { aux: true, span: 0.25, ground: () => {}, air: sTurretShotAir },
+    s_decoy: {
+      group: 'skill', label: 'デコイ', who: 'スキル・敵の目を引く身代わり。消えるときに弾ける', caster: 'rogue', ramp: 'holy', castAt: 0.3, span: 2.3, loop: 2.8, charge: 0.1, recover: [0.2, 0.4], pose: 'idle',
+      cx: 50, cy: 70, ang: 0, R: T16(2.4), enemies: [[102, 62], [110, 82]],
+      hits: () => [{ t: 1.62, k: 2 }], ground: sDecoySceneGround, air: sDecoySceneAir
+    },
+    s_decoy_live: { aux: true, span: 1e9, ground: sDecoyGround, air: sDecoyAir },
+    s_burst_holy: { aux: true, span: 0.65, ground: sBurstHolyGround, air: sBurstHolyAir },
+    s_meteor: {
+      glow: {col:'#ff7a2e', a:0.40, at:'center', along:0, dx:54, rx:0.9, ry:0.5, dy:-6, spin:false, fade:0.6},
+      group: 'skill', label: 'メテオ', who: 'スキル・赤い円の所へ岩が落ちる（落ちるまで1秒）', caster: 'mage', ramp: 'fire', castAt: 0.35, span: 2.4, loop: 3.2, charge: 0.25, recover: [0.3, 0.6], pose: 'high', status: 'burn', sky: 120, ext: 80,
+      cx: 26, cy: 72, ang: 0, R: T16(2.6), enemies: [[78, 66], [94, 78]],
+      hits: () => [{ t: 1.02, k: 3, z: 6, zt: 0.3 }], ground: sMeteorSceneGround, air: sMeteorSceneAir
+    },
+    s_meteor_fall: { aux: true, span: 1e9, sky: 120, ext: 60, ground: sMeteorFallGround, air: sMeteorFallAir },
+    s_meteor_boom: { aux: true, span: 1.25, ground: sMeteorBoomGround, air: sMeteorBoomAir },
+    s_embers: { aux: true, span: 1e9, ground: sEmbersGround, air: sEmbersAir },
+    s_tornado: {
+      group: 'skill', label: 'トルネード', who: 'スキル・前へ進む竜巻。巻き込んだ敵を運びながら刻む', caster: 'warrior', castAt: 0.3, span: 2.3, loop: 2.8, charge: 0.15, recover: [0.3, 0.6], pose: 'melee', swings: [0], sky: 40,
+      cx: 20, cy: 72, ang: 0, R: T16(1.3), enemies: [[64, 70], [100, 74]],
+      hits: (o, e) => { const t0 = clamp((e[0] - o.x - 10) / 90) * 2.0; return [0, 1, 2].map(k => ({ t: t0 + k * 0.25, k: 1 })); },
+      ground: sTornadoSceneGround, air: sTornadoSceneAir
+    },
+    s_tornado_live: { aux: true, span: 1e9, sky: 40, ground: sTornadoGround, air: sTornadoAir },
 
 
     /* ==== ボス（5F 灰の大蛙・10F ヴェラ） ==== */
@@ -3186,6 +3556,7 @@
     let ext = d.ext != null ? (id === 'n_swing' ? Math.max(d.ext, R + 8) : d.ext) : Math.max(R, d.healR || 0, 24);
     if (p.tx != null) ext = Math.max(ext, Math.hypot(p.tx - p.x, p.ty - p.y) / k + 20);
     if (p.casterX != null) ext = Math.max(ext, Math.hypot(p.casterX - p.x, p.casterY - p.y) / k + 20);
+    if (p.pts) for (const q of p.pts) ext = Math.max(ext, Math.hypot(q[0] - p.x, q[1] - p.y) / k + 20);
     const pad = d.pad != null ? d.pad : 26, sky = d.sky != null ? d.sky : (SKY[id] || 14);
     const w = Math.ceil(2 * (ext + pad)), h = Math.ceil(2 * (ext + pad) + sky), ox = Math.ceil(ext + pad), oy = Math.ceil(ext + pad + sky);
     CUR = FX_BUF; SCENE_MODE = false; SX = 0; SY = 0;
@@ -3199,6 +3570,8 @@
                        wide: p.wide != null ? p.wide * TILE : (d.wide || 0), seed: p.seed || 0,
                        hitR: p.hitR != null && Number.isFinite(p.hitR) ? Math.round(p.hitR * TILE) : null });
     if (p.arc != null) o.arc = p.arc;
+    if (p.pts) o.pts = p.pts.map(q => toBuf(q[0], q[1], ox, oy));
+    if (p.o) Object.assign(o, p.o);                 // 技ごとの追加の引数（地雷が張れたか・砲台がいつ撃ったか など）
     if (p.isFloor) o.floor = (bx, by) => p.isFloor(p.x + (bx - ox) * k, p.y + (by - oy) * k);   // 床かどうか（画面座標で聞く）
     if (p.tx != null) { const [a, b] = toBuf(p.tx, p.ty, ox, oy); o.tx = a; o.ty = b; }
     if (p.casterX != null && id !== 'collapse') { const [a, b] = toBuf(p.casterX, p.casterY, ox, oy); o.cx = a; o.cy = b; }

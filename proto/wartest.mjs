@@ -301,10 +301,10 @@ R.saysName = await pg.evaluate(()=>{
   TH.dummy('sword'); S.greatKills=9; S.ult='quake'; P.ultCd=0; W.pops.length=0;
   fireUlt();
   out.ult = txts().includes('地脈断！');
-  // 衝撃波
+  // スキル技（ショック。旧名 衝撃波）
   TH.dummy('sword'); S.upg={wave:1}; P.waveCd=0; W.pops.length=0;
   fireWave();
-  out.wave = txts().includes('衝撃波！');
+  out.wave = txts().includes('ショック！');
   out.allSay = out.art && out.ult && out.wave;
   return out;
 });

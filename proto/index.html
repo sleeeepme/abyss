@@ -185,6 +185,57 @@
      満ちたら技の色で縁全体が光る（.ready）。中は白黒のアイコンだけ（名札は出さない）。 */
   #ultbtn,#wavebtn,#artbtn{--gp:0deg;--pb:conic-gradient(#cfd6e4 var(--gp),#2b3244 var(--gp))}
   #ultbtn.ready,#wavebtn.ready,#artbtn.ready{--pb:currentColor;filter:drop-shadow(0 0 4px currentColor)}
+  /* ---------- スキルツリー（横に伸びる盤） ---------- */
+  .skt-scroll{overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;margin:0 -16px;padding:0 16px 6px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .skt-board{position:relative;margin:4px 0}
+  .skt-lines{position:absolute;left:0;top:0;pointer-events:none}
+  .skt-tier{position:absolute;top:0;border-left:2px dashed #232a39;background:linear-gradient(#141923,transparent 40px)}
+  .skt-tier:first-child{border-left-color:transparent}
+  .skt-tier.shut{background:repeating-linear-gradient(135deg,rgba(0,0,0,.18) 0 6px,transparent 6px 12px)}
+  .skt-th{padding:4px 8px;font-size:11px;color:#8b93a7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .skt-th b{font-size:13px;color:#c9cfdc;margin-right:6px}
+  .skt-tier.shut .skt-th b{color:#5c6479}
+  .skt-th span{color:#c9a06a}
+  .skt-br{position:absolute;left:0;width:24px;display:flex;align-items:center;justify-content:center;
+    background:#141923;clip-path:var(--pxr1)}
+  .skt-br span{writing-mode:vertical-rl;font-size:11px;letter-spacing:2px;color:#8b93a7}
+  .skn{position:absolute;width:106px;height:52px;display:flex;align-items:center;gap:6px;padding:0 6px 0 7px;
+    background:var(--panel);border:2px solid var(--line);clip-path:var(--pxr2);cursor:pointer;box-sizing:border-box}
+  .skn>i{flex:none;width:30px;height:30px;background:var(--ic);
+    -webkit-mask:var(--im) center/100% 100% no-repeat;mask:var(--im) center/100% 100% no-repeat}
+  .skn-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .skn-nm{font-size:10.5px;font-weight:700;color:#e6e9f0;line-height:1.15;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .skn-nm .pi{margin-right:2px}
+  .skn-pp{display:flex;gap:2px}
+  .skn-pp b{width:6px;height:4px;background:#2a3040}
+  .skn-pp b.on{background:var(--ic)}
+  .skn.own{border-color:#3d4a66}
+  .skn.maxed{border-color:#3f7d5c}
+  .skn.maxed .skn-pp b.on{background:#7fe0c0}
+  .skn.afford:not(.own){border-color:#4a6aa0}
+  .skn.locked,.skn.noreq{background:#12151c}
+  .skn.locked .skn-nm,.skn.noreq .skn-nm{color:#5c6479}
+  .skn.sel{border-color:#e6e9f0;background:#1e2432}
+  .skn-set{position:absolute;right:3px;top:2px;font-style:normal;font-size:8px;font-weight:700;color:#7fe0c0;letter-spacing:1px}
+  .skn:active{background:#1e2432}
+  .skt-detail{position:sticky;bottom:calc(-1 * max(16px,env(safe-area-inset-bottom)));z-index:3;margin:8px -16px 0;
+    padding:10px 16px max(12px,env(safe-area-inset-bottom));background:#11141b;border-top:2px solid var(--line);min-height:96px}
+  .skd-h{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+  .skd-h span{font-size:12px;color:var(--dim);font-weight:400}
+  .skd-ic{width:22px;height:22px;background:var(--ic);-webkit-mask:var(--im) center/100% 100% no-repeat;mask:var(--im) center/100% 100% no-repeat}
+  .skd-d{font-size:12px;color:#c9cfdc;margin-top:4px;line-height:1.5}
+  .skd-d span{color:#7b8398}
+  .skd-l{font-size:12px;color:#e6e9f0;margin-top:3px}
+  .skd-l.nx{color:#7fe0c0}
+  .skd-l span{color:var(--dim)}
+  .skd-a{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .skd-a button{width:auto;padding:7px 14px;font-size:12px;margin:0}
+  .skd-why{font-size:12px;color:#c9a06a}
+  .skd-max{font-size:12px;color:#4a9d6e}
+  .skd-on{font-size:12px;color:#7fe0c0}
+  .skd-empty{font-size:12px;color:var(--dim);padding:8px 0}
+  .slico{display:inline-block;width:15px;height:15px;background:center/100% 100% no-repeat;image-rendering:pixelated;vertical-align:-2px}
   .skico{display:block;width:30px;height:30px;background:center/100% 100% no-repeat;
     image-rendering:pixelated;image-rendering:crisp-edges;opacity:.42}
   #ultbtn .skico{width:45px;height:45px}
@@ -799,7 +850,7 @@
       </div>
       <div class="hub-row5">
         <button class="hub-mini" id="btn-go-mem"><i class="pi pi-candle"></i><b>慰霊碑</b><em class="hub-badge" id="badge-mem"></em></button>
-        <button class="hub-mini" id="btn-go-upg"><i class="pi pi-up"></i><b>能力強化</b><em class="hub-badge" id="badge-upg"></em></button>
+        <button class="hub-mini" id="btn-go-upg"><i class="pi pi-up"></i><b>スキルツリー</b><em class="hub-badge" id="badge-upg"></em></button>
         <button class="hub-mini" id="btn-go-bld"><i class="pi pi-hall"></i><b>街開発</b><em class="hub-badge" id="badge-bld"></em></button>
         <button class="hub-mini" id="btn-go-stash"><i class="pi pi-stash"></i><b>倉庫</b></button>
         <button class="hub-mini" id="btn-go-forge"><i class="pi pi-forge"></i><b>鍛冶屋</b><em class="hub-badge" id="badge-forge"></em></button>
@@ -900,14 +951,15 @@
   <div style="height:24px"></div>
 </div>
 
-<!-- ============ 能力強化 ============ -->
+<!-- ============ スキルツリー（旧 能力強化） ============ -->
 <div class="screen" id="scr-upg">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
-    <h1>能力強化</h1><span class="gold" id="upg-gold"></span></div>
+    <h1>スキルツリー</h1><span class="gold" id="upg-gold"></span></div>
   <p class="sub">対価は<b style="color:#8fd8ff">SP</b>。敵を倒した瞬間に貯まるので
     <b style="color:#7fe0c0">死んでも失いません</b>。<br>
-    どんな探索も、必ずここに変わります。</p>
-  <div class="grid" id="upgrades"></div>
+    ノードを押して中身を見て、下の札で強化。線の先は、前のノードを覚えると開きます。</p>
+  <div class="skt-scroll" id="skt-scroll"><div id="upgrades"></div></div>
+  <div class="skt-detail" id="skt-detail"></div>
 
   <h2 id="relic-head">遺物 <span style="color:var(--dim);font-weight:400;font-size:12px">試練で得る・死んでも失わない</span></h2>
   <p class="sub" id="relic-hint"></p>
@@ -923,7 +975,7 @@
 <div class="screen" id="scr-bld">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>街開発</h1><span class="gold" id="bld-gold"></span></div>
-  <p class="sub">能力強化が「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
+  <p class="sub">スキルツリーが「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
     帰ってくるたびに街が育つ。</p>
   <div class="grid" id="buildings"></div>
   <div style="height:24px"></div>
@@ -1030,7 +1082,7 @@
   <div id="durtag"></div>
   <div id="guardbtn"><i class="pi pi-shield"></i></div>
   <div id="ultbtn" role="button"><i id="ult-icon" class="skico"></i></div>
-  <div id="wavebtn" role="button" aria-label="衝撃波"><i id="wave-icon" class="skico"></i></div>
+  <div id="wavebtn" role="button" aria-label="スキル技"><i id="wave-icon" class="skico"></i></div>
   <div id="artbtn" role="button"><i id="art-icon" class="skico"></i></div>
   <div id="linkbtn" role="button" aria-label="一斉攻撃"><i id="link-icon" class="skico"></i></div>
   <div id="prompt"></div>
@@ -1424,7 +1476,7 @@
       （盗賊は<b style="color:#d6b34a">回避32%</b>で、薄い装備のまま前に出られます）。<br>
     ・<b style="color:#7fe0c0">僧侶は後衛</b>です。近接の仲間がいるあいだはその後ろに陣取り、
       <b>攻撃には参加しません</b>（祈りの回復は続きます）。<br>
-    ・街の<b>能力強化「仲間の練度」</b>で、仲間全員の能力が上がります。
+    ・街の<b>スキルツリー「仲間の練度」</b>で、仲間全員の能力が上がります。
       <span style="font-size:12px">口座側の強化なので、これから拾う仲間にも効きます。</span>
   </div>
 
@@ -1449,8 +1501,8 @@
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     敵を倒すと<b style="color:#8fd8ff">◆SP</b>が入ります。経験値や金と同じで、
     <b>倒した瞬間に貯まる</b>ので、拾いに行く必要はありません。<br>
-    そのあと死んでも失いません。SPは<b>能力強化</b>の対価です（金では買えません）。<br>
-    どんなに酷い死に方をしても、潜った時間は必ず能力強化に変わります。<br>
+    そのあと死んでも失いません。SPは<b>スキルツリー</b>の対価です（金では買えません）。<br>
+    どんなに酷い死に方をしても、潜った時間は必ずスキルツリーの強化に変わります。<br>
     <span style="font-size:12px">雑魚 1 ／ 精鋭 2 ／ 規格外 3 ／ 中ボス 5 ／ 大ボス 10。<br>
     <b>深さでは増えません</b>——深いところは敵の数で増えます。</span>
   </div>
@@ -1484,7 +1536,7 @@
     セットできるのは<b>1つだけ</b>。探索中は画面右下の丸ボタンで発動します。<br>
     <span style="font-size:12px">地脈断（周囲を殴る）/ 縮地（走り抜けて無敵）/ 灼髄（前方へ火柱）/
       守護（全員の被ダメージ減）/ 裂天（画面内すべて）</span><br><br>
-    技レベルは<b style="color:#8fd8ff">SP</b>で上げられます（街 → 能力強化）。
+    技レベルは<b style="color:#8fd8ff">SP</b>で上げられます（街 → スキルツリー）。
     威力が上がり、<b>リキャストも短くなります</b>。<br>
     <span style="font-size:12px">操作は移動だけ、という原則の唯一の例外です。だから枠は1つ、
       リキャストは20〜40秒、狙いを付ける操作はありません。増えるのは「ここで切るかどうか」の判断だけです。</span>
@@ -1606,10 +1658,10 @@
   <h2>ルール</h2>
   <div class="card" style="font-size:12px;line-height:1.8;color:var(--dim)">
     ・敵の周りに<b style="color:#ff7050">赤い輪</b>が広がったら攻撃の予兆。歩いて離れる。<br>
-    ・街では<b>能力強化</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
+    ・街では<b>スキルツリー</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
     ・<b style="color:#d6b34a">生きて帰ると帰還報酬</b>がもらえる。深いところから戻るほど大きい。<br>
     ・その金で<b>街開発</b>（鍛冶屋・酒場・祭壇・商館）を進められる。
-      能力強化がキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
+      スキルツリーがキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
     　とくに<b style="color:#d6b34a">祭壇</b>は、死んだときに<b>恩寵を次のキャラへ引き継ぐ</b>。<br>
     ・装備には<b>耐久</b>がある。0になると<b>破損</b>して性能を完全に失う。道具屋で修理できる。<br>
     ・残り25%を切ると<b style="color:#ffb08a">画面下に警告</b>が出っぱなしになる。
@@ -2962,6 +3014,85 @@ const WAVE_REACH = 3.4;    // 前方への届き（マス）
 const WAVE_ARC   = 1.5;    // 扇の広さ（ラジアン。約86度）
 const BLOOM_EVERY = 2;     // 大技「命脈」が体を戻す間隔（秒）
 
+/* ==================== スキル技（スキルツリーで覚え、ツリーで Lv を上げる） ====================
+   2026-10-13 ユーザー要望：
+     ・衝撃波の名前を「ショック」に。
+     ・スキルで手に入る技を10種くらい足す。**スキル技はスキルツリーでレベルが上がる**ように。
+     ・チェインライトニングや範囲攻撃など、**今足りていない遊びが広がる技**を足したい。
+
+   それまでのスキル技は衝撃波1つで、「前を薙ぐ」しかなかった。大技・武器技を見渡しても、
+     敵から敵へ跳ねる／行って戻る／止める／罠を置く／脆くして連鎖させる／寄せ集める／
+     置き物に戦わせる／敵の狙いを逸らす／遅れて落ちる大範囲／進み続ける持続範囲
+   はどれも無かった。この10個を足す（1つの技に1つの新しい遊び）。
+
+   枠は1つのまま（#wavebtn＝ステータス画面の「枠2」）。覚えた技から1つを選んで載せる。
+   技の Lv はツリーのノードの段（S.upg[id]）そのもので、0 は未修得。
+   リキャストは枠に残す（武器技と同じ。替えても待ち時間は戻らない）。
+
+   数値の目安：ショック Lv.1（6秒で ATK×4.0 の扇）と同じくらいの手応えにそろえ、
+   **単体への火力では勝たない**ようにしてある。強いのはそれぞれの得意な形のときだけ。 */
+const SKILL_MAX_LV = 5;
+const SK_CD_FLOOR  = 0.6;      // 練気で縮むリキャストの下限（元の 60% まで）
+const SKILL_TECHS = [
+  {id:'wave', nm:'ショック', col:'#8fd8ff', tier:1, shard:70, need:null,
+   desc:'前方の扇をまとめて薙ぐ。下がりながらでも出せる',
+   cd:lv=>WAVE_CD-(lv-1)*0.25,
+   v:lv=>({mul:WAVE_MUL+(lv-1)*0.5, reach:WAVE_REACH+(lv-1)*0.2, arc:WAVE_ARC}),
+   txt:v=>`前方 ${v.reach.toFixed(1)}マスの扇に ATK×${v.mul.toFixed(1)}`},
+  {id:'chain', nm:'チェインライトニング', col:'#ffe066', tier:1, shard:60, need:'wave', dt:'shock', status:'shock',
+   desc:'近くの敵に雷を落とし、そこから次の敵へ跳ねていく。散らばった群れほど得をする',
+   cd:lv=>7-(lv-1)*0.3,
+   v:lv=>({mul:2.2+(lv-1)*0.3, n:3+lv, fall:0.85, find:5.5, hop:3.4}),
+   txt:v=>`${v.n}体まで跳ねる。1体目に ATK×${v.mul.toFixed(1)}（跳ねるたびに -15%）`},
+  {id:'boomer', nm:'ブーメラン', col:'#c8d8e8', tier:1, shard:55, need:'wave', dt:'slash',
+   desc:'前へ刃を投げる。刃はあなたの所へ戻ってきて、行きと帰りで2回当たる',
+   cd:lv=>5-(lv-1)*0.2,
+   v:lv=>({mul:1.7+(lv-1)*0.3, dist:5.0+(lv-1)*0.3, wide:0.8+(lv-1)*0.08}),
+   txt:v=>`${v.dist.toFixed(1)}マス先まで往復・貫通。1回 ATK×${v.mul.toFixed(1)}`},
+  {id:'nova', nm:'フロストノヴァ', col:'#7fd8ff', tier:2, shard:90, need:'wave', dt:'frost',
+   desc:'周りを凍らせて止める。凍った敵は受けるダメージ +25%（ボスはすぐ溶ける）',
+   cd:lv=>10-(lv-1)*0.4,
+   v:lv=>({mul:1.4+(lv-1)*0.25, r:2.6+(lv-1)*0.15, frz:1.4+(lv-1)*0.3}),
+   txt:v=>`周囲 ${v.r.toFixed(1)}マスに ATK×${v.mul.toFixed(1)}・${v.frz.toFixed(1)}秒 凍らせる`},
+  {id:'mine', nm:'マイン', col:'#ff9a5a', tier:2, shard:80, need:'boomer', dt:'fire', status:'burn',
+   desc:'足元に罠を置く。踏んだ敵の周りが爆ぜる。下がりながら置き、追ってくる敵に踏ませる',
+   cd:lv=>3.5,
+   v:lv=>({mul:3.0+(lv-1)*0.5, r:1.9+(lv-1)*0.1, max:2+Math.floor((lv-1)/2), arm:0.5, life:25}),
+   txt:v=>`爆発 ${v.r.toFixed(1)}マスに ATK×${v.mul.toFixed(1)}・同時に ${v.max}個まで置ける`},
+  {id:'mark', nm:'呪印', col:'#c98adf', tier:2, shard:90, need:'chain', dt:'arcane',
+   desc:'前方の敵に印を付ける。印の敵は脆くなり、倒れると周りへ爆ぜて印を移す',
+   cd:lv=>10-(lv-1)*0.4,
+   v:lv=>({mul:1.0+(lv-1)*0.15, amp:0.20+(lv-1)*0.05, dur:6, burst:2.0+(lv-1)*0.4, br:2.2, r:4.2, arc:100}),
+   txt:v=>`${v.dur}秒 受けるダメージ +${Math.round(v.amp*100)}%。倒れると ATK×${v.burst.toFixed(1)} で爆ぜる`},
+  {id:'vortex', nm:'グラビティ', col:'#a97fe0', tier:3, shard:130, need:'mark', dt:'arcane',
+   desc:'前に渦を置き、周りの敵を引き寄せる。最後に弾ける。範囲技の前に集めておく',
+   cd:lv=>13-(lv-1)*0.5,
+   v:lv=>({t:2.0+(lv-1)*0.2, pull:3.8, at:3.0, tick:0.3+(lv-1)*0.05, burst:2.2+(lv-1)*0.4, br:2.2}),
+   txt:v=>`${v.t.toFixed(1)}秒 引き寄せ、最後に ATK×${v.burst.toFixed(1)} で弾ける`},
+  {id:'turret', nm:'タレット', col:'#8fd8ff', tier:3, shard:120, need:'nova', dt:'arcane',
+   desc:'その場に砲台を置く。近くの敵を勝手に撃つ。砲台のそばを戦う場所にする',
+   cd:lv=>15-(lv-1)*0.5,
+   v:lv=>({t:8+(lv-1), every:0.7-(lv-1)*0.05, mul:0.8+(lv-1)*0.12, reach:6}),
+   txt:v=>`${v.t}秒 残り、${v.every.toFixed(2)}秒ごとに ATK×${v.mul.toFixed(2)} で撃つ`},
+  {id:'decoy', nm:'デコイ', col:'#e8d9a0', tier:3, shard:110, need:'mine', dt:'blunt',
+   desc:'身代わりを置く。近くの敵はそちらを狙う。消えるときに弾ける',
+   cd:lv=>14-(lv-1)*0.5,
+   v:lv=>({t:3.0+(lv-1)*0.4, lure:7, burst:2.4+(lv-1)*0.4, br:2.4}),
+   txt:v=>`${v.t.toFixed(1)}秒 敵を引きつけ、ATK×${v.burst.toFixed(1)} で弾ける`},
+  {id:'meteor', nm:'メテオ', col:'#ff6a2b', tier:4, shard:190, need:'vortex', dt:'fire', status:'burn',
+   desc:'敵の多い所へ岩を落とす。落ちるまで1秒——止めるか寄せるかしてから撃つ',
+   cd:lv=>16-(lv-1)*0.6,
+   v:lv=>({mul:6.0+(lv-1)*1.0, r:2.6+(lv-1)*0.15, delay:1.0, find:7, burnT:2.5}),
+   txt:v=>`${v.r.toFixed(1)}マスに ATK×${v.mul.toFixed(1)}。焼け跡がしばらく燃える`},
+  {id:'tornado', nm:'トルネード', col:'#c8f0b8', tier:4, shard:170, need:'decoy', dt:'slash',
+   desc:'前へ進む竜巻。巻き込んだ敵を運びながら刻み、壁で跳ね返る',
+   cd:lv=>11-(lv-1)*0.4,
+   v:lv=>({t:3.0+(lv-1)*0.25, speed:2.4, r:1.3+(lv-1)*0.06, every:0.25, mul:0.45+(lv-1)*0.07}),
+   txt:v=>`${v.t.toFixed(1)}秒 進み、${v.every}秒ごとに ATK×${v.mul.toFixed(2)}`},
+];
+function skillDef(id){ return SKILL_TECHS.find(t=>t.id===id) || null; }
+function isSkillTech(id){ return !!skillDef(id); }
+
 /* ---------- 能力強化（アカウント単位。ロストしても消えない成長要素） ---------- */
 /* 対価はSP（shard）。死んでも失わないので、どの探索も必ず前進になる。 */
 const UPGRADES=[
@@ -3055,10 +3186,17 @@ const UPGRADES=[
    step:'倒れても一度だけ立ち上がる',
    desc:'探索1回につき一度／HPは全快で戻る'},
 
-  /* 第1段。5階の壁を越えるための物なので、壁の手前で買えないと意味がない。 */
-  {id:'wave',   nm:'衝撃波', max:1, shard:70, tier:1,
-   step:'技を覚える（'+WAVE_CD+'秒ごと）',
-   desc:'前方をまとめて薙ぐ。下がりながらでも出せる'},
+  /* 第1段。5階の壁を越えるための物なので、壁の手前で買えないと意味がない。
+     2026-10-13：衝撃波は「ショック」に名前を変え、スキル技（SKILL_TECHS）の根になった。
+     ほかの10個の技も同じ形のノードとしてここに並ぶ（段と前提は技の側に書いてある）。
+     技のノードは Lv.5 まで上がり、それがそのまま技の Lv になる。 */
+  ...SKILL_TECHS.map(t=>({id:t.id, nm:t.nm, max:SKILL_MAX_LV, shard:t.shard, tier:t.tier, need:t.need, tech:true,
+     step:'スキル技を覚える／Lv で強くなる', desc:t.desc})),
+  /* 技の枝の、技全部に効くノード。どの技を選んでも無駄にならない受け皿 */
+  {id:'spow',   nm:'技巧',  max:5, shard:24, tier:1, need:'wave',
+   step:'スキル技の威力 +8%', desc:'いまセットしている技に効く'},
+  {id:'scd',    nm:'練気',  max:4, shard:45, tier:2, need:'spow',
+   step:'スキル技のリキャスト -5%', desc:'待ち時間が短くなる'},
 
   {id:'regen',  nm:'治癒',  max:3, shard:55,  tier:2,
    step:'10秒ごとに最大HPの 3% 回復',
@@ -5115,6 +5253,7 @@ function tickArts(dt){
   if(!W.arts || !W.arts.length) return;
   for(const f of W.arts){
     f.t -= dt;
+    if(f.kind && f.kind.startsWith('sk')){ tickSkillArt(f, dt); continue; }   // スキル技の置き物
     if(f.kind==='arrow'){
       // 予約された着弾。t が尽きた瞬間に1回だけ判定する
       if(f.t<=0 && !f.hit){
@@ -5228,7 +5367,7 @@ function tickArts(dt){
       }
     }
   }
-  W.arts = W.arts.filter(f=>f.t>0 || (f.kind==='artdragoon' && !f.hit));
+  W.arts = W.arts.filter(f=>f.t>0 || (f.kind==='artdragoon' && !f.hit) || (f.kind&&f.kind.startsWith('sk')&&f.done===false));
   // 聖域の残り時間
   if(S.run && S.run.sanct){
     S.run.sanct.t -= dt;
@@ -6058,6 +6197,7 @@ const S={
      同じ物を2つの規則で数えることになる。値は「何段目まで閃いたか」（0〜3）。 */
   arts:{},
   artPick:{},            // 武器種ごとに、ボタンへ乗せている技の id
+  skill:null,            // 枠2（#wavebtn）に載せているスキル技の id。null なら覚えた最初の技
   artName:{},            // 閃いた技に自分で付けた名前（技ID→名前）。既定は WEAPON_ARTS の nm
   relics:[], relicEq:[], // 遺物：持っている物と、装備している物（どちらも死んでも残る）
   name:'',               // 冒険者の名前。代を重ねても受け継がれる
@@ -8982,6 +9122,7 @@ function nearestVisibleEnemyTo(x, y, maxDist){
 function enemyTarget(e){
   // 侵入者だけは仲間を見ない。壁役で時間を買えるなら、それが居座りの答えになってしまう。
   if(e.intruder) return {x:P.x, y:P.y, ent:null};
+  const dc=skDecoyFor(e); if(dc) return dc;     // スキル技「デコイ」が立っている間はそちらを狙う
   let best={x:P.x, y:P.y, ent:null}, bd=Math.hypot(P.x-e.x, P.y-e.y);
   for(const a of livingParty()){
     const d=Math.hypot(a.x-e.x, a.y-e.y);
@@ -9539,7 +9680,11 @@ function tickHazards(dt){
      移動しか無いいまの操作系では、ただ引き撃ちの理由が増えるだけになる。 */
 }
 
-/* ==================== 衝撃波（リキャスト技） ====================
+/* ==================== スキル技の発動（枠2・#wavebtn） ====================
+   もとは「衝撃波」1つだけの枠だった（いまの名前はショック。中の名前は 'wave' のまま）。
+   覚えた技から1つを載せる。載せていなければ、覚えた最初の物。
+
+   ショック（旧 衝撃波）について：
    能力強化「衝撃波」で覚える。大技（ULT）とは**別枠**にする——
    大技は CD 24〜40秒の切り札で、抱えたまま死ぬ物。こちらは 8 秒で気軽に押す物。
 
@@ -9552,9 +9697,48 @@ function tickHazards(dt){
    同じ「+25%」でも、火力ノードは殴れている時間にしか乗らないが、
    これは**殴れていない時間に乗る**。比への効き方が違う。
 
-   狙いを付ける操作は要らない（大技と同じ作法）。向いている方へ出る。 */
+   狙いを付ける操作は要らない（大技と同じ作法）。向いている方へ出る。
+   狙う相手が要る技（チェインライトニング・メテオ）は、相手がいなければ出さず、待ち時間も減らさない。 */
+function skillLv(id){ return Math.min(SKILL_MAX_LV, upgLv(id)); }
+function skillsLearned(){ return SKILL_TECHS.filter(t=>skillLv(t.id)>0); }
+function skillEquipped(){
+  const id=S.skill;
+  if(id && skillLv(id)>0) return skillDef(id);
+  const l=skillsLearned();
+  return l.length ? l[0] : null;
+}
+function skillSet(id){
+  if(!skillDef(id) || skillLv(id)<=0) return false;
+  S.skill=id; return true;
+}
+/* 技巧（威力）・練気（リキャスト）。ツリーの技の枝にある、技全部に効くノード。 */
+function skillPowMul(){ return 1 + upgLv('spow')*0.08; }
+function skillCooldown(t, lv){
+  return t.cd(lv||skillLv(t.id)||1) * Math.max(SK_CD_FLOOR, 1 - upgLv('scd')*0.05);
+}
+function skillStats(t){
+  const st=stats(S.hero);
+  return t.dt ? Object.assign({}, st, {dmgType:t.dt}) : st;
+}
+/* 技の1発。状態異常が付く技は、生き残った相手にだけ乗せる */
+function skHit(e, st, mult, t){
+  if(!e || e.dead || !S.hero) return;
+  hitEnemy(e, st, mult*skillPowMul());
+  if(t && t.status && !e.dead && e.hp>0) addStatus(e, t.status, S.hero.lv);
+}
+function skLiving(x, y, r){
+  return nearEnemies(x, y, r+1).filter(e=>!e.dead && Math.hypot(e.x-x, e.y-y) <= r+(e.r||0.3));
+}
+/* 凍結・呪印で脆くなっている分。duelVuln（ボスの崩れ）と同じ所で掛ける */
+const SK_FROZEN_VULN = 1.25;
+function skillVuln(e){
+  let m=1;
+  if(e.frz>0) m*=SK_FROZEN_VULN;
+  if(e.markT>0) m*=1+(e.markAmp||0);
+  return m;
+}
 function waveReady(){
-  if(!upgLv('wave')) return false;
+  if(!skillEquipped()) return false;
   if(hasCurse('silence')) return false;            // 呪い「静寂」
   return S.screen==='game' && !!S.run && !!S.hero && (P.waveCd||0)<=0;
 }
@@ -9563,26 +9747,250 @@ function fireWave(){
   if(!waveReady()) return false;
   if(frozenNow()){ log('凍りついて動けない'); return false; }
   if(baneMul('silence',false)){ log('封技 — 技が出せない'); return false; }
-  const st = stats(S.hero);
-  P.waveCd = WAVE_CD; P.waveCdMax = WAVE_CD;
-  const ang = Math.atan2(P.diry||0, P.dirx||1);
-  const half = WAVE_ARC/2;
-  W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:FEEL_ATTACK_SECONDS, max:FEEL_ATTACK_SECONDS,
-             r:WAVE_REACH, arc:half, dt:st.dmgType, elem:elemOf(st), skill:'wave',
-             weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
-  if(typeof feelPixelArt==='function') feelPixelArt('s_wave', P.x, P.y, {angle:ang, range:WAVE_REACH, arc:WAVE_ARC});
+  const t=skillEquipped(), lv=skillLv(t.id), v=t.v(lv), st=skillStats(t);
+  const ang=Math.atan2(P.diry||0, P.dirx||1);
+  const ok=SKILL_FIRE[t.id](t, v, st, ang, lv);
+  if(ok===false) return false;
+  P.waveCd = skillCooldown(t, lv); P.waveCdMax = P.waveCd;
   feelKick(3.4, .18);
   if(typeof feelSkillZoom==='function') feelSkillZoom();
-  nearEnemies(P.x, P.y, WAVE_REACH+1).forEach(e=>{
-    if(e.dead) return;
-    const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
-    if(d > WAVE_REACH+e.r) return;
-    const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
-    if(da > half) return;
-    hitEnemy(e, st, WAVE_MUL);
-  });
-  sayArt(P.x, P.y, '衝撃波', '#8fd8ff');
+  sayArt(P.x, P.y, t.nm, t.col);
   return true;
+}
+const SKILL_FIRE = {
+  wave(t, v, st, ang){
+    const half=v.arc/2;
+    W.fx.push({t:'swing', x:P.x, y:P.y, a:ang, life:FEEL_ATTACK_SECONDS, max:FEEL_ATTACK_SECONDS,
+               r:v.reach, arc:half, dt:st.dmgType, elem:elemOf(st), skill:'wave',
+               weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
+    if(typeof feelPixelArt==='function') feelPixelArt('s_wave', P.x, P.y, {angle:ang, range:v.reach, arc:v.arc});
+    nearEnemies(P.x, P.y, v.reach+1).forEach(e=>{
+      if(e.dead) return;
+      const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
+      if(d > v.reach+e.r) return;
+      const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(da > half) return;
+      skHit(e, st, v.mul, t);
+    });
+  },
+  /* 一番近い敵から、まだ当てていない一番近い敵へ跳ねる。当たりは跳ねる順に少しずつ遅らせる */
+  chain(t, v, st){
+    const first=skLiving(P.x, P.y, v.find).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y))[0];
+    if(!first) return false;
+    const list=[first];
+    while(list.length<v.n){
+      const c=list[list.length-1];
+      const nx=skLiving(c.x, c.y, v.hop).filter(e=>!list.includes(e))
+        .sort((a,b)=>Math.hypot(a.x-c.x,a.y-c.y)-Math.hypot(b.x-c.x,b.y-c.y))[0];
+      if(!nx) break;
+      list.push(nx);
+    }
+    W.arts.push({kind:'skchain', x:P.x, y:P.y, t:list.length*SK_CHAIN_HOP+0.05, max:list.length*SK_CHAIN_HOP+0.05,
+                 list, done:0, mul:v.mul, fall:v.fall, st, tech:t.id});
+    if(typeof feelPixelArt==='function')
+      feelPixelArt('s_chain', P.x, P.y, {pts:[[P.x,P.y], ...list.map(e=>[e.x,e.y])]});
+  },
+  /* 刃は壁の手前で折り返す。戻りは「投げた場所」ではなく**いまの自分**へ向かう */
+  boomer(t, v, st, ang){
+    const far=dashStop(P.x, P.y, ang, v.dist, 0.2);
+    W.arts.push({kind:'skboomer', x:P.x, y:P.y, ox:P.x, oy:P.y, fx:far.x, fy:far.y, a:ang,
+                 t:SK_BOOMER_T*2, max:SK_BOOMER_T*2, wide:v.wide, mul:v.mul, st, tech:t.id,
+                 hitOut:[], hitBack:[]});
+  },
+  nova(t, v, st){
+    if(typeof feelPixelArt==='function') feelPixelArt('s_nova', P.x, P.y, {range:v.r});
+    skLiving(P.x, P.y, v.r).forEach(e=>{
+      skHit(e, st, v.mul, t);
+      if(e.dead || e.hp<=0) return;
+      const f = e.boss ? v.frz*0.35 : v.frz;
+      e.frz=Math.max(e.frz||0, f); e.frzMax=Math.max(e.frzMax||0, e.frz);
+    });
+  },
+  /* 置ける数を超えたら、一番古い罠から消える */
+  mine(t, v, st){
+    const mines=W.arts.filter(f=>f.kind==='skmine' && f.t>0);
+    while(mines.length>=v.max){ mines.shift().t=0; }
+    W.arts.push({kind:'skmine', x:P.x, y:P.y, t:v.life, max:v.life, arm:v.arm, r:v.r, mul:v.mul, st, tech:t.id});
+  },
+  mark(t, v, st, ang){
+    const half=v.arc*Math.PI/180/2;
+    if(typeof feelPixelArt==='function') feelPixelArt('s_mark', P.x, P.y, {angle:ang, range:v.r, arc:v.arc*Math.PI/180});
+    skLiving(P.x, P.y, v.r).forEach(e=>{
+      const da=Math.abs(((Math.atan2(e.y-P.y, e.x-P.x)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(da>half) return;
+      skHit(e, st, v.mul, t);
+      if(e.dead || e.hp<=0) return;
+      skMarkPut(e, v.dur, v);
+    });
+  },
+  vortex(t, v, st, ang){
+    const at=dashStop(P.x, P.y, ang, v.at, 0.3);
+    W.arts.push({kind:'skvortex', x:at.x, y:at.y, t:v.t, max:v.t, pull:v.pull, tick:0.4, every:0.4,
+                 tickMul:v.tick, burst:v.burst, br:v.br, st, tech:t.id, done:false});
+  },
+  /* 砲台は1つだけ。置き直すと前の物は消える */
+  turret(t, v, st){
+    W.arts.forEach(f=>{ if(f.kind==='skturret') f.t=0; });
+    W.arts.push({kind:'skturret', x:P.x, y:P.y, t:v.t, max:v.t, every:v.every, tick:0.35,
+                 mul:v.mul, reach:v.reach, st, tech:t.id, shot:9});
+  },
+  decoy(t, v, st){
+    W.arts.forEach(f=>{ if(f.kind==='skdecoy') f.t=Math.min(f.t, 0.001); });
+    W.arts.push({kind:'skdecoy', x:P.x, y:P.y, t:v.t, max:v.t, lure:v.lure, burst:v.burst, br:v.br,
+                 st, tech:t.id, done:false});
+  },
+  /* 一番固まっている所を狙う（そこにいる敵の数で選ぶ。同じなら近い方） */
+  meteor(t, v, st){
+    const cand=skLiving(P.x, P.y, v.find);
+    if(!cand.length) return false;
+    let best=null, bn=-1, bd=1e9;
+    cand.forEach(e=>{
+      const n=cand.filter(o=>Math.hypot(o.x-e.x, o.y-e.y)<=v.r).length, d=Math.hypot(e.x-P.x, e.y-P.y);
+      if(n>bn || (n===bn && d<bd)){ best=e; bn=n; bd=d; }
+    });
+    W.arts.push({kind:'skmeteor', x:best.x, y:best.y, t:v.delay, max:v.delay, r:v.r, mul:v.mul,
+                 burnT:v.burnT, st, tech:t.id, done:false});
+  },
+  tornado(t, v, st, ang){
+    W.arts.push({kind:'sktornado', x:P.x+Math.cos(ang)*0.6, y:P.y+Math.sin(ang)*0.6,
+                 vx:Math.cos(ang)*v.speed, vy:Math.sin(ang)*v.speed, t:v.t, max:v.t, r:v.r,
+                 every:v.every, tick:0.05, mul:v.mul, st, tech:t.id});
+  },
+};
+const SK_CHAIN_HOP = 0.07;     // 雷が次の敵へ跳ねる間（weapon-art-pixel.js の CHAIN_HOP と揃える）
+const SK_BOOMER_T  = 0.45;     // 刃が行ききるまで／戻るまで（同 BOOMER_T）
+const SK_MARK_PASS = 4;        // 爆ぜて移った印が残る秒数
+function skMarkPut(e, dur, v){
+  e.markT=Math.max(e.markT||0, dur);
+  e.markAmp=v.amp; e.markBurst=v.burst; e.markBr=v.br;
+}
+/* 印の付いた敵が倒れた。**その場では爆ぜず、次のコマで爆ぜる**——
+   killEnemy の中で隣を倒すと、その隣の killEnemy がまた呼ばれて入れ子が深くなる。 */
+function skillOnKill(e){
+  if(!(e.markT>0) || !W.arts) return;
+  W.arts.push({kind:'skmarkburst', x:e.x, y:e.y, t:0.06, max:0.06, r:e.markBr||2.2,
+               mul:e.markBurst||2, amp:e.markAmp||0.2, burstMul:e.markBurst||2, done:false});
+  e.markT=0;
+}
+/* 身代わりが立っていれば、そばの敵はそちらを狙う（侵入者は除く。enemyTarget から呼ぶ） */
+const SK_DECOY_ENT = {decoy:true};
+function skDecoyFor(e){
+  if(!W.arts || !W.arts.length || e.intruder) return null;
+  for(const f of W.arts){
+    if(f.kind!=='skdecoy' || !(f.t>0)) continue;
+    if(Math.hypot(f.x-e.x, f.y-e.y) <= f.lure) return {x:f.x, y:f.y, ent:SK_DECOY_ENT};
+  }
+  return null;
+}
+/* スキル技の置き物を1コマ進める（tickArts から）。終わった物は f.t<=0 で捨てられる */
+function tickSkillArt(f, dt){
+  const st=f.st;
+  if(f.kind==='skchain'){
+    const el=f.max-f.t;
+    while(f.done<f.list.length && el >= (f.done+1)*SK_CHAIN_HOP - 0.0001){
+      const e=f.list[f.done];
+      skHit(e, st, f.mul*Math.pow(f.fall, f.done), skillDef(f.tech));
+      f.done++;
+    }
+    if(f.t<=0) while(f.done<f.list.length){ skHit(f.list[f.done], st, f.mul*Math.pow(f.fall, f.done), skillDef(f.tech)); f.done++; }
+  }else if(f.kind==='skboomer'){
+    const el=clamp(f.max-f.t, 0, f.max), back=el>SK_BOOMER_T;
+    if(!back){
+      const p=1-(1-el/SK_BOOMER_T)*(1-el/SK_BOOMER_T);
+      f.x=f.ox+(f.fx-f.ox)*p; f.y=f.oy+(f.fy-f.oy)*p;
+    }else{
+      const q=clamp((el-SK_BOOMER_T)/SK_BOOMER_T), p=q*q;
+      f.x=f.fx+(P.x-f.fx)*p; f.y=f.fy+(P.y-f.fy)*p;
+      f.a=Math.atan2(P.y-f.fy, P.x-f.fx);
+    }
+    const seen=back?f.hitBack:f.hitOut;
+    skLiving(f.x, f.y, f.wide).forEach(e=>{
+      if(seen.includes(e)) return;
+      seen.push(e); skHit(e, st, f.mul, skillDef(f.tech));
+    });
+  }else if(f.kind==='skmine'){
+    if(f.max-f.t < f.arm || f.t<=0) return;
+    if(!skLiving(f.x, f.y, 0.55).length) return;
+    if(typeof feelPixelArt==='function') feelPixelArt('s_mine_boom', f.x, f.y, {range:f.r});
+    feelKick(2.4, .14);
+    skLiving(f.x, f.y, f.r).forEach(e=>skHit(e, st, f.mul, skillDef(f.tech)));
+    f.t=0;
+  }else if(f.kind==='skvortex'){
+    if(f.t>0){
+      skLiving(f.x, f.y, f.pull).forEach(e=>{
+        if(e.boss) return;                      // ボスは動かない（寄せられると大広間の駆け引きが崩れる）
+        const dx=f.x-e.x, dy=f.y-e.y, d=Math.hypot(dx,dy);
+        if(d<0.35) return;
+        const s=Math.min(d-0.3, (e.elite?1.6:3.2)*dt);
+        moveEnt(e, dx/d*s, dy/d*s);
+      });
+      f.tick-=dt;
+      if(f.tick<=0){ f.tick=f.every; skLiving(f.x, f.y, 1.6).forEach(e=>skHit(e, st, f.tickMul, null)); }
+    }else if(!f.done){
+      f.done=true;
+      if(typeof feelPixelArt==='function') feelPixelArt('s_burst_arc', f.x, f.y, {range:f.br});
+      feelKick(2.6, .16);
+      skLiving(f.x, f.y, f.br).forEach(e=>skHit(e, st, f.burst, null));
+    }
+  }else if(f.kind==='skturret'){
+    f.shot=(f.shot||0)+dt;
+    f.tick-=dt;
+    if(f.tick<=0 && f.t>0){
+      const tg=skLiving(f.x, f.y, f.reach).filter(e=>losClear(f.x, f.y, e.x, e.y))
+        .sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y))[0];
+      if(tg){
+        f.tick=f.every; f.shot=0;
+        if(typeof feelPixelArt==='function') feelPixelArt('s_turret_shot', f.x, f.y, {tx:tg.x, ty:tg.y});
+        skHit(tg, st, f.mul, null);
+      }else f.tick=0.15;
+    }
+  }else if(f.kind==='skdecoy'){
+    if(f.t<=0 && !f.done){
+      f.done=true;
+      if(typeof feelPixelArt==='function') feelPixelArt('s_burst_holy', f.x, f.y, {range:f.br});
+      feelKick(2.4, .14);
+      skLiving(f.x, f.y, f.br).forEach(e=>skHit(e, st, f.burst, null));
+    }
+  }else if(f.kind==='skmeteor'){
+    if(f.t<=0 && !f.done){
+      f.done=true;
+      if(typeof feelPixelArt==='function') feelPixelArt('s_meteor_boom', f.x, f.y, {range:f.r});
+      feelKick(6, .3);
+      skLiving(f.x, f.y, f.r).forEach(e=>skHit(e, st, f.mul, skillDef(f.tech)));
+      W.arts.push({kind:'skembers', x:f.x, y:f.y, t:f.burnT, max:f.burnT, r:f.r*0.8, tick:0.5, st});
+    }
+  }else if(f.kind==='skembers'){
+    f.tick-=dt;
+    if(f.tick<=0 && f.t>0){
+      f.tick=0.5;
+      skLiving(f.x, f.y, f.r).forEach(e=>{ skHit(e, st, 0.2, null); if(!e.dead && rnd()<0.3) addStatus(e,'burn',S.hero?S.hero.lv:1); });
+    }
+  }else if(f.kind==='sktornado'){
+    if(f.t<=0) return;
+    // 進む。壁に当たったら、当たった向きの成分だけ反転する
+    const nx=f.x+f.vx*dt, ny=f.y+f.vy*dt;
+    if(solid(nx, f.y)) f.vx=-f.vx; else f.x=nx;
+    if(solid(f.x, ny)) f.vy=-f.vy; else f.y=ny;
+    // 巻き込んだ敵を運ぶ（真ん中へ寄せながら、竜巻と同じだけ進める）
+    skLiving(f.x, f.y, f.r).forEach(e=>{
+      if(e.boss) return;
+      const dx=f.x-e.x, dy=f.y-e.y;
+      moveEnt(e, f.vx*dt*0.85 + dx*Math.min(1, dt*4), f.vy*dt*0.85 + dy*Math.min(1, dt*4));
+    });
+    f.tick-=dt;
+    if(f.tick<=0){ f.tick=f.every; skLiving(f.x, f.y, f.r).forEach(e=>skHit(e, st, f.mul, null)); }
+  }else if(f.kind==='skmarkburst'){
+    if(f.t<=0 && !f.done){
+      f.done=true;
+      if(typeof feelPixelArt==='function') feelPixelArt('s_burst_arc', f.x, f.y, {range:f.r});
+      if(!S.hero) return;
+      const st2=Object.assign({}, stats(S.hero), {dmgType:'arcane'});
+      skLiving(f.x, f.y, f.r).forEach(e=>{
+        skHit(e, st2, f.burstMul, null);
+        if(!e.dead && e.hp>0) skMarkPut(e, SK_MARK_PASS, {amp:f.amp, burst:f.burstMul, br:f.r});
+      });
+    }
+  }
 }
 
 /* ==================== 武器技の発動 ====================
@@ -11618,6 +12026,7 @@ function killEnemy(e, byAlly){
     }
   }
   e.dead=true; S.run.kills++;
+  skillOnKill(e);                     // 呪印：倒れた所で爆ぜて、周りへ印を移す
   linkGain(e.boss ? LINK.killBoss : e.elite ? LINK.killElite : LINK.kill);
   burstEnemyPixels(e);
   countMossKill(e);                 // 苔玉は層ごとに数える（口座側）
@@ -11852,6 +12261,7 @@ function enemyUpdate(e,dt){
     if(e.ttl<=0){ e.dead=true; W.fx.push({t:'grave',x:e.x,y:e.y,life:0.3,max:0.3}); return; }
   }
 
+  if(e.markT>0) e.markT-=dt;         // 呪印の残り
   // 状態異常: 出血・火傷は継続ダメージ、よろめきは行動停止、凍傷は減速
   tickStatus(e, dt, (d,col)=>{
     e.hp-=d; pop(e.x,e.y,d,col);
@@ -11859,6 +12269,8 @@ function enemyUpdate(e,dt){
     if(e.hp<=0 && !e.dead) killEnemy(e);
   });
   if(e.dead) return;
+  /* フロストノヴァの凍結。動きも、溜めている技の時計も止まる（溶けたら続きから） */
+  if(e.frz>0){ e.frz-=dt; if(e.frz<=0){ e.frz=0; e.frzMax=0; } return; }
   if(hasStatus(e,'stagger')){ e.hit=Math.max(e.hit,0.05); return; }   // 打撃で止まる
   if(e.parts) for(const p of e.parts) p.hit=Math.max(0,p.hit-dt);
   if(e.boss && !e.mirror && duelTick(e, dt)) return;   // 崩れ・吠え・技の後の隙
@@ -11937,7 +12349,8 @@ function enemyUpdate(e,dt){
             const mo = typeof feelBossMouth==='function' ? feelBossMouth(e, Math.atan2(dy,dx)) : {x:e.x, y:e.y};
             feelPixelArt('bt_jab', mo.x, mo.y, {angle:Math.atan2(tg.y-mo.y, tg.x-mo.x), range:Math.hypot(tg.x-mo.x, tg.y-mo.y), kind:BA.kind});
           }
-          if(tg.ent) hitAlly(tg.ent, e);
+          if(tg.ent && tg.ent.decoy){ /* 身代わりは傷つかない（殴らせておくのが役目） */ }
+          else if(tg.ent) hitAlly(tg.ent, e);
           else hitPlayer(e);
         }
       }
@@ -12169,10 +12582,12 @@ function duelInit(e){
 function isDuelBoss(e){ return !!(e && e.boss && !e.mirror && !e.dead); }
 /* いま受けるダメージの倍率。崩れ ×1.3、隙・怯み ×1.2 */
 function duelVuln(e){
-  if(!e || !e.boss) return 1;
-  if(e.broken>0) return DUEL.brkDmg;
-  if(e.recover>0) return DUEL.recDmg;
-  return 1;
+  if(!e) return 1;
+  const sk = skillVuln(e);           // スキル技の凍結・呪印（ボス以外にも効く）
+  if(!e.boss) return sk;
+  if(e.broken>0) return DUEL.brkDmg*sk;
+  if(e.recover>0) return DUEL.recDmg*sk;
+  return sk;
 }
 function addBreak(e, pts){
   if(!isDuelBoss(e) || !(pts>0)) return;
@@ -14164,7 +14579,7 @@ function update(dt){
   S.run.ft = (S.run.ft||0) + dt;
   tickIntruder();                     // 居座りに顔をつける
   P.ultCd = Math.max(0, (P.ultCd||0) - dt);
-  P.waveCd = Math.max(0, (P.waveCd||0) - dt);   // リキャスト技「衝撃波」
+  P.waveCd = Math.max(0, (P.waveCd||0) - dt);   // スキル技（枠2）のリキャスト
   P.artCd  = Math.max(0, (P.artCd||0) - dt);    // 武器技（枠ごとに1つ）
   P.mikiri = Math.max(0, (P.mikiri||0) - dt);   // 見切りのあとの確定会心
   tickHazards(dt);
@@ -15502,6 +15917,7 @@ function draw(){
     ctx.save();
     if(typeof drawFeelPersistentArt==='function'&&drawFeelPersistentArt(f,camX,camY)){ctx.restore();return;}
     if(f.kind==='collapse'){ctx.restore();return;}   // 崩落の着弾待ち。絵は演出側（PixelArtFx）が描く
+    if(f.kind && f.kind.startsWith('sk')){ctx.restore();return;}   // スキル技の置き物（絵は PixelArtFx）
     if(f.kind==='arrow'){
       /* 落ちてくる矢。**落ちる前に置き場所を見せる**——
          予兆なしに25本降ると、何が起きたのか分からないまま敵が減る。 */
@@ -16732,14 +17148,15 @@ function updateHUD(){
   /* 通常技のボタン。覚えるまでは出さない——押せないボタンを常に置いておくより、
      覚えた瞬間に現れるほうが「何かできるようになった」が伝わる。
      大技のように名前は出さない。技が1つしかないので、名札は場所を食うだけ。 */
-  const wb=el('wavebtn');
-  if(upgLv('wave')){
+  const wb=el('wavebtn'), sk=skillEquipped();
+  if(sk){
     const wr=(P.waveCd||0)<=0;
     wb.classList.add('on');
     wb.classList.toggle('ready', wr);
-    hset('wavebtn.col', wr ? '#8fd8ff' : '', v=>wb.style.color=v);
-    hset('wave-icon.bg', 'wave', v=>el('wave-icon').style.backgroundImage=skillIconUrl(v));
-    skillGauge(wb, 'wavebtn.gp', P.waveCd, P.waveCdMax || WAVE_CD);
+    hset('wavebtn.col', wr ? sk.col : '', v=>wb.style.color=v);
+    hset('wave-icon.bg', sk.id, v=>el('wave-icon').style.backgroundImage=skillIconUrl(v));
+    hset('wavebtn.lbl', sk.nm+' Lv.'+skillLv(sk.id), v=>wb.setAttribute('aria-label', v));
+    skillGauge(wb, 'wavebtn.gp', P.waveCd, P.waveCdMax || skillCooldown(sk));
   }else wb.classList.remove('on');
 
   /* 武器技のボタン。**閃くまでは出さない**（衝撃波と同じ作法）。
@@ -17217,27 +17634,6 @@ function rerollShop(){
     S.shop.push(c);
   }
   RNG=prev;
-}
-function upgradeHTML(u){
-  const lv=upgLv(u.id), maxed=lv>=u.max, cost=upgCost(u,lv);
-  const afford=(S.shards||0)>=cost;
-  /* 開いていない段は**錠を見せる。** 隠すと、死に戻る理由が
-     「SPが少し増える」だけになる。何が待っているかを先に見せておくと、
-     もう一度潜る理由が「あの錠を開けに行く」に変わる。 */
-  if(upgLocked(u)){
-    const t=tierDef(upgTier(u));
-    return `<div class="item" data-upg="${u.id}" style="border-left-color:#3a4152;opacity:.72">
-      <div class="nm" style="color:#5c6479"><i class="pi pi-lock"></i> ${u.nm}</div>
-      <div class="af" style="color:#5c6479">${u.step}</div>
-      <div class="af" style="color:#c9a06a;font-size:12px">${t.via}と開く</div>
-    </div>`;
-  }
-  const col = maxed?'#4a9d6e' : afford?'#e6e9f0' : '#5c6479';
-  return `<div class="item" data-upg="${u.id}" style="border-left-color:${maxed?'#4a9d6e':'#5b8dd6'}">
-    <div class="nm" style="color:${col}">${u.nm} <span style="font-size:12px;color:var(--dim)">Lv.${lv}/${u.max}</span></div>
-    <div class="af">${u.step}　<span style="color:#7b8398">${u.desc}</span></div>
-    <div class="af" style="color:${maxed?'#4a9d6e':afford?'#8fd8ff':'#5c6479'}">${maxed?'最大':'◆ '+cost+' SP'}</div>
-  </div>`;
 }
 function buildingHTML(b){
   const lv=bldLv(b.id), maxed=lv>=b.max, cost=bldCost(b,lv);
@@ -18799,9 +19195,143 @@ function renderStash(){
       ? S.stash.map(it=>itemHTML(it,true,{compare:true})).join('')
       : (shelf.length ? '' : '<div class="empty">空</div>')));
 }
+/* ==================== スキルツリー画面（旧 能力強化） ====================
+   2026-10-13 ユーザー要望：「スキルツリーにバリエーションを持たせたいので、
+   横に伸びてスクロールが必要になっても良いのでスキルツリー画面として再構成したい」。
+
+   それまでは UPGRADES を縦に1列並べるだけで、どれも単独で買えた。
+   ここで**枝（攻め・守り・身のこなし・仲間・技）× 段（根→幹→枝→梢）**の盤に並べ直し、
+   ノードに前提（need：前のノードを1段以上）を持たせる。段は左から右へ、
+   深い段ほど右にあるので、盤は横に伸びる（横スクロール）。
+
+   操作は「ノードを押す → 下の札に中身が出る → 札のボタンで強化」の2段。
+   盤の上のノードを押しただけでは買わない——小さなノードが並ぶ盤で1タップ購入にすると、
+   スクロールのつもりで触れた所を買ってしまう。
+
+   UPG_TREE の c は列（段の中で左から）、r は行。段（tier）は UPGRADES の側にある。 */
+const UPG_TREE = {
+  atk:[0,0], aspd:[1,0], range:[2,0], crit:[1,1],
+  hp:[0,2], def:[1,2], dr:[2,2], revive:[3,2], regen:[3,3],
+  ms:[0,4], dash:[1,4], escape:[4,4], mf:[1,5],
+  ally:[0,6], party:[1,6], relic:[2,6],
+  chain:[1,7], mark:[3,7], vortex:[4,7], meteor:[5,7],
+  wave:[0,8], nova:[3,8], turret:[4,8],
+  boomer:[1,9], mine:[3,9], decoy:[4,9], tornado:[5,9],
+  spow:[1,10], scd:[3,10],
+};
+/* 前提。技の枝は SKILL_TECHS の need をそのまま使う */
+const UPG_NEED = {aspd:'atk', range:'aspd', crit:'atk', def:'hp', dr:'def', revive:'dr', regen:'dr',
+                  dash:'ms', escape:'dash', mf:'ms', party:'ally'};
+const UPG_BRANCH = [
+  {nm:'攻め', r:[0,1]}, {nm:'守り', r:[2,3]}, {nm:'身のこなし', r:[4,5]},
+  {nm:'仲間', r:[6,6]}, {nm:'技', r:[7,10]},
+];
+/* 段ごとの列の範囲（根は3列、ほかは1列ずつ） */
+const UPG_TIER_COLS = {1:[0,2], 2:[3,3], 3:[4,4], 4:[5,5]};
+const SKT = {cw:120, ch:60, nw:106, nh:52, lw:34, hh:40};
+function upgNeed(u){ return u.need || UPG_NEED[u.id] || null; }
+/* 前提を満たしているか。前提のノードが隠れている（まだ開かない枠）ときは、前提なしとして扱う */
+function upgNeedOk(u){
+  const n=upgNeed(u); if(!n) return true;
+  const nu=UPGRADES.find(x=>x.id===n);
+  if(!nu || (nu.hidden && nu.hidden())) return true;
+  return upgLv(n)>0;
+}
+function upgIconId(u){ return isSkillTech(u.id) ? u.id : 'n_'+u.id; }
+let _upgSel = null;
+function upgSelect(id){ _upgSel=id; if(S.screen==='upg') renderUpg(); }
+function upgVisible(){ return UPGRADES.filter(u=>!(u.hidden && u.hidden()) && UPG_TREE[u.id]); }
+function upgState(u){
+  const lv=upgLv(u.id);
+  if(upgLocked(u)) return 'locked';
+  if(lv>=u.max) return 'maxed';
+  if(!upgNeedOk(u)) return 'noreq';
+  return (S.shards||0)>=upgCost(u,lv) ? 'afford' : 'poor';
+}
+function upgNodeHTML(u){
+  const [c,r]=UPG_TREE[u.id], lv=upgLv(u.id), stt=upgState(u);
+  const x=SKT.lw+c*SKT.cw+(SKT.cw-SKT.nw)/2, y=SKT.hh+r*SKT.ch+(SKT.ch-SKT.nh)/2;
+  const tech=skillDef(u.id), col = stt==='locked'||stt==='noreq' ? '#4a5164' : tech ? tech.col : '#e6e9f0';
+  const set = tech && lv>0 && skillEquipped()===tech;
+  const pips = Array.from({length:u.max}, (_,i)=>`<b class="${i<lv?'on':''}"></b>`).join('');
+  return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}" data-upgsel="${u.id}"
+     style="left:${x}px;top:${y}px;--ic:${col}">
+    <i style="--im:${skillIconUrl(upgIconId(u))}"></i>
+    <div class="skn-t"><span class="skn-nm">${stt==='locked'?'<i class="pi pi-lock"></i>':''}${u.nm}</span>
+      <span class="skn-pp">${pips}</span></div>
+    ${set?'<em class="skn-set">SET</em>':''}
+  </div>`;
+}
+/* 線は「親の右端から出て、列の間で曲がり、子の左端に入る」鉤形。斜めにすると交差が読めない */
+function upgEdgesSVG(vis, W, H){
+  const ids=new Set(vis.map(u=>u.id)), out=[];
+  vis.forEach(u=>{
+    const n=upgNeed(u); if(!n || !ids.has(n)) return;
+    const [pc,pr]=UPG_TREE[n], [cc,cr]=UPG_TREE[u.id];
+    const x0=SKT.lw+pc*SKT.cw+(SKT.cw+SKT.nw)/2, y0=SKT.hh+pr*SKT.ch+SKT.ch/2;
+    const x1=SKT.lw+cc*SKT.cw+(SKT.cw-SKT.nw)/2, y1=SKT.hh+cr*SKT.ch+SKT.ch/2;
+    const xm=x1-(SKT.cw-SKT.nw)/2;
+    const on=upgLv(n)>0, col=on ? (skillDef(u.id)?'#6f86b8':'#7b8398') : '#2e3445';
+    const d = y0===y1 ? `M${x0} ${y0}H${x1}` : `M${x0} ${y0}H${xm}V${y1}H${x1}`;
+    out.push(`<path d="${d}" stroke="${col}" stroke-width="2" fill="none" shape-rendering="crispEdges"${on?'':' stroke-dasharray="4 3"'}/>`);
+  });
+  return `<svg class="skt-lines" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`;
+}
+function upgTreeHTML(){
+  const vis=upgVisible();
+  const cols=6, rows=11, W=SKT.lw+cols*SKT.cw+8, H=SKT.hh+rows*SKT.ch+6;
+  const heads=UPG_TIERS.map(t=>{
+    const [c0,c1]=UPG_TIER_COLS[t.t], x=SKT.lw+c0*SKT.cw, w=(c1-c0+1)*SKT.cw, open=tierOpen(t.t);
+    return `<div class="skt-tier${open?'':' shut'}" style="left:${x}px;width:${w-4}px;height:${H-4}px">
+      <div class="skt-th">${open?'':'<i class="pi pi-lock"></i> '}<b>${t.nm}</b>`
+      +(open?'':`<span>${t.via}と開く</span>`)+`</div></div>`;
+  }).join('');
+  const brs=UPG_BRANCH.map(b=>{
+    const y=SKT.hh+b.r[0]*SKT.ch, h=(b.r[1]-b.r[0]+1)*SKT.ch;
+    return `<div class="skt-br" style="top:${y+3}px;height:${h-6}px"><span>${b.nm}</span></div>`;
+  }).join('');
+  const nodes=vis.slice().sort((a,b)=>UPG_TREE[a.id][1]-UPG_TREE[b.id][1] || UPG_TREE[a.id][0]-UPG_TREE[b.id][0])
+    .map(upgNodeHTML).join('');
+  return `<div class="skt-board" style="width:${W}px;height:${H}px">${heads}${brs}${upgEdgesSVG(vis,W,H)}${nodes}</div>`;
+}
+/* 下の札。押したノードの中身と、強化・セットのボタン */
+function upgDetailHTML(u){
+  if(!u) return '<div class="skd-empty">ノードを押すと、ここに中身が出る</div>';
+  const lv=upgLv(u.id), stt=upgState(u), tech=skillDef(u.id), cost=upgCost(u,lv);
+  const col = tech ? tech.col : '#e6e9f0';
+  const lines=[];
+  if(tech){
+    const cur = lv>0 ? tech.v(lv) : null, nxt = lv<u.max ? tech.v(lv+1) : null;
+    lines.push(`<div class="skd-d">${tech.desc}</div>`);
+    if(cur) lines.push(`<div class="skd-l">いま　${tech.txt(cur)}　<span>リキャスト ${skillCooldown(tech,lv).toFixed(1)}秒</span></div>`);
+    if(nxt) lines.push(`<div class="skd-l nx">${lv>0?'次':'覚えると'}　${tech.txt(nxt)}　<span>リキャスト ${skillCooldown(tech,lv+1).toFixed(1)}秒</span></div>`);
+  }else{
+    lines.push(`<div class="skd-d">${u.step}　<span>${u.desc}</span></div>`);
+  }
+  let act='';
+  if(stt==='locked') act=`<div class="skd-why"><i class="pi pi-lock"></i> ${tierDef(upgTier(u)).via}と開く</div>`;
+  else if(stt==='noreq'){ const n=UPGRADES.find(x=>x.id===upgNeed(u)); act=`<div class="skd-why">先に「${n?n.nm:upgNeed(u)}」を覚える</div>`; }
+  else if(stt==='maxed') act='<div class="skd-max">最大</div>';
+  else act=`<button class="${stt==='afford'?'primary':'ghost'}" data-upg="${u.id}">◆ ${cost} SP で Lv.${lv+1}</button>`;
+  if(tech && lv>0){
+    const on=skillEquipped()===tech;
+    act += on ? '<span class="skd-on">枠2にセット中</span>'
+              : `<button class="ghost" data-sksel="${u.id}">枠2にセット</button>`;
+  }
+  return `<div class="skd-h" style="color:${col}"><i class="skd-ic" style="--im:${skillIconUrl(upgIconId(u))};--ic:${col}"></i>${u.nm}
+      <span>Lv.${lv} / ${u.max}</span></div>${lines.join('')}<div class="skd-a">${act}</div>`;
+}
 function renderUpg(){
   el('upg-gold').innerHTML = '<span style="color:#8fd8ff">◆ '+(S.shards||0)+' SP</span>';
-  el('upgrades').innerHTML = UPGRADES.filter(u=>!(u.hidden && u.hidden())).map(upgradeHTML).join('');
+  const vis=upgVisible();
+  if(!_upgSel || !vis.some(u=>u.id===_upgSel)){
+    // 最初に開いたときは、いま強化できる物のうち一番左上を選んでおく（札が空だと何をする画面か分からない）
+    const c=vis.filter(u=>upgState(u)==='afford')
+      .sort((a,b)=>UPG_TREE[a.id][0]-UPG_TREE[b.id][0] || UPG_TREE[a.id][1]-UPG_TREE[b.id][1])[0];
+    _upgSel = c ? c.id : 'hp';
+  }
+  el('upgrades').innerHTML = upgTreeHTML();
+  el('skt-detail').innerHTML = upgDetailHTML(UPGRADES.find(u=>u.id===_upgSel));
   renderRelics();
   renderUlts();
 }
@@ -18881,7 +19411,7 @@ function artSlotHTML(o){
          style="width:auto;padding:4px 10px;font-size:12px;margin:4px 0 0">✎ 名前</button>` : '';
   return `<div class="item" data-artslot="${o.slot}" data-artpick="${o.id||''}"
      style="border-left-color:${o.col};${o.set?'background:rgba(143,216,255,.06)':''}">
-    <div class="nm" style="color:${o.col}">${o.icon||'・'} ${o.nm}
+    <div class="nm" style="color:${o.col}">${o.iconUrl?`<i class="slico" style="background-image:${o.iconUrl}"></i>`:(o.icon||'・')} ${o.nm}
       ${o.set?'<span style="color:#7fe0c0;font-size:12px">　セット中</span>'
              :'<span style="color:var(--dim);font-size:12px">　タップでセット</span>'}</div>
     <div class="af">${o.desc}</div>
@@ -18904,12 +19434,16 @@ function artSlotsHTML(){
 
   // ---- 枠2: スキル技 ----
   rows.push('<div class="gridhead">枠2　スキル技</div>');
-  if(upgLv('wave')){
-    rows.push(artSlotHTML({slot:'wave', id:'wave', nm:'衝撃波', icon:'〓', col:'#8fd8ff', set:true,
-      desc:'前方をまとめて薙ぐ。下がりながらでも出せる',
-      sub:'リキャスト '+WAVE_CD+'秒　（今はこの枠に入る技が1つだけ）'}));
+  const learnedSk=skillsLearned(), curSk=skillEquipped();
+  if(learnedSk.length){
+    learnedSk.forEach(t=>{
+      const lv=skillLv(t.id);
+      rows.push(artSlotHTML({slot:'wave', id:t.id, nm:t.nm, iconUrl:skillIconUrl(t.id), col:t.col, set:!!curSk && curSk.id===t.id,
+        desc:t.desc,
+        sub:'Lv.'+lv+'　'+t.txt(t.v(lv))+'　リキャスト '+skillCooldown(t, lv).toFixed(1)+'秒'}));
+    });
   }else{
-    rows.push('<div class="empty">能力強化「衝撃波」を買うと、この枠に入る</div>');
+    rows.push('<div class="empty">スキルツリーで技（ショックなど）を覚えると、この枠に入る</div>');
   }
 
   // ---- 枠3: 武器技 ----
@@ -19005,7 +19539,35 @@ const SKILL_ICON_GRID={
   rally:["...............",".###.......###.","#####.....#####","######.#.######","#######.#######","#######.#######","#####.....#####",".######.######.","..#####.#####..","...#########...","....#######....",".....#####.....","......###......",".......#.......","..............."],
   bloom:["...............","..#.........#..",".###.......###.","..#.........#..",".......#.......","..###..#..###..",".#####.#.#####.",".######.######.","..###########..","....##.#.##....",".......#.......",".......#.......","...#########...",".#############.","..............."],
   wave:["...........#...","............#..",".......#.....#.","........#.....#","...#.....#....#","....#....#....#",".##.#.....#....","####.#....#....",".##.#.....#....","....#....#....#","...#.....#....#","........#.....#",".......#.....#.","............#..","...........#..."],
-  link:["...............",".#.....#.....#.",".##....#....##.","..##...#...##..","...##..#..##...","....##.#.##....",".....#.#.#.....",".......#.......",".......#.......","...#.#.#.#.#...","....#..#..#....","...#.#####.#...","..#....#....#..",".......#.......","..............."]
+  link:["...............",".#.....#.....#.",".##....#....##.","..##...#...##..","...##..#..##...","....##.#.##....",".....#.#.#.....",".......#.......",".......#.......","...#.#.#.#.#...","....#..#..#....","...#.#####.#...","..#....#....#..",".......#.......","..............."],
+  chain:["...............",".......##......","......####.....","......####.....",".......##......","......#..#.....",".....#....#....",".....##...##...","....#.......#..",".##.#.......##.","####.........##","####......#####",".##.......#####","..........#####","...........###."],
+  boomer:["...............","..#####........","..######.......","...######......",".....#####.....",".......####....","........####...",".......####....",".....#####.....","...######......","..######.......","..#####.......#",".............#.","...#........#..","....########..."],
+  nova:[".......#.......","...#...#...#...","....#.....#....",".......#.......",".#...#.#.#...#.","..#...###...#..",".....#####.....","##.#########.##",".....#####.....","..#...###...#..",".#...#.#.#...#.",".......#.......","....#.....#....","...#...#...#...",".......#......."],
+  mine:[".......#.......","...#...#...#...","....#.....#....","...............",".....#####.....","....#..#..#....","...#..###..#...","..#.........#..",".#############.",".#.#.#.#.#.#.#.",".#############.","...............","...............","...............","..............."],
+  mark:[".....#####.....","...##.....##...","..#.........#..",".#...........#.",".#...#####...#.","#...#.....#...#","#..#..###..#..#","#.#..#####..#.#","#..#..###..#..#","#...#.....#...#",".#...#####...#.",".#...........#.","..#.........#..","...##.....##...",".....#####....."],
+  vortex:[".....######....","...##......##..","..#..........#.",".#....####....#",".#...#....#...#","#...#..##..#..#","#...#.#..#.#..#","#...#.#.##.#..#","#...#.#....#..#","#....#.####...#",".#....#......#.",".#.....######..","..#............","...##..........",".....######...."],
+  turret:["......#........",".....###.......","....#####..#.##","....#####......",".....###...#.##","......#........","...............",".....###.......",".....###.......","....#####......","....#####......","...#######.....","...#######.....","..#########....","..............."],
+  decoy:[".......#.......",".......#.......",".......#.......","...............",".......#.......","...............","......###......","......###......","...#########...","...#.#####.#...","...#.#####.#...",".....#####.....",".....##.##.....",".....##.##.....",".....##.##....."],
+  meteor:["..............#","............##.","..........###..",".......#.###...",".........##....",".....#####.#...","....#######....","...#########...","...####.####...","...###.#####...","...#########...","....#######....",".....#####.....","...............","..............."],
+  tornado:[".#############.","...............","..###########..","...............","...#########...","...............","....#######....","...............",".....######....","...............",".....#####.....","...............","......###......",".......##......","........#......"],
+  n_hp:["...............","...............","..###.....###..",".#####...#####.","###############","###############","###############",".#############.","..###########..","...#########...","....#######....",".....#####.....","......###......",".......#.......","..............."],
+  n_atk:[".......#.......","......###......","......###......","......###......","......###......","......###......","......###......","......###......","......###......","...#########...","...#########...",".......#.......","......###......",".......#.......","..............."],
+  n_aspd:["...............","...............",".##.....##.....","..##.....##....","...##.....##...","....##.....##..",".....##.....##.","......##.....##",".....##.....##.","....##.....##..","...##.....##...","..##.....##....",".##.....##.....","...............","..............."],
+  n_range:["...........####",".............##","..#.........#.#","..##.......#..#","..#.#.....#....","..#..#...#.....","..#...#.#......","..#....#.......","..#...#.#......","..#..#...#.....","..#.#.....#....","..##...........","..#............","...............","..............."],
+  n_ms:["...............","....#####......","....#####......","....#####......","....#####......","....#####......","....#####......","....######.....","....########...","....#########..","...##########..","...###########.","...###########.","...............","..............."],
+  n_mf:["...............","...............","...............",".....#####.....","...##.....##...","..#...###...#..",".#...#####...#.","#....##.##....#",".#...#####...#.","..#...###...#..","...##.....##...",".....#####.....","...............","...............","..............."],
+  n_crit:[".......#.......",".......#.......","......###......","......###......",".....#####.....",".##..#####..##.","..###########..",".######.######.","..###########..",".##..#####..##.",".....#####.....","......###......","......###......",".......#.......",".......#......."],
+  n_def:["...............",".#############.",".#############.",".##.........##.",".##.........##.",".##.........##.",".##.........##.",".##.........##.","..##.......##..","..##.......##..","...##.....##...","....##...##....",".....##.##.....","......###......",".......#......."],
+  n_dr:["...............",".#############.",".#############.",".######.######.",".######.######.",".######.######.",".###.#####.###.",".####.###.####.","..####.#.####..","..###########..","...#########...","....#######....",".....#####.....","......###......",".......#......."],
+  n_ally:["...............","...###....###..","..#####..#####.","..#####..#####.","..#####..#####.","...###....###..","...............",".#######.######","#########.#####","#########.#####","#########.#####","#########.#####","...............","...............","..............."],
+  n_party:["...............","...............",".##....###...##","###...#####..##","###...#####..##",".##....###...##",".......###.....","..............#","###..#######.##","##..#########.#","##..#########.#","##..#########.#","...............","...............","..............."],
+  n_relic:["...............","...#########...","..##.#####.##..",".##..#####..##.","###############",".#############.","..##..###..##..","...##.###.##...","....##.#.##....",".....##.##.....","......###......",".......#.......","...............","...............","..............."],
+  n_dash:["...............","...............","...............",".........##....","..........##...","#####.......##.","...........####",".#######....###","...........####","#####.......##.","..........##...",".........##....","...............","...............","..............."],
+  n_revive:[".......#.......","......###......","......###......",".#.....#.....#.",".##...###...##.",".###.#####.###.","..###########..","...#########...","....#######....","......###......","......###......",".....#.#.#.....","....#..#..#....","...............",".#############."],
+  n_regen:["...............",".....#####.....","...##.....##...","..#....#....#..",".#.....#.....#.",".#.....#.....#.","#...#######...#","#......#......#","#......#......#",".#.....#.....#.",".#...........#.","..#.........#..","...##.....##...",".....#####.....","..............."],
+  n_escape:["...............","..#########....","..#.......#....","..#.......#....","..#.......#....","..#.....#.#....","..#....#..#.###","..#...#####...#","..#....#..#.###","..#.....#.#....","..#.......#....","..#.......#....","..#.......#....","..#########....","..............."],
+  n_spow:[".......#.......",".......#.......","......###......","......###......",".....#####.....","...#########...","###############","...#########...",".....#####.....","......###......","......###......",".......#.......",".......#.......","...............","..............."],
+  n_scd:["...............","..###########..","...#.......#...","...#.......#...","....#.###.#....",".....#.#.#.....","......#.#......","......#.#......",".....#.#.#.....","....#..#..#....","...#..###..#...","...#.#####.#...","..###########..","...............","..............."]
 };
 const _skillIconUrl={};
 function skillIconUrl(id){
@@ -19288,7 +19850,7 @@ function townTap(e){
   if(!isMenu(S.screen)) return;
   if(!e.target || !e.target.closest) return;
   // 何にも当たっていないタップでは _lastTap を消費しない
-  if(!e.target.closest('[data-back],[data-depth],[data-upg],[data-bld],[data-buy],[data-orebuy],[data-fix],.item')) return;
+  if(!e.target.closest('[data-back],[data-depth],[data-upg],[data-upgsel],[data-sksel],[data-bld],[data-buy],[data-orebuy],[data-fix],.item')) return;
   if(!tapAccepted(e)) return;
   if(e.type==='touchend' && e.cancelable) e.preventDefault();
 
@@ -19318,7 +19880,14 @@ function townTap(e){
           if(S.hero) S.hero.hpNow=Math.min(S.hero.hpNow, stats(S.hero).maxHp);
           redraw(); return; }
 
-  // 能力強化の購入
+  // スキルツリー：ノードを押すと札に中身が出る（買うのは札のボタン）
+  const sn=e.target.closest('[data-upgsel]');
+  if(sn){ _upgSel=sn.dataset.upgsel; redraw(); return; }
+  // 覚えたスキル技を枠2に載せる
+  const ss=e.target.closest('[data-sksel]');
+  if(ss){ if(skillSet(ss.dataset.sksel)) log('スキル技を『'+skillDef(ss.dataset.sksel).nm+'』にした'); redraw(); return; }
+
+  // スキルツリーの強化
   const ub=e.target.closest('[data-upg]');
   if(ub){
     const u=UPGRADES.find(x=>x.id===ub.dataset.upg), lv=upgLv(u.id);
@@ -19326,9 +19895,12 @@ function townTap(e){
     /* 段が開いていなければ買えない。押したときに何も起きないと
        壊れているように見えるので、開ける条件を言う。 */
     if(upgLocked(u)){ log(tierDef(upgTier(u)).via+'と開く'); return; }
+    if(!upgNeedOk(u)){ log('先に「'+(UPGRADES.find(x=>x.id===upgNeed(u))||{}).nm+'」を覚える'); return; }
     const cost=upgCost(u,lv);
     if((S.shards||0)<cost) return;
     S.shards-=cost; S.upg[u.id]=lv+1;
+    // 初めて覚えたスキル技は、枠2が空ならそのまま載せる
+    if(lv===0 && isSkillTech(u.id) && !S.skill) S.skill=u.id;
     if(S.hero) S.hero.hpNow=stats(S.hero).maxHp;
     redraw(); return;
   }
@@ -19907,6 +20479,7 @@ function artSlotTap(e, redraw){
   if(e.type==='touchend' && e.cancelable) e.preventDefault();
   const slot=as.dataset.artslot, id=as.dataset.artpick;
   if(slot==='ult' && id){ S.ult=id; log('大技を『'+ultDef(id).nm+'』にした'); }
+  else if(slot==='wave' && id && skillSet(id)){ log('スキル技を『'+skillDef(id).nm+'』にした'); }
   else if(slot==='art' && id){
     const wb=heroWeaponBase();
     if(wb){ S.artPick=S.artPick||{}; S.artPick[wb]=id; log('武器技を『'+artName(artDef(id))+'』にした'); }

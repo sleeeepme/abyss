@@ -173,7 +173,7 @@ function feelWeaponArtAim(ent,id,tx,ty){
 function feelPixelArt(id,x,y,o={}){
   if(!PIXEL_ART_FX||!PIXEL_ART_FX.span(id))return;
   FEEL.weaponArts.push({id,x,y,angle:o.angle||0,age:-(o.delay||0),max:PIXEL_ART_FX.span(id)||1,range:o.range,life:o.life,
-    tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:o.ent||null,follow:!!o.ent,wide:o.wide,arc:o.arc,kind:o.kind,elem:o.elem});
+    tx:o.tx,ty:o.ty,cx:o.cx,cy:o.cy,ent:o.ent||null,follow:!!o.ent,wide:o.wide,arc:o.arc,kind:o.kind,elem:o.elem,pts:o.pts,o:o.o});
   feelTrimArts();
 }
 function feelArtScale(){return clamp(TS/48,.58,1.35);}
@@ -183,7 +183,8 @@ function feelDrawPixelArt(f,layer,camX,camY){
   PIXEL_ART_FX.renderEffect(ctx,{id:f.id,age:f.age,x:x*TS-camX,y:y*TS-camY,angle:f.angle,scale:feelArtScale(),
     range:f.range,life:f.life,layer,wide:f.wide,arc:f.arc,kind:f.kind,elem:f.elem,
     tx:f.tx!=null?f.tx*TS-camX:undefined,ty:f.ty!=null?f.ty*TS-camY:undefined,
-    casterX:f.cx!=null?f.cx*TS-camX:undefined,casterY:f.cy!=null?f.cy*TS-camY:undefined});
+    casterX:f.cx!=null?f.cx*TS-camX:undefined,casterY:f.cy!=null?f.cy*TS-camY:undefined,
+    pts:f.pts?f.pts.map(q=>[q[0]*TS-camX,q[1]*TS-camY]):undefined,o:f.o});
 }
 /* W.arts の持続技を PixelArtFx の引数へ。age は周期で割らず、発動からの実時間を渡す。 */
 function feelPersistentPixel(f){
@@ -194,6 +195,19 @@ function feelPersistentPixel(f){
   if(f.kind==='field')return{id:'a_field',age:f.max-f.t,life:f.max,range:f.r};
   if(f.kind==='sanct')return{id:'a_sanct',age:f.max-f.t,life:f.max,range:f.r};
   if(f.kind==='collapse')return{skip:true};
+  /* スキル技（2026-10-13）。age は置いてからの秒 */
+  if(f.kind&&f.kind.startsWith('sk')){
+    const age=f.max-f.t;
+    if(f.kind==='skboomer')return{id:'s_boomer_blade',age,angle:f.a||0};
+    if(f.kind==='skmine')return{id:'s_mine_idle',age,o:{armed:age>=f.arm}};
+    if(f.kind==='skvortex')return f.t>0?{id:'s_vortex_live',age,life:f.max,range:f.pull}:{skip:true};
+    if(f.kind==='skturret')return{id:'s_turret_live',age,life:f.max,o:{shotAge:f.shot}};
+    if(f.kind==='skdecoy')return f.t>0?{id:'s_decoy_live',age,life:f.max}:{skip:true};
+    if(f.kind==='skmeteor')return f.t>0?{id:'s_meteor_fall',age,life:f.max,range:f.r}:{skip:true};
+    if(f.kind==='skembers')return{id:'s_embers',age,life:f.max,range:f.r};
+    if(f.kind==='sktornado')return{id:'s_tornado_live',age,life:f.max,range:f.r};
+    return{skip:true};
+  }
   return null;
 }
 function feelDrawPersistentPixel(layer,camX,camY){
@@ -202,6 +216,15 @@ function feelDrawPersistentPixel(layer,camX,camY){
     const sx=f.x*TS-camX,sy=f.y*TS-camY;
     if(sx<-200||sy<-200||sx>innerWidth+200||sy>innerHeight+200)continue;
     PIXEL_ART_FX.renderEffect(ctx,{...p,x:sx,y:sy,scale:feelArtScale(),layer});
+  }
+  /* スキル技が敵に残す物：凍結の氷・呪印の印（どちらも体より上に描く） */
+  if(layer!=='air'||!W.enemies)return;
+  for(const e of W.enemies){
+    if(e.dead||!(e.frz>0||e.markT>0))continue;
+    const sx=e.x*TS-camX,sy=e.y*TS-camY;
+    if(sx<-80||sy<-80||sx>innerWidth+80||sy>innerHeight+80)continue;
+    if(e.frz>0)PIXEL_ART_FX.renderEffect(ctx,{id:'s_frozen',age:(e.frzMax||0)-e.frz,x:sx,y:sy,range:e.r||0.34,scale:feelArtScale(),layer});
+    if(e.markT>0)PIXEL_ART_FX.renderEffect(ctx,{id:'s_marked',age:FEEL.time,x:sx,y:sy,range:e.r||0.34,scale:feelArtScale(),layer});
   }
 }
 /* 効いている間の足元の輪（守護・鉄壁・命脈・聖域・恩寵）。一番強い物を1つだけ描く。 */

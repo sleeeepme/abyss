@@ -47,6 +47,7 @@ await tap('#scr-shop [data-back]'); await tap('#btn-go-stash');
 await tap(`#stash .item[data-uid="${uid}"]`);
 R.equipInStashScreen = await pg.evaluate(u=>Object.values(S.hero.equip).some(i=>i&&i.uid===u), uid);
 await tap('#scr-stash [data-back]'); await tap('#btn-go-upg');
+await tap('[data-upgsel="hp"]');   // スキルツリー：選んでから強化
 await tap('[data-upg="hp"]');
 R.upgradeInUpgScreen = await pg.evaluate(()=>upgLv('hp')===1);
 await tap('#scr-upg [data-back]');

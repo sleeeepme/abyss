@@ -78,6 +78,7 @@ const shop = await pg.evaluate(() => {
   const bought = S.stash.some(i => i.uid === item.uid) && S.gold === g0 - p;
   setScreen('upg');                        // 永続強化も独立画面
   const u = UPGRADES[0], c = upgCost(u, 0), s1 = S.shards;
+  upgSelect(u.id);                         // スキルツリー：ノードを選ぶと札に強化ボタンが出る
   document.querySelector(`[data-upg="${u.id}"]`).click();
   const upgraded = upgLv(u.id) === 1 && S.shards === s1 - c;
   // 欠片が足りないときは買えないこと
