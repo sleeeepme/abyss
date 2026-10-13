@@ -9,10 +9,10 @@ await pg.waitForTimeout(300);
 /* タイトル画面を1枚跨いでから拠点に入るようになった。
    このスイートが見たいのは拠点から先なので、ここで済ませておく。 */
 await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); } });
-await pg.evaluate(()=>{ S.gold=99999; S.shards=99999; S.deepest=20; rerollShop(); setScreen('upg'); upgSelect('atk'); });
-// スキルツリー：ノードを選ぶと下の札に強化ボタンが出る。スワイプ・タップはその札のボタンで見る
-await pg.locator('[data-upg="atk"]').scrollIntoViewIfNeeded();
-const box=await pg.locator('[data-upg="atk"]').boundingBox();
+await pg.evaluate(()=>{ S.gold=99999; S.shards=99999; S.deepest=20; rerollShop(); setScreen('upg');  });
+// スキル：ノードをタップすると覚える。スワイプで覚えてしまわないかをノードの上で見る
+await pg.locator('[data-upgsel="atk"]').scrollIntoViewIfNeeded();
+const box=await pg.locator('[data-upgsel="atk"]').boundingBox();
 const before=await pg.evaluate(()=>({lv:upgLv('atk'), gold:S.gold}));
 // カードの上から指を置いて大きく上へスワイプ（＝スクロール）
 await pg.touchscreen.tap(1,1).catch(()=>{});
@@ -30,15 +30,14 @@ await pg.evaluate(async ([cx,cy])=>{
 await pg.waitForTimeout(400);
 const after=await pg.evaluate(()=>({lv:upgLv('atk'), gold:S.gold}));
 // 続けて普通にタップすれば効くこと
-await pg.locator('[data-upg="atk"]').scrollIntoViewIfNeeded();
-await pg.locator('[data-upg="atk"]').tap();
+await pg.locator('[data-upgsel="atk"]').scrollIntoViewIfNeeded();
+await pg.locator('[data-upgsel="atk"]').tap();
 await pg.waitForTimeout(300);
 const tapped=await pg.evaluate(()=>upgLv('atk'));
 // 連続タップ（300ms 間隔）が両方効くこと
-await pg.evaluate(()=>upgSelect('hp'));
-await pg.locator('[data-upg="hp"]').scrollIntoViewIfNeeded();
-await pg.locator('[data-upg="hp"]').tap(); await pg.waitForTimeout(300);
-await pg.locator('[data-upg="hp"]').tap(); await pg.waitForTimeout(300);
+await pg.locator('[data-upgsel="hp"]').scrollIntoViewIfNeeded();
+await pg.locator('[data-upgsel="hp"]').tap(); await pg.waitForTimeout(300);
+await pg.locator('[data-upgsel="hp"]').tap(); await pg.waitForTimeout(300);
 const rapid=await pg.evaluate(()=>upgLv('hp'));
 await b.close();
 console.log(JSON.stringify({errs,

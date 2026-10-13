@@ -210,20 +210,30 @@ R.tree = await pg.evaluate(()=>{
   const board = document.querySelector('.skt-board');
   const wide = board.offsetWidth > innerWidth;
   const scrollX = getComputedStyle(document.getElementById('skt-scroll')).overflowX === 'auto';
-  // 前提が無いと買えない
+  // 前提が無いと覚えられない（タップしても選ぶだけ。理由が札に出る）
   click('[data-upgsel="chain"]');
   const selShows = document.getElementById('skt-detail').textContent.includes('チェインライトニング');
   const reqMsg = document.getElementById('skt-detail').textContent.includes('先に「ショック」を覚える');
-  const noBtn = !document.querySelector('[data-upg="chain"]');
-  // 押しただけでは買わない
+  const noBtn = !document.querySelector('[data-upg="chain"]') && upgLv('chain') === 0;
+  // ノードをタップすると覚える。もう一度タップで Lv が上がる
   click('[data-upgsel="wave"]');
-  const notBought = upgLv('wave') === 0;
-  click('[data-upg="wave"]');
   const bought = upgLv('wave') === 1 && S.skill === 'wave';
-  click('[data-upgsel="chain"]'); click('[data-upg="chain"]');
+  click('[data-upgsel="wave"]');
+  const again = upgLv('wave') === 2;
+  // 札のボタンでも上がる
+  click('[data-upg="wave"]');
+  const byBtn = upgLv('wave') === 3;
+  click('[data-upgsel="chain"]');
   const chainOk = upgLv('chain') === 1 && S.skill === 'wave';   // 2つ目は勝手に載せ替えない
   click('[data-sksel="chain"]');
   const setOk = S.skill === 'chain';
+  // SPが足りないと覚えない
+  S.shards = 0; click('[data-upgsel="boomer"]');
+  const poorBlocked = upgLv('boomer') === 0;
+  S.shards = 5000;
+  // アイコンは表示の整数倍で焼いてある（mask で伸ばさない）
+  const ic = document.querySelector('.skn>i');
+  const crisp = getComputedStyle(ic).imageRendering === 'pixelated' && /url\("?data:image\/png/.test(ic.style.backgroundImage);
   // 段が閉じている技
   click('[data-upgsel="nova"]');
   const lockMsg = document.getElementById('skt-detail').textContent.includes('第5階層の中ボスを倒すと開く');
@@ -231,8 +241,8 @@ R.tree = await pg.evaluate(()=>{
   // 線が引かれている
   const lines = document.querySelectorAll('.skt-lines path').length;
   setScreen('town');
-  return {wide, scrollX, selShows, reqMsg, noBtn, notBought, bought, chainOk, setOk, lockMsg, lockNoBtn, lines,
-    ok: wide && scrollX && selShows && reqMsg && noBtn && notBought && bought && chainOk && setOk && lockMsg && lockNoBtn && lines > 15};
+  return {wide, scrollX, selShows, reqMsg, noBtn, bought, again, byBtn, chainOk, setOk, poorBlocked, crisp, lockMsg, lockNoBtn, lines,
+    ok: wide && scrollX && selShows && reqMsg && noBtn && bought && again && byBtn && chainOk && setOk && poorBlocked && crisp && lockMsg && lockNoBtn && lines > 15};
 });
 
 /* --- 6. HUD のボタンは載せた技の絵と名前になる --- */

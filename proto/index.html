@@ -202,8 +202,7 @@
   .skt-br span{writing-mode:vertical-rl;font-size:11px;letter-spacing:2px;color:#8b93a7}
   .skn{position:absolute;width:106px;height:52px;display:flex;align-items:center;gap:6px;padding:0 6px 0 7px;
     background:var(--panel);border:2px solid var(--line);clip-path:var(--pxr2);cursor:pointer;box-sizing:border-box}
-  .skn>i{flex:none;width:30px;height:30px;background:var(--ic);
-    -webkit-mask:var(--im) center/100% 100% no-repeat;mask:var(--im) center/100% 100% no-repeat}
+  .skn>i{flex:none;width:30px;height:30px;background:center/100% 100% no-repeat;image-rendering:pixelated}
   .skn-t{display:flex;flex-direction:column;gap:3px;min-width:0}
   .skn-nm{font-size:10.5px;font-weight:700;color:#e6e9f0;line-height:1.15;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .skn-nm .pi{margin-right:2px}
@@ -219,11 +218,14 @@
   .skn.sel{border-color:#e6e9f0;background:#1e2432}
   .skn-set{position:absolute;right:3px;top:2px;font-style:normal;font-size:8px;font-weight:700;color:#7fe0c0;letter-spacing:1px}
   .skn:active{background:#1e2432}
+  .skn.just{animation:sknGot .45s steps(3) 1}
+  @keyframes sknGot{0%{background:#e6e9f0}100%{background:#1e2432}}
+  @media (prefers-reduced-motion:reduce){.skn.just{animation:none}}
   .skt-detail{position:sticky;bottom:calc(-1 * max(16px,env(safe-area-inset-bottom)));z-index:3;margin:8px -16px 0;
     padding:10px 16px max(12px,env(safe-area-inset-bottom));background:#11141b;border-top:2px solid var(--line);min-height:96px}
   .skd-h{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
   .skd-h span{font-size:12px;color:var(--dim);font-weight:400}
-  .skd-ic{width:22px;height:22px;background:var(--ic);-webkit-mask:var(--im) center/100% 100% no-repeat;mask:var(--im) center/100% 100% no-repeat}
+  .skd-ic{width:30px;height:30px;background:center/100% 100% no-repeat;image-rendering:pixelated}
   .skd-d{font-size:12px;color:#c9cfdc;margin-top:4px;line-height:1.5}
   .skd-d span{color:#7b8398}
   .skd-l{font-size:12px;color:#e6e9f0;margin-top:3px}
@@ -850,7 +852,7 @@
       </div>
       <div class="hub-row5">
         <button class="hub-mini" id="btn-go-mem"><i class="pi pi-candle"></i><b>慰霊碑</b><em class="hub-badge" id="badge-mem"></em></button>
-        <button class="hub-mini" id="btn-go-upg"><i class="pi pi-up"></i><b>スキルツリー</b><em class="hub-badge" id="badge-upg"></em></button>
+        <button class="hub-mini" id="btn-go-upg"><i class="pi pi-up"></i><b>スキル</b><em class="hub-badge" id="badge-upg"></em></button>
         <button class="hub-mini" id="btn-go-bld"><i class="pi pi-hall"></i><b>街開発</b><em class="hub-badge" id="badge-bld"></em></button>
         <button class="hub-mini" id="btn-go-stash"><i class="pi pi-stash"></i><b>倉庫</b></button>
         <button class="hub-mini" id="btn-go-forge"><i class="pi pi-forge"></i><b>鍛冶屋</b><em class="hub-badge" id="badge-forge"></em></button>
@@ -951,22 +953,19 @@
   <div style="height:24px"></div>
 </div>
 
-<!-- ============ スキルツリー（旧 能力強化） ============ -->
+<!-- ============ スキル（旧 能力強化・スキルツリー） ============ -->
 <div class="screen" id="scr-upg">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
-    <h1>スキルツリー</h1><span class="gold" id="upg-gold"></span></div>
-  <p class="sub">対価は<b style="color:#8fd8ff">SP</b>。敵を倒した瞬間に貯まるので
-    <b style="color:#7fe0c0">死んでも失いません</b>。<br>
-    ノードを押して中身を見て、下の札で強化。線の先は、前のノードを覚えると開きます。</p>
+    <h1>スキル</h1><span class="gold" id="upg-gold"></span></div>
   <div class="skt-scroll" id="skt-scroll"><div id="upgrades"></div></div>
   <div class="skt-detail" id="skt-detail"></div>
 
-  <h2 id="relic-head">遺物 <span style="color:var(--dim);font-weight:400;font-size:12px">試練で得る・死んでも失わない</span></h2>
+  <h2 id="relic-head">遺物</h2>
   <p class="sub" id="relic-hint"></p>
   <div class="grid" id="relics"></div>
 
-  <h2 id="ult-head">大技 <span style="color:var(--dim);font-weight:400;font-size:12px">大ボスを倒すと増える・1つだけセットできる</span></h2>
-  <p class="sub" id="ult-hint"></p>
+  <h2 id="ult-head">大技</h2>
+  <p class="sub" id="ult-hint" hidden></p>
   <div class="grid" id="ults"></div>
   <div style="height:24px"></div>
 </div>
@@ -975,7 +974,7 @@
 <div class="screen" id="scr-bld">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>街開発</h1><span class="gold" id="bld-gold"></span></div>
-  <p class="sub">スキルツリーが「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
+  <p class="sub">スキルが「キャラを強くする」なら、こちらは<b>探索そのものを楽にする</b>。<br>
     帰ってくるたびに街が育つ。</p>
   <div class="grid" id="buildings"></div>
   <div style="height:24px"></div>
@@ -1477,7 +1476,7 @@
       （盗賊は<b style="color:#d6b34a">回避32%</b>で、薄い装備のまま前に出られます）。<br>
     ・<b style="color:#7fe0c0">僧侶は後衛</b>です。近接の仲間がいるあいだはその後ろに陣取り、
       <b>攻撃には参加しません</b>（祈りの回復は続きます）。<br>
-    ・街の<b>スキルツリー「仲間の練度」</b>で、仲間全員の能力が上がります。
+    ・街の<b>スキル「仲間の練度」</b>で、仲間全員の能力が上がります。
       <span style="font-size:12px">口座側の強化なので、これから拾う仲間にも効きます。</span>
   </div>
 
@@ -1502,8 +1501,8 @@
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     敵を倒すと<b style="color:#8fd8ff">◆SP</b>が入ります。経験値や金と同じで、
     <b>倒した瞬間に貯まる</b>ので、拾いに行く必要はありません。<br>
-    そのあと死んでも失いません。SPは<b>スキルツリー</b>の対価です（金では買えません）。<br>
-    どんなに酷い死に方をしても、潜った時間は必ずスキルツリーの強化に変わります。<br>
+    そのあと死んでも失いません。SPは<b>スキル</b>の対価です（金では買えません）。<br>
+    どんなに酷い死に方をしても、潜った時間は必ずスキルの強化に変わります。<br>
     <span style="font-size:12px">雑魚 1 ／ 精鋭 2 ／ 規格外 3 ／ 中ボス 5 ／ 大ボス 10。<br>
     <b>深さでは増えません</b>——深いところは敵の数で増えます。</span>
   </div>
@@ -1537,7 +1536,7 @@
     セットできるのは<b>1つだけ</b>。探索中は画面右下の丸ボタンで発動します。<br>
     <span style="font-size:12px">地脈断（周囲を殴る）/ 縮地（走り抜けて無敵）/ 灼髄（前方へ火柱）/
       守護（全員の被ダメージ減）/ 裂天（画面内すべて）</span><br><br>
-    技レベルは<b style="color:#8fd8ff">SP</b>で上げられます（街 → スキルツリー）。
+    技レベルは<b style="color:#8fd8ff">SP</b>で上げられます（街 → スキル）。
     威力が上がり、<b>リキャストも短くなります</b>。<br>
     <span style="font-size:12px">操作は移動だけ、という原則の唯一の例外です。だから枠は1つ、
       リキャストは20〜40秒、狙いを付ける操作はありません。増えるのは「ここで切るかどうか」の判断だけです。</span>
@@ -1659,10 +1658,10 @@
   <h2>ルール</h2>
   <div class="card" style="font-size:12px;line-height:1.8;color:var(--dim)">
     ・敵の周りに<b style="color:#ff7050">赤い輪</b>が広がったら攻撃の予兆。歩いて離れる。<br>
-    ・街では<b>スキルツリー</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
+    ・街では<b>スキル</b>と<b>装備の購入</b>ができる。これはロストしても消えない。<br>
     ・<b style="color:#d6b34a">生きて帰ると帰還報酬</b>がもらえる。深いところから戻るほど大きい。<br>
     ・その金で<b>街開発</b>（鍛冶屋・酒場・祭壇・商館）を進められる。
-      スキルツリーがキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
+      スキルがキャラを強くするのに対し、こちらは<b>探索そのものを楽にする</b>。<br>
     　とくに<b style="color:#d6b34a">祭壇</b>は、死んだときに<b>恩寵を次のキャラへ引き継ぐ</b>。<br>
     ・装備には<b>耐久</b>がある。0になると<b>破損</b>して性能を完全に失う。道具屋で修理できる。<br>
     ・残り25%を切ると<b style="color:#ffb08a">画面下に警告</b>が出っぱなしになる。
@@ -19299,6 +19298,26 @@ function upgNeedOk(u){
 }
 function upgIconId(u){ return isSkillTech(u.id) ? u.id : 'n_'+u.id; }
 let _upgSel = null;
+let _upgJust = null;          // 今覚えたノード（次の描画で一度だけ光らせる）
+/* Lv を1つ上げる。上げられなければ理由をログに出して false。 */
+function upgBuy(id){
+  const u=UPGRADES.find(x=>x.id===id); if(!u) return false;
+  const lv=upgLv(u.id);
+  if(lv>=u.max) return false;
+  /* 段が開いていなければ買えない。押したときに何も起きないと
+     壊れているように見えるので、開ける条件を言う。 */
+  if(upgLocked(u)){ log(tierDef(upgTier(u)).via+'と開く'); return false; }
+  if(!upgNeedOk(u)){ log('先に「'+(UPGRADES.find(x=>x.id===upgNeed(u))||{}).nm+'」を覚える'); return false; }
+  const cost=upgCost(u,lv);
+  if((S.shards||0)<cost){ log('SPが足りない（あと '+(cost-(S.shards||0))+'）'); return false; }
+  S.shards-=cost; S.upg[u.id]=lv+1;
+  // 初めて覚えたスキル技は、枠2が空ならそのまま載せる
+  if(lv===0 && isSkillTech(u.id) && !S.skill) S.skill=u.id;
+  if(S.hero) S.hero.hpNow=stats(S.hero).maxHp;
+  _upgJust=u.id;
+  log('「'+u.nm+'」 Lv.'+(lv+1)+(lv===0?' を覚えた':' に上がった'));
+  return true;
+}
 function upgSelect(id){ _upgSel=id; if(S.screen==='upg') renderUpg(); }
 function upgVisible(){ return UPGRADES.filter(u=>!(u.hidden && u.hidden()) && UPG_TREE[u.id]); }
 function upgState(u){
@@ -19314,9 +19333,9 @@ function upgNodeHTML(u){
   const tech=skillDef(u.id), col = stt==='locked'||stt==='noreq' ? '#4a5164' : tech ? tech.col : '#e6e9f0';
   const set = tech && lv>0 && skillEquipped()===tech;
   const pips = Array.from({length:u.max}, (_,i)=>`<b class="${i<lv?'on':''}"></b>`).join('');
-  return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}" data-upgsel="${u.id}"
+  return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}${_upgJust===u.id?' just':''}" data-upgsel="${u.id}"
      style="left:${x}px;top:${y}px;--ic:${col}">
-    <i style="--im:${skillIconUrl(upgIconId(u))}"></i>
+    <i style="background-image:${skillIconTint(upgIconId(u), col)}"></i>
     <div class="skn-t"><span class="skn-nm">${stt==='locked'?'<i class="pi pi-lock"></i>':''}${u.nm}</span>
       <span class="skn-pp">${pips}</span></div>
     ${set?'<em class="skn-set">SET</em>':''}
@@ -19378,7 +19397,7 @@ function upgDetailHTML(u){
     act += on ? '<span class="skd-on">枠2にセット中</span>'
               : `<button class="ghost" data-sksel="${u.id}">枠2にセット</button>`;
   }
-  return `<div class="skd-h" style="color:${col}"><i class="skd-ic" style="--im:${skillIconUrl(upgIconId(u))};--ic:${col}"></i>${u.nm}
+  return `<div class="skd-h" style="color:${col}"><i class="skd-ic" style="background-image:${skillIconTint(upgIconId(u), col)}"></i>${u.nm}
       <span>Lv.${lv} / ${u.max}</span></div>${lines.join('')}<div class="skd-a">${act}</div>`;
 }
 function renderUpg(){
@@ -19391,6 +19410,7 @@ function renderUpg(){
     _upgSel = c ? c.id : 'hp';
   }
   el('upgrades').innerHTML = upgTreeHTML();
+  _upgJust = null;
   el('skt-detail').innerHTML = upgDetailHTML(UPGRADES.find(u=>u.id===_upgSel));
   renderRelics();
   renderUlts();
@@ -19442,6 +19462,9 @@ function ultHTML(u){
 }
 function renderUlts(){
   const list=unlockedUlts();
+  /* 1つも無いうちは見出しごと畳む（遺物と同じ）。「まだ無い」の説明文はスキル画面の下に要らない */
+  el('ult-head').hidden = !list.length;
+  el('ults').hidden = !list.length;
   el('ults').innerHTML = list.length
     ? list.map(ultHTML).join('')
     : '<div class="empty">まだ1つも無い。第10階層の大ボスを倒すと最初の大技を覚える</div>';
@@ -19498,12 +19521,12 @@ function artSlotsHTML(){
   if(learnedSk.length){
     learnedSk.forEach(t=>{
       const lv=skillLv(t.id);
-      rows.push(artSlotHTML({slot:'wave', id:t.id, nm:t.nm, iconUrl:skillIconUrl(t.id), col:t.col, set:!!curSk && curSk.id===t.id,
+      rows.push(artSlotHTML({slot:'wave', id:t.id, nm:t.nm, iconUrl:skillIconTint(t.id, t.col), col:t.col, set:!!curSk && curSk.id===t.id,
         desc:t.desc,
         sub:'Lv.'+lv+'　'+t.txt(t.v(lv))+'　リキャスト '+skillCooldown(t, lv).toFixed(1)+'秒'}));
     });
   }else{
-    rows.push('<div class="empty">スキルツリーで技（ショックなど）を覚えると、この枠に入る</div>');
+    rows.push('<div class="empty">スキルで技（ショックなど）を覚えると、この枠に入る</div>');
   }
 
   // ---- 枠3: 武器技 ----
@@ -19638,6 +19661,22 @@ function skillIconUrl(id){
   const c=cv.getContext('2d'); c.fillStyle='#f4f4f4';
   for(let y=0;y<15;y++) for(let x=0;x<15;x++) if(g[y][x]==='#') c.fillRect(x,y,1,1);
   return (_skillIconUrl[id]='url('+cv.toDataURL()+')');
+}
+/* スキル画面のアイコン。**最初から表示の大きさの整数倍で、色も付けて焼く。**
+   以前は 15px の白い絵を CSS の mask で 30px に伸ばしていたが、mask の拡大は補間がかかり、
+   ドットがにじんで見えた（報告「アイコンがボケてる」）。1ドット＝SKILL_ICON_PX 画素で焼き、
+   表示側は image-rendering:pixelated で縮めるだけにする（30px 表示なら 3倍の画面で 6画素＝ちょうど整数）。 */
+const SKILL_ICON_PX = 2*Math.max(1, Math.round(window.devicePixelRatio||1));   // 30px 表示の画面画素ちょうど
+const _skillIconTint={};
+function skillIconTint(id, col){
+  const k=id+'|'+col;
+  if(_skillIconTint[k]!==undefined) return _skillIconTint[k];
+  const g=SKILL_ICON_GRID[id];
+  if(!g){ _skillIconTint[k]=''; return ''; }
+  const n=SKILL_ICON_PX, cv=document.createElement('canvas'); cv.width=15*n; cv.height=15*n;
+  const c=cv.getContext('2d'); c.fillStyle=col;
+  for(let y=0;y<15;y++) for(let x=0;x<15;x++) if(g[y][x]==='#') c.fillRect(x*n,y*n,n,n);
+  return (_skillIconTint[k]='url('+cv.toDataURL()+')');
 }
 /* 外周の円ゲージ。満ちた割合（0〜1）を角度にして --gp へ。3度刻みで丸めて、書き込みを減らす */
 function skillGauge(btn, key, cd, max){
@@ -19940,30 +19979,19 @@ function townTap(e){
           if(S.hero) S.hero.hpNow=Math.min(S.hero.hpNow, stats(S.hero).maxHp);
           redraw(); return; }
 
-  // スキルツリー：ノードを押すと札に中身が出る（買うのは札のボタン）
+  /* スキル：ノードをタップすると、その場で覚える（Lv を1つ上げる）。中身は下の札に出る。
+     2026-10-13 に「押すと札に出る→札のボタンで強化」の2段にしたが、
+     「タップしても習得できない」と言われた。前の一覧と同じく、押したら覚える形に戻す。
+     覚えられないとき（段が閉じている・前提が無い・SPが足りない）は、選ぶだけにして理由を出す。 */
   const sn=e.target.closest('[data-upgsel]');
-  if(sn){ _upgSel=sn.dataset.upgsel; redraw(); return; }
+  if(sn){ _upgSel=sn.dataset.upgsel; upgBuy(_upgSel); redraw(); return; }
   // 覚えたスキル技を枠2に載せる
   const ss=e.target.closest('[data-sksel]');
   if(ss){ if(skillSet(ss.dataset.sksel)) log('スキル技を『'+skillDef(ss.dataset.sksel).nm+'』にした'); redraw(); return; }
 
-  // スキルツリーの強化
+  // スキルの強化（札のボタン）
   const ub=e.target.closest('[data-upg]');
-  if(ub){
-    const u=UPGRADES.find(x=>x.id===ub.dataset.upg), lv=upgLv(u.id);
-    if(lv>=u.max) return;
-    /* 段が開いていなければ買えない。押したときに何も起きないと
-       壊れているように見えるので、開ける条件を言う。 */
-    if(upgLocked(u)){ log(tierDef(upgTier(u)).via+'と開く'); return; }
-    if(!upgNeedOk(u)){ log('先に「'+(UPGRADES.find(x=>x.id===upgNeed(u))||{}).nm+'」を覚える'); return; }
-    const cost=upgCost(u,lv);
-    if((S.shards||0)<cost) return;
-    S.shards-=cost; S.upg[u.id]=lv+1;
-    // 初めて覚えたスキル技は、枠2が空ならそのまま載せる
-    if(lv===0 && isSkillTech(u.id) && !S.skill) S.skill=u.id;
-    if(S.hero) S.hero.hpNow=stats(S.hero).maxHp;
-    redraw(); return;
-  }
+  if(ub){ upgBuy(ub.dataset.upg); redraw(); return; }
 
   // 呪いの掛け外し
   const cu=e.target.closest('[data-curse]');
