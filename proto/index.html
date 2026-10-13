@@ -219,8 +219,27 @@
   .skn-set{position:absolute;right:3px;top:2px;font-style:normal;font-size:8px;font-weight:700;color:#7fe0c0;letter-spacing:1px}
   .skn:active{background:#1e2432}
   .skn.just{animation:sknGot .45s steps(3) 1}
+  .skn.just>i{animation:sknPop .36s steps(4) 1}
   @keyframes sknGot{0%{background:#e6e9f0}100%{background:#1e2432}}
-  @media (prefers-reduced-motion:reduce){.skn.just{animation:none}}
+  @keyframes sknPop{0%{transform:scale(1)}40%{transform:scale(1.33)}100%{transform:scale(1)}}
+  .skn.opened{animation:sknOpen .9s steps(6) 1}
+  @keyframes sknOpen{0%,34%,67%{border-color:#e6e9f0}17%,50%,84%,100%{border-color:var(--line)}}
+  .skn-fx{position:absolute;width:0;height:0;pointer-events:none;z-index:4}
+  .skn-fx .ring{position:absolute;left:-55px;top:-28px;width:110px;height:56px;border:2px solid var(--fc);
+    clip-path:var(--pxr2);opacity:0;animation:sknRing .5s steps(5) 1 forwards}
+  .skn-fx.first .ring{animation-duration:.6s}
+  .skn-fx .ring.r2{animation-delay:.12s}
+  @keyframes sknRing{0%{transform:scale(1);opacity:1}100%{transform:scale(1.4,1.6);opacity:0}}
+  .skn-fx b{position:absolute;left:-3px;top:-3px;width:6px;height:6px;background:var(--fc);opacity:0;
+    animation:sknSpark .55s steps(6) 1 forwards;animation-delay:var(--dl)}
+  .skn-fx b:nth-child(3n){background:#fff;width:4px;height:4px}
+  @keyframes sknSpark{0%{transform:translate(0,0);opacity:1}70%{opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}
+  .skn-fx em{position:absolute;left:0;top:-44px;transform:translateX(-50%);font-style:normal;font-weight:700;
+    font-size:12px;color:var(--fc);white-space:nowrap;text-shadow:0 2px 0 #000,2px 0 0 #000,-2px 0 0 #000,0 -2px 0 #000;
+    opacity:0;animation:sknWord .95s steps(8) 1 forwards}
+  .skn-fx.first em{font-size:14px}
+  @keyframes sknWord{0%{transform:translate(-50%,6px);opacity:1}25%{transform:translate(-50%,-4px)}80%{opacity:1}100%{transform:translate(-50%,-10px);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.skn.just,.skn.just>i,.skn.opened{animation:none}}
   .skt-detail{position:sticky;bottom:calc(-1 * max(16px,env(safe-area-inset-bottom)));z-index:3;margin:8px -16px 0;
     padding:10px 16px max(12px,env(safe-area-inset-bottom));background:#11141b;border-top:2px solid var(--line);min-height:96px}
   .skd-h{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
@@ -19298,7 +19317,9 @@ function upgNeedOk(u){
 }
 function upgIconId(u){ return isSkillTech(u.id) ? u.id : 'n_'+u.id; }
 let _upgSel = null;
-let _upgJust = null;          // 今覚えたノード（次の描画で一度だけ光らせる）
+let _upgJust = null;          // 今覚えたノードの id（次の描画で一度だけ演出を出す）
+let _upgJustFirst = false;    // そのノードを初めて覚えた（Lv.0→1）か
+let _upgJustOpened = [];      // それで前提が満ちて開いたノード
 /* Lv を1つ上げる。上げられなければ理由をログに出して false。 */
 /* 街の画面ではログ（#log）が見えない（盤面の HUD の中にある）。できた／できなかった理由は toast で出す。
    これが無かったので、SPが足りないときなどにタップしても**何も起きないように見えた**。 */
@@ -19317,7 +19338,9 @@ function upgBuy(id){
   // 初めて覚えたスキル技は、枠2が空ならそのまま載せる
   if(lv===0 && isSkillTech(u.id) && !S.skill) S.skill=u.id;
   if(S.hero) S.hero.hpNow=stats(S.hero).maxHp;
-  _upgJust=u.id;
+  _upgJust=u.id; _upgJustFirst=(lv===0);
+  // 初めて覚えたなら、このノードを前提にしていたノードが開く（段が閉じている物は除く）
+  _upgJustOpened = lv===0 ? UPGRADES.filter(x=>upgNeed(x)===u.id && !upgLocked(x) && UPG_TREE[x.id]).map(x=>x.id) : [];
   upgSay('「'+u.nm+'」 Lv.'+(lv+1)+(lv===0?' を覚えた':' に上がった'),'#7fe0c0');
   return true;
 }
@@ -19330,13 +19353,37 @@ function upgState(u){
   if(!upgNeedOk(u)) return 'noreq';
   return (S.shards||0)>=upgCost(u,lv) ? 'afford' : 'poor';
 }
+/* ---------- 覚えたときの演出 ----------
+   ノードの上に一度だけ重ねる、ドットの粒と四角い波紋。CSS の steps() で12コマ相当に刻み、
+   なめらかに動かしすぎない（盤面のドット演出と同じ手触りにする）。
+   初めて覚えたとき（Lv.0→1）は粒を増やし「習得」の字を出す。Lv が上がっただけなら控えめに「Lv.N」。
+   前提が満ちて開いたノードは、枠が一度だけ明滅する（.opened）。 */
+function upgPlayGot(id, first){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const board=document.querySelector('#upgrades .skt-board'), node=board && board.querySelector('[data-upgsel="'+id+'"]');
+  if(!node) return;
+  const u=UPGRADES.find(x=>x.id===id), t=skillDef(id), col=t ? t.col : '#e6e9f0';
+  const cx=node.offsetLeft+node.offsetWidth/2, cy=node.offsetTop+node.offsetHeight/2;
+  const n=first?12:8, parts=[];
+  for(let i=0;i<n;i++){
+    const a=i/n*Math.PI*2+(i%2?0.2:0), d=(first?84:66)*(i%2?0.75:1);
+    parts.push(`<b style="--dx:${Math.round(Math.cos(a)*d)}px;--dy:${Math.round(Math.sin(a)*d*0.8)}px;--dl:${(i%3)*30}ms"></b>`);
+  }
+  const fx=document.createElement('div');
+  fx.className='skn-fx'+(first?' first':'');
+  fx.style.cssText=`left:${cx}px;top:${cy}px;--fc:${col}`;
+  fx.innerHTML=`<i class="ring"></i>${first?'<i class="ring r2"></i>':''}${parts.join('')}`
+    +`<em>${first?'習得':'Lv.'+upgLv(id)}</em>`;
+  board.appendChild(fx);
+  setTimeout(()=>fx.remove(), 1100);
+}
 function upgNodeHTML(u){
   const [c,r]=UPG_TREE[u.id], lv=upgLv(u.id), stt=upgState(u);
   const x=SKT.lw+c*SKT.cw+(SKT.cw-SKT.nw)/2, y=SKT.hh+r*SKT.ch+(SKT.ch-SKT.nh)/2;
   const tech=skillDef(u.id), col = stt==='locked'||stt==='noreq' ? '#4a5164' : tech ? tech.col : '#e6e9f0';
   const set = tech && lv>0 && skillEquipped()===tech;
   const pips = Array.from({length:u.max}, (_,i)=>`<b class="${i<lv?'on':''}"></b>`).join('');
-  return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}${_upgJust===u.id?' just':''}" data-upgsel="${u.id}"
+  return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}${_upgJust===u.id?' just':''}${_upgJustOpened.includes(u.id)?' opened':''}" data-upgsel="${u.id}"
      style="left:${x}px;top:${y}px;--ic:${col}">
     <i style="background-image:${skillIconTint(upgIconId(u), col)}"></i>
     <div class="skn-t"><span class="skn-nm">${stt==='locked'?'<i class="pi pi-lock"></i>':''}${u.nm}</span>
@@ -19413,7 +19460,8 @@ function renderUpg(){
     _upgSel = c ? c.id : 'hp';
   }
   el('upgrades').innerHTML = upgTreeHTML();
-  _upgJust = null;
+  if(_upgJust) upgPlayGot(_upgJust, _upgJustFirst);
+  _upgJust = null; _upgJustOpened = [];
   el('skt-detail').innerHTML = upgDetailHTML(UPGRADES.find(u=>u.id===_upgSel));
   renderRelics();
   renderUlts();
