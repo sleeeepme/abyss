@@ -27,6 +27,32 @@ function feelEntityOffset(e){
   // 被弾時の反動は移動アニメーションではないので残す。
   return {x:m.recoilX*recoil,y:m.recoilY*recoil};
 }
+/* 眷属は主人公の後、照明の前に描く。攻撃・追従の座標は本編のまま。 */
+function drawFeelKins(camX,camY){
+  [S.hero, ...livingParty()].forEach(h=>{
+    if(!h || h.dead) return;
+    (h.kins||[]).forEach(k=>{                // 眷属（最大3体）
+      if(k.x===undefined) return;
+      const sx=k.x*TS-camX, sy=k.y*TS-camY;
+      const pl=0.6+0.4*Math.sin(performance.now()/170+k.ang);
+      ctx.save();
+      ctx.globalAlpha=0.20*pl; ctx.fillStyle='#8fd8ff';     // 足もとの淡い光は残す（撃つ線と同じ色）
+      ctx.beginPath(); ctx.arc(sx,sy,TS*0.32,0,7); ctx.fill();
+      ctx.globalAlpha=1;
+      if(!k.look) k.look=pickKinLook(h.kins);               // 前のセーブから来た眷属にも絵を配る
+      /* 6種のドット絵（鬼火・蝙蝠・梟・目玉・骸骨・海月）。ふわふわ上下させる。
+         絵が読めていないときだけ前の光る丸で出す。 */
+      const bob=Math.round(Math.sin(performance.now()/260+k.ang*3)*TS/16)*1;
+      // 24px canvas = 16px body grid + 4px glow padding per side; preserve body scale.
+      if(!CharacterArt.put('kin-'+k.look, sx, sy-TS*0.08+bob, TS*24/16)){
+        ctx.globalAlpha=0.95; ctx.fillStyle='#dff2ff';
+        ctx.beginPath(); ctx.arc(sx,sy,TS*0.14,0,7); ctx.fill();
+      }
+      ctx.restore();
+    });
+  });
+}
+
 function feelBlink(e){
   const m=feelMotion(e);let alpha=m.flash>0&&Math.floor(m.flash*32)%2===0?.4:1;
   if(m.artLife>0&&m.artId==='dgmirage')alpha*=.42+.12*Math.sin(m.artAge*24);

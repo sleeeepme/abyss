@@ -15359,25 +15359,6 @@ function draw(){
   [S.hero, ...livingParty()].forEach(h=>{
     if(!h || h.dead) return;
     const hx=(h===S.hero?P.x:h.x), hy=(h===S.hero?P.y:h.y);
-    (h.kins||[]).forEach(k=>{                // 眷属（最大3体）
-      if(k.x===undefined) return;
-      const sx=k.x*TS-camX, sy=k.y*TS-camY;
-      const pl=0.6+0.4*Math.sin(performance.now()/170+k.ang);
-      ctx.save();
-      ctx.globalAlpha=0.20*pl; ctx.fillStyle='#8fd8ff';     // 足もとの淡い光は残す（撃つ線と同じ色）
-      ctx.beginPath(); ctx.arc(sx,sy,TS*0.32,0,7); ctx.fill();
-      ctx.globalAlpha=1;
-      if(!k.look) k.look=pickKinLook(h.kins);               // 前のセーブから来た眷属にも絵を配る
-      /* 6種のドット絵（鬼火・蝙蝠・梟・目玉・骸骨・海月）。ふわふわ上下させる。
-         絵が読めていないときだけ前の光る丸で出す。 */
-      const bob=Math.round(Math.sin(performance.now()/260+k.ang*3)*TS/16)*1;
-      // 24px canvas = 16px body grid + 4px glow padding per side; preserve body scale.
-      if(!CharacterArt.put('kin-'+k.look, sx, sy-TS*0.08+bob, TS*24/16)){
-        ctx.globalAlpha=0.95; ctx.fillStyle='#dff2ff';
-        ctx.beginPath(); ctx.arc(sx,sy,TS*0.14,0,7); ctx.fill();
-      }
-      ctx.restore();
-    });
     if(h.barrier>0) uiLater(()=>{             // 重騎士の守護陣
       const sx=hx*TS-camX, sy=hy*TS-camY;
       ctx.save();
@@ -15905,6 +15886,7 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   occOne(P);                          // 主人公のぶんの立ち物の描き戻し
+  drawFeelKins(camX,camY);             // 主人公より前面、照明・HUDより下
   drawPlayerLight(camX,camY);
   // ランタンの網（?lantern=net のときだけ）の暗がりはキャラまで描いた所で重ねる
   if(lanternNet && typeof drawFeelDarkness==='function') drawFeelDarkness();
@@ -20521,9 +20503,10 @@ function tickBoonTimers(h, dt, isPlayer){
     while(h.kins.length < kv.length)
       h.kins.push({ang:rnd()*6.28, cd:rf(0,KIN_CD), look:pickKinLook(h.kins)});
     h.kins.length = kv.length;
+    // 全員が同じ回転基準を使う。個別の乱数角に等分角を足すと重なってしまう。
+    const orbitPhase = h.kins[0].ang + dt*1.6;
     h.kins.forEach((k,i)=>{
-      // 等間隔に散らす。重なると何体いるのか数えられない
-      k.ang += dt*1.6;
+      k.ang = orbitPhase;
       const ang = k.ang + i*Math.PI*2/kv.length;
       k.x = hx + Math.cos(ang)*1.05;
       k.y = hy + Math.sin(ang)*1.05 - 0.2;
@@ -21064,7 +21047,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261009a"></script>
-<script src="game-feel.js?v=20260929c"></script>
+<script src="game-feel.js?v=20261013-kin-layer"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
 <script src="cave-look.js?v=20261008a"></script>
