@@ -5,7 +5,7 @@
     {id:"normal", label:"通常攻撃", short:"通常", color:"var(--cat-normal)", desc:"武器種ごとの通常攻撃モーション・属性別エフェクト。全種実装済み。プレビューは ally-effect-study.js / weapon-effect-gallery.js の実装コードをそのまま再生しています。"},
     {id:"arts",   label:"武器技",   short:"武器技", color:"var(--cat-arts)",   desc:"8武器種×lv1〜3＝24種。閃きで習得する武器固有アーツ。全種実装済み。プレビューは weapon-art-pixel.js（ドット演出）の見本シーンをそのまま再生しています。"},
     {id:"ult",    label:"大技",     short:"大技",   color:"var(--cat-ult)",    desc:"CD24〜40秒の切り札枠。確認できている名称のみ仮登録、詳細設計はこれから。プレビューコードはまだ存在しません。"},
-    {id:"skill",  label:"スキル技", short:"スキル", color:"var(--cat-skill)", desc:"スキルツリーのリキャスト技・キーストーン由来の常時発動系。"},
+    {id:"skill",  label:"スキル技", short:"スキル", color:"var(--cat-skill)", desc:"スキルツリーで覚える技（ボタンで放つ11種。段ごとに根・幹・枝・梢）と、キーストーン由来の常時発動系。ボタンで放つ技は weapon-art-pixel.js の見本シーンをそのまま再生しています。"},
     {id:"enemy",  label:"敵の攻撃", short:"敵",     color:"var(--cat-enemy)", desc:"雑魚共通の4形式（寄・回・飛・溜）、中ボス5体、大ボス4体、ラスボス級2体。"}
   ];
 
@@ -60,13 +60,24 @@
     {id:"u-gokuka",  cat:"ult", group:"", name:"灼髄 Lv.1", meta:"大技（ULT） ／ 実測ATK倍率 約6.93", desc:"武器技システム比較時のベンチマーク名として言及のみ。演出未設計。", status:"todo"},
     {id:"u-collapse-ally", cat:"ult", group:"", name:"崩落（大魔導士 Lv.50）", meta:"仲間の大技 ／ 着弾点から半径3マス・0.55秒後に着弾", desc:"魔法陣→影→岩が落ちる→衝撃波。足元にも魔法陣。", status:"done", preview:{type:"art", key:"collapse"}},
 
-    // ---- スキル技：リキャスト技・キーストーン ----
-    {id:"s-shockwave", cat:"skill", group:"", name:"衝撃波", meta:"CD8秒 ／ 前方3.4マスの扇", desc:"［刃］キーストーン。HUD通常技ボタン。威力実測 5.35。", status:"todo"},
-    {id:"s-renzan",    cat:"skill", group:"", name:"連斬", meta:"CD10秒 ／ 3連撃", desc:"［刃］段3キーストーン。", status:"todo"},
-    {id:"s-fukutsu",   cat:"skill", group:"", name:"不屈", meta:"探索1回に1度 ／ HP100%で復活", desc:"［躯］段3キーストーン。比を÷2する生存の要。", status:"todo"},
-    {id:"s-chiyu",     cat:"skill", group:"", name:"治癒／治癒II", meta:"12秒毎に4% → 10秒毎に8%回復", desc:"［躯］段2〜3。継続回復の常時発動エフェクト。", status:"todo"},
-    {id:"s-shunsoku",  cat:"skill", group:"", name:"瞬足／瞬足II", meta:"CD6→4秒 ／ 無敵0.2秒", desc:"［影］ダッシュ。Codex実装により演出も実装済み（別モジュール・本ページでは未対応）。", status:"done"},
-    {id:"s-dasshutsu", cat:"skill", group:"", name:"脱出", meta:"探索1回に1度 ／ その場から帰還", desc:"［影］段3キーストーン。帰還ポータル演出が必要。", status:"todo"},
+    // ---- スキル技：ボタンで放つ技（スキルツリーで覚え、Lv.5 まで上がる。2026-10-13 に10種追加） ----
+    {id:"s-shock",   cat:"skill", group:"ボタンで放つ技（根）", name:"ショック", meta:"旧名 衝撃波 ／ 前方の扇 ／ CD6秒", desc:"前方をまとめて薙ぐ。下がりながらでも出せる。", status:"done", preview:{type:"art", key:"s_wave"}},
+    {id:"s-chain",   cat:"skill", group:"ボタンで放つ技（根）", name:"チェインライトニング", meta:"雷 ／ 4〜8体へ跳ねる ／ CD7秒", desc:"敵から敵へ雷が跳ねる。跳ねるたびに少し弱まる。", status:"done", preview:{type:"art", key:"s_chain"}},
+    {id:"s-boomer",  cat:"skill", group:"ボタンで放つ技（根）", name:"ブーメラン", meta:"斬撃 ／ 往復・貫通 ／ CD5秒", desc:"刃が自分の所へ戻ってきて、行きと帰りで2回当たる。", status:"done", preview:{type:"art", key:"s_boomer"}},
+    {id:"s-nova",    cat:"skill", group:"ボタンで放つ技（幹）", name:"フロストノヴァ", meta:"冷気 ／ 周囲を凍結 ／ CD10秒", desc:"周りを凍らせて止める。凍った敵は受けるダメージ +25%。", status:"done", preview:{type:"art", key:"s_nova"}},
+    {id:"s-mine",    cat:"skill", group:"ボタンで放つ技（幹）", name:"マイン", meta:"炎 ／ 設置罠 ／ CD3.5秒", desc:"足元に罠を置き、踏んだ敵の周りが爆ぜる。", status:"done", preview:{type:"art", key:"s_mine"}},
+    {id:"s-mark",    cat:"skill", group:"ボタンで放つ技（幹）", name:"呪印", meta:"魔法 ／ 前方の扇に印 ／ CD10秒", desc:"印の敵は脆くなり、倒れると爆ぜて周りへ印を移す。", status:"done", preview:{type:"art", key:"s_mark"}},
+    {id:"s-vortex",  cat:"skill", group:"ボタンで放つ技（枝）", name:"グラビティ", meta:"魔法 ／ 引き寄せる渦 ／ CD13秒", desc:"前に渦を置いて敵を寄せ集め、最後に弾ける。", status:"done", preview:{type:"art", key:"s_vortex"}},
+    {id:"s-turret",  cat:"skill", group:"ボタンで放つ技（枝）", name:"タレット", meta:"置き物 ／ 8〜12秒 ／ CD15秒", desc:"その場に砲台を置き、近くの敵を撃たせる。", status:"done", preview:{type:"art", key:"s_turret"}},
+    {id:"s-decoy",   cat:"skill", group:"ボタンで放つ技（枝）", name:"デコイ", meta:"身代わり ／ 3〜4.6秒 ／ CD14秒", desc:"近くの敵の狙いを引きつけ、消えるときに弾ける。", status:"done", preview:{type:"art", key:"s_decoy"}},
+    {id:"s-meteor",  cat:"skill", group:"ボタンで放つ技（梢）", name:"メテオ", meta:"炎 ／ 1秒後に着弾 ／ CD16秒", desc:"敵の固まった所に赤い円が出て、岩が落ちる。焼け跡が残る。", status:"done", preview:{type:"art", key:"s_meteor"}},
+    {id:"s-tornado", cat:"skill", group:"ボタンで放つ技（梢）", name:"トルネード", meta:"風 ／ 前へ進む ／ CD11秒", desc:"進みながら敵を巻き込んで運び、壁で跳ね返る。", status:"done", preview:{type:"art", key:"s_tornado"}},
+
+    // ---- スキル技：常時・キーストーン ----
+    {id:"s-shunsoku",  cat:"skill", group:"常時・キーストーン", name:"瞬足", meta:"ダッシュ ／ 出際に1回だけ攻撃を消す", desc:"画面を短くタップして踏み込む。", status:"done", preview:{type:"art", key:"s_dash"}},
+    {id:"s-fukutsu",   cat:"skill", group:"常時・キーストーン", name:"不屈", meta:"探索1回に1度 ／ HP全快で復活", desc:"倒れても一度だけ立ち上がる。", status:"done", preview:{type:"art", key:"s_revive"}},
+    {id:"s-chiyu",     cat:"skill", group:"常時・キーストーン", name:"治癒", meta:"10秒ごとに最大HPの3%×Lv", desc:"回復した瞬間に小さな十字が出る。", status:"done", preview:{type:"art", key:"s_regen"}},
+    {id:"s-dasshutsu", cat:"skill", group:"常時・キーストーン", name:"脱出", meta:"探索1回に1度 ／ どの階の穴からでも帰れる", desc:"帰還ポータル演出が必要。", status:"todo"},
 
     // ---- 敵の攻撃：雑魚共通4形式 ----
     {id:"e-rush",   cat:"enemy", group:"雑魚共通（4形式）", name:"寄（Rush）", meta:"まっすぐ突進・止まらない", desc:"アッシュハウンド系など8系統に共通する挙動の型。", status:"todo"},
