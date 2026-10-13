@@ -7661,10 +7661,14 @@ const ENEMY_STEP = 5;            // この階数ごとに一段乗る
 const ENEMY_HARD_FROM = 15;      // ここから曲線を吊り上げる
 const ENEMY_STEP_LV = 3;         // 一段ぶんのレベル
 // 10回ごとに1死亡ぶんの進行を 1, 1/2, 1/3…へ鈍化。端数は次の段へ持ち越す。
+const DEATH_PRESSURE_FROM = 5;
 const DEATH_PRESSURE_STEP = 10;
 const SPRING_OFFER_COST = 100;
 function deathPressureLevel(depth){
-  const n=(S.deathPressure||{})[depth]||0;
+  if(depth<DEATH_PRESSURE_FROM) return 0;
+  return deathPressureLevelFromCount((S.deathPressure||{})[depth]||0);
+}
+function deathPressureLevelFromCount(n){
   const blocks=Math.floor(n/DEATH_PRESSURE_STEP);
   let progress=0;
   for(let i=1;i<=blocks;i++) progress+=DEATH_PRESSURE_STEP/i;
@@ -7673,7 +7677,7 @@ function deathPressureLevel(depth){
 }
 function recordDeathPressure(depth){
   S.deathPressure=S.deathPressure||{};
-  for(let d=1;d<=depth;d++) S.deathPressure[d]=(S.deathPressure[d]||0)+1;
+  for(let d=DEATH_PRESSURE_FROM;d<=depth;d++) S.deathPressure[d]=(S.deathPressure[d]||0)+1;
 }
 function enemyLevelAt(depth){
   const base = depth + Math.floor(depth/8) + deathPressureLevel(depth);
@@ -7681,8 +7685,21 @@ function enemyLevelAt(depth){
   return base + (Math.floor((depth-ENEMY_HARD_FROM)/ENEMY_STEP)+1)*ENEMY_STEP_LV;
 }
 // 現在の階もその場で解除。被ダメージ割合・各種倍率・第二形態の控えを保つ。
+function hasDeathPressure(){
+  return Object.entries(S.deathPressure||{}).some(([d,n])=>Number(d)>=DEATH_PRESSURE_FROM && n>0);
+}
 function clearDeathPressure(){
-  const bonus=S.run ? deathPressureLevel(S.run.depth) : 0;
+  removeEnemyDeathPressure(S.run ? deathPressureLevel(S.run.depth) : 0);
+  S.deathPressure={};
+}
+// 旧セーブの1〜4階の蓄積と、保存済みの現階の敵強化を解除する。
+function normalizeDeathPressure(){
+  S.deathPressure=S.deathPressure||{};
+  if(S.run && S.run.depth<DEATH_PRESSURE_FROM)
+    removeEnemyDeathPressure(deathPressureLevelFromCount(S.deathPressure[S.run.depth]||0));
+  for(let d=1;d<DEATH_PRESSURE_FROM;d++) delete S.deathPressure[d];
+}
+function removeEnemyDeathPressure(bonus){
   if(bonus) for(const e of W.enemies){
     const old=e.lv, lv=Math.max(1,old-bonus);
     const hpMul=(26+lv*11)/(26+old*11), atkMul=(5+lv*2.6)/(5+old*2.6);
@@ -7698,7 +7715,6 @@ function clearDeathPressure(){
       if(e.parts) for(const part of e.parts) resizeHp(part,'max','hp');
     }
   }
-  S.deathPressure={};
 }
 
 /* ---------- 序盤の牙 ----------
@@ -13284,7 +13300,9 @@ function die(){
      「どこに何が残ったか」が埋もれていた（報告：文字情報が多すぎる）。
      残すのは**この探索で何が起きたか**だけにする。
      規則は遺体を回収する場面と「遊び方」に書いてある。 */
-  let html='<div style="color:#e0705a;line-height:1.9">第1〜'+S.run.depth+'階層に死の蓄積 — この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</div>';
+  let html=S.run.depth>=DEATH_PRESSURE_FROM
+    ? '<div style="color:#e0705a;line-height:1.9">第'+DEATH_PRESSURE_FROM+'〜'+S.run.depth+'階層に死の蓄積 — この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</div>'
+    : '';
   html += S.grave
     ? '<div style="color:#7fe0c0;line-height:1.9">'
       + `遺体が<b>第${S.grave.depth}階層</b>に残った</div>`
@@ -20871,7 +20889,7 @@ function openEvent(){
   const offer=el('ev-offer');
   offer.hidden=ev.id!=='spring';
   if(ev.id==='spring'){
-    const active=Object.values(S.deathPressure||{}).some(n=>n>0);
+    const active=hasDeathPressure();
     offer.disabled=!active || (S.shards||0)<SPRING_OFFER_COST;
     offer.textContent=SPRING_OFFER_COST+'SPを捧げる（蓄積リセット）';
     body+='<br><br><b>死の蓄積：この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</b>'
@@ -20984,7 +21002,7 @@ bindTap(el('ev-yes'), ()=>{
 function offerAtSpring(){
   const ev=nearEvent();
   if(!S.hero || !S.run || !ev || ev.id!=='spring' || S.screen!=='event') return;
-  if((S.shards||0)<SPRING_OFFER_COST || !Object.values(S.deathPressure||{}).some(n=>n>0)) return;
+  if((S.shards||0)<SPRING_OFFER_COST || !hasDeathPressure()) return;
   S.shards-=SPRING_OFFER_COST;
   clearDeathPressure();
   ev.used=true;
@@ -21737,7 +21755,7 @@ if(typeof tapDash === 'function'){
 }
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
-<script src="save-load.js?v=20261013pressure"></script>
+<script src="save-load.js?v=20261013pressure-f5"></script>
 <script src="audio.js?v=20261009a"></script>
 <script src="audio-game.js?v=20261010a"></script>
 </body>

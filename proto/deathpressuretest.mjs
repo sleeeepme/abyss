@@ -16,7 +16,7 @@ try{
     function check(name,ok){if(!ok)throw Error(name);out.push(name);}
     window.DROP_IN=false; S.tutStone=true;
     const expected=[[0,0],[1,1],[9,9],[10,10],[11,10],[12,11],[19,14],[20,15],[21,15],[22,15],[23,16],[30,18],[40,20]];
-    for(const [n,lv] of expected){S.deathPressure={1:n};check('curve '+n,deathPressureLevel(1)===lv);}
+    for(const [n,lv] of expected){S.deathPressure={5:n};check('curve '+n,deathPressureLevel(5)===lv);}
     S.deathPressure={};startRun(6);S.hero.boons=[];S.hero.party=[];
     function rewardSample(n){
       S.deathPressure=n?{6:n}:{};RNG=mulberry32(37);
@@ -42,8 +42,16 @@ try{
     clearDeathPressure();const resetReward=rewardSample(0);
     check('reset restores original rewards',JSON.stringify(resetReward)===JSON.stringify(ordinary));
     S.deathPressure={};recordDeathPressure(5);recordDeathPressure(2);
-    check('death floors inclusive',JSON.stringify(S.deathPressure)===JSON.stringify({1:2,2:2,3:1,4:1,5:1}));
-    check('beyond death floor unchanged',deathPressureLevel(6)===0);
+    check('death pressure begins at floor five',JSON.stringify(S.deathPressure)===JSON.stringify({5:1}));
+    recordDeathPressure(8);check('death floors inclusive from five',JSON.stringify(S.deathPressure)===JSON.stringify({5:2,6:1,7:1,8:1}));
+    check('beyond death floor unchanged',deathPressureLevel(9)===0);
+    S.deathPressure={1:40,2:40,3:40,4:40};
+    check('legacy shallow pressure has no level or SP effect',[1,2,3,4].every(d=>deathPressureLevel(d)===0&&enemyLevelAt(d)===d&&shardDrop({},d)===SP_MOB));
+    check('legacy shallow pressure cannot spend SP at spring',!hasDeathPressure());
+    S.deathPressure={};startRun(4);S.hero.boons=[];S.upg.revive=0;S.hero.hpNow=0;die();
+    check('shallow death does not accumulate',Object.keys(S.deathPressure).length===0);
+    check('shallow death shows no misleading pressure notice',!_deathHtml.includes('死の蓄積'));
+    S.hero=newHero();
     S.deathPressure={};startRun(5);S.upg.revive=1;S.hero.hpNow=0;const deaths=S.deaths;die();
     check('revive has no pressure',S.deaths===deaths&&Object.keys(S.deathPressure).length===0);
     S.upg.revive=0;S.hero.boons=[];S.hero.hpNow=0;die();
@@ -75,7 +83,7 @@ try{
     return out;
   });
   await page.reload();await page.waitForFunction(()=>ABYSS_SAVE.info().ready);await page.click('#t-start');
-  assert.deepEqual(await page.evaluate(()=>[S.deathPressure[1],S.deathPressure[5],deathPressureLevel(5)]),[1,1,1]);
+  assert.deepEqual(await page.evaluate(()=>[S.deathPressure[1]||0,S.deathPressure[5],deathPressureLevel(5)]),[0,1,1]);
   checks.push('pressure survives save/reload');
   // 保存項目が無い旧セーブは、既存の総死亡数にかかわらず未蓄積で再開する。
   await page.evaluate(()=>{delete S.deathPressure;ABYSS_SAVE.request();ABYSS_SAVE.frame();});
@@ -83,26 +91,46 @@ try{
   assert.deepEqual(await page.evaluate(()=>[S.deaths,Object.keys(S.deathPressure).length,deathPressureLevel(5)]),[13,0,0]);
   checks.push('old save begins without retroactive pressure');
   await page.click('#save-action');
+  const legacyEnemy=await page.evaluate(()=>{
+    S.deathPressure={};startRun(4);S.hero.boons=[];S.hero.party=[];S.hero.equip.weapon=null;P.invuln=999;P.atkCd=999;
+    const e=W.enemies.find(e=>!e.boss);W.enemies=[e];e.ms=0;e.cd=999;e.hp=e.maxHp/2;
+    const before={lv:e.lv,hpRatio:e.hp/e.maxHp,atkV:e.atkV,def:e.def};
+    const bonus=10,old=e.lv;e.lv+=bonus;
+    e.maxHp=Math.round(e.maxHp*(26+e.lv*11)/(26+old*11));e.hp=e.maxHp/2;
+    e.atkV*=(5+e.lv*2.6)/(5+old*2.6);e.def*=e.lv/old;
+    S.deathPressure={1:10,2:10,3:10,4:10,5:3};S.deaths=13;
+    pauseGame(true);el('m-help').classList.add('on');ABYSS_SAVE.request();ABYSS_SAVE.frame();
+    return before;
+  });
+  await page.reload();await page.waitForFunction(()=>ABYSS_SAVE.info().ready);await page.click('#t-start');
+  const migrated=await page.evaluate(()=>{
+    const e=W.enemies[0];return {lv:e.lv,hpRatio:e.hp/e.maxHp,atkV:e.atkV,def:e.def,pressure:S.deathPressure,color:feelEnemyLevelColor()};
+  });
+  assert.equal(migrated.lv,legacyEnemy.lv);assert.equal(migrated.hpRatio,legacyEnemy.hpRatio);
+  assert.ok(Math.abs(migrated.atkV-legacyEnemy.atkV)<1e-9);assert.ok(Math.abs(migrated.def-legacyEnemy.def)<1e-9);
+  assert.deepEqual(migrated.pressure,{5:3});assert.equal(migrated.color,'#98a1b2');
+  checks.push('old shallow run restores normal enemy stats and keeps deep pressure');
+  await page.click('#save-action');
   await page.evaluate(()=>{el('save-dialog').classList.remove('on');el('m-help').classList.remove('on');S.deathPressure={1:12,5:12};S.shards=100;W.ev={id:'spring',x:P.x,y:P.y,used:false};openEvent();});
   await page.screenshot({path:'/tmp/abyss-death-pressure-spring.png'});
   await page.click('#ev-offer');
   assert.deepEqual(await page.evaluate(()=>[S.shards,W.ev.used,Object.keys(S.deathPressure).length]),[0,true,0]);
   checks.push('mobile offering button executes reset');
   const colors=await page.evaluate(()=>{
-    S.hero=newHero();S.deathPressure={};startRun(1);P.invuln=999;P.atkCd=999;W.pops=[];W.fx=[];W.drops=[];_banner=null;
+    S.hero=newHero();S.deathPressure={};startRun(6);P.invuln=999;P.atkCd=999;W.pops=[];W.fx=[];W.drops=[];_banner=null;
     const e=W.enemies.find(e=>!e.boss);e.elite=true;e.uniq=false;e.intruder=false;
     W.enemies=[e];e.x=P.x+2;e.y=P.y;e.ms=0;e.cd=999;P.target=e;W.seen.forEach(row=>row.fill(1));
     const rows=[],original=label;
     try{
       for(const [bonus,color] of [[0,'#98a1b2'],[1,'#ffe066'],[4,'#ffe066'],[5,'#ff9a5a'],[9,'#ff9a5a'],[10,'#ff625a']]){
-        S.deathPressure=bonus?{1:bonus}:{};e.lv=enemyLevelAt(1);
+        S.deathPressure=bonus?{6:bonus}:{};e.lv=enemyLevelAt(6);
         let seen=false;
         label=function(text,x,y,col,scale){if(text==='Lv.'+e.lv){if(col!==color)throw Error('wrong rendered Lv color');seen=true;}return original(text,x,y,col,scale);};
         draw();if(!seen)throw Error('Lv label not rendered');rows.push(bonus);
       }
     }finally{label=original;}
     clearDeathPressure();if(feelEnemyLevelColor()!=='#98a1b2')throw Error('color did not reset');
-    S.deathPressure={1:5};e.lv=enemyLevelAt(1);W.pops=[];W.fx=[];draw();
+    S.deathPressure={6:5};e.lv=enemyLevelAt(6);W.pops=[];W.fx=[];draw();
     return rows;
   });
   checks.push('actual enemy Lv colors at boundaries '+colors.join('/'),'spring reset restores normal Lv color');

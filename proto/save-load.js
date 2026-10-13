@@ -218,7 +218,7 @@
     const keepDebug=S.debug;
     for(const [i,target] of [S,P,W].entries()){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,roots[i]);}
     if(keepDebug)S.debug=keepDebug;
-    S.deathPressure=S.deathPressure||{}; // 旧セーブは未蓄積から開始
+    normalizeDeathPressure(); // 旧セーブの1〜4階の死亡強化も解除
     W.pops=[];RNG=mulberry32(d.rng);genItem._n=d.itemId;
     _intrF=null;_intrKey='';_fallen=null;_fallenQueue=d.ui.fallenQueue||[];
     _deathPool=d.ui.deathPool;_deathBase=d.ui.deathBase;_deathCap=d.ui.deathCap;
