@@ -95,7 +95,7 @@ R.swingType = await pg.evaluate(()=>{
           spearIsPierce: out.spear==='pierce',
           swordIsSlash:  out.sword==='slash',
           maceIsBlunt:   out.mace==='blunt',
-          daggerIsPierce:out.dagger==='pierce',
+          daggerIsSlash: out.dagger==='slash',          // 2026-10-13 短剣は斬撃に（ユーザー指定）
           bowIsProjectile: String(out.bow).startsWith('proj:'),
           staffIsProjectile: String(out.staff).startsWith('proj:')};
 });
@@ -193,7 +193,7 @@ R.allySwing = await pg.evaluate(()=>{
           knightSlash: out.knight
             && out.knight.dt===(BASES.find(b=>b.id===jobDef('knight').weapon)||{}).dt,
           priestBlunt: out.priest && out.priest.dt==='blunt',
-          roguePierce: out.rogue && out.rogue.dt==='pierce',
+          rogueByWeapon: out.rogue && out.rogue.dt===(BASES.find(b=>b.id===jobDef('rogue').weapon)||{}).dt,   // 短剣（2026-10-13 から斬撃）
           taggedAsAlly: Object.values(out).every(o=>o && o.ally)};
 });
 

@@ -1987,8 +1987,9 @@ function consumNeedsTarget(it){
 const BASES=[
   // --- 武器 ---
   /* 短剣は**避けて生きる**武器。手数だけだと「弱い剣」でしかなかったので、
-     持っているあいだ回避が乗る。盗賊の evade と同じ枠に足される。 */
-  {id:'dagger', nm:'短剣',   slot:SLOT.W, dt:'pierce', atk:[4,6],   spd:1.45, reach:1.15, arc:55,  hands:1, dur:60, ilvl:1, evade:7,
+     持っているあいだ回避が乗る。盗賊の evade と同じ枠に足される。
+     属性は斬撃（2026-10-13 ユーザー指定。前は刺突）——斬って出血を溜める。 */
+  {id:'dagger', nm:'短剣',   slot:SLOT.W, dt:'slash',  atk:[4,6],   spd:1.45, reach:1.15, arc:55,  hands:1, dur:60, ilvl:1, evade:7,
     nmByRar:['短剣','スティレット','ミスリルスティレット','双牙の短剣','神速の短剣']},
   {id:'sword',  nm:'剣',     slot:SLOT.W, dt:'slash',  atk:[7,10],  spd:1.00, reach:1.45, arc:75,  hands:1, dur:80, ilvl:1,
     nmByRar:['剣','ロングソード','ミスリルソード','魔剣','聖剣']},
