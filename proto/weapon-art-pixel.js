@@ -2247,6 +2247,38 @@
   function sTornadoSceneGround(t, o) { const p = clamp(t / 2.0); sTornadoGround(t, { x: o.x + 10 + p * 90, y: o.y, R: T16(1.3), life: 2.0 }); }
   function sTornadoSceneAir(t, o) { const p = clamp(t / 2.0); if (t >= 0) sTornadoAir(t, { x: o.x + 10 + p * 90, y: o.y, R: T16(1.3), life: 2.0 }); }
 
+  /* 疾風の加護：足元から巻き上がる小さなつむじ風（トルネードの小型版）。
+     o.lv（0〜1）は走っている速さで、止まると網掛けで薄れて消える。
+     輪の奥側は ground（キャラの後ろ）、手前側は air（キャラの前）に分けて描き、体に巻き付いて見えるようにする。 */
+  const GRACE_WIND = [P.W, P.fr0, P.fr1, P.fr2];
+  function graceWindRings(t, o, front) {
+    const lv = clamp(o.lv != null ? o.lv : 1), tq = q12(t * 2) / 2;
+    if (lv <= 0.02) return;
+    // 足元から腰までの3段。上ほど広く、体より横へはみ出させて「巻き付いている」と読ませる
+    for (let j = 0; j < 3; j++) {
+      const h = j * 3.2, w = 6 + j * 1.8, ry = Math.max(1.4, w * 0.36), sway = Math.sin(t * 7 + j * 0.9) * j * 0.45;
+      const cx = o.x + sway, cy = o.y - h, ph = tq * (9 - j * 2) + j * 1.7, n = Math.round(w * 7);
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU + ph, sn = Math.sin(a);
+        if ((sn > 0) !== front) continue;                                  // 手前（下半分）か奥（上半分）か
+        const arc = ((i / n * 2 + j * 0.31) % 1);                         // 輪を2つの切れた弧にする
+        if (arc > 0.7) continue;
+        const c = arc < 0.14 ? GRACE_WIND[0] : arc < 0.4 ? GRACE_WIND[1] : GRACE_WIND[2];
+        const x = cx + Math.cos(a) * w, y = cy + sn * ry;
+        px(x, y, c, lv * (front ? 1 : 0.75));
+        if (front && arc < 0.4) px(x, y + 1, GRACE_WIND[3], lv * 0.6);     // 下に影の1ドット（細い線にしない）
+      }
+    }
+    if (!front) { dust(o.x, o.y + 1, (t % 0.4), 2, 960 + Math.floor(t / 0.4), 6, 0.4, null, 0.8, lv); return; }
+    for (let i = 0; i < 5; i++) {                                         // 巻き上がる粒
+      const b = (t * 1.3 + hash(i, 951)) % 1, a = t * 11 + i * 1.3, r = 5 + b * 5;
+      if (Math.sin(a) < 0) continue;
+      px(o.x + Math.cos(a) * r, o.y - b * 12 + Math.sin(a) * r * 0.35, b < 0.4 ? P.W : P.fr1, lv * (1 - b * 0.8));
+    }
+  }
+  function graceWindGround(t, o) { graceWindRings(t, o, false); }
+  function graceWindAir(t, o) { graceWindRings(t, o, true); }
+
   /* ============ 効いている間の足元の輪（守護・鉄壁・生気・聖域・恩寵） ============ */
   const AURA_COL = { ward: [P.hl1, P.hl0], aegis: [P.ag1, P.ag0], bloom: [P.lf2, P.lf1], sanct: [P.ho1, P.ho0], grace: [P.hl0, P.W] };
   function auraGround(t, o) {
@@ -3245,6 +3277,7 @@
       ground: sTornadoSceneGround, air: sTornadoSceneAir
     },
     s_tornado_live: { aux: true, span: 1e9, sky: 40, ground: sTornadoGround, air: sTornadoAir },
+    grace_wind: { aux: true, span: 1e9, sky: 24, ext: 20, ground: graceWindGround, air: graceWindAir },
 
 
     /* ==== ボス（5F 灰の大蛙・10F ヴェラ） ==== */
