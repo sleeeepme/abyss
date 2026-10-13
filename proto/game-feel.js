@@ -84,6 +84,20 @@ function feelJustDodge(){
   if(FEEL.just<=0||FEEL.justUsed)return false;
   FEEL.justUsed=true;feelPerfect('JUST DODGE','#c4fff1');return true;
 }
+/* ボタンで放つ技（大技・武器技・衝撃波・一斉攻撃）を出した瞬間、画面を少しだけ寄せる
+   （2026-10-13 ユーザー要望）。すっと寄って（.12秒）少し留まり（.22秒）、ゆっくり戻る（.5秒）。
+   寄るのは盤面だけで、HUD は動かない。中心は主人公（＝画面の真ん中）。動きを減らす設定では寄らない。 */
+const SKILL_ZOOM={amt:.07, inS:.12, hold:.22, outS:.5};
+function feelSkillZoom(amt=SKILL_ZOOM.amt){ syncFeel(); FEEL.skillZoom={t0:FEEL.time, amt}; }
+function feelSkillZoomK(){
+  const z=FEEL.skillZoom; if(!z) return 0;
+  const t=FEEL.time-z.t0, Z=SKILL_ZOOM, sm=x=>x*x*(3-2*x);
+  if(t<0) return 0;
+  if(t<Z.inS) return sm(t/Z.inS);
+  if(t<Z.inS+Z.hold) return 1;
+  if(t<Z.inS+Z.hold+Z.outS) return 1-sm((t-Z.inS-Z.hold)/Z.outS);
+  FEEL.skillZoom=null; return 0;
+}
 function feelUltimate(ent,col='#f7d898'){
   feelKick(FEEL_TUNING.ultimateShake,.3);feelSpray(ent.x,ent.y,col,48,4);
   W.fx.push({t:'feelring',x:ent.x,y:ent.y,col,life:.6,max:.6,r:3});
@@ -659,7 +673,7 @@ function drawFeelMagic(f,camX,camY,col){
 }
 function resetFeel(){
   FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
-  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.weaponArts=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;
+  FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.weaponArts=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;FEEL.skillZoom=null;
   FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
 }
 function syncFeel(){ if(FEEL.floor!==W.fl) resetFeel(); }
@@ -706,6 +720,9 @@ function beginFeelWorld(){
     const y=innerHeight/2+clamp((b.y-P.y)*TS,-innerHeight*.28,innerHeight*.28);
     ctx.translate(x,y);ctx.scale(zoom,zoom);ctx.translate(-x,-y);
   }
+  { const zk=feelSkillZoomK();
+    if(zk>0){ const zoom=1+FEEL.skillZoom.amt*zk, x=innerWidth/2, y=innerHeight/2;
+      ctx.translate(x,y); ctx.scale(zoom,zoom); ctx.translate(-x,-y); } }
   const kick=FEEL.strength*FEEL.kick/FEEL.kickMax;
   // 移動時の画面揺れも止める。歩行のリズムはキャラの脚でのみ見せ、
   // 画面を揺らすのはクリティカルなどの衝撃演出に限る。

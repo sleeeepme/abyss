@@ -7782,7 +7782,7 @@ function makeUnique(fl, depth, fams){
    帰還ポータルは 5 階ごとなので、圧力は「次のポータルまで持たせる」形で着地する。 */
 /* ---------- 灯り（蛍石） ----------
    明るさは 10 段階。10 が今までの明るさで、1 はほとんど何も見えない。
-   ・灯りは蛍石で灯っていて、最初の 1 段（10→9）だけ LIGHT_FIRST 秒、そこからは LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で約6分半）。
+   ・灯りは蛍石で灯っていて、最初の 1 段（10→9）だけ LIGHT_FIRST 秒、そこからは LIGHT_STEP 秒ごとに 1 段ずつ暗くなる（10→1 で約5分半）。
    ・新しい蛍石を手に入れると**新しい灯りに替わる**（回復ではなく交換。10 に戻る）。
      商人が売っているほか、灯りを帯びた敵が稀に落とす。
    ・味方1人・眷属1体につき +1（上限 10）。仲間は灯りを持っている——連れているほど暗くなるのが遅い。
@@ -7792,8 +7792,9 @@ function makeUnique(fl, depth, fams){
    3 以下では見えなくなる。明るさ 1 のまま一定時間いると、巡回者が来る。
    潜る時間そのものに配分が要るようにするための仕掛け。 */
 const LIGHT_MAX   = 10;
-const LIGHT_FIRST = 120;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い。3分→2分 2026-10-01）
-const LIGHT_STEP  = 34;     // そこから1段暗くなるまでの秒数（90→34 2026-10-01：10→1 を約6分半に）
+const LIGHT_FIRST = 100;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い。3分→2分 2026-10-01、120→100 2026-10-13）
+const LIGHT_STEP  = 28;     // そこから1段暗くなるまでの秒数（90→34 2026-10-01、34→28 2026-10-13）
+/* 2026-10-13 ユーザー要望「灯りの減るスピードを2割程度速く」。10→1 が 392秒 → 324秒（約2割速い）。 */
 const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見えない
 const STONE_DROP  = 0.07;   // 灯りを帯びた敵が蛍石を落とす率（精鋭は2倍）
 /* 灯りを帯びた敵（系統×形式）。洞窟版で自分で光る敵と同じ顔ぶれ。 */
@@ -9571,6 +9572,7 @@ function fireWave(){
              weaponBase:S.hero.equip.weapon&&S.hero.equip.weapon.base, self:true});
   if(typeof feelPixelArt==='function') feelPixelArt('s_wave', P.x, P.y, {angle:ang, range:WAVE_REACH, arc:WAVE_ARC});
   feelKick(3.4, .18);
+  if(typeof feelSkillZoom==='function') feelSkillZoom();
   nearEnemies(P.x, P.y, WAVE_REACH+1).forEach(e=>{
     if(e.dead) return;
     const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
@@ -9698,6 +9700,7 @@ function fireArt(def, src){
   const ang=Math.atan2(c.diry||0, c.dirx||1);
   sayArt(c.x, c.y, artName(def), def.col);
   if(c.isPlayer) feelUltimate(P, def.col); else feelUltimate(c.ally, def.col);
+  if(c.isPlayer && typeof feelSkillZoom==='function') feelSkillZoom();   // 自分で押した技だけ寄る（仲間の技では寄らない）
   if(typeof feelWeaponArtStart==='function')feelWeaponArtStart(c.isPlayer?P:c.ally,def,c.x,c.y,ang);
 
   if(def.k==='dash'){
@@ -9955,6 +9958,7 @@ function fireLink(){
   P.guard=false;
   _linkNow = {t:0, tg, actors, hits, done:0, clouds, burstDone:false, sum:new Map(), later:[]};
   sayArt(P.x, P.y, '一斉攻撃', LINK.col);
+  if(typeof feelSkillZoom==='function') feelSkillZoom();
   // 「◯人で◯ヒット」の文は出さない。ヒット数は、合計ダメージが出終わってから「◯HIT!」で見せる
   _linkCombo = {n:N, t:0};
   if(typeof feelKick==='function') feelKick(2.2, 0.16);
@@ -10315,6 +10319,7 @@ function fireUltCore(){
   const st = UP===1 ? base : Object.assign({}, base, {atk: base.atk*UP});
   P.ultCd = ultCooldown(u); P.ultCdMax = P.ultCd;
   feelUltimate(P,u.col);
+  if(typeof feelSkillZoom==='function') feelSkillZoom();   // ボタンで放つ技は少しだけ寄る
   sayArt(P.x, P.y, u.nm, u.col);        // 技名を頭上に（大技も武器技も同じ作法）
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && Math.hypot(e.x-P.x, e.y-P.y) <= r + e.r);
