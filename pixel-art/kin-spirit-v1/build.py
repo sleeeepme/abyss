@@ -2,6 +2,9 @@
 from pathlib import Path
 import json
 import zipfile
+import argparse
+import base64
+import re
 from PIL import Image,ImageDraw,ImageFilter,ImageChops
 
 ROOT=Path(__file__).resolve().parent
@@ -62,6 +65,14 @@ def main():
             for p in [(5,8),(10,8)]:
                 assert base.getpixel(p)==(74,163,216,255)
                 base.putpixel(p,(31,40,67,255));edits.append(list(p))
+        elif name=='eye':
+            # A centered 2px pupil straddles the sprite's x=7.5 symmetry axis.
+            for p in [(7,8),(7,9)]:
+                assert base.getpixel(p)==(58,143,122,255)
+                base.putpixel(p,(18,24,40,255));edits.append(list(p))
+            for p in [(7,10),(8,10)]:
+                assert base.getpixel(p)==(242,236,224,255)
+                base.putpixel(p,(58,143,122,255));edits.append(list(p))
         core,outline,glow,effect,final,ring=spirit(base)
         if edits:base.save(ROOT/f'body-16/kin-{name}.png')
         else:(ROOT/f'body-16/kin-{name}.png').write_bytes(path.read_bytes())
@@ -93,6 +104,7 @@ def main():
         display.paste(preview(images[i][1]),(x+8,30));display.paste(preview(images[i][1],1),(x+68,186))
     display.save(ROOT/'spirit-preview.png')
     preview(images[0][1],12).save(ROOT/'wisp-preview.png')
+    preview(images[NAMES.index('eye')][1],12).save(ROOT/'eye-preview.png')
     backgrounds=Image.new('RGB',(960,3*144))
     for row,bg in enumerate([(16,18,27),(60,59,66),(134,128,115)]):
         for i,(_,im) in enumerate(images):backgrounds.paste(preview(im,6,bg),(i*160,row*144))
@@ -103,4 +115,21 @@ def main():
             for p in sorted((ROOT/folder).glob('*.png')):z.write(p,p.relative_to(ROOT))
     print(json.dumps(report))
 
-if __name__=='__main__':main()
+def install_game():
+    repo=ROOT.parents[1]
+    page=repo/'proto/index.html'
+    html=page.read_text()
+    for name in NAMES:
+        data=(ROOT/f'native/kin-{name}-spirit.png').read_bytes()
+        uri='data:image/png;base64,'+base64.b64encode(data).decode('ascii')
+        html,count=re.subn(r"('kin-"+name+r"': ')[^']+(')",lambda m:m[1]+uri+m[2],html)
+        assert count==1,(name,count)
+        (repo/f'proto/assets/sprites/characters/kin/kin-{name}.png').write_bytes(data)
+    page.write_text(html)
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--install-game',action='store_true')
+    args=parser.parse_args()
+    main()
+    if args.install_game:install_game()

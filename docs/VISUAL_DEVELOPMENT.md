@@ -40,6 +40,13 @@ Codexはデザイナー・アニメーターとして、見た目、動き、操
 
 ## 編集先
 
+### 2026-10-13 眷属の小型化・霊体表示
+
+- 正本は `pixel-art/kin-spirit-v1/build.py`。`--install-game` で6種の24×24透過PNGを `proto/assets/sprites/characters/kin/` と `proto/index.html` の埋め込み画像へ同期する。旧 `tools/npc_px.py` の眷属は採用前の造形。
+- 本体は小型化稿の16pxグリッド、外側に発光用の4px余白。眷属の `CharacterArt.put` だけ描画幅を `TS*24/16` にし、本体の倍率・中心・既存の浮遊動作を維持する。
+- ウィスプの左右に暗い輪郭各1px、EYEの黒目は中央2×2px、その直下に緑の虹彩2pxを追加。眷属の移動・攻撃・恩寵の効果は変更しない。
+- 6種の埋め込みとPNG一致・実レンダラー表示を確認。`feeltest.html` は変更前後とも28通過、同一の既存10失敗、新規失敗・実行時エラーなし。詳細は `pixel-art/kin-spirit-v1/quality/integration-report.json`。
+
 - `proto/game-feel.js`：揺れ、歩行アニメーション、被弾点滅、照明、環境装飾、水面、粒子、攻撃の軌跡、ドロップとボス撃破演出。
 - `proto/index.html`：既存のダメージ式、経験値・報酬の計算、AI、移動・弾の当たり判定。描画内の `feel*` / `drawFeel*` 呼び出しが演出との接点。
 - `proto/feeltest.html`：ブラウザで開く演出・接続の回帰検証。

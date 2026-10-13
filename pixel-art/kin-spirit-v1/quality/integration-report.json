@@ -1,0 +1,19 @@
+{
+  "embedded_and_exported_pngs_match": 6,
+  "runtime_loaded_and_drawn": 6,
+  "feeltest_passed": 28,
+  "preexisting_failures_unchanged": [
+    "Tap starts one dash and cooldown rejects repeat",
+    "Held movement direction wins over attack facing",
+    "Dash stops with radius clearance before wall",
+    "Dash stops before pit even in a floor without pit metadata",
+    "Pointer tap works; drag and cancellation do not dash",
+    "Light stops on wall face and illuminated pixels do not leak behind it",
+    "Latest log only, bottom placement, no prompt overlap",
+    "Just dodge cancels one hit, expires, and does not alter armor durability",
+    "Persistent weapon arts use approved renderers without duplicate transients",
+    "Blurred ambient appears through furnace but not in pale layer"
+  ],
+  "new_failures": [],
+  "runtime_errors": []
+}
