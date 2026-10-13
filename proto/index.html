@@ -19300,22 +19300,25 @@ function upgIconId(u){ return isSkillTech(u.id) ? u.id : 'n_'+u.id; }
 let _upgSel = null;
 let _upgJust = null;          // 今覚えたノード（次の描画で一度だけ光らせる）
 /* Lv を1つ上げる。上げられなければ理由をログに出して false。 */
+/* 街の画面ではログ（#log）が見えない（盤面の HUD の中にある）。できた／できなかった理由は toast で出す。
+   これが無かったので、SPが足りないときなどにタップしても**何も起きないように見えた**。 */
+function upgSay(msg, col){ if(S.screen==='game') log(msg); else toast(msg, col, 1.8); }
 function upgBuy(id){
   const u=UPGRADES.find(x=>x.id===id); if(!u) return false;
   const lv=upgLv(u.id);
   if(lv>=u.max) return false;
   /* 段が開いていなければ買えない。押したときに何も起きないと
      壊れているように見えるので、開ける条件を言う。 */
-  if(upgLocked(u)){ log(tierDef(upgTier(u)).via+'と開く'); return false; }
-  if(!upgNeedOk(u)){ log('先に「'+(UPGRADES.find(x=>x.id===upgNeed(u))||{}).nm+'」を覚える'); return false; }
+  if(upgLocked(u)){ upgSay(tierDef(upgTier(u)).via+'と開く','#c9a06a'); return false; }
+  if(!upgNeedOk(u)){ upgSay('先に「'+(UPGRADES.find(x=>x.id===upgNeed(u))||{}).nm+'」を覚える','#c9a06a'); return false; }
   const cost=upgCost(u,lv);
-  if((S.shards||0)<cost){ log('SPが足りない（あと '+(cost-(S.shards||0))+'）'); return false; }
+  if((S.shards||0)<cost){ upgSay('SPが足りない（あと '+(cost-(S.shards||0))+'）','#e07a6a'); return false; }
   S.shards-=cost; S.upg[u.id]=lv+1;
   // 初めて覚えたスキル技は、枠2が空ならそのまま載せる
   if(lv===0 && isSkillTech(u.id) && !S.skill) S.skill=u.id;
   if(S.hero) S.hero.hpNow=stats(S.hero).maxHp;
   _upgJust=u.id;
-  log('「'+u.nm+'」 Lv.'+(lv+1)+(lv===0?' を覚えた':' に上がった'));
+  upgSay('「'+u.nm+'」 Lv.'+(lv+1)+(lv===0?' を覚えた':' に上がった'),'#7fe0c0');
   return true;
 }
 function upgSelect(id){ _upgSel=id; if(S.screen==='upg') renderUpg(); }
