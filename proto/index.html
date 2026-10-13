@@ -1230,6 +1230,10 @@
     <button class="sw ghost" id="dbg-kin">実行</button>
   </div>
   <div class="row">
+    <div><b>総攻撃ゲージを満タンにする</b><s>連携値を最大にし、総攻撃を使える状態にする</s></div>
+    <button class="sw ghost" id="dbg-link">実行</button>
+  </div>
+  <div class="row">
     <div><b>レジェンド武器を全開放</b><s>24本すべてを倉庫の専用棚へ。玉鋼も999個入れる</s></div>
     <button class="sw ghost" id="dbg-legend">実行</button>
   </div>
@@ -20935,6 +20939,13 @@ bindTap(el('dbg-blade'), ()=>{
   if(bladeCount() >= BLADE_MAX){ log('<i class="pi pi-bug"></i> 鞘無しは上限（'+BLADE_MAX+'本）'); return; }
   S.hero.boons.push({id:'orbit', rar:'common'});
   log('<i class="pi pi-bug"></i> 鞘無し '+bladeCount()+' 本');
+  el('m-debug').classList.remove('on'); last=performance.now();
+});
+bindTap(el('dbg-link'), ()=>{
+  if(!S.hero){ log('冒険者がいない'); return; }
+  S.hero.link=LINK.max;
+  log('<i class="pi pi-bug"></i> 総攻撃ゲージを満タンにした');
+  updateHUD();
   el('m-debug').classList.remove('on'); last=performance.now();
 });
 bindTap(el('dbg-kin'), ()=>{

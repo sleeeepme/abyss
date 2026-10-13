@@ -278,4 +278,20 @@ R.dbgKinWeaponCap = await pg.evaluate(()=>{
   return {initial,capped,ok:initial>0 && capped};
 });
 
+R.dbgLinkFills = await pg.evaluate(()=>{
+  TH.run(3,{seed:5}); S.hero.link=0; updateHUD();
+  const hiddenBefore=!el('linkbtn').classList.contains('on');
+  openDebug();
+  const tap=()=>el('dbg-link').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+  tap();
+  const full=linkReady() && S.hero.link===LINK.max;
+  const shown=el('linkbtn').classList.contains('on');
+  const closed=!el('m-debug').classList.contains('on');
+  tap();
+  const capped=S.hero.link===LINK.max;
+  const hero=S.hero;
+  try{ S.hero=null; tap(); }finally{ S.hero=hero; }
+  return {hiddenBefore,full,shown,closed,capped,ok:hiddenBefore && full && shown && closed && capped};
+});
+
 await done(b, errs, R);
