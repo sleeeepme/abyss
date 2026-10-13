@@ -2800,9 +2800,10 @@ function doRepairAll(h, mid){
   return {ok:true, need:c.need, fixed:c.list.length, names};
 }
 /* 装備の札（2026-10-12 ユーザー要望で作り直し）。
-   - 数値は文字に戻し、略せる物は略す：攻撃力→ATK、速度→SPD、射程→RNG、防御力→DEF、耐久→DUR、ガード軽減→GRD、パリイ受付→PARRY。
-     （いったんアイコンにしたが、分かりづらくなったと言われて戻した）
-   - 攻撃属性と状態異常は、技のアイコンと同じ白1色の 15×15 にして、レア度の文字があった所（Lv. の横）に置く。
+   - 数値は日本語の文字（攻撃力・速度・射程・防御力・耐久・ガード軽減・パリイ受付）。
+     （アイコン → ATK などの略字と試したが、どちらも分かりづらいと言われて日本語に戻した）
+   - 攻撃属性と状態異常は、技のアイコンと同じ 15×15 の1色にして、レア度の文字があった所（Lv. の横）に置く。
+     攻撃属性は白、状態異常はその状態異常の色（STATUS[].col）で塗る（ユーザー要望）。
    - 「追加 炎ダメージ」「炎耐性」などの炎・雷・冷気の部分もそのアイコンにする。 */
 const ELEM_ICON_GRID={
   slash:['.####..........','.#######.......','.#########.....','.##########....','..##########...','.....########..','.......######..','........######.','.........#####.','.........#####.','..........#####','..........#####','..........#####','...........####','...............'],
@@ -2819,17 +2820,19 @@ const ELEM_ICON_GRID={
   stagger:['...............','...............','...............','......####.....','.....##..##....','....##.....#...','....#......##..','#...#..##...#..','#....#.##...#..','.#....##...##..','.#.........#...','..#.......##...','...##...###....','....#####......','...............']
 };
 const _elemIconUrl={};
-function elemIconUrl(id){
-  if(_elemIconUrl[id]!==undefined) return _elemIconUrl[id];
+function elemIconUrl(id, col){
+  col=col||'#f4f4f4';                                                  // 既定は技のアイコンと同じ白
+  const key=id+col;
+  if(_elemIconUrl[key]!==undefined) return _elemIconUrl[key];
   const g=ELEM_ICON_GRID[id];
-  if(!g){ _elemIconUrl[id]=''; return ''; }
+  if(!g){ _elemIconUrl[key]=''; return ''; }
   const cv=document.createElement('canvas'); cv.width=15; cv.height=15;
-  const c=cv.getContext('2d'); c.fillStyle='#f4f4f4';                 // 技のアイコンと同じ白
+  const c=cv.getContext('2d'); c.fillStyle=col;
   for(let y=0;y<15;y++) for(let x=0;x<15;x++) if(g[y][x]==='#') c.fillRect(x,y,1,1);
-  return (_elemIconUrl[id]='url('+cv.toDataURL()+')');
+  return (_elemIconUrl[key]='url('+cv.toDataURL()+')');
 }
-function elIc(id, label){
-  return `<i class="eli" role="img" aria-label="${label}" title="${label}" style="background-image:${elemIconUrl(id)}"></i>`;
+function elIc(id, label, col){
+  return `<i class="eli" role="img" aria-label="${label}" title="${label}" style="background-image:${elemIconUrl(id,col)}"></i>`;
 }
 const STATUS_IC={bleed:'bleed', burn:'burn', chill:'chill', shock:'shockst', stagger:'stagger'};
 /* 武器の攻撃属性と、それが溜める状態異常（Lv. の横に並べる） */
@@ -2837,11 +2840,10 @@ function itemTagIcons(it){
   if(!it || !it.ident || !it.atk || isConsum(it)) return '';
   const b=weaponShape(it), d=DTYPE[b.dt]||DTYPE.blunt, st=d.status&&STATUS[d.status];
   return ' <span class="elt">'+elIc(DTYPE[b.dt]?b.dt:'blunt', d.nm)
-    +(st&&STATUS_IC[d.status] ? elIc(STATUS_IC[d.status], st.nm+'を蓄積') : '')+'</span>';
+    +(st&&STATUS_IC[d.status] ? elIc(STATUS_IC[d.status], st.nm+'を蓄積', st.col) : '')+'</span>';   // 状態異常は色付き
 }
 /* 札に出す付帯の名前。ほかの画面（STATNM）はそのまま */
-const CARD_STATNM={dmgPct:'物理DMG +%v%', aspdPct:'SPD +%v%', hp:'HP +%v', critPct:'CRIT +%v%', def:'DEF +%v',
-  allStat:'全能力 +%v',
+const CARD_STATNM={
   fire:'追加{fire}ダメージ %v', shock:'追加{shock}ダメージ %v', frost:'追加{frost}ダメージ %v',
   resFire:'{fire}耐性 +%v%', resShock:'{shock}耐性 +%v%', resFrost:'{frost}耐性 +%v%'};
 function cardStat(stat, v){
@@ -2852,7 +2854,7 @@ function durIcon(it){
   if(!it.durMax) return '';
   const p=it.dur/it.durMax;
   const col = p<=0 ? '#c4433f' : p<0.25 ? '#d97a2b' : p<0.6 ? '#d6b34a' : '#7b8398';
-  return `<span style="color:${col}">DUR ${Math.max(0,it.dur)}/${it.durMax}</span>`;
+  return `<span style="color:${col}">耐久 ${Math.max(0,it.dur)} / ${it.durMax}</span>`;
 }
 function durLine(it){
   if(!it.durMax) return '';
@@ -2870,16 +2872,16 @@ function affLines(it){
   const b=weaponShape(it);      // レジェンドの上書き（射程・属性・飛び道具）を含んだ形
   const L=[];
   /* 2026-10-12 ユーザー要望で情報を削った：
-     数値は略した文字（ATK・SPD・RNG・GRD・PARRY・DEF・DUR）。「飛び道具」は使えば分かるので出さない。
+     数値は日本語の文字。「飛び道具」は使えば分かるので出さない。
      片手は出さず、両手だけ書く（盾が持てないことに関わるので）。
      攻撃属性と状態異常は Lv. の横に白1色のアイコン（itemTagIcons）。 */
   if(it.atk){
-    L.push(`<span class="stl"><span>ATK ${it.atk}</span><span>SPD ${it.spd.toFixed(2)}</span>`
-      +`<span>RNG ${(b.reach||1.45).toFixed(2)}</span>`
+    L.push(`<span class="stl"><span>攻撃力 ${it.atk}</span><span>速度 ${it.spd.toFixed(2)}</span>`
+      +`<span>射程 ${(b.reach||1.45).toFixed(2)}</span>`
       +(b.hands===2?'<span>両手</span>':'')+'</span>');
   }
-  if(it.block) L.push(`<span class="stl"><span>GRD ${it.block}%</span><span>PARRY ${(b.parry||0.2).toFixed(2)}秒</span></span>`);
-  if(it.def) L.push(`DEF ${it.def}`);
+  if(it.block) L.push(`<span class="stl"><span>ガード軽減 ${it.block}%</span><span>パリイ受付 ${(b.parry||0.2).toFixed(2)}秒</span></span>`);
+  if(it.def) L.push(`防御力 ${it.def}`);
   it.aff.forEach(a=>{
     // 装飾品の付帯は専用の書き方をする（状態異常や隊の強化は %v では書けない）
     if(a.t==='c'){ L.push(charmAffLine(a)); return; }
@@ -17167,10 +17169,10 @@ function compareHTML(it){
   const after=stats(S.hero);
   S.hero.equip[it.slot]=backup;
   const rows=[
-    ['ATK', Math.round(after.atk)-Math.round(before.atk)],
-    ['DEF', Math.round(after.def)-Math.round(before.def)],
-    ['HP',  after.maxHp-before.maxHp],
-    ['SPD', +(after.aspd-before.aspd).toFixed(2)],
+    ['攻撃', Math.round(after.atk)-Math.round(before.atk)],
+    ['防御', Math.round(after.def)-Math.round(before.def)],
+    ['HP',   after.maxHp-before.maxHp],
+    ['攻速', +(after.aspd-before.aspd).toFixed(2)],
   ].filter(r=>r[1]!==0);
   if(!rows.length) return '<div class="af" style="color:#7b8398">増減なし</div>';
   /* **上がる値だけ太字にする。** 色（緑／赤）だけだと、
