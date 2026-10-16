@@ -8570,6 +8570,9 @@ function startRun(depth){
    蛍石は周りを照らすので、真っ暗な入口から、遠くに見える灯りを目指して歩くことになる（チュートリアル代わり）。
    「次の部屋」は入口から床を歩いて一番近い部屋。周りのマスは最初から見えている扱いにする（灯りが遠くから見える）。 */
 const STONE_LIGHT_R = 2.8;   // 落ちている蛍石が照らす半径（マス）
+/* 商人の角灯（蛍石が入っている）が照らす半径（マス）と明るさ。2026-10-16「商人の周りをもっと明るく」。
+   落ちている蛍石（.85）より明るく広くして、暗い階でも遠くから「あそこに商人がいる」と分かるようにする。 */
+const MERCHANT_LIGHT_R = 3.8, MERCHANT_LIGHT_I = 1.0;
 function placeFirstStone(fl){
   const W_=fl.W, H_=fl.H, dist=new Int32Array(W_*H_).fill(-1), q=[];
   const s0=fl.start.cy*W_+fl.start.cx; dist[s0]=0; q.push(s0);
@@ -15094,6 +15097,7 @@ const CharacterArt = (function(){
     'kin-eye': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAC0ElEQVR4nO1V3UsUURQ/92OcHcvdFcvNDxILMoKFkF6U9akGIsF3hR5K7SnaQP+JwAojenAzHwJ760EoAukhknzzRQgVSxSVssTdlZxd5947ccYZmZVxjSAi6MCF4c7v/H7n495zAf7b3zZyFODy0EYQ4387/sbbwVrntwQCxAQAaGChqcByygmRMuQ+MaMG1QmnGgBwDyIcoWxlqSIASF8oTIQcQu4SIyHRqc6iPMaiPAEEDK9AlsyLrzIvck7RFRG+0EEREkKOxIxGaAQ4qaSVLMbjWnNfu/HM8UpEANTTD9ZNkbWX1I7MgXB2VEEVPBEZFCEhkWtEpwar4tUsyhqJRmv724zhdMqsDwYzPDW5npm20o6tNmRersptseUUlQUAdjATv6a+GEaus7hWw6K8pa/NGMWo0ynz5OzUaEkpkymz/uH7ySduNtNWL+FkXmbtb6qg/Ma7AjTYVKJTRqP8OIvx5v52I3O3w0wggU969fmIuwIRKcQgFn3QFznwl38KgxkAjVDGjrGq/jZjLJ0y6160tkB3h5nA6JF47t7LPSEAwL1kyky4mJRZNzw1OTbyTl1xiioni/sx7Z9r11RBSflDbmemrRud4xML3TPzcJQhBrHog77IEXqKvJQ0GqEGi/FaFtPOnW6ER4h53dPV7GeB9ub6LUimeuHa+MQS1nplFe7InL0gc2JDFfYaHdZkNKkKqug4YhMAFleoNtBUD0P44+PsDDy4eAkuJFtLerC8DoMyZy+KrNj07kR4BoEssEkaqaCVLM5P8GrtbFMD3H/V03U+iO0cn5hbXoMBsWV/klnx3dlVO94RDb8HoSI6NXic17C4dqapAR47e/voJJfX4LbM2p+9yK0w8lCBAyIcbzTFUVHFT5WMim3xReVFzrvB7qj4pVkUIkKpwXTCSUXpsHN2lSWx5uow8rICARFy1Lgu9yb88QcH/nn7CZscaPR+XfOdAAAAAElFTkSuQmCC',
     'kin-skull': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAACUUlEQVR4nO1Vv2sUQRR+M7Ob2+XIGQ0EQgrRRhsbG68QLKIiBPwDBEEkIQSUK0zhn2ARC1EEEcQo5A8IBKIxnYU24ey0khOSQOBIvHjsJrszI9/c7LHu7d3G1PngwePNN9/7ce9miU5QAFZEmFzYGchZnx/Tx05gxbMG6LQNSsIKxAURcV4WLuNM6EgZPnO51kpL1ZYRESkikv2SsAJxh3u8JEbcYebzU6otD3DOy6KkA/Vb7kX7KlSIxf2S8AJxT5x2R8WIc2H2WvmDc8a9BIOPGM7AARd38n4v3qcr0RWvOOdnqv672tUbE9NV/yUMPmI4SyVBUT0JWF71zGWeMzpkKp+p+m8geG/1E729dd3wEv/Z57XN11+C+3Iv/hE3D5s60mF2VHkdcO6JEi+L8emqvwhxBOf4N/r68akx+IDtahFc3MnTywaYjTnEyNP2HKJXbj7qkuAjBhgOo+R34Nmp5HXQxdqv4E/iYyxpv75R7+HkAVnT0HavY9IUMiKJIMTmLncqTzrqyJtyJbh2VXFXF3WgVCgPVFtuN7bowdTS8vfZx+/NwasndzviG3VCDGfggIs7NsE/6FmryYUdJHW5x327pufOTtDzlTu3L6Z5RnyTHspW/FPuRk0VqoCIovX5MTVoRMmYpApVSLtRE4EGc2pTS8svdGfXzVgaW1RLiZv1zI4nt4O8fzOvOBUx7IwTI9+WEMj9eFu14pYV7/tUHO2x80WJOWwo1XGsY32ogu7c/++xyyRhdhkSIyua2PGe60ySBOnvwZE+OCegIvwFl7QgvH24z98AAAAASUVORK5CYII=',
     'kin-jelly': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAACUElEQVR4nO1VPYgTQRT+5id/niYnEbkjxaEWloLVFXZic2nsLCwU8To9LbS6RovrbLSNHNgE7CSNRVAsBK+yuOqUk0sCucBhND/GTbLzI7PZCeua3GoaEfzgMbs7733fvJl5b4H/+NsgUQ4XHx0Efeyzth9e3TupZxbwyY3RgBmogOnDREgEOTOkNMUShJM4AO5PCy30UDly4IvIaSIkgpzTJE3SNE+zY3wRBCnPQcORXdFQHdFRfdU3gtNESBQ5Ox7Lsgw/c3M59Uz7W0QA9XTLuSbb4pP86jYPE7Eph0XZmDzNT60upzbvXLi0EHR6/La8WXjnXPdeRiKOPZOpGdjVkxhJ8mw8y+b5WZ88V3n9cuzX3v6Cc3evGpF6Ycu5IVvig2gOm9rV/XAW9lYEQWmSJehRtmC2xZIbUmsGzy9vwMwZHzrHFk3MJL5JAgQEDARJO29XbGBHC+9cRr7c9ydRAhoaEgqDcs3pmA87byreioOjRbnmfJvAcaiAUo50ZVd8ru7jfr5Y2r3yYh3btQrC4yhdSGjYW/TLIf8k4B+O8oqoJzva1QfBgJViaXfjfQHr51dhxnyxtFPdxy3Vkw3VHxddZAYjEVOnXdGo1rGWL5Y+GkIA8ZViaW9MXseaVwstt61d7Zq4cB1Mq2RbaCk2HzvBMvz0Ug5PqnU8MCRLOTys1nFbdsReVKH9TqtI0DTP0BTLqO9y6KV9hMV1X7Zk22sVgz9qFRNEKJ1jMRBwCD+eE7ORQvWkO1OzC4mQkBnooM3UrkMimIaoH86/jx/DP1slW/fu5AAAAABJRU5ErkJggg==',
+    'merchant_b': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB4klEQVR42u1asUoDQRDdqK2CisaAEETBq0QECQG7VGohWAoaK7GySGHuE7wmRaqQSgmIhQgWERECFoKEFIJVBEOICFFDPEkdiJ0wW8wy3EWFe6+bm83d7WPey8xySgEAAAAAEFSE9AtRK9Hz8wGNain0nwkYCHoFgICgEzCka3552/b3CQXV6+cGvHoMJAACgu4B+oVatUTiWSshylcKRyTej9T7uoGcoh4m9QRIAATAAxSraWleio2UJVp/mamiAkAACPDxPMDv+d+JuSSuv3z96QZzzRl2doAEQAA8gHpAPjUnusFe5pnE5Yv0r24gtul4Oh+ABEAAZgGK+8d3EscXwr5q1OQR0vUm6B6HPgASAAG8B3jVfKvyQOLr4jGJXcPvTeu7d6cizeuzSVo7Q4QEQAA8gEd8vkn7hKcIu/4mf07itZUtdn3jlfYd0emw6P5KjbB9w61jowJAAAiQ9AGa5ocXkzSvTkQPcA93qYe8dUi8ak+Q+GqnxXvSFNV8ts3PEk4MFQACQAAD43eC+vwszR+Md3x94WybeoDpDPAsuUTeJ10eRQWAABDA9AEmTUnP3WuDXTZf/Bhj8+uTn2xcxDdCkAAI6Ot5gFeYNG7SrK5xKfT/fVQACAABAAAAP/gGx7uT/eDt/c0AAAAASUVORK5CYII=',
   };
   const img={};
   for(const [id,src] of Object.entries(FILES)){ const im=new Image(); im.src=src; img[id]=im; }
@@ -15182,6 +15186,7 @@ function enemyLit(e){
   /* シルトジェリーなど自分で光る敵は、自分も周りも見える（暗がりの目印になる） */
   if(glowFoe(e)) return 'lit';
   if(W.drops.some(d=>d.stone && Math.hypot(d.x-e.x, d.y-e.y) <= STONE_LIGHT_R)) return 'lit';   // 落ちている蛍石の灯りの中
+  if(W.shop && Math.hypot(W.shop.x-e.x, W.shop.y-e.y) <= MERCHANT_LIGHT_R) return 'lit';           // 商人の角灯の灯りの中
   if(W.enemies.some(g=>g!==e && glowFoe(g) && Math.hypot(g.x-e.x, g.y-e.y) <= GLOW_R)) return 'lit';
   const r = (window.CAVE && CAVE.on && Number.isFinite(CAVE.litTiles)) ? CAVE.litTiles : null;
   if(r==null) return 'lit';
@@ -15443,12 +15448,10 @@ function draw(){
     // これで拾い物の高さと、主人公ライトに対する向きが一目で分かる。
     drawFeelGroundShadow(sx,(d.y*TS-camY)+TS*.12,TS*.64,.85);
     if(d.stone){
-      /* 蛍石。淡い緑に光る結晶（闇の外でも見える） */
-      const q=Math.max(2,Math.round(TS/16)), gl=0.55+0.45*Math.sin(performance.now()/260);
-      ctx.fillStyle='#1d4a3c'; ctx.fillRect(Math.round(sx-q*2),Math.round(sy-q*3),q*4,q*6);
-      ctx.fillStyle='#6fe8b8'; ctx.fillRect(Math.round(sx-q),Math.round(sy-q*3),q*2,q*5);
-      ctx.globalAlpha=gl; ctx.fillStyle='#d8fff0'; ctx.fillRect(Math.round(sx-q),Math.round(sy-q*2),q,q*2); ctx.globalAlpha=1;
-      if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.55, '#6fe8b8', 0.95);
+      /* 蛍石。淡い緑に光る結晶（闇の外でも見える）。2026-10-16：まわりに円いにじみの光、
+         結晶を3本のドット絵にして、光の帯が下から上へ走るゆらめきと、まわりで瞬くきらめきを足した */
+      drawFluorite(sx, sy, d);
+      if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.62, '#6fe8b8', 0.95);
       return;
     }
     if(d.shard){
@@ -15476,6 +15479,7 @@ function draw(){
     }
     const c=RARCOL[d.it.rar];
     drawDropIcon(d.it,sx,sy,c);
+    if(isGearUpgrade(d.it)) drawUpgradeMark(sx, sy);   // 今の装備より強い（緑の↑）
     /* 名前は近づいたときだけ。常時出すと画面が文字で埋まる。
        さらに、ボスが技を溜めている間は名前を伏せる——
        いま読むべきは予兆であって、足元に落ちている革鎧の名前ではない。
@@ -16074,15 +16078,28 @@ function draw(){
   // 商人。鍛冶場と同じく「そこに何かある」と遠目で分かるようにする。
   if(W.shop && tileSeen(W.shop.x, W.shop.y)){
     const sx=W.shop.x*TS-camX, sy=W.shop.y*TS-camY;
-    if(sx>-80 && sy>-80 && sx<innerWidth+80 && sy<innerHeight+80){
-      const pl=0.5+0.3*Math.sin(performance.now()/300+W.shop.seed);
+    if(sx>-120 && sy>-120 && sx<innerWidth+120 && sy<innerHeight+120){
+      const now=performance.now()/1000+(W.shop.seed||0);
+      /* 待機アニメ（2026-10-16）。0.8秒ずつ2コマ：2コマ目は上半身・荷・角灯が1ドット沈む（息をつく）。
+         絵は tools/npc_px.py の MERCHANT_M／MERCHANT_M2。 */
+      const breath=(now % 1.6) >= 0.8;
+      const face=(W.shop._artFace)||1;
+      // 角灯（絵の 2,10 のドット）。主人公の側へ向き直ると左右が入れ替わる。沈んだコマでは1ドット下
+      const u=TS/16, lx=sx+(2.5-8)*u*face, ly=sy+(10.5-8+(breath?1:0))*u;
+      const fl=0.86+0.08*Math.sin(now*7.3)+0.06*Math.sin(now*13.1);   // 灯のゆらぎ
       ctx.save();
-      ctx.globalAlpha=0.18*pl; ctx.fillStyle='#d6b34a';
-      ctx.beginPath(); ctx.arc(sx,sy,TS*0.8,0,7); ctx.fill();
-      ctx.globalAlpha=1;
+      // 足もとの灯だまり（床に落ちた明かり）と、角灯のまわりのにじみ
+      let g=ctx.createRadialGradient(lx, sy+TS*0.3, 0, lx, sy+TS*0.3, TS*2.4);
+      g.addColorStop(0, 'rgba(255,226,140,'+(0.20*fl)+')'); g.addColorStop(0.5, 'rgba(255,210,120,'+(0.08*fl)+')'); g.addColorStop(1, 'rgba(255,200,110,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(lx, sy+TS*0.3, TS*2.4, TS*1.5, 0, 0, 7); ctx.fill();
+      ctx.globalCompositeOperation='lighter';
+      g=ctx.createRadialGradient(lx, ly, 0, lx, ly, TS*1.1);
+      g.addColorStop(0, 'rgba(255,240,170,'+(0.55*fl)+')'); g.addColorStop(0.35, 'rgba(255,214,120,'+(0.22*fl)+')'); g.addColorStop(1, 'rgba(255,200,100,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(lx, ly, TS*1.1, 0, 7); ctx.fill();
+      ctx.globalCompositeOperation='source-over';
       /* 仲間と同じ描き方の人型（tools/npc_px.py）。主人公のいる側へ向く。
          絵がまだ読めていないときだけ、前の荷箱の図形で出す。 */
-      if(!CharacterArt.put('merchant', sx, sy, TS, W.shop, P.x-W.shop.x, 0)){
+      if(!CharacterArt.put(breath && CharacterArt.image('merchant_b') ? 'merchant_b' : 'merchant', sx, sy, TS, W.shop, P.x-W.shop.x, 0)){
         ctx.fillStyle='#6b5a36';
         ctx.fillRect(sx-TS*0.30, sy-TS*0.02, TS*0.60, TS*0.34);   // 荷
         ctx.fillStyle='#c8a24a';
@@ -16092,6 +16109,14 @@ function draw(){
         ctx.fillStyle='#2a2418';
         ctx.fillText('◈', sx, sy+TS*0.16);
         ctx.textBaseline='alphabetic';
+      }
+      // 角灯の芯のきらめき（ときどき十字に光る）
+      const tw=(now*1.3) % 1;
+      if(tw < 0.18){
+        const q=Math.max(1,Math.round(u)), cx=Math.round(lx), cy=Math.round(ly)-q;
+        ctx.globalAlpha=1-tw/0.18; ctx.fillStyle='#fffbe0';
+        ctx.fillRect(cx-q*2, cy, q*5, q); ctx.fillRect(cx, cy-q*2, q, q*5);
+        ctx.globalAlpha=1;
       }
       if(Math.hypot(W.shop.x-P.x, W.shop.y-P.y)<8)
         label(W.shop.stock.length?'商人':'商人（売り切れ）', sx, sy+TS*0.80, '#d6b34a', 1);
@@ -16923,6 +16948,141 @@ function drawAir(Z, dt){
    絵が無いことは、例外ではなく**簡易表示**で伝える。
    一度落ちたら以後は試さない（毎フレーム例外を作ること自体が重い）。 */
 let _dropArtOk = true;
+/* ---------- 落ちている装備が「今の装備より強い」かの印 ----------
+   2026-10-16 ユーザー要望：拾うときに、今装備しているものより強いか一目で分かるように。
+   今の装備より良ければ、アイテムの絵の右上に緑の↑を出す。
+
+   「強い」の物差しは1つにまとめる。攻め（攻撃力×攻撃速度×会心の期待値、属性ダメージ込み）と
+   守り（最大HP×防御の効き）の比を掛け合わせ、3%より上がるなら↑。
+   片方が上がって片方が下がる物は、掛け合わせた結果で決まる（例：攻撃+10%・HP-5% は↑）。
+   **未鑑定の物には出さない**——中身が分からない物の良し悪しを先に教えると、鑑定の意味が無くなる。
+   比べるのは主人公の今の装備（同じスロットに着け替えた場合）。stats() を2回呼ぶので、0.4秒ごとにだけ測り直す。 */
+const UPGRADE_MARK_MIN = 1.03;
+const _upMark = new WeakMap();
+function gearScore(st){
+  const el = st.elem ? (st.elem.fire||0)+(st.elem.shock||0)+(st.elem.frost||0) : 0;
+  return {off: Math.max(0.01, (st.atk + el*0.8) * st.aspd * (1 + st.crit/100*(CRIT_MUL-1))),
+          tank: Math.max(1, st.maxHp * (1 + Math.max(0, st.def)/60))};
+}
+function isGearUpgrade(it){
+  if(!it || !S.hero || !it.ident || !it.slot || isConsum(it) || isBroken(it)) return false;
+  const now = performance.now(), c = _upMark.get(it);
+  if(c && now - c.t < 400) return c.v;
+  const slot = it.slot, cur = S.hero.equip[slot];
+  let v = false;
+  if(cur !== it){
+    if(!cur) v = true;                                  // 空いているスロットなら、着ければ必ず強くなる
+    else {
+      const before = gearScore(stats(S.hero));
+      S.hero.equip[slot] = it;
+      let after; try{ after = gearScore(stats(S.hero)); } finally { S.hero.equip[slot] = cur; }
+      v = (after.off/before.off) * (after.tank/before.tank) > UPGRADE_MARK_MIN;
+    }
+  }
+  _upMark.set(it, {t:now, v});
+  return v;
+}
+/* 緑の↑（ドット 7×7）。アイテムの絵（16ドットの枠）の右上の角に置き、0.5秒ごとに1ドットだけ跳ねる */
+const UP_MARK_GRID = ['...W...', '..GWG..', '.GGWGG.', 'GGGGGGG', '..GGG..', '..GGG..', '..GGG..'];
+function drawUpgradeMark(sx, sy){
+  const q = Math.max(1, Math.round(TS/16)), side = Math.max(16, Math.round(TS));
+  const left = Math.round(sx - side/2), top = Math.round(sy - side/2);
+  const hop = (Math.floor(performance.now()/500) & 1) ? 0 : -q;
+  const G = UP_MARK_GRID, GW = G[0].length;
+  const ox = left + (16-GW)*q, oy = top + hop;
+  const on = (x,y)=> y>=0 && y<G.length && x>=0 && x<GW && G[y][x] !== '.';
+  ctx.save();
+  ctx.fillStyle = '#0b2a12';                            // 縁取り（暗い緑）。どの床・どの絵の上でも読める
+  for(let y=-1; y<=G.length; y++) for(let x=-1; x<=GW; x++){
+    if(on(x,y)) continue;
+    if(on(x-1,y)||on(x+1,y)||on(x,y-1)||on(x,y+1)||on(x-1,y-1)||on(x+1,y-1)||on(x-1,y+1)||on(x+1,y+1))
+      ctx.fillRect(ox + x*q, oy + y*q, q, q);
+  }
+  for(let y=0; y<G.length; y++) for(let x=0; x<GW; x++){
+    const c = G[y][x]; if(c === '.') continue;
+    ctx.fillStyle = c === 'W' ? '#d8ffdc' : '#4fe06a';
+    ctx.fillRect(ox + x*q, oy + y*q, q, q);
+  }
+  ctx.restore();
+}
+/* ---------- 落ちている蛍石 ----------
+   結晶の形は 16×16 のドットの格子に一度だけ焼き、毎フレームは
+     1) 円いにじみ（放射状のグラデーション。呼吸するように強弱）
+     2) 結晶の絵
+     3) ゆらめき：結晶の中を、明るい帯が下から上へ 1.6 秒で走る
+     4) きらめき：まわりの3か所で、十字の小さな星が順に瞬く
+   を重ねる。動きはドットの格子に合わせて刻む（なめらかに動かしすぎない）。 */
+const FLUO_PAL = {o:'#0f3a30', d:'#1f7a5c', m:'#3fc495', l:'#8ff0c8', w:'#e6fff4'};
+let _fluoArt = null;
+function fluoriteArt(){
+  if(_fluoArt) return _fluoArt;
+  // 結晶3本：真ん中が高く、左右が低い。左の面が明るく、右の面が暗い（光は左上から）
+  const CR=[{cx:4.4, w:1.7, h:6, tip:2.4}, {cx:11.8, w:1.7, h:7, tip:2.4}, {cx:8, w:2.2, h:11, tip:3.5}];
+  const BASE=14, cell=Array.from({length:16},()=>Array(16).fill(''));
+  const inC=(x,y,c)=>{ const top=BASE-c.h; if(y<top||y>=BASE) return false;
+    const hw = y<top+c.tip ? c.w*(y-top+0.6)/c.tip : c.w; return x+0.5>c.cx-hw && x+0.5<c.cx+hw; };
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
+    let hit=0;
+    for(const c of CR){ if(!inC(x,y,c)) continue; hit++;
+      const rel=(x+0.5-c.cx)/c.w, top=BASE-c.h;
+      cell[y][x] = y<=top+1 ? 'w' : rel<-0.25 ? 'l' : rel<0.35 ? 'm' : 'd';   // 後ろ（配列の後ろ）の結晶が手前に来る
+    }
+    // 2本が重なる所は、手前の結晶の縁として暗い筋にする（3本に分かれて見えるように）
+    if(hit>1 && cell[y][x]!=='w') cell[y][x]='o';
+  }
+  const mask=cell.map(r=>r.map(v=>!!v));
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){       // 縁取り
+    if(mask[y][x]) continue;
+    const n=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>mask[y+dy]&&mask[y+dy][x+dx]);
+    if(n) cell[y][x]='o';
+  }
+  for(let x=3;x<14;x++) if(!cell[BASE][x]) cell[BASE][x]='o';   // 地面に埋まっている所
+  const cv=document.createElement('canvas'); cv.width=16; cv.height=16; const c=cv.getContext('2d');
+  for(let y=0;y<16;y++) for(let x=0;x<16;x++){ const k=cell[y][x]; if(!k) continue; c.fillStyle=FLUO_PAL[k]; c.fillRect(x,y,1,1); }
+  return (_fluoArt={cv, mask});
+}
+function drawFluorite(sx, sy, d){
+  const A=fluoriteArt(), q=Math.max(1,Math.round(TS/16)), side=16*q;
+  const left=Math.round(sx-side/2), top=Math.round(sy-side*0.62);
+  const now=performance.now()/1000 + ((d && d.x) ? (d.x*1.7+d.y*2.3) : 0);
+  const pulse=0.8+0.2*Math.sin(now*2.4);
+  const cx=sx, cy=top+side*0.55;
+  ctx.save();
+  // 1) 円いにじみ。外側の大きな輪と、芯の明るい輪の2枚
+  ctx.globalCompositeOperation='lighter';
+  let g=ctx.createRadialGradient(cx, cy, 0, cx, cy, TS*1.35);
+  g.addColorStop(0, 'rgba(120,240,190,'+(0.42*pulse)+')'); g.addColorStop(0.45, 'rgba(90,220,170,'+(0.16*pulse)+')'); g.addColorStop(1, 'rgba(80,200,160,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx, cy, TS*1.35, 0, 7); ctx.fill();
+  g=ctx.createRadialGradient(cx, cy, 0, cx, cy, TS*0.55);
+  g.addColorStop(0, 'rgba(220,255,240,'+(0.45*pulse)+')'); g.addColorStop(1, 'rgba(160,255,210,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx, cy, TS*0.55, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation='source-over';
+  // 2) 結晶
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(A.cv, left, top, side, side);
+  // 3) ゆらめき：明るい帯が下から上へ（12コマ/秒で刻む）
+  const band = 14 - Math.floor(((now*12)|0) % 20 * 0.75);   // 14→0 を 1.6 秒ほどで
+  ctx.fillStyle='#e6fff4';
+  for(const [y,a] of [[band,0.85],[band+1,0.4]]){
+    if(y<0||y>15) continue;
+    ctx.globalAlpha=a;
+    for(let x=0;x<16;x++) if(A.mask[y][x]) ctx.fillRect(left+x*q, top+y*q, q, q);
+  }
+  ctx.globalAlpha=1;
+  // 4) きらめき：3か所が順番に瞬く（十字の星。大きい時は腕が2ドット）
+  const SP=[[2,4],[14,3],[12,11],[3,10],[9,1]];
+  for(let i=0;i<3;i++){
+    const ph=(now*0.9 + i/3) % 1, cyc=Math.floor(now*0.9 + i/3);
+    if(ph>0.35) continue;
+    const p=SP[(cyc*3+i*2) % SP.length], k=ph/0.35, arm = k>0.25&&k<0.75 ? 2 : 1;
+    const x=left+p[0]*q, y=top+p[1]*q;
+    ctx.globalAlpha = k<0.5 ? 1 : 1-(k-0.5)*2;
+    ctx.fillStyle='#ffffff'; ctx.fillRect(x, y, q, q);
+    ctx.fillStyle='#bff8dc';
+    for(let a=1;a<=arm;a++){ ctx.fillRect(x-a*q, y, q, q); ctx.fillRect(x+a*q, y, q, q); ctx.fillRect(x, y-a*q, q, q); ctx.fillRect(x, y+a*q, q, q); }
+  }
+  ctx.restore();
+}
 function drawDropIcon(it, sx, sy, col){
   if(_dropArtOk){
     try{ drawFeelItemIcon(it, sx, sy); return; }

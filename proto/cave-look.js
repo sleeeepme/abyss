@@ -907,10 +907,14 @@ function terrain(f,Z,camX,camY,blinded){
   const blindR2=blindR*blindR, visInR=Math.max(0,blindR-24), visIn2=visInR*visInR, visInv=1/Math.max(1,blindR-visInR);
   /* 落ちている蛍石は周りを照らす（影は落とさない柔らかい灯り）。暗闇の中の目印になる。
      視界の輪の外でも、この灯りの中は見える。 */
-  const LSx=[], LSy=[], LSr=[];
+  const LSx=[], LSy=[], LSr=[], LSi=[];
   if(typeof W!=='undefined'&&W.drops) for(const d of W.drops){ if(!d.stone) continue;
     const r=((typeof STONE_LIGHT_R!=='undefined')?STONE_LIGHT_R:2.8)*Q, x=d.x*Q, y=d.y*Q;
-    if(x+r<bx0||x-r>bx0+bw||y+r<by0||y-r>by0+bh) continue; LSx.push(x); LSy.push(y); LSr.push(r); }
+    if(x+r<bx0||x-r>bx0+bw||y+r<by0||y-r>by0+bh) continue; LSx.push(x); LSy.push(y); LSr.push(r); LSi.push(.85); }
+  /* 商人の角灯（中は蛍石）。落ちている蛍石より広く明るい。半径だけ少し揺らして灯のゆらぎにする（2026-10-16） */
+  if(typeof W!=='undefined'&&W.shop&&typeof MERCHANT_LIGHT_R!=='undefined'){
+    const sh=W.shop, r=MERCHANT_LIGHT_R*Q*(1+.03*Math.sin(t*7.3)), x=sh.x*Q, y=sh.y*Q;
+    if(!(x+r<bx0||x-r>bx0+bw||y+r<by0||y-r>by0+bh)){ LSx.push(x); LSy.push(y); LSr.push(r); LSi.push(MERCHANT_LIGHT_I); } }
   const LSn=LSx.length;
 
   /* ---------- マス単位でまとめて片付ける ----------
@@ -956,7 +960,7 @@ function terrain(f,Z,camX,camY,blinded){
       const i=wy*PW+wx, c=RB?0:code[i], b=BAYER[((wy&3)<<2)|(wx&3)], dx=wx-lampX, d2=dx*dx+dy*dy;   // 根の層はマスで描き分ける（石積みも絵で描く）
       let sl=0;                                                  // 蛍石の灯り
       if(LSn) for(let li=0;li<LSn;li++){ const ex=wx-LSx[li], ey=wy-LSy[li], e2=ex*ex+ey*ey, r=LSr[li];
-        if(e2<r*r){ const q=1-Math.sqrt(e2)/r, v=q*q*(3-2*q)*.85; if(v>sl) sl=v; } }
+        if(e2<r*r){ const q=1-Math.sqrt(e2)/r, v=q*q*(3-2*q)*LSi[li]; if(v>sl) sl=v; } }
       if(d2>visIn2 && sl<.04+b*.1){ if(d2>=blindR2||(Math.sqrt(d2)-visInR)*visInv>b){buf[k]=VOID;continue;} }   // 視界の輪の外は闇（蛍石の灯りの中は除く）。縁は網点で溶かす
       let Lv=0, fc=1;
       if(flat){ Lv=flatL+(d2<1600?.12:0); }

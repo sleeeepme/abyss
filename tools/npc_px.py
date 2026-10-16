@@ -38,6 +38,12 @@ MERCHANT_M=[
 "................",
 ]
 
+# 待機の2コマ目（2026-10-16「商人のグラフィックに待機アニメを入れて」）。
+# 足（下の3行）はそのままに、上半身・荷・角灯・杖を1ドット沈める＝息をついて肩が下がる。
+# 外套は2行あるうちの1行（M[11]）を詰めて、沈んだ分の背丈を吸わせる。
+MERCHANT_M2=["................"]+MERCHANT_M[0:11]+MERCHANT_M[12:15]+["................"]
+assert len(MERCHANT_M2)==16
+
 # ---------------- 鉱床 ----------------
 # 等級ごとに鉱石そのものの素材を変える。
 #   粗鉱 … 母岩に食い込んだ鉄の塊（鈍い鋼色＋光る面）と錆の筋
@@ -270,7 +276,7 @@ def render(M,pal,scale=4):
     return im
 
 def build():
-    out={'merchant':render(MERCHANT_M, MERCHANT_PAL)}
+    out={'merchant':render(MERCHANT_M, MERCHANT_PAL), 'merchant_b':render(MERCHANT_M2, MERCHANT_PAL)}
     for g in ('raw','fine','deep'):
         pal=dict(BASE); pal.update(PALS[g]); out['ore-'+g]=render(SPR[g],pal)
         mp=dict(BASE)
@@ -280,7 +286,8 @@ def build():
     for n,M in KIN.items(): out['kin-'+n]=render(M, KIN_PAL)
     return out
 
-PATHS={'merchant':'proto/assets/sprites/characters/npc/merchant-right-idle.png'}
+PATHS={'merchant':'proto/assets/sprites/characters/npc/merchant-right-idle.png',
+       'merchant_b':'proto/assets/sprites/characters/npc/merchant-right-idle-2.png'}
 for g in ('raw','fine','deep'):
     PATHS['ore-'+g]='proto/assets/sprites/props/ore/ore-'+g+'.png'
     PATHS['ore-'+g+'-mined']='proto/assets/sprites/props/ore/ore-'+g+'-mined.png'
@@ -294,6 +301,7 @@ def b64(im):
 def main():
     out=build()
     for k,im in out.items():
+        if k.startswith('kin-') and '--kin' not in sys.argv: continue   # 眷属の PNG も発光版を潰さない（--apply の注記）
         p=os.path.join(ROOT,PATHS[k]); os.makedirs(os.path.dirname(p),exist_ok=True); im.save(p)
     if '--preview' in sys.argv:
         names=list(out); W=192
@@ -306,6 +314,9 @@ def main():
         a=s.index('const CharacterArt = (function(){'); b=s.index('  };', a)
         head=s[a:b]
         for k,im in out.items():
+            # 眷属は 2026-10-13 に別の道具（pixel-art/kin-spirit-v1/build.py）の発光版へ差し替わった。
+            # ここの KIN は古いので、--kin を付けたときだけ書き戻す（付けないと発光版を潰してしまう）
+            if k.startswith('kin-') and '--kin' not in sys.argv: continue
             line="    '%s': '%s',\n" % (k, b64(im))
             pat=re.compile(r"    '%s': 'data:image/png;base64,[^']*',\n" % re.escape(k))
             if pat.search(head): head=pat.sub(lambda _:line, head)
