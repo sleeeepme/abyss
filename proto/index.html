@@ -16982,8 +16982,8 @@ function isGearUpgrade(it){
   _upMark.set(it, {t:now, v});
   return v;
 }
-/* 緑の↑（ドット 5×5。2026-10-16 にユーザーが描いた形：細い縦棒と、斜めに開いた返し。ハイライトWは縦棒の中心に1列通す）。アイテムの絵（16ドットの枠）の右下の角に置き（右上は名前と重なるので移した）、0.5秒ごとに1ドットだけ跳ねる */
-const UP_MARK_GRID = ['..W..', '.GWG.', 'G.W.G', '..W..', '..G..'];   // 縁取りは8方向で付く（返しと縦棒のすき間も縁で埋まる）
+/* 緑の↑（ドット 5×5。2026-10-16 にユーザーが描いた形：細い縦棒と、斜めに開いた返し。左上から光が当たる向きでハイライトW）。アイテムの絵（16ドットの枠）の右下の角に置き（右上は名前と重なるので移した）、0.5秒ごとに1ドットだけ跳ねる */
+const UP_MARK_GRID = ['..W..', '.WGG.', 'W.G.G', '..G..', '..G..'];   // 縁取りは8方向で付く（返しと縦棒のすき間も縁で埋まる）
 function drawUpgradeMark(sx, sy){
   const q = Math.max(1, Math.round(TS/16)), side = Math.max(16, Math.round(TS));
   const left = Math.round(sx - side/2), top = Math.round(sy - side/2);
