@@ -16950,7 +16950,7 @@ function drawAir(Z, dt){
 let _dropArtOk = true;
 /* ---------- 落ちている装備が「今の装備より強い」かの印 ----------
    2026-10-16 ユーザー要望：拾うときに、今装備しているものより強いか一目で分かるように。
-   今の装備より良ければ、アイテムの絵の右上に緑の↑を出す。
+   今の装備より良ければ、アイテムの絵の右下に緑の↑を出す（最初は右上だったが、名前の文字とぶつかるので右下へ）。
 
    「強い」の物差しは1つにまとめる。攻め（攻撃力×攻撃速度×会心の期待値、属性ダメージ込み）と
    守り（最大HP×防御の効き）の比を掛け合わせ、3%より上がるなら↑。
@@ -16982,14 +16982,14 @@ function isGearUpgrade(it){
   _upMark.set(it, {t:now, v});
   return v;
 }
-/* 緑の↑（ドット 5×5。2026-10-16 に 7×7 から2ドット小さく）。アイテムの絵（16ドットの枠）の右上の角に置き、0.5秒ごとに1ドットだけ跳ねる */
+/* 緑の↑（ドット 5×5。2026-10-16 に 7×7 から2ドット小さく）。アイテムの絵（16ドットの枠）の右下の角に置き（右上は名前と重なるので移した）、0.5秒ごとに1ドットだけ跳ねる */
 const UP_MARK_GRID = ['..W..', '.GWG.', 'GGGGG', '..G..', '..G..'];
 function drawUpgradeMark(sx, sy){
   const q = Math.max(1, Math.round(TS/16)), side = Math.max(16, Math.round(TS));
   const left = Math.round(sx - side/2), top = Math.round(sy - side/2);
   const hop = (Math.floor(performance.now()/500) & 1) ? 0 : -q;
   const G = UP_MARK_GRID, GW = G[0].length;
-  const ox = left + (16-GW)*q, oy = top + hop;
+  const ox = left + (16-GW)*q, oy = top + (15-G.length)*q + hop;   // 右下（上には名前の文字が出るので避ける）
   const on = (x,y)=> y>=0 && y<G.length && x>=0 && x<GW && G[y][x] !== '.';
   ctx.save();
   ctx.fillStyle = '#0b2a12';                            // 縁取り（暗い緑）。どの床・どの絵の上でも読める
