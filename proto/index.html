@@ -15449,9 +15449,9 @@ function draw(){
     drawFeelGroundShadow(sx,(d.y*TS-camY)+TS*.12,TS*.64,.85);
     if(d.stone){
       /* 蛍石。淡い緑に光る結晶（闇の外でも見える）。2026-10-16：まわりに円いにじみの光、
-         結晶を3本のドット絵にして、光の帯が下から上へ走るゆらめきと、まわりで瞬くきらめきを足した */
+         芯を光が下から上へ走るゆらめき、まわりで瞬くきらめきを足した（結晶の絵は前のまま） */
       drawFluorite(sx, sy, d);
-      if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.62, '#6fe8b8', 0.95);
+      if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.55, '#6fe8b8', 0.95);
       return;
     }
     if(d.shard){
@@ -16982,8 +16982,8 @@ function isGearUpgrade(it){
   _upMark.set(it, {t:now, v});
   return v;
 }
-/* 緑の↑（ドット 7×7）。アイテムの絵（16ドットの枠）の右上の角に置き、0.5秒ごとに1ドットだけ跳ねる */
-const UP_MARK_GRID = ['...W...', '..GWG..', '.GGWGG.', 'GGGGGGG', '..GGG..', '..GGG..', '..GGG..'];
+/* 緑の↑（ドット 5×5。2026-10-16 に 7×7 から2ドット小さく）。アイテムの絵（16ドットの枠）の右上の角に置き、0.5秒ごとに1ドットだけ跳ねる */
+const UP_MARK_GRID = ['..W..', '.GWG.', 'GGGGG', '..G..', '..G..'];
 function drawUpgradeMark(sx, sy){
   const q = Math.max(1, Math.round(TS/16)), side = Math.max(16, Math.round(TS));
   const left = Math.round(sx - side/2), top = Math.round(sy - side/2);
@@ -17006,43 +17006,14 @@ function drawUpgradeMark(sx, sy){
   ctx.restore();
 }
 /* ---------- 落ちている蛍石 ----------
-   結晶の形は 16×16 のドットの格子に一度だけ焼き、毎フレームは
+   毎フレーム
      1) 円いにじみ（放射状のグラデーション。呼吸するように強弱）
-     2) 結晶の絵
-     3) ゆらめき：結晶の中を、明るい帯が下から上へ 1.6 秒で走る
+     2) 結晶の絵（前からの形）
+     3) ゆらめき：結晶の芯を、明るい1段が下から上へ走る
      4) きらめき：まわりの3か所で、十字の小さな星が順に瞬く
    を重ねる。動きはドットの格子に合わせて刻む（なめらかに動かしすぎない）。 */
-const FLUO_PAL = {o:'#0f3a30', d:'#1f7a5c', m:'#3fc495', l:'#8ff0c8', w:'#e6fff4'};
-let _fluoArt = null;
-function fluoriteArt(){
-  if(_fluoArt) return _fluoArt;
-  // 結晶3本：真ん中が高く、左右が低い。左の面が明るく、右の面が暗い（光は左上から）
-  const CR=[{cx:4.4, w:1.7, h:6, tip:2.4}, {cx:11.8, w:1.7, h:7, tip:2.4}, {cx:8, w:2.2, h:11, tip:3.5}];
-  const BASE=14, cell=Array.from({length:16},()=>Array(16).fill(''));
-  const inC=(x,y,c)=>{ const top=BASE-c.h; if(y<top||y>=BASE) return false;
-    const hw = y<top+c.tip ? c.w*(y-top+0.6)/c.tip : c.w; return x+0.5>c.cx-hw && x+0.5<c.cx+hw; };
-  for(let y=0;y<16;y++) for(let x=0;x<16;x++){
-    let hit=0;
-    for(const c of CR){ if(!inC(x,y,c)) continue; hit++;
-      const rel=(x+0.5-c.cx)/c.w, top=BASE-c.h;
-      cell[y][x] = y<=top+1 ? 'w' : rel<-0.25 ? 'l' : rel<0.35 ? 'm' : 'd';   // 後ろ（配列の後ろ）の結晶が手前に来る
-    }
-    // 2本が重なる所は、手前の結晶の縁として暗い筋にする（3本に分かれて見えるように）
-    if(hit>1 && cell[y][x]!=='w') cell[y][x]='o';
-  }
-  const mask=cell.map(r=>r.map(v=>!!v));
-  for(let y=0;y<16;y++) for(let x=0;x<16;x++){       // 縁取り
-    if(mask[y][x]) continue;
-    const n=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>mask[y+dy]&&mask[y+dy][x+dx]);
-    if(n) cell[y][x]='o';
-  }
-  for(let x=3;x<14;x++) if(!cell[BASE][x]) cell[BASE][x]='o';   // 地面に埋まっている所
-  const cv=document.createElement('canvas'); cv.width=16; cv.height=16; const c=cv.getContext('2d');
-  for(let y=0;y<16;y++) for(let x=0;x<16;x++){ const k=cell[y][x]; if(!k) continue; c.fillStyle=FLUO_PAL[k]; c.fillRect(x,y,1,1); }
-  return (_fluoArt={cv, mask});
-}
 function drawFluorite(sx, sy, d){
-  const A=fluoriteArt(), q=Math.max(1,Math.round(TS/16)), side=16*q;
+  const q=Math.max(1,Math.round(TS/16)), side=16*q;
   const left=Math.round(sx-side/2), top=Math.round(sy-side*0.62);
   const now=performance.now()/1000 + ((d && d.x) ? (d.x*1.7+d.y*2.3) : 0);
   const pulse=0.8+0.2*Math.sin(now*2.4);
@@ -17057,25 +17028,23 @@ function drawFluorite(sx, sy, d){
   g.addColorStop(0, 'rgba(220,255,240,'+(0.45*pulse)+')'); g.addColorStop(1, 'rgba(160,255,210,0)');
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx, cy, TS*0.55, 0, 7); ctx.fill();
   ctx.globalCompositeOperation='source-over';
-  // 2) 結晶
-  ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(A.cv, left, top, side, side);
-  // 3) ゆらめき：明るい帯が下から上へ（12コマ/秒で刻む）
-  const band = 14 - Math.floor(((now*12)|0) % 20 * 0.75);   // 14→0 を 1.6 秒ほどで
-  ctx.fillStyle='#e6fff4';
-  for(const [y,a] of [[band,0.85],[band+1,0.4]]){
-    if(y<0||y>15) continue;
-    ctx.globalAlpha=a;
-    for(let x=0;x<16;x++) if(A.mask[y][x]) ctx.fillRect(left+x*q, top+y*q, q, q);
-  }
-  ctx.globalAlpha=1;
+  /* 2) 結晶。2026-10-16「蛍石のグラフィックは前のに戻して」——3本の結晶の絵はやめ、
+     前の形（暗い外枠＋明るい芯＋明滅する光）に戻した。にじみ・ゆらめき・きらめきは残す */
+  const Q=Math.max(2,Math.round(TS/16)), gl=0.55+0.45*Math.sin(performance.now()/260);
+  const bx=Math.round(sx-Q*2), by=Math.round(sy-Q*3);
+  ctx.fillStyle='#1d4a3c'; ctx.fillRect(bx, by, Q*4, Q*6);
+  ctx.fillStyle='#6fe8b8'; ctx.fillRect(Math.round(sx-Q), by, Q*2, Q*5);
+  ctx.globalAlpha=gl; ctx.fillStyle='#d8fff0'; ctx.fillRect(Math.round(sx-Q), Math.round(sy-Q*2), Q, Q*2); ctx.globalAlpha=1;
+  // 3) ゆらめき：芯の中を、明るい1段が下から上へ（12コマ/秒で刻む）
+  const band = 4 - (((now*12)|0) % 9);                    // 4→0 と動き、あとは休む
+  if(band>=0){ ctx.globalAlpha=0.85; ctx.fillStyle='#e6fff4'; ctx.fillRect(Math.round(sx-Q), by+band*Q, Q*2, Q); ctx.globalAlpha=1; }
   // 4) きらめき：3か所が順番に瞬く（十字の星。大きい時は腕が2ドット）
-  const SP=[[2,4],[14,3],[12,11],[3,10],[9,1]];
+  const SP=[[-4,-3],[4,-4],[3,2],[-4,1],[1,-6]];   // 結晶の真ん中（sx,sy）からのずれ（ドット）
   for(let i=0;i<3;i++){
     const ph=(now*0.9 + i/3) % 1, cyc=Math.floor(now*0.9 + i/3);
     if(ph>0.35) continue;
     const p=SP[(cyc*3+i*2) % SP.length], k=ph/0.35, arm = k>0.25&&k<0.75 ? 2 : 1;
-    const x=left+p[0]*q, y=top+p[1]*q;
+    const x=Math.round(sx)+p[0]*q, y=Math.round(sy)+p[1]*q;
     ctx.globalAlpha = k<0.5 ? 1 : 1-(k-0.5)*2;
     ctx.fillStyle='#ffffff'; ctx.fillRect(x, y, q, q);
     ctx.fillStyle='#bff8dc';
