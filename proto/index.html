@@ -2073,6 +2073,9 @@ function consumNeedsTarget(it){
    接頭辞・接尾辞（冴えた、など）は今まで通りこの前後に付く。 */
 const BASES=[
   // --- 武器 ---
+  /* 武器は**8種とも1階から出る**（ilvl:1。2026-10-17 ユーザー指定「色々な武器を遊ばせたい」）。
+     以前は大剣4・槍5・戦斧6・戦槌8・弓杖3 から解禁で、序盤は短剣と剣が4割ずつを占めていた。
+     攻撃力は ilvl に比例して伸びるので、浅い階の大剣もその階なりの強さに収まる。 */
   /* 短剣は**避けて生きる**武器。手数だけだと「弱い剣」でしかなかったので、
      持っているあいだ回避が乗る。盗賊の evade と同じ枠に足される。
      属性は斬撃（2026-10-13 ユーザー指定。前は刺突）——斬って出血を溜める。 */
@@ -2080,24 +2083,24 @@ const BASES=[
     nmByRar:['短剣','スティレット','ミスリルスティレット','双牙の短剣','神速の短剣']},
   {id:'sword',  nm:'剣',     slot:SLOT.W, dt:'slash',  atk:[7,10],  spd:1.00, reach:1.45, arc:75,  hands:1, dur:80, ilvl:1,
     nmByRar:['剣','ロングソード','ミスリルソード','魔剣','聖剣']},
-  {id:'axe',    nm:'戦斧',   slot:SLOT.W, dt:'blunt',  atk:[10,14], spd:0.78, reach:1.35, arc:105, hands:1, dur:70, ilvl:6,
+  {id:'axe',    nm:'戦斧',   slot:SLOT.W, dt:'blunt',  atk:[10,14], spd:0.78, reach:1.35, arc:105, hands:1, dur:70, ilvl:1,
     nmByRar:['戦斧','バトルアクス','ミスリルアクス','魔斧','巨神の斧']},
-  {id:'mace',   nm:'戦槌',   slot:SLOT.W, dt:'blunt',  atk:[12,16], spd:0.62, reach:1.30, arc:95,  hands:1, dur:105,ilvl:8,
+  {id:'mace',   nm:'戦槌',   slot:SLOT.W, dt:'blunt',  atk:[12,16], spd:0.62, reach:1.30, arc:95,  hands:1, dur:105,ilvl:1,
     nmByRar:['戦槌','ウォーハンマー','ミスリルメイス','破魂の槌','聖なる鉄槌']},
-  {id:'spear',  nm:'槍',     slot:SLOT.W, dt:'pierce', atk:[8,11],  spd:0.88, reach:2.30, arc:30,  hands:2, dur:75, ilvl:5,
+  {id:'spear',  nm:'槍',     slot:SLOT.W, dt:'pierce', atk:[8,11],  spd:0.88, reach:2.30, arc:30,  hands:2, dur:75, ilvl:1,
     nmByRar:['槍','ランス','ミスリルスピア','貫竜の槍','聖槍']},
   /* 大剣。**遅さの代償が足りていなかった**——攻撃速度 0.58 は槌より遅いのに、
      火力も範囲も戦斧と大差がなかった。振り一回の重みで釣り合わせる。 */
-  {id:'great',  nm:'大剣',   slot:SLOT.W, dt:'slash',  atk:[17,23], spd:0.58, reach:2.35, arc:135, hands:2, dur:95, ilvl:4,
+  {id:'great',  nm:'大剣',   slot:SLOT.W, dt:'slash',  atk:[17,23], spd:0.58, reach:2.35, arc:135, hands:2, dur:95, ilvl:1,
     nmByRar:['大剣','クレイモア','ミスリル大剣','魔導大剣','天空大剣']},
   // 飛び道具は「射程 = 安全」なので、射程そのものが火力より効く。
   // 弓 6.5 は敵の索敵 8 に近く、後ろに歩くだけで永久に届かない距離だった。
   // 少し縮めて「敵に近づかれてから撃つ」を強いる（威力も気持ち下げる）。
   /* 飛び道具は**射程がそのまま安全**なので、手数まで近接並みにあると近接を選ぶ理由が消える。
      一段落として「足を止めて撃つ」の重みを上げる。 */
-  {id:'bow',    nm:'弓',     slot:SLOT.W, dt:'pierce', atk:[5,7],   spd:0.80, reach:5.8,  arc:14,  hands:2, dur:65, proj:'arrow', ilvl:3,
+  {id:'bow',    nm:'弓',     slot:SLOT.W, dt:'pierce', atk:[5,7],   spd:0.80, reach:5.8,  arc:14,  hands:2, dur:65, proj:'arrow', ilvl:1,
     nmByRar:['弓','ロングボウ','ミスリルボウ','風切りの弓','聖弓']},
-  {id:'staff',  nm:'杖',     slot:SLOT.W, dt:'arcane', atk:[6,8],   spd:0.70, reach:4.2,  arc:20,  hands:1, dur:70, proj:'bolt',  ilvl:3,
+  {id:'staff',  nm:'杖',     slot:SLOT.W, dt:'arcane', atk:[6,8],   spd:0.70, reach:4.2,  arc:20,  hands:1, dur:70, proj:'bolt',  ilvl:1,
     nmByRar:['杖','メイジスタッフ','ミスリルロッド','魔導の杖','星辰の杖']},
   // --- 盾（block=軽減率%, parry=パリイ受付秒） ---
   {id:'buckler',nm:'小盾',   slot:SLOT.S, def:[1,2], block:[16,20], parry:0.28, dur:80,  ilvl:1,
