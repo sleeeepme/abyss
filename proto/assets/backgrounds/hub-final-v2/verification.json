@@ -1,0 +1,20 @@
+{
+  "native": [
+    544,
+    306
+  ],
+  "frames": 72,
+  "durationMs": 6000,
+  "endpointExactMatch": true,
+  "plazaChangedChannels": 0,
+  "meanAdjacentFrameDifference": 0.2975352473051674,
+  "loopBoundaryDifference": 0.3186815167243368,
+  "maxAdjacentFrameDifference": 0.3604102588747917,
+  "sourceExactCopy": true,
+  "vinePixelCount": 177,
+  "millRoofChangedChannels": 0,
+  "waterMaskPixels": 1594,
+  "flowerGroups": 44,
+  "wheelRimPixels": 108,
+  "movingWheelRimPixels": 108
+}

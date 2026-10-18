@@ -1,0 +1,35 @@
+{
+  "status": "approved",
+  "approvedDate": "2026-10-18",
+  "sourceVersion": "hub-loop-wide-v14",
+  "sourceDirectory": "output/hub-loop-wide-v14",
+  "durationSeconds": 6,
+  "fps": 12,
+  "frames": 72,
+  "nativeWidth": 544,
+  "nativeHeight": 306,
+  "sheetColumns": 12,
+  "sheetRows": 6,
+  "files": {
+    "background.png": {
+      "bytes": 457871,
+      "sha256": "1704b8d1c48bf744d782410a2cf3bc2947a00ed3a07dd9d7c6eb215611e084fb"
+    },
+    "loop-spritesheet.png": {
+      "bytes": 4639706,
+      "sha256": "35bc9afdd5081277d9622e32896294d974e5922e5a23c9156fdfcbb76a02b820"
+    },
+    "spritesheet.json": {
+      "bytes": 186,
+      "sha256": "93f6765e32e6e077c86cacb6a44b0cc06bf0ce19658462b9eb93dcb2e5d8f1e5"
+    },
+    "hub-loop-16x9.webp": {
+      "bytes": 2151486,
+      "sha256": "c71254c47ea65095c5b4ca732aacba4c7927fb133129529a6fd5dc05a366f243"
+    },
+    "verification.json": {
+      "bytes": 477,
+      "sha256": "e8e2700cf01a74e2c88153228082d4c6ada816d02d96c0100f3538d054c7cab9"
+    }
+  }
+}
