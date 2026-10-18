@@ -980,7 +980,7 @@ function terrain(f,Z,camX,camY,blinded){
         /* 降りる穴。縁をノイズで崩し、網点の輪（点線の円に見えた）をやめる。
            手前（下）の縁は灯りを受けた岩、奥（上）の縁は影——穴の縁が段になって見える。 */
         const hn=NZ[((wy&255)<<8)|(wx&255)]-.5, HR=64*(1+hn*.6);
-        if(sd<HR){ buf[k]= sd>HR*.66 ? (wy>sty ? rim[Math.min(4,Math.floor(Lv*4.5+b))] : ed[0]) : (sd<20&&((wx*3+wy*5+((t*6)|0))%11===0)?Pp.pit:0xff020203); continue; }
+        if(sd<HR){ buf[k]= sd>HR*.66 ? (wy>sty ? rim[Math.min(4,Math.floor(Lv*4.5+b))] : ed[0]) : 0xff020203; continue; }   // 穴の中は真っ黒（中で瞬いていた点はやめた：2026-10-18 ユーザー指定「ピコピコが気になる」）
         if(RB){
           if(CAVE.rlFlat) Lv=Math.max(Lv,CAVE.rlFlat);                // 見た目の確認用：灯りの外も照らす
           if(RB.mat[i]){ buf[k]=rlShade(RB,i,wx,wy,Lv,Cv,b); continue; }
