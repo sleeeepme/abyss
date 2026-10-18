@@ -16694,7 +16694,8 @@ function uiLater(fn){
    ・描き方は拠点の煙と同じ：1ドット（TS/16）単位の小さな画用紙に透明度で描き、
      ぼかさずに拡大して貼る。だから煙の縁もドットの段になる
    puff は状態を持たない：番号と時刻だけで位置が決まる。 */
-const STAIR_CHILL = {n:9, life:3.6, mouth:0.40, spread:1.05, alpha:0.42, ex:1.9, ey:1.3};
+const STAIR_CHILL = {n:9, life:3.6, mouth:0.40, spread:1.05, alpha:0.42, ex:1.9, ey:1.3,
+  bits:12, bitLife:2.4, bitAlpha:0.95};   // 煙に乗って溢れる粒（少しだけ）
 const _chillCv = document.createElement('canvas');
 function drawStairChill(cx, cy){
   const D=STAIR_CHILL, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
@@ -16732,6 +16733,21 @@ function drawStairChill(cx, cy){
   ctx.imageSmoothingEnabled=false;
   const x0=Math.round((cx-ox*q)/q)*q, y0=Math.round((cy-oy*q)/q)*q;
   ctx.drawImage(_chillCv, x0, y0, gw*q, gh*q);
+  /* 煙に乗って溢れる粒（2026-10-18 ユーザー指定「パーティクルも若干溢れ出てきているように」）。
+     昇らせるとホコリに見えたので、煙と同じく**縁から床を這って外へ**流す。
+     縁を越えた直後が一番速く、外へ行くほど遅くなって消える（溢れて広がる水の動き）。 */
+  for(let i=0;i<D.bits;i++){
+    const h1=((i*3571)%997)/997, h2=((i*65537)%991)/991, h3=((i*7717)%983)/983;
+    const life=D.bitLife*(0.7+0.6*h3), p=((now/life + h1) % 1);
+    const ang=h2*6.283 + Math.sin(now*0.5+i*2.3)*0.12;
+    const r=TS*(D.mouth*0.45 + D.spread*1.2*(1-Math.pow(1-p,2)));    // 穴の中（黒の上）から湧いて、速く溢れて、ゆっくり止まる
+    const x=cx+Math.cos(ang)*r, y=cy+Math.sin(ang)*r*0.6;
+    const al=D.bitAlpha*Math.min(1,p*6)*(1-p)*(0.65+0.35*h1);
+    if(al<0.04) continue;
+    ctx.globalAlpha=al;
+    ctx.fillStyle=(i%3===0)?'#ffffff':'#d6f0ff';
+    ctx.fillRect(Math.round(x/q)*q, Math.round(y/q)*q, q, q);
+  }
   ctx.restore();
 }
 function label(text,x,y,color,scale){
