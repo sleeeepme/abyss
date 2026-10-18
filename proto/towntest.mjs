@@ -286,9 +286,7 @@ R.hubIntroWalk = await pg.evaluate(()=>{
   setScreen('town'); renderTown();
   const started=maybePlayHubIntro();
   const hero=document.querySelector('[data-hubava="hero"]');
-  /* style.top はもう行き先（広場の立ち位置）に戻してある——動かしているのは
-     CSSの transition なので、**今どこに居るか**は実寸で見るしかない。
-     始まった直後なので、まだ画面の下の方に居るはず。 */
+  /* 原画座標の足元をtransformで移動する。開始直後は画面下端の通路にいる。 */
   const y = hero.getBoundingClientRect().top;
   const startsLow = y > innerHeight*0.75;
   const uiHidden = el('hubui').classList.contains('hub-intro');
@@ -301,7 +299,7 @@ await pg.waitForTimeout(2500);        // 歩き切るのを待つ（HUB_INTRO_WA
 // 5-c. 着いたらUIが出て、立ち位置は広場の中に収まっている
 R.hubIntroSettles = await pg.evaluate(()=>{
   const hero=document.querySelector('[data-hubava="hero"]');
-  const top=parseFloat(hero.style.top);
+  const top=+hero.dataset.py;
   const uiShown = !el('hubui').classList.contains('hub-intro');
   const pos=hubAvatarPoint(hero);
   const insidePlaza = hubCanStand(pos.x,pos.y)&&hubInsidePolygon(pos.x,pos.y,HUB_SCENE.floors[0]);

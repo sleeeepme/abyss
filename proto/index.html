@@ -703,7 +703,7 @@
     animation:hubDiveBob 1.6s ease-in-out infinite}
   .hub-dive b{font-size:15px;font-weight:700;color:#fff}
   @keyframes hubDiveBob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
-  .hub-ava{position:absolute;transform:translate(-50%,-87.5%);display:block;
+  .hub-ava{position:absolute;left:0;top:0;transform:translate3d(0,0,0) translate(-50%,-87.5%);will-change:transform;display:block;
     width:16px;height:16px;min-width:0;min-height:0;background:none;border:none;padding:0;transition:none}
   #hub-avatars{position:absolute;transform-origin:0 0;pointer-events:none;z-index:1}
   #hub-avatars .hub-ava{pointer-events:auto}
@@ -18577,7 +18577,10 @@ function hubPlaceAvatar(b,p){
   // 原画1pxへの丸めは通常の歩行を約12段階/秒に落としてしまう。
   const {x,y}=p;
   if(!hubCanStand(x,y))return false;
-  b.dataset.px=x;b.dataset.py=y;b.style.left=x+'px';b.style.top=y+'px';
+  b.dataset.px=x;b.dataset.py=y;
+  // left/topで再配置すると拡大前のレイアウト画素にスナップする。
+  // 独立した合成レイヤーを動かし、絵は再ラスタライズせず移動する。
+  b.style.transform=`translate3d(${x}px,${y}px,0) translate(-50%,-87.5%)`;
   b.style.zIndex=String(Math.round(y));return true;
 }
 const _hubMoves=new Map();let _hubMoveRaf=0;
@@ -18689,7 +18692,7 @@ function renderHubPlaza(){
          </span>`
       : `<span class="glyph" style="border-color:${col};color:${col}">${isHero?'<i class="pi pi-person"></i>':hubGlyph(m.job)}</span>`;
     return `<button class="hub-ava" data-hubava="${isHero?'hero':m.uidA}"
-      data-px="${p.x}" data-py="${p.y}" style="left:${p.x}px;top:${p.y}px;z-index:${p.y}">
+      data-px="${p.x}" data-py="${p.y}" style="transform:translate3d(${p.x}px,${p.y}px,0) translate(-50%,-87.5%);z-index:${p.y}">
       ${body}
       <span class="nm">${nm}</span></button>`;
   }).join('');
@@ -18898,7 +18901,7 @@ function playHubWarp(done){
   avas.forEach((b,i)=>{
     hubAnimLater(()=>{
       b.style.transition='opacity '+HUB_WARP.vanishMs+'ms ease, transform '+HUB_WARP.vanishMs+'ms ease-in';
-      b.style.transform='translate(-50%,-87.5%) scale(0.35,1.7)';
+      b.style.transform=`translate3d(${b.dataset.px}px,${b.dataset.py}px,0) translate(-50%,-87.5%) scale(0.35,1.7)`;
       b.style.opacity='0';
     }, HUB_WARP.vanish + i*HUB_WARP.vanishGap);
   });
