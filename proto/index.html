@@ -14967,16 +14967,17 @@ function drawHubBgFrame(){
 }
 /* ---------- 拠点の空気（2026-10-18） ----------
    背景の絵（171×300 のドット）の**上に同じ解像度で**重ねる。拡大は絵と一緒に整数倍で掛かるので、
-   スモークの網も舞う粒も、背景のドットと同じ大きさの四角になる。
-     1) スモーク：見えている範囲の下 38% に、薄い網掛け（4×4 の網点）の煙。
-        濃さは下ほど濃く、ゆっくり横へ流れる2つの波で斑にする。網点の位置は画面に固定
-        （流れるのは濃淡だけ）なので、網の目がちらつかない。
-     2) 舞う粒：画面全体に、ゆっくり昇りながら左右に揺れる1ドットの粒。明滅する。
+   煙の濃淡も舞う粒も、背景のドットと同じ大きさの四角になる。
+     1) スモーク：見えている範囲の下 40% に、うっすらした煙。網掛けはやめて
+        （ユーザー指定「網掛けが気になる」）、ドットごとの透明度で濃淡を出す。
+        濃さは下ほど濃く、ゆっくり横へ流れる2つの波で斑にする。
+     2) 舞う粒：奥の洞窟の口のあたり（見えている範囲の上の方・中央寄り）にだけ漂う。
+        楕円の外へ出るほど薄くなって消えるので、粒の居場所に縁が見えない。
    ?hubfx=off で消せる。 */
 const HUB_AMB = window.HUB_AMB = {on:new URLSearchParams(location.search).get('hubfx')!=='off',
-  smokeH:.38, smokeA:.34, motes:44};
+  smokeH:.40, smokeA:.30, motes:18,
+  cave:{x:.5, y:.13, rx:.30, ry:.13}};      // 粒の居場所（見えている範囲に対する比率）
 const _hubSmoke = document.createElement('canvas');
-const HUB_BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
 function hubVisibleRect(c){
   const wrap=c.parentElement, zoom=parseFloat(c.style.width)/c.width;
   if(!wrap || !(zoom>0)) return {x:0,y:0,w:c.width,h:c.height};
@@ -14986,35 +14987,38 @@ function hubVisibleRect(c){
 function drawHubAmbience(c, g, t){
   if(!HUB_AMB.on) return;
   const vr=hubVisibleRect(c), W0=c.width;
-  // 1) スモーク
+  // 1) スモーク（網掛けなし。ドットごとの透明度）
   const bh=Math.max(8, Math.round(vr.h*HUB_AMB.smokeH)), by=Math.round(vr.y+vr.h)-bh;
   const sc=_hubSmoke; if(sc.width!==W0||sc.height!==bh){ sc.width=W0; sc.height=bh; }
   const sg=sc.getContext('2d'), im=sg.createImageData(W0,bh), u=new Uint32Array(im.data.buffer);
-  const A=Math.round(255*HUB_AMB.smokeA), col=(A<<24)|(0xe2<<16)|(0xd8<<8)|0xcc;   // ABGR：薄い灰（少し青み）
+  const RGB=(0xe2<<16)|(0xd8<<8)|0xcc, AM=255*HUB_AMB.smokeA;                      // ABGR：薄い灰（少し青み）
   for(let j=0;j<bh;j++){
-    const yy=by+j, d=Math.pow(j/bh, 1.25);
+    const yy=by+j, d=Math.pow(j/bh, 1.4);
     for(let i=0;i<W0;i++){
       const n=0.5+0.25*Math.sin(i*0.075 + t*0.32 + Math.sin(yy*0.11 - t*0.21)*1.7)
                  +0.25*Math.sin(i*0.031 - t*0.19 + yy*0.047);
-      const v=d*(0.35+0.85*n)*0.62;                 // 濃いところでも半分強まで——網が「面」にならない
-      if(v > (HUB_BAYER[(yy&3)*4+(i&3)]+0.5)/16) u[j*W0+i]=col;
+      const v=Math.min(1, d*(0.45+0.75*n));
+      const al=(v*AM)|0;
+      if(al>2) u[j*W0+i]=(al<<24)|RGB;
     }
   }
   sg.putImageData(im,0,0);
   g.drawImage(sc, 0, by);
-  // 2) 舞う粒
-  const N=HUB_AMB.motes;
-  for(let k=0;k<N;k++){
+  // 2) 舞う粒（奥の洞窟のあたりだけ）
+  const C=HUB_AMB.cave, cx=vr.x+vr.w*C.x, cy=vr.y+vr.h*C.y, rx=vr.w*C.rx, ry=vr.h*C.ry;
+  for(let k=0;k<HUB_AMB.motes;k++){
     const h1=((k*7919)%997)/997, h2=((k*104729)%991)/991, h3=((k*1297)%983)/983;
-    const sp=2.2+4.5*h3;                               // 昇る速さ（ドット/秒）
-    const y=vr.y + ((h2*vr.h - t*sp) % vr.h + vr.h) % vr.h;
-    const x=vr.x + ((h1*vr.w + Math.sin(t*(0.35+0.4*h2)+k)*3.2 + t*0.6) % vr.w + vr.w) % vr.w;
-    const tw=0.5+0.5*Math.sin(t*(1.1+1.7*h1)+k*2.1);
-    const al=(0.25+0.55*tw) * Math.min(1, (y-vr.y)/12);  // 上端で消える
+    // 楕円の中をゆっくり漂う。昇りながら左右に揺れ、上へ抜けたら下から戻る
+    const sp=0.8+1.6*h3;
+    const yy=((h2*2-1) - t*sp/ry) ; const fy=((yy+1)%2+2)%2-1;              // -1..1 を巡回
+    const fx=(h1*2-1)*0.9 + Math.sin(t*(0.25+0.3*h2)+k*1.3)*0.18;
+    const e=fx*fx+fy*fy; if(e>=1) continue;
+    const tw=0.5+0.5*Math.sin(t*(0.9+1.4*h1)+k*2.1);
+    const al=(0.25+0.6*tw)*(1-e);                      // 楕円の縁ほど薄い
     if(al<0.06) continue;
     g.globalAlpha=al;
-    g.fillStyle=(k%4===0)?'#cfe6ff':'#f2e3bf';
-    g.fillRect(Math.round(x), Math.round(y), 1, 1);
+    g.fillStyle=(k%3===0)?'#cfe6ff':'#f2e3bf';
+    g.fillRect(Math.round(cx+fx*rx), Math.round(cy+fy*ry), 1, 1);
   }
   g.globalAlpha=1;
 }
@@ -15485,9 +15489,8 @@ function draw(){
   }else{
   /* 穴の周りの点線の輪と、封鎖中の赤い輪はやめた（報告「下への穴…に出ている円をなくして」）。
      穴そのものは地形の側で描いてある。印は▼と文字だけにする。 */
-  if(!S.run.bossAlive && canDescendFrom(S.run.depth)) drawStairDraft(stx, sty);
-  ctx.fillStyle='#7fc3e0'; ctx.font='bold '+(TS*0.55)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('▼',stx,sty);
+  // 穴の中の▼はやめた（2026-10-18 ユーザー指定）。穴そのものは地形の側で描いてある
+  if(!S.run.bossAlive && canDescendFrom(S.run.depth)) drawStairChill(stx, sty);
   if(S.run.bossAlive){
     label('封鎖中', stx, sty-TS*0.95, '#c4433f');
   }else{
@@ -16682,35 +16685,39 @@ function uiLater(fn){
   if(!_uiQ) return fn();
   const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; fn(); });
 }
-/* ---------- 穴へ吸い込まれる空気（2026-10-18） ----------
-   下の階へ抜ける穴は、まわりの冷えた空気を吸っている——という手触りを足す。
+/* ---------- 穴から漏れ出る冷気（2026-10-18） ----------
+   下の階の冷えた空気が、穴の口からうっすら立ちのぼる。渦で吸い込む案から変えた
+   （ユーザー指定「冷気がうっすら出てきているような感じに」）。
    粒は状態を持たない：番号 i と時刻だけで位置が決まるので、生成も掃除も要らない。
-     ・輪の外（半径 1.5〜2.5マス）で生まれ、渦を巻きながら穴の口へ縮む
-     ・縮むほど速く回る（角度は進み具合の2乗で増える）
-     ・口に近づくと尾を1ドット引き、最後は口の縁で消える
-   色は冷たい薄青と白。ドットの格子（1ドット＝TS/16）に合わせて刻む。 */
-const STAIR_DRAFT = {n:28, life:1.9, r0:1.4, r1:2.6, mouth:0.40};
-function drawStairDraft(cx, cy){
-  const D=STAIR_DRAFT, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
+     ・穴の縁のどこかで生まれ、外へ少し広がりながら上へ昇る
+     ・昇るほど大きく（1→2ドット）、薄くなって消える
+     ・口の上には、うっすらした冷えた靄を1枚敷く
+     ・左右にゆっくり揺れる
+   色は冷たい薄青。ドットの格子（1ドット＝TS/16）に合わせて刻む。 */
+const STAIR_CHILL = {n:22, life:2.8, mouth:0.38, rise:1.05, spread:0.45, alpha:0.85, haze:0.10};
+function drawStairChill(cx, cy){
+  const D=STAIR_CHILL, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
   const snap=v=>Math.round(v/q)*q;
   ctx.save();
+  // 口の上のうっすらした冷えた靄。息をするように少しだけ濃淡する
+  const hy=cy-TS*0.30, hr=TS*0.95, ha=D.haze*(0.8+0.2*Math.sin(now*1.4));
+  const hg=ctx.createRadialGradient(cx, hy, 0, cx, hy, hr);
+  hg.addColorStop(0,'rgba(205,236,255,'+ha+')'); hg.addColorStop(1,'rgba(205,236,255,0)');
+  ctx.fillStyle=hg; ctx.beginPath(); ctx.ellipse(cx, hy, hr, hr*0.8, 0, 0, 7); ctx.fill();
   for(let i=0;i<D.n;i++){
     const h1=((i*7919)%997)/997, h2=((i*104729)%991)/991, h3=((i*1297)%983)/983;
-    const life=D.life*(0.8+0.45*h3);
-    const p=((now/life + h1) % 1);                       // 0 → 1 で穴へ
-    const R=TS*(D.r0+(D.r1-D.r0)*h2);
-    const al=Math.min(1, p*3) * (1-Math.pow(p,6)) * (0.55+0.45*h2);
-    if(al<=0.02) continue;
-    /* 頭の1ドット＋来た道に沿った尾。尾は穴に近づくほど長く（速く見える） */
-    const tail = p<0.35 ? 1 : (p<0.7 ? 2 : 3);
-    ctx.fillStyle = (i%3===0) ? '#eaf8ff' : '#a8dcf6';
-    for(let k=0;k<=tail;k++){
-      const pk=Math.max(0, p-k*0.045);
-      const rk=TS*D.mouth + (R-TS*D.mouth)*Math.pow(1-pk, 1.6);
-      const ak=h1*6.283 + h3*2 + pk*pk*2.6;               // 縮むほど速く回る（y は 0.82 倍：見下ろしの床）
-      ctx.globalAlpha=al*(k===0 ? 1 : 0.55/k);
-      ctx.fillRect(snap(cx+Math.cos(ak)*rk)-q/2|0, snap(cy+Math.sin(ak)*rk*0.82)-q/2|0, q, q);
-    }
+    const life=D.life*(0.75+0.5*h3);
+    const p=((now/life + h1) % 1);                       // 0 → 1 で立ちのぼって消える
+    const ang=h2*6.283;
+    const r=TS*(D.mouth*(0.6+0.4*h3) + D.spread*p);
+    const x=cx + Math.cos(ang)*r + Math.sin(now*1.3+i*1.7)*TS*0.08*p;
+    const y=cy + Math.sin(ang)*r*0.55 - TS*D.rise*Math.pow(p,0.85);
+    const al=D.alpha*Math.min(1,p*5)*(1-p)*(0.6+0.4*h1);
+    if(al<=0.01) continue;
+    const sz=(p>0.3 && i%2===0) ? 2*q : q;
+    ctx.globalAlpha=al;
+    ctx.fillStyle=(i%3===0)?'#f4fbff':'#c6e8fa';
+    ctx.fillRect(snap(x)-(sz>>1), snap(y)-(sz>>1), sz, sz);
   }
   ctx.restore();
 }
