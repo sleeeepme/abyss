@@ -728,9 +728,9 @@
      16px箱の足裏y=14を位置アンカーとし、名前は足元座標に影響させない。 */
   .hub-ava-sh{position:absolute;left:3px;bottom:.5px;width:10px;height:3px;
     background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,0) 72%);
-    animation:hubHopShadow 1.7s steps(2) infinite;pointer-events:none}
+    animation:hubHopShadow 1.7s ease-in-out infinite;pointer-events:none}
   .hub-ava-art{display:block;width:16px;height:16px;image-rendering:pixelated;
-    animation:hubHop 1.7s steps(2) infinite;position:relative}
+    animation:hubHop 1.7s ease-in-out infinite;position:relative}
   @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-1px)}}
   @keyframes hubHopShadow{0%,58%,100%{opacity:1}22%{opacity:.55}}
   @media (prefers-reduced-motion: reduce){
@@ -18504,13 +18504,14 @@ function hubSegmentClear(a,b){
   const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)*2));
   for(let i=0;i<=n;i++){
     const k=i/n;
-    if(!hubCanStand(Math.round(a.x+(b.x-a.x)*k),Math.round(a.y+(b.y-a.y)*k))) return false;
+    if(!hubCanStand(a.x+(b.x-a.x)*k,a.y+(b.y-a.y)*k)) return false;
   }
   return true;
 }
 // 経路の全区間を確認。柱で直線が塞がるときだけ2pxグリッドを探索する。
 function hubFindPath(from,to){
-  from={x:Math.round(from.x),y:Math.round(from.y)};to={x:Math.round(to.x),y:Math.round(to.y)};
+  // 途中で出発演出へ切り替えても、現在の小数座標から連続して移動する。
+  from={x:from.x,y:from.y};to={x:to.x,y:to.y};
   if(!hubCanStand(from.x,from.y)||!hubCanStand(to.x,to.y)) return [];
   if(hubSegmentClear(from,to)) return [from,to];
   const key=p=>p.x+','+p.y;
@@ -18572,10 +18573,12 @@ function hubSceneLayout(){
 }
 function hubAvatarPoint(b){return {x:+b.dataset.px,y:+b.dataset.py};}
 function hubPlaceAvatar(b,p){
-  const x=Math.round(p.x),y=Math.round(p.y);
+  // 絵のドット倍率は固定し、移動位置だけはrAFごとに小数で補間する。
+  // 原画1pxへの丸めは通常の歩行を約12段階/秒に落としてしまう。
+  const {x,y}=p;
   if(!hubCanStand(x,y))return false;
   b.dataset.px=x;b.dataset.py=y;b.style.left=x+'px';b.style.top=y+'px';
-  b.style.zIndex=String(y);return true;
+  b.style.zIndex=String(Math.round(y));return true;
 }
 const _hubMoves=new Map();let _hubMoveRaf=0;
 function hubMoveTick(now){

@@ -22,6 +22,25 @@ try{
   for(const p of v.points){assert(p.safe);assert(Math.abs(p.dot-p.sc)<.02);assert(Math.abs(p.foot[0]-p.p.x)<.03);assert(Math.abs(p.foot[1]-p.p.y)<.03);}report.viewports.push(v);
   if(width===390||width===1920)await pg.screenshot({path:path.join(out,`aligned-${width}.png`)});
  }
+ // 背景のドットに移動位置まで丸めると、12px/秒の歩行が12段階/秒になる。
+ report.smoothMotion=await pg.evaluate(()=>{
+  stopHubWander();const btn=document.querySelector('.hub-ava');const old=hubAvatarPoint(btn);
+  hubPlaceAvatar(btn,{x:260,y:170});hubMoveAvatar(btn,{x:272,y:170},1000);
+  const start=_hubMoves.get(btn).start,positions=[];
+  for(let i=0;i<=60;i++){
+   cancelAnimationFrame(_hubMoveRaf);hubMoveTick(start+i*1000/60);positions.push(+btn.dataset.px);
+  }
+  stopHubWander();hubPlaceAvatar(btn,{x:260.37,y:170.28});
+  hubMoveAvatar(btn,{x:270,y:150},600);const continuous=_hubMoves.get(btn).path[0];
+  stopHubWander();hubPlaceAvatar(btn,old);
+  return {unique:new Set(positions).size,held:positions.slice(1).filter((x,i)=>x===positions[i]).length,
+    maxStep:Math.max(...positions.slice(1).map((x,i)=>Math.abs(x-positions[i]))),continuous,
+    hopTiming:getComputedStyle(btn.querySelector('.hub-ava-art')).animationTimingFunction};
+ });
+ assert.equal(report.smoothMotion.unique,61);assert.equal(report.smoothMotion.held,0);
+ assert(report.smoothMotion.maxStep<.201);
+ assert.deepEqual(report.smoothMotion.continuous,{x:260.37,y:170.28});
+ assert.equal(report.smoothMotion.hopTiming,'ease-in-out');
  report.collision=await pg.evaluate(()=>{
   const blocked=[[330,175],[206,165],[239,145],[306,145],[239,194],[306,194],[271,80],[352,150],[420,90]];
   if(blocked.some(([x,y])=>hubCanStand(x,y)))throw Error('water/building/cliff/pillar accepted');
