@@ -14963,6 +14963,60 @@ function drawHubBgFrame(){
   const sx=(frame%HUB_BG.cols)*HUB_BG.fw, sy=Math.floor(frame/HUB_BG.cols)*HUB_BG.fh;
   ctx.drawImage(hubBgImg, sx, sy, HUB_BG.fw, HUB_BG.fh, 0, 0, HUB_BG.fw, HUB_BG.fh);
   if(typeof drawFeelHubTiltShift==='function') drawFeelHubTiltShift(c,ctx);
+  drawHubAmbience(c, ctx, reduced ? 0 : (performance.now()-_hubBgT0)/1000);
+}
+/* ---------- 拠点の空気（2026-10-18） ----------
+   背景の絵（171×300 のドット）の**上に同じ解像度で**重ねる。拡大は絵と一緒に整数倍で掛かるので、
+   スモークの網も舞う粒も、背景のドットと同じ大きさの四角になる。
+     1) スモーク：見えている範囲の下 38% に、薄い網掛け（4×4 の網点）の煙。
+        濃さは下ほど濃く、ゆっくり横へ流れる2つの波で斑にする。網点の位置は画面に固定
+        （流れるのは濃淡だけ）なので、網の目がちらつかない。
+     2) 舞う粒：画面全体に、ゆっくり昇りながら左右に揺れる1ドットの粒。明滅する。
+   ?hubfx=off で消せる。 */
+const HUB_AMB = window.HUB_AMB = {on:new URLSearchParams(location.search).get('hubfx')!=='off',
+  smokeH:.38, smokeA:.34, motes:44};
+const _hubSmoke = document.createElement('canvas');
+const HUB_BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function hubVisibleRect(c){
+  const wrap=c.parentElement, zoom=parseFloat(c.style.width)/c.width;
+  if(!wrap || !(zoom>0)) return {x:0,y:0,w:c.width,h:c.height};
+  const x=Math.max(0,-parseFloat(c.style.left||0)/zoom), y=Math.max(0,-parseFloat(c.style.top||0)/zoom);
+  return {x, y, w:Math.min(c.width-x, wrap.clientWidth/zoom), h:Math.min(c.height-y, wrap.clientHeight/zoom)};
+}
+function drawHubAmbience(c, g, t){
+  if(!HUB_AMB.on) return;
+  const vr=hubVisibleRect(c), W0=c.width;
+  // 1) スモーク
+  const bh=Math.max(8, Math.round(vr.h*HUB_AMB.smokeH)), by=Math.round(vr.y+vr.h)-bh;
+  const sc=_hubSmoke; if(sc.width!==W0||sc.height!==bh){ sc.width=W0; sc.height=bh; }
+  const sg=sc.getContext('2d'), im=sg.createImageData(W0,bh), u=new Uint32Array(im.data.buffer);
+  const A=Math.round(255*HUB_AMB.smokeA), col=(A<<24)|(0xe2<<16)|(0xd8<<8)|0xcc;   // ABGR：薄い灰（少し青み）
+  for(let j=0;j<bh;j++){
+    const yy=by+j, d=Math.pow(j/bh, 1.25);
+    for(let i=0;i<W0;i++){
+      const n=0.5+0.25*Math.sin(i*0.075 + t*0.32 + Math.sin(yy*0.11 - t*0.21)*1.7)
+                 +0.25*Math.sin(i*0.031 - t*0.19 + yy*0.047);
+      const v=d*(0.35+0.85*n)*0.62;                 // 濃いところでも半分強まで——網が「面」にならない
+      if(v > (HUB_BAYER[(yy&3)*4+(i&3)]+0.5)/16) u[j*W0+i]=col;
+    }
+  }
+  sg.putImageData(im,0,0);
+  g.drawImage(sc, 0, by);
+  // 2) 舞う粒
+  const N=HUB_AMB.motes;
+  for(let k=0;k<N;k++){
+    const h1=((k*7919)%997)/997, h2=((k*104729)%991)/991, h3=((k*1297)%983)/983;
+    const sp=2.2+4.5*h3;                               // 昇る速さ（ドット/秒）
+    const y=vr.y + ((h2*vr.h - t*sp) % vr.h + vr.h) % vr.h;
+    const x=vr.x + ((h1*vr.w + Math.sin(t*(0.35+0.4*h2)+k)*3.2 + t*0.6) % vr.w + vr.w) % vr.w;
+    const tw=0.5+0.5*Math.sin(t*(1.1+1.7*h1)+k*2.1);
+    const al=(0.25+0.55*tw) * Math.min(1, (y-vr.y)/12);  // 上端で消える
+    if(al<0.06) continue;
+    g.globalAlpha=al;
+    g.fillStyle=(k%4===0)?'#cfe6ff':'#f2e3bf';
+    g.fillRect(Math.round(x), Math.round(y), 1, 1);
+  }
+  g.globalAlpha=1;
 }
 /* ---------- 街の背景は 12fps の絵。60回描く意味は無い ----------
    スプライトシートは 12fps・72コマ。rAF は 60回/秒で回るので、
@@ -14971,7 +15025,8 @@ function drawHubBgFrame(){
 let _hubBgFrame=-1;
 function hubBgTick(){
   const reduced=hubReducedMotion();
-  const f = reduced ? 0 : Math.floor((performance.now()-_hubBgT0)/1000*HUB_BG.fps) % HUB_BG.frames;
+  /* 背景の絵は 12fps だが、拠点の空気（煙・舞う粒）は 24fps で刻む。それでも 60fps の rAF の半分以下 */
+  const f = reduced ? 0 : Math.floor((performance.now()-_hubBgT0)/1000*(HUB_AMB.on ? 24 : HUB_BG.fps));
   if(f!==_hubBgFrame){ _hubBgFrame=f; drawHubBgFrame(); }
   _hubBgRaf = (S.screen==='town' && !reduced) ? requestAnimationFrame(hubBgTick) : null;
 }
@@ -15430,12 +15485,14 @@ function draw(){
   }else{
   /* 穴の周りの点線の輪と、封鎖中の赤い輪はやめた（報告「下への穴…に出ている円をなくして」）。
      穴そのものは地形の側で描いてある。印は▼と文字だけにする。 */
+  if(!S.run.bossAlive && canDescendFrom(S.run.depth)) drawStairDraft(stx, sty);
   ctx.fillStyle='#7fc3e0'; ctx.font='bold '+(TS*0.55)+'px '+FONT; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('▼',stx,sty);
   if(S.run.bossAlive){
     label('封鎖中', stx, sty-TS*0.95, '#c4433f');
   }else{
-    label(canDescendFrom(S.run.depth)?'降りる穴':'底', stx, sty-TS*0.85, '#7fc3e0');
+    // 文字は穴の真上（2026-10-18 ユーザー指定「次の階へ」に改名して穴の上部に）
+    label(canDescendFrom(S.run.depth)?'次の階へ':'底', stx, sty-TS*0.80, '#7fc3e0');
   }
   }   // if(stairRevealed())
   drawReturnPortal(camX, camY);
@@ -16624,6 +16681,38 @@ let _uiQ=null;
 function uiLater(fn){
   if(!_uiQ) return fn();
   const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; fn(); });
+}
+/* ---------- 穴へ吸い込まれる空気（2026-10-18） ----------
+   下の階へ抜ける穴は、まわりの冷えた空気を吸っている——という手触りを足す。
+   粒は状態を持たない：番号 i と時刻だけで位置が決まるので、生成も掃除も要らない。
+     ・輪の外（半径 1.5〜2.5マス）で生まれ、渦を巻きながら穴の口へ縮む
+     ・縮むほど速く回る（角度は進み具合の2乗で増える）
+     ・口に近づくと尾を1ドット引き、最後は口の縁で消える
+   色は冷たい薄青と白。ドットの格子（1ドット＝TS/16）に合わせて刻む。 */
+const STAIR_DRAFT = {n:28, life:1.9, r0:1.4, r1:2.6, mouth:0.40};
+function drawStairDraft(cx, cy){
+  const D=STAIR_DRAFT, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
+  const snap=v=>Math.round(v/q)*q;
+  ctx.save();
+  for(let i=0;i<D.n;i++){
+    const h1=((i*7919)%997)/997, h2=((i*104729)%991)/991, h3=((i*1297)%983)/983;
+    const life=D.life*(0.8+0.45*h3);
+    const p=((now/life + h1) % 1);                       // 0 → 1 で穴へ
+    const R=TS*(D.r0+(D.r1-D.r0)*h2);
+    const al=Math.min(1, p*3) * (1-Math.pow(p,6)) * (0.55+0.45*h2);
+    if(al<=0.02) continue;
+    /* 頭の1ドット＋来た道に沿った尾。尾は穴に近づくほど長く（速く見える） */
+    const tail = p<0.35 ? 1 : (p<0.7 ? 2 : 3);
+    ctx.fillStyle = (i%3===0) ? '#eaf8ff' : '#a8dcf6';
+    for(let k=0;k<=tail;k++){
+      const pk=Math.max(0, p-k*0.045);
+      const rk=TS*D.mouth + (R-TS*D.mouth)*Math.pow(1-pk, 1.6);
+      const ak=h1*6.283 + h3*2 + pk*pk*2.6;               // 縮むほど速く回る（y は 0.82 倍：見下ろしの床）
+      ctx.globalAlpha=al*(k===0 ? 1 : 0.55/k);
+      ctx.fillRect(snap(cx+Math.cos(ak)*rk)-q/2|0, snap(cy+Math.sin(ak)*rk*0.82)-q/2|0, q, q);
+    }
+  }
+  ctx.restore();
 }
 function label(text,x,y,color,scale){
   if(_uiQ){ const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; label(text,x,y,color,scale); }); return; }
