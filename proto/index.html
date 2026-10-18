@@ -16686,39 +16686,52 @@ function uiLater(fn){
   const a=ctx.globalAlpha, m=ctx.getTransform(); _uiQ.push(()=>{ ctx.setTransform(m); ctx.globalAlpha=a; fn(); });
 }
 /* ---------- 穴から漏れ出る冷気（2026-10-18） ----------
-   下の階の冷えた空気が、穴の口からうっすら立ちのぼる。渦で吸い込む案から変えた
-   （ユーザー指定「冷気がうっすら出てきているような感じに」）。
-   粒は状態を持たない：番号 i と時刻だけで位置が決まるので、生成も掃除も要らない。
-     ・穴の縁のどこかで生まれ、外へ少し広がりながら上へ昇る
-     ・昇るほど大きく（1→2ドット）、薄くなって消える
-     ・口の上には、うっすらした冷えた靄を1枚敷く
-     ・左右にゆっくり揺れる
-   色は冷たい薄青。ドットの格子（1ドット＝TS/16）に合わせて刻む。 */
-const STAIR_CHILL = {n:22, life:2.8, mouth:0.38, rise:1.05, spread:0.45, alpha:0.85, haze:0.10};
+   ドライアイスのように、冷えた煙が穴の口から少しずつ溢れて床を這う
+   （ユーザー指定：粒だとホコリに見えるので、冷気のスモークを少量）。
+   ・煙のかたまり（puff）が穴の縁から生まれ、床に沿って外へ這い出しながら広がって薄れる。
+     冷気は重いので昇らない。見下ろしの床なので縦は 0.6 倍に潰す
+   ・口の上には薄い溜まりを1枚。ゆっくり息をする
+   ・描き方は拠点の煙と同じ：1ドット（TS/16）単位の小さな画用紙に透明度で描き、
+     ぼかさずに拡大して貼る。だから煙の縁もドットの段になる
+   puff は状態を持たない：番号と時刻だけで位置が決まる。 */
+const STAIR_CHILL = {n:9, life:3.6, mouth:0.40, spread:1.05, alpha:0.42, ex:1.9, ey:1.3};
+const _chillCv = document.createElement('canvas');
 function drawStairChill(cx, cy){
   const D=STAIR_CHILL, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
-  const snap=v=>Math.round(v/q)*q;
-  ctx.save();
-  // 口の上のうっすらした冷えた靄。息をするように少しだけ濃淡する
-  const hy=cy-TS*0.30, hr=TS*0.95, ha=D.haze*(0.8+0.2*Math.sin(now*1.4));
-  const hg=ctx.createRadialGradient(cx, hy, 0, cx, hy, hr);
-  hg.addColorStop(0,'rgba(205,236,255,'+ha+')'); hg.addColorStop(1,'rgba(205,236,255,0)');
-  ctx.fillStyle=hg; ctx.beginPath(); ctx.ellipse(cx, hy, hr, hr*0.8, 0, 0, 7); ctx.fill();
+  const gw=Math.ceil(TS*D.ex*2/q), gh=Math.ceil(TS*D.ey*2/q);
+  if(_chillCv.width!==gw||_chillCv.height!==gh){ _chillCv.width=gw; _chillCv.height=gh; }
+  const T=TS/q;                                              // 1マスが何ドットか
+  const ox=gw/2, oy=gh/2;
+  // この瞬間の puff を並べる（ドット単位の座標）
+  const P=[];
   for(let i=0;i<D.n;i++){
     const h1=((i*7919)%997)/997, h2=((i*104729)%991)/991, h3=((i*1297)%983)/983;
-    const life=D.life*(0.75+0.5*h3);
-    const p=((now/life + h1) % 1);                       // 0 → 1 で立ちのぼって消える
-    const ang=h2*6.283;
-    const r=TS*(D.mouth*(0.6+0.4*h3) + D.spread*p);
-    const x=cx + Math.cos(ang)*r + Math.sin(now*1.3+i*1.7)*TS*0.08*p;
-    const y=cy + Math.sin(ang)*r*0.55 - TS*D.rise*Math.pow(p,0.85);
-    const al=D.alpha*Math.min(1,p*5)*(1-p)*(0.6+0.4*h1);
-    if(al<=0.01) continue;
-    const sz=(p>0.3 && i%2===0) ? 2*q : q;
-    ctx.globalAlpha=al;
-    ctx.fillStyle=(i%3===0)?'#f4fbff':'#c6e8fa';
-    ctx.fillRect(snap(x)-(sz>>1), snap(y)-(sz>>1), sz, sz);
+    const life=D.life*(0.8+0.4*h3), p=((now/life + h1) % 1);
+    const ang=h2*6.283 + Math.sin(now*0.3+i)*0.15;
+    const r=T*(D.mouth*0.85 + D.spread*Math.pow(p,0.7));
+    const k=Math.min(1,p*4)*Math.pow(1-p,1.6);              // 生まれてすぐ濃く、這ううちに薄れる
+    P.push(ox+Math.cos(ang)*r, oy+Math.sin(ang)*r*0.6, T*(0.28+0.42*p), k);
   }
+  P.push(ox, oy-T*0.05, T*0.55, 0.55+0.12*Math.sin(now*1.2));   // 口の上の溜まり
+  const g=_chillCv.getContext('2d'), im=g.createImageData(gw,gh), u=new Uint32Array(im.data.buffer);
+  const RGB=(0xff<<16)|(0xf2<<8)|0xe4, AM=255*D.alpha;          // ABGR：白に近い薄青
+  for(let y=0;y<gh;y++) for(let x=0;x<gw;x++){
+    let d=0;
+    for(let j=0;j<P.length;j+=4){
+      const dx=x-P[j], dy=(y-P[j+1])/0.6, rr=P[j+2];
+      const e=(dx*dx+dy*dy)/(rr*rr); if(e<1) d+=P[j+3]*(1-e)*(1-e);
+    }
+    if(d<=0.02) continue;
+    // 縁を少しちぎれさせる（ゆっくり動く揺らぎ）
+    const w=0.78+0.22*Math.sin(x*0.55+now*0.9)*Math.sin(y*0.7-now*0.6);
+    const al=(Math.min(1,d*w)*AM)|0;
+    if(al>3) u[y*gw+x]=(al<<24)|RGB;
+  }
+  g.putImageData(im,0,0);
+  ctx.save();
+  ctx.imageSmoothingEnabled=false;
+  const x0=Math.round((cx-ox*q)/q)*q, y0=Math.round((cy-oy*q)/q)*q;
+  ctx.drawImage(_chillCv, x0, y0, gw*q, gh*q);
   ctx.restore();
 }
 function label(text,x,y,color,scale){
