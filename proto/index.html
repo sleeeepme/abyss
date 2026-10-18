@@ -703,11 +703,14 @@
     animation:hubDiveBob 1.6s ease-in-out infinite}
   .hub-dive b{font-size:15px;font-weight:700;color:#fff}
   @keyframes hubDiveBob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
-  .hub-ava{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
-    align-items:center;gap:2px;width:auto;background:none;border:none;padding:0;
-    transition:left 2s ease-in-out,top 2s ease-in-out}
-  .hub-ava .glyph{width:38px;height:38px;display:flex;align-items:center;
-    justify-content:center;font-size:19px;--pf:rgba(18,20,28,.8);background:none;--pb:var(--line);border:none;}
+  .hub-ava{position:absolute;transform:translate(-50%,-87.5%);display:block;
+    width:16px;height:16px;min-width:0;min-height:0;background:none;border:none;padding:0;transition:none}
+  #hub-avatars{position:absolute;transform-origin:0 0;pointer-events:none;z-index:1}
+  #hub-avatars .hub-ava{pointer-events:auto}
+  .hubui.hub-intro #hub-avatars,.hubui.hub-leaving #hub-avatars,
+  #hubui.hub-intro .hub-ava,#hubui.hub-leaving .hub-ava{pointer-events:none}
+  .hub-ava .glyph{width:16px;height:16px;display:flex;align-items:center;
+    justify-content:center;font-size:8px;--pf:rgba(18,20,28,.8);background:none;--pb:var(--line);border:none;}
   /* 実キャラアート版。台座は置かず、キャラ絵だけを広場に立たせる。
      向き（scaleX）と歩行中の弾みはJS側（hubWander）が実移動に合わせて操作する。
 
@@ -716,21 +719,20 @@
      付けていなかったが、影が無いとキャラが石畳から浮いて見える。
      濁らせない作り方で入れる——**輪郭のある落射影ではなく、中心だけ濃くて
      外へ完全に消える楕円**にして、背景の石畳の模様を潰さない。 */
-  .hub-ava-wrap{display:block;transition:transform .2s ease;position:relative}
+  .hub-ava-wrap{display:block;width:16px;height:16px;position:relative}
   /* 跳ねているあいだ、影は縮んで薄くなる（＝浮いている高さが影で読める）。
      跳ねは .hub-ava-art 側のアニメで、位相はキャラごとに inline の
      animation-delay でずらしてある。影にも**同じ delay を渡す**こと——
      渡し忘れると、跳ねと影が別の位相で動いて足元がちらつく。 */
-  /* 位置は実測で合わせてある。キャラ絵は64pxの画像を50pxで描いていて、
-     色が乗っている一番下の行は64px中の55行目——つまり**箱の下端から約7px上**が
-     足の裏になる。楕円の中心をそこへ置くと、影が足元に敷かれて見える。 */
-  .hub-ava-sh{position:absolute;left:50%;bottom:2px;width:32px;height:11px;margin-left:-16px;
-    background:radial-gradient(ellipse at center, rgba(0,0,0,.62) 0%, rgba(0,0,0,.38) 45%, rgba(0,0,0,0) 72%);
-    animation:hubHopShadow 1.7s ease-in-out infinite;pointer-events:none}
-  .hub-ava-art{display:block;width:50px;height:50px;image-rendering:pixelated;
-    animation:hubHop 1.7s ease-in-out infinite;position:relative}
-  @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-5px)}}
-  @keyframes hubHopShadow{0%,58%,100%{transform:scale(1);opacity:1}22%{transform:scale(.7);opacity:.55}}
+  /* 64px素材は4倍で書き出した16px原画。背景1pxとキャラ1ドットを揃える。
+     16px箱の足裏y=14を位置アンカーとし、名前は足元座標に影響させない。 */
+  .hub-ava-sh{position:absolute;left:3px;bottom:.5px;width:10px;height:3px;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,0) 72%);
+    animation:hubHopShadow 1.7s steps(2) infinite;pointer-events:none}
+  .hub-ava-art{display:block;width:16px;height:16px;image-rendering:pixelated;
+    animation:hubHop 1.7s steps(2) infinite;position:relative}
+  @keyframes hubHop{0%,58%,100%{transform:translateY(0)}22%{transform:translateY(-1px)}}
+  @keyframes hubHopShadow{0%,58%,100%{opacity:1}22%{opacity:.55}}
   @media (prefers-reduced-motion: reduce){
     .hub-ava-art{animation:none}
     .hub-ava-sh{animation:none}
@@ -761,9 +763,10 @@
      素の名前は最大でも数文字で必ず収まるので、ellipsis 自体を持たせない
      ——万一のため overflow:hidden だけは安全網として残すが、
      「…」を足す仕組みは使わない。 */
-  .hub-ava .nm{font-size:11px;font-weight:700;white-space:nowrap;max-width:72px;
+  .hub-ava .nm{position:absolute;top:calc(14px + var(--hub-name-gap,1px));left:50%;transform:translateX(-50%);
+    font-size:var(--hub-name-size,4px);font-weight:700;white-space:nowrap;max-width:var(--hub-name-width,26px);
     overflow:hidden;
-    text-shadow:var(--pxshadow)}
+    text-shadow:0 var(--hub-name-outline,1px) #10131a,var(--hub-name-outline,1px) 0 #10131a,calc(-1 * var(--hub-name-outline,1px)) 0 #10131a,0 calc(-1 * var(--hub-name-outline,1px)) #10131a}
   .hub-bottom{display:flex;flex-direction:column;gap:8px}
   .hub-row2{display:flex;justify-content:space-between;gap:10px}
   .hub-row5{display:flex;justify-content:space-between;gap:6px}
@@ -14947,6 +14950,7 @@ function layoutHubBg(){
   c.style.width=dw+'px'; c.style.height=dh+'px';
   c.style.left=((cw-dw)/2)+'px';
   c.style.top='0px';
+  hubSceneLayout();
 }
 function drawHubBgFrame(){
   const c=el('hubbg'); if(!c) return;
@@ -14989,6 +14993,7 @@ function resizeHubBg(){
 // URLバーの開閉など、visualViewportによる親要素の高さ変更にも追従する。
 if(typeof ResizeObserver==='function') new ResizeObserver(resizeHubBg).observe(el('hub-bgwrap'));
 else addEventListener('resize', resizeHubBg);
+if(typeof ResizeObserver==='function') new ResizeObserver(hubSceneLayout).observe(document.querySelector('.hub-plaza'));
 
 /* ---------- 画面遷移の黒暗転 ----------
    タイトル→街／街→アビスの2箇所だけに挟む演出。
@@ -17738,7 +17743,7 @@ function setScreen(s){
   // 消えた要素を触りにいかないように）。
   // 入場演出の最中は始めない——歩いて来ている途中で徘徊が行き先を上書きすると、
   // 主人公が画面の下から来ずに、いきなり広場の中で歩き出す。
-  if(s==='town'){ if(!_hubIntroOn) startHubWander(); } else stopHubWander();
+  if(s==='town'){ if(!_hubIntroOn) startHubWander(); } else { stopHubWander(); cancelHubScene(); }
 }
 /* ---------- 苔玉の1行 ----------
    6層ぶん通う話なので、**どこまで進んでいるか**が見えないと積み上がらない。
@@ -18453,17 +18458,6 @@ const JOB_GLYPH={warrior:'j_warrior',knight:'j_knight',hunter:'j_hunter',mage:'j
                  rogue:'j_rogue',priest:'j_priest',
                  paladin:'j_knight',summoner:'orb',archmage:'j_mage'};
 function hubGlyph(jobId){ return '<i class="pi pi-'+(JOB_GLYPH[jobId]||'orb')+'"></i>'; }
-/* 人数ぶんを楕円へ均等配置。0番（主人公）は下寄り＝手前に来るよう90°から始める。
-   1人だけなら広場の中央に置く。**これは初期配置だけ**——以降は hubWander が動かす。 */
-function hubPlazaPoints(n){
-  if(n<=1) return [{x:50,y:56}];
-  const cx=50, cy=54, rx=30, ry=23, pts=[];
-  for(let i=0;i<n;i++){
-    const ang=Math.PI/2 + i*(2*Math.PI/n);
-    pts.push({x:cx+rx*Math.cos(ang), y:cy+ry*Math.sin(ang)});
-  }
-  return pts;
-}
 /* キャラごとにアニメの位相をずらす軽いハッシュ。
    毎回ランダムにすると renderHubPlaza() が呼ばれるたび（状態が変わるたび）に
    動きが飛んで見えるので、個体のID/名前から**毎回同じ位相**を作る。 */
@@ -18471,72 +18465,169 @@ function hubAnimSeed(key){
   let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))|0;
   return Math.abs(h);
 }
-/* ---------- 広場のランダム徘徊（hubWander） ----------
-   背景アート（docs/HUB_BACKGROUND_HANDOFF.md）の実測に基づく、
-   .hub-plaza を基準にした％座標。柱の上のような「歩いたら不自然な場所」を
-   避けて、歩ける範囲（HUB_WALK＝楕円）の中だけをランダムに移動させる。
-   実測方法：iPhone 13相当のビューポートで #hubbg と .hub-plaza の
-   getBoundingClientRect() を取り、cover表示の倍率・オフセットから
-   背景アート内の柱4本の位置を .hub-plaza に対する％へ逆算した。 */
-const HUB_WALK = {cx:50, cy:71, rx:31, ry:17};
-const HUB_PILLARS = [
-  {x:22, y:59, rx:9, ry:8}, {x:78, y:59, rx:9, ry:8},
-  {x:22, y:96, rx:9, ry:8}, {x:78, y:96, rx:9, ry:8},
-];
-function hubOnPillar(x,y){
-  return HUB_PILLARS.some(p=>{
-    const dx=(x-p.x)/p.rx, dy=(y-p.y)/p.ry;
-    return dx*dx+dy*dy < 1;
+/* 拠点の足元座標は背景544×306の原画座標。通路の外はすべてコリジョン。
+   背景の倍率・左端を共有し、UIの高さや画面比率から地形を逆算しない。 */
+const HUB_SCENE = {
+  center:{x:271,y:170}, cave:{x:270,y:100}, entry:{x:271,y:303},
+  spriteSize:16, footY:14, radius:2,
+  floors:[
+    [[246,138],[295,138],[316,152],[319,180],[310,198],[293,209],[246,209],[226,193],[224,157],[234,146]],
+    [[257,98],[282,98],[282,117],[290,132],[296,145],[246,145],[251,123],[257,116]],
+    [[252,202],[291,202],[289,231],[285,268],[288,307],[254,307],[255,270],[256,232]],
+  ],
+  // 柱の見える面＋足元。背後へ回って柱に重なるのも避ける。
+  obstacles:[
+    [[233,133],[245,133],[245,152],[233,152]],
+    [[300,134],[313,134],[313,153],[300,153]],
+    [[232,182],[246,182],[246,203],[232,203]],
+    [[300,182],[314,182],[314,205],[300,205]],
+  ],
+};
+const HUB_WALK = {cx:271, cy:170, rx:35, ry:25};
+function hubInsidePolygon(x,y,points){
+  let inside=false;
+  for(let i=0,j=points.length-1;i<points.length;j=i++){
+    const [ax,ay]=points[i], [bx,by]=points[j];
+    if(((ay>y)!==(by>y)) && x<(bx-ax)*(y-ay)/(by-ay)+ax) inside=!inside;
+  }
+  return inside;
+}
+function hubOnPillar(x,y){ return HUB_SCENE.obstacles.some(p=>hubInsidePolygon(x,y,p)); }
+function hubCanStand(x,y,radius=HUB_SCENE.radius){
+  for(const [dx,dy] of [[0,0],[radius,0],[-radius,0],[0,radius],[0,-radius],
+    [radius*.707,radius*.707],[-radius*.707,radius*.707],[radius*.707,-radius*.707],[-radius*.707,-radius*.707]]){
+    if(!HUB_SCENE.floors.some(p=>hubInsidePolygon(x+dx,y+dy,p)) || hubOnPillar(x+dx,y+dy)) return false;
+  }
+  return true;
+}
+function hubSegmentClear(a,b){
+  const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)*2));
+  for(let i=0;i<=n;i++){
+    const k=i/n;
+    if(!hubCanStand(Math.round(a.x+(b.x-a.x)*k),Math.round(a.y+(b.y-a.y)*k))) return false;
+  }
+  return true;
+}
+// 経路の全区間を確認。柱で直線が塞がるときだけ2pxグリッドを探索する。
+function hubFindPath(from,to){
+  from={x:Math.round(from.x),y:Math.round(from.y)};to={x:Math.round(to.x),y:Math.round(to.y)};
+  if(!hubCanStand(from.x,from.y)||!hubCanStand(to.x,to.y)) return [];
+  if(hubSegmentClear(from,to)) return [from,to];
+  const key=p=>p.x+','+p.y;
+  const near=p=>{
+    let best=null,d=Infinity;
+    for(let y=Math.floor(p.y/2)*2-4;y<=p.y+4;y+=2) for(let x=Math.floor(p.x/2)*2-4;x<=p.x+4;x+=2){
+      const q={x,y},dist=Math.hypot(x-p.x,y-p.y);
+      if(dist<d && hubCanStand(x,y) && hubSegmentClear(p,q)){best=q;d=dist;}
+    }
+    return best;
+  };
+  const start=near(from),goal=near(to);if(!start||!goal)return [];
+  const queue=[start],prev=new Map([[key(start),null]]);let hit=null;
+  for(let head=0;head<queue.length;head++){
+    const p=queue[head];if(key(p)===key(goal)){hit=p;break;}
+    for(const [dx,dy] of [[2,0],[-2,0],[0,2],[0,-2]]){
+      const q={x:p.x+dx,y:p.y+dy},k=key(q);
+      if(q.x<220||q.x>322||q.y<98||q.y>306||prev.has(k)||!hubSegmentClear(p,q))continue;
+      prev.set(k,p);queue.push(q);
+    }
+  }
+  if(!hit)return [];
+  const raw=[to];for(let p=hit;p;p=prev.get(key(p)))raw.push(p);raw.push(from);raw.reverse();
+  const path=[from];let i=0;
+  while(i<raw.length-1){let j=raw.length-1;while(j>i+1&&!hubSegmentClear(raw[i],raw[j]))j--;path.push(raw[j]);i=j;}
+  return path;
+}
+function hubRandPoint(avoid=[],from=HUB_SCENE.center){
+  let best={...from};
+  for(let tries=0;tries<40;tries++){
+    const ang=Math.random()*Math.PI*2,r=Math.sqrt(Math.random());
+    const p={x:Math.round(HUB_WALK.cx+Math.cos(ang)*HUB_WALK.rx*r),y:Math.round(HUB_WALK.cy+Math.sin(ang)*HUB_WALK.ry*r)};
+    if(!hubCanStand(p.x,p.y)||!hubFindPath(from,p).length)continue;
+    best=p;if(!avoid.some(o=>Math.hypot(p.x-o.x,(p.y-o.y)*1.4)<12))return p;
+  }
+  return best;
+}
+function hubPlazaPoints(n){
+  if(n<=1)return [{...HUB_SCENE.center}];
+  return Array.from({length:n},(_,i)=>{
+    const a=Math.PI/2+i*Math.PI*2/n;
+    return {x:Math.round(271+Math.cos(a)*21),y:Math.round(170+Math.sin(a)*15)};
   });
 }
-/* 柱を避け、他のキャラの行き先ともある程度離れた点を探す。
-   何度か試して見つからなければ（狭い・人数が多い等）最後の候補で妥協する
-   ——探索を無限に続けて処理落ちさせないため。 */
-function hubRandPoint(avoid){
-  let best=null;
-  for(let tries=0; tries<14; tries++){
-    const ang=Math.random()*Math.PI*2, r=Math.sqrt(Math.random());
-    const x=HUB_WALK.cx + Math.cos(ang)*HUB_WALK.rx*r;
-    const y=HUB_WALK.cy + Math.sin(ang)*HUB_WALK.ry*r;
-    if(hubOnPillar(x,y)) continue;
-    best={x,y};
-    const tooClose=(avoid||[]).some(o=>Math.hypot(x-o.x,(y-o.y)*1.4)<12);
-    if(!tooClose) return best;
+function hubSceneLayout(){
+  const bg=el('hubbg'),box=el('hub-avatars'),plaza=document.querySelector('.hub-plaza');
+  if(!bg||!box||!plaza||S.screen!=='town')return;
+  const br=bg.getBoundingClientRect(),pr=plaza.getBoundingClientRect(),scale=br.height/HUB_BG.fh;
+  if(!(scale>0))return;
+  box.style.cssText=`left:${br.left-pr.left}px;top:${br.top-pr.top}px;width:544px;height:306px;transform:scale(${scale});--hub-name-size:${11/scale}px;--hub-name-width:${72/scale}px;--hub-name-gap:${2/scale}px;--hub-name-outline:${1/scale}px`;
+  const dive=el('btn-dive');
+  // 敷居の少し上。ラベルだけはUIと同じCSSピクセルの大きさ。
+  dive.style.left=(br.left-pr.left+HUB_SCENE.cave.x*scale)+'px';
+  dive.style.top=(br.top-pr.top+(HUB_SCENE.cave.y-12)*scale)+'px';
+  for(const id of ['hub-warp-lo','hub-warp-hi']){
+    const c=el(id);c.style.left=(br.left-pr.left)+'px';c.style.top=(br.top-pr.top)+'px';
+    c.style.width=br.width+'px';c.style.height=br.height+'px';
   }
-  return best || {x:HUB_WALK.cx, y:HUB_WALK.cy};
+}
+function hubAvatarPoint(b){return {x:+b.dataset.px,y:+b.dataset.py};}
+function hubPlaceAvatar(b,p){
+  const x=Math.round(p.x),y=Math.round(p.y);
+  if(!hubCanStand(x,y))return false;
+  b.dataset.px=x;b.dataset.py=y;b.style.left=x+'px';b.style.top=y+'px';
+  b.style.zIndex=String(y);return true;
+}
+const _hubMoves=new Map();let _hubMoveRaf=0;
+function hubMoveTick(now){
+  _hubMoveRaf=0;
+  if(S.screen!=='town'){_hubMoves.clear();return;}
+  for(const [b,m] of [..._hubMoves]){
+    const k=Math.min(1,Math.max(0,(now-m.start)/m.duration));let d=k*m.length,seg=m.path[0];
+    for(let i=1;i<m.path.length;i++){
+      const q=m.path[i],len=Math.hypot(q.x-seg.x,q.y-seg.y);
+      if(d<=len||i===m.path.length-1){
+        const f=len?Math.min(1,d/len):1;
+        const wrap=b.querySelector('.hub-ava-wrap');
+        if(wrap&&Math.abs(q.x-seg.x)>.5)wrap.style.transform='scaleX('+(q.x>=seg.x?1:-1)+')';
+        hubPlaceAvatar(b,{x:seg.x+(q.x-seg.x)*f,y:seg.y+(q.y-seg.y)*f});break;
+      }
+      d-=len;seg=q;
+    }
+    if(k>=1){_hubMoves.delete(b);b.classList.remove('hub-moving');if(m.done)m.done();}
+  }
+  if(_hubMoves.size)_hubMoveRaf=requestAnimationFrame(hubMoveTick);
+}
+function hubMoveAvatar(b,to,duration,done){
+  const path=hubFindPath(hubAvatarPoint(b),to);if(!path.length)return false;
+  const length=path.slice(1).reduce((s,p,i)=>s+Math.hypot(p.x-path[i].x,p.y-path[i].y),0);
+  b.dataset.tx=to.x;b.dataset.ty=to.y;b.classList.add('hub-moving');
+  _hubMoves.set(b,{path,length,duration:Math.max(1,duration),start:performance.now(),done});
+  if(!_hubMoveRaf)_hubMoveRaf=requestAnimationFrame(hubMoveTick);return true;
 }
 let _hubWanderTimers=[];
-function stopHubWander(){ _hubWanderTimers.forEach(clearTimeout); _hubWanderTimers=[]; }
-/* 街に入るたび（＝広場のボタンを作り直すたび）に呼ぶ。
-   キャラは静止画一枚しか無いので「移動」で歩いている感を出す：
-   left/top をCSS transitionで滑らかに動かし、移動方向で
-   .hub-ava-wrap を左右反転させる。跳ねる動き自体は常時のCSSアニメ（hubHop）に任せる。 */
+function stopHubWander(){
+  _hubWanderTimers.forEach(clearTimeout);_hubWanderTimers=[];
+  if(_hubMoveRaf)cancelAnimationFrame(_hubMoveRaf);_hubMoveRaf=0;
+  for(const b of _hubMoves.keys())b.classList.remove('hub-moving');_hubMoves.clear();
+}
 function startHubWander(){
   stopHubWander();
-  if(hubReducedMotion()) return;               // 動きを減らす設定では徘徊させない
+  if(hubReducedMotion()||_hubIntroOn||el('hubui').classList.contains('hub-leaving'))return;
   const btns=[...document.querySelectorAll('#hub-avatars .hub-ava')];
-  const targets=btns.map(b=>({x:+b.dataset.px||50, y:+b.dataset.py||60}));
+  const targets=btns.map(hubAvatarPoint);
   btns.forEach((btn,i)=>{
     const step=()=>{
-      const cur={x:+btn.dataset.px, y:+btn.dataset.py};
-      const tgt=hubRandPoint(targets.filter((_,j)=>j!==i));
-      targets[i]=tgt;
-      const dist=Math.hypot(tgt.x-cur.x, tgt.y-cur.y);
-      const dur=clamp(dist/9, 1.6, 5.5);        // 距離に応じた所要時間。速すぎ・遅すぎを抑える
-      btn.style.transitionDuration=dur+'s';
-      btn.style.left=tgt.x+'%'; btn.style.top=tgt.y+'%';
-      btn.dataset.px=tgt.x; btn.dataset.py=tgt.y;
-      if(Math.abs(tgt.x-cur.x)>0.6){
-        const wrap=btn.querySelector('.hub-ava-wrap');
-        if(wrap) wrap.style.transform='scaleX('+(tgt.x>=cur.x?1:-1)+')';
-      }
-      const dwell=900 + Math.random()*2400;     // 着いたらしばらく立ち止まる
-      _hubWanderTimers.push(setTimeout(step, dur*1000 + dwell));
+      if(S.screen!=='town')return;
+      const cur=hubAvatarPoint(btn),tgt=hubRandPoint(targets.filter((_,j)=>j!==i),cur);targets[i]=tgt;
+      const path=hubFindPath(cur,tgt),dist=path.slice(1).reduce((s,p,j)=>s+Math.hypot(p.x-path[j].x,p.y-path[j].y),0);
+      const dur=clamp(dist/12,1.6,5.5)*1000;
+      hubMoveAvatar(btn,tgt,dur);
+      _hubWanderTimers.push(setTimeout(step,dur+900+Math.random()*2400));
     };
-    const start=260 + i*280 + Math.random()*900; // 全員同時に動き出さないようずらす
-    _hubWanderTimers.push(setTimeout(step, start));
+    _hubWanderTimers.push(setTimeout(step,260+i*280+Math.random()*900));
   });
 }
+
 function renderHubPlaza(){
   const box=el('hub-avatars'); if(!box || !S.hero) return;
   const members=[S.hero, ...livingParty()];
@@ -18595,10 +18686,11 @@ function renderHubPlaza(){
          </span>`
       : `<span class="glyph" style="border-color:${col};color:${col}">${isHero?'<i class="pi pi-person"></i>':hubGlyph(m.job)}</span>`;
     return `<button class="hub-ava" data-hubava="${isHero?'hero':m.uidA}"
-      data-px="${p.x}" data-py="${p.y}" style="left:${p.x}%;top:${p.y}%">
+      data-px="${p.x}" data-py="${p.y}" style="left:${p.x}px;top:${p.y}px;z-index:${p.y}">
       ${body}
       <span class="nm">${nm}</span></button>`;
   }).join('');
+  hubSceneLayout();
   startHubWander();
 }
 /* ---------- 街へ入る／街から発つ、その一瞬 ----------
@@ -18608,9 +18700,8 @@ function renderHubPlaza(){
      ・「拠点からアビスに入る際には、キャラが整列してみんなでアビスに入る
         （画面上に移動する）ような演出を挟んでから暗転したい」
 
-   どちらも `.hub-ava` の left/top を動かすだけで作る。広場のキャラはDOMで、
-   位置は％、動きはCSSの transition が持っている（徘徊と同じ仕組み）ので、
-   **演出のためだけの描画経路を1本も増やさない。**
+   広場のキャラはDOM。足元の原画座標をhubMoveAvatarで補間し、
+   徘徊・入場・出発で同じ通路判定と表示倍率を共有する。
 
    HUB_ANIM_INSTANT は**自動操作のときだけ**立てる逃げ道。
    潜る操作（#btn-dive）は多くのスイートが「押した直後に S.screen==='game'」で
@@ -18632,27 +18723,23 @@ const HUB_INTRO_WALK_MS = 2100;      // 画面の下から広場まで歩く
 const HUB_LINEUP_MS     = 520;       // 門の手前に並ぶ
 const HUB_MARCH_MS      = 700;       // 階段を上って洞窟の口まで
 const HUB_VANISH_MS     = 380;       // 洞窟の口で消える
-/* 縦一列の並び（.hub-plaza に対する％）。先頭が一番上＝洞窟に近い側。
-   HUB_MARCH_GAP は次の一人が歩き出すまでの間。**消える時間（HUB_VANISH_MS）
-   より長く**しておくこと——短いと、前の一人がまだ消え切らないうちに次が
-   口へ着いて、そこで重なる。完全に順番待ちさせる（歩く時間ぶん空ける）と
-   4人で4秒を超えて、毎回潜るたびに待たされるほうが気になる。 */
-const HUB_COLUMN_TOP    = 46;
-const HUB_COLUMN_GAP    = 10;
-const HUB_MARCH_GAP     = 420;
-const HUB_DEPART_FADE   = 300;       // 暗転
-/* 洞窟の口の高さ（.hub-plaza に対する％）。**実測値。**
-   以前は -18%（画面の外）まで歩かせていたが、階段を上り切った先は
-   岩壁のあいだの霧で、そこを通り過ぎると**宙に浮いて見える**
-   （報告：「画面の一番上まで行くと中に浮いているように見える」）。
-   測り方：iPhone 13相当で .hub-plaza の rect を取り、背景の
-   「階段の上の門（.hub-dive と同じ 27%）」を基準に％へ逆算した。
-   22% にしてあるのは、**足が石段の上に乗る**高さだから。
-   .hub-ava は中心で位置を取る（translate -50%）ので、足は中心より約10px下。
-   22% → 中心 CSS165・足 CSS173 で、ちょうど門の敷居のあたりに立つ。
-   これより上（16%で試した）だと足の下が霧だけになり、
-   「洞窟の前に立っている」ではなく「霧に浮いている」に戻ってしまう。 */
-const HUB_CAVE_TOP      = 22;
+// 縦一列も敷居も背景の原画座標。人数が増えても広場の外へ延ばさない。
+const HUB_COLUMN_TOP=151, HUB_COLUMN_GAP=13;
+const HUB_MARCH_GAP=420, HUB_DEPART_FADE=300;
+const HUB_CAVE_TOP=HUB_SCENE.cave.y;
+function hubLineupPoint(i,n){return {x:270,y:HUB_COLUMN_TOP+i*Math.min(HUB_COLUMN_GAP,44/Math.max(1,n-1))};}
+function cancelHubScene(){
+  clearHubAnimTimers();_hubIntroOn=false;hubWarpStop();
+  const ui=el('hubui');
+  if(ui&&(ui.classList.contains('hub-intro')||ui.classList.contains('hub-leaving'))){
+    ui.classList.remove('hub-intro','hub-leaving');
+    hubResetAvatars([...el('hub-avatars').querySelectorAll('.hub-ava')]);
+  }
+}
+function hubResetAvatars(avas){
+  const pts=hubPlazaPoints(avas.length);
+  avas.forEach((b,i)=>{b.style.transition='';b.style.transitionDuration='';b.style.transitionDelay='';b.style.opacity='';b.style.transform='';hubPlaceAvatar(b,pts[i]);});
+}
 
 /* 一度きりの門番。startAdventure はこちらを呼ぶ。
    「出したかどうか」の判断を playHubIntro の中に混ぜないのは、
@@ -18664,27 +18751,13 @@ function maybePlayHubIntro(){
   return playHubIntro();
 }
 function playHubIntro(){
-  const box=el('hub-avatars');
-  const hero=box && box.querySelector('[data-hubava="hero"]');
-  const ui=el('hubui');
-  if(HUB_ANIM_INSTANT || hubReducedMotion() || !hero || !ui) return false;
-  clearHubAnimTimers();
-  _hubIntroOn=true;
-  stopHubWander();                   // 歩いて来る途中で徘徊に横取りさせない
-  ui.classList.add('hub-intro');
-  const dest=hero.style.top;         // renderHubPlaza が決めた立ち位置
-  hero.style.transition='none';
-  hero.style.top='126%';             // 画面の下、外側
-  void hero.offsetWidth;             // ここで一度確定させないと下端から動き出さない
-  hero.style.transition='';
-  hero.style.transitionDuration=(HUB_INTRO_WALK_MS/1000)+'s';
-  hero.style.top=dest;
-  hubAnimLater(()=>{
-    _hubIntroOn=false;
-    hero.style.transitionDuration='';
-    ui.classList.remove('hub-intro');
-    if(S.screen==='town') startHubWander();
-  }, HUB_INTRO_WALK_MS);
+  const hero=el('hub-avatars')?.querySelector('[data-hubava="hero"]'),ui=el('hubui');
+  if(HUB_ANIM_INSTANT||hubReducedMotion()||!hero||!ui)return false;
+  clearHubAnimTimers();_hubIntroOn=true;stopHubWander();ui.classList.add('hub-intro');
+  const dest=hubAvatarPoint(hero);hubPlaceAvatar(hero,HUB_SCENE.entry);
+  hubMoveAvatar(hero,dest,HUB_INTRO_WALK_MS,()=>{
+    _hubIntroOn=false;ui.classList.remove('hub-intro');if(S.screen==='town')startHubWander();
+  });
   return true;
 }
 
@@ -18692,54 +18765,23 @@ function playHubIntro(){
    **演出を飛ばす場合も必ず done() を呼ぶ**——ここで呼び忘れると
    「潜るボタンが効かない」になる。分岐の一番外側で返しているのはそのため。 */
 function playHubDeparture(done){
-  const box=el('hub-avatars');
-  const avas=box ? [...box.querySelectorAll('.hub-ava')] : [];
-  const ui=el('hubui');
-  if(HUB_ANIM_INSTANT || hubReducedMotion() || !avas.length || !ui){ done(); return false; }
-  clearHubAnimTimers();
-  stopHubWander();
-  ui.classList.add('hub-leaving');   // ボタンを伏せる＝連打で二重に潜らせない
-  /* 1. 門へ向かう**縦一列**に並ぶ（ユーザー要望「縦に整列させて順番に消えて
-        いくように」）。横一列だと全員が同時に口へ着いてしまい、
-        「連れ立って入っていく」ではなく「一斉に消えた」に見えていた。
-        先頭が一番前＝洞窟に近い側。 */
-  const n=avas.length;
+  const avas=[...el('hub-avatars').querySelectorAll('.hub-ava')],ui=el('hubui');
+  if(HUB_ANIM_INSTANT||hubReducedMotion()||!avas.length||!ui){done();return false;}
+  clearHubAnimTimers();stopHubWander();ui.classList.add('hub-leaving');
+  avas.forEach((b,i)=>hubMoveAvatar(b,hubLineupPoint(i,avas.length),HUB_LINEUP_MS));
+  const marchStart=HUB_LINEUP_MS+140;
   avas.forEach((b,i)=>{
-    b.style.transitionDuration=(HUB_LINEUP_MS/1000)+'s';
-    b.style.transitionDelay='';
-    b.style.left='50%';
-    b.style.top=(HUB_COLUMN_TOP + i*HUB_COLUMN_GAP)+'%';
-    const wrap=b.querySelector('.hub-ava-wrap');
-    if(wrap) wrap.style.transform='scaleX(1)';   // 並んだら全員おなじ向き
-  });
-  /* 2〜3. 先頭から順に、洞窟の口まで歩いて、着いたところで消える。
-     歩き出しをずらしてあるので、口の前で重なる瞬間が無い
-     ——前の一人が消えてから次が着く。 */
-  const marchStart = HUB_LINEUP_MS+140;
-  avas.forEach((b,i)=>{
-    const go = marchStart + i*HUB_MARCH_GAP;
     hubAnimLater(()=>{
-      b.style.transitionDuration=(HUB_MARCH_MS/1000)+'s';
-      b.style.top=HUB_CAVE_TOP+'%';
-    }, go);
-    hubAnimLater(()=>{
-      b.style.transition='opacity '+HUB_VANISH_MS+'ms ease';
-      b.style.opacity='0';
-    }, go+HUB_MARCH_MS);
-  });
-  // 4. 最後のひとりが消えたら暗転。黒の向こう側が探索画面
-  const vanishEnd = marchStart + (n-1)*HUB_MARCH_GAP + HUB_MARCH_MS + HUB_VANISH_MS;
-  hubAnimLater(()=>{
-    fadeToBlack(HUB_DEPART_FADE, ()=>{
-      ui.classList.remove('hub-leaving');
-      avas.forEach(b=>{
-        b.style.transitionDelay=''; b.style.transitionDuration='';
-        b.style.transition=''; b.style.opacity='';
+      // 中央の通路→石段→霧の敷居。原画の入口で止まってから消える。
+      hubMoveAvatar(b,HUB_SCENE.cave,HUB_MARCH_MS,()=>{
+        b.style.transition='opacity '+HUB_VANISH_MS+'ms ease';b.style.opacity='0';
       });
-      done();
-      flashFade(360);                // 黒はもう乗っている。探索画面の上でそれを抜く
-    });
-  }, Math.max(0, vanishEnd-60));
+    },marchStart+i*HUB_MARCH_GAP);
+  });
+  const vanishEnd=marchStart+(avas.length-1)*HUB_MARCH_GAP+HUB_MARCH_MS+HUB_VANISH_MS;
+  hubAnimLater(()=>fadeToBlack(HUB_DEPART_FADE,()=>{
+    ui.classList.remove('hub-leaving');hubResetAvatars(avas);done();flashFade(360);
+  }),vanishEnd);
   return true;
 }
 
@@ -18756,23 +18798,11 @@ function playHubDeparture(done){
 const HUB_WARP = {gather:650, ring:[200,700], beam:[1000,1400], vanish:1150, vanishGap:90, vanishMs:300, white:1650, whiteMs:260};
 let _hubWarpRaf=0;
 function hubWarpCanvasSetup(){
-  const plaza=document.querySelector('.hub-plaza');
-  const lo=el('hub-warp-lo'), hi=el('hub-warp-hi');
-  if(!plaza||!lo||!hi) return null;
-  const bg=el('hubbg');
-  const sc=Math.max(1, Math.round((bg && parseFloat(bg.style.width)/HUB_BG.fw) || 3));
-  const pw=plaza.clientWidth||1, ph=plaza.clientHeight||1;
-  const W=Math.ceil(pw/sc), H=Math.ceil(ph/sc);
-  [lo,hi].forEach(c=>{ c.width=W; c.height=H; c.style.width=(W*sc)+'px'; c.style.height=(H*sc)+'px'; c.style.top='0px'; c.style.display='block'; });
-  /* 光の柱は**背景の絵の天井（#hubbg の上端）まで**伸ばす（ユーザー要望）。
-     広場（.hub-plaza）は上の名札の列の下から始まるので、柱を描く側の canvas だけ
-     上へはみ出させ、背景の上端に合わせる。背景が画面より上に切れている（cover）ときは
-     画面の上端で #scr-town の overflow:hidden に切られる——見えるのは画面の天井まで。 */
-  const pr=plaza.getBoundingClientRect(), br=bg ? bg.getBoundingClientRect() : pr;
-  const up=Math.max(0, Math.ceil((pr.top-br.top)/sc));      // 背景の上端が広場より何ドット上か
-  hi.height=H+up; hi.style.height=((H+up)*sc)+'px'; hi.style.top=(-up*sc)+'px';
-  /* 中心は広場の床の真ん中（HUB_WALK）。.hub-ava は中心で位置を取り、足は中心より約10px下 */
-  return {lo, hi, W, H, sc, up, cx:Math.round(W*HUB_WALK.cx/100), cy:Math.round((ph*HUB_WALK.cy/100+10)/sc)};
+  const lo=el('hub-warp-lo'),hi=el('hub-warp-hi');if(!lo||!hi)return null;
+  // 背景と同じ544×306のCanvasを同じ位置・倍率に置く。丸め倍率は使わない。
+  for(const c of [lo,hi]){c.width=544;c.height=306;c.style.display='block';c.getContext('2d').imageSmoothingEnabled=false;}
+  hubSceneLayout();
+  return {lo,hi,W:544,H:306,up:0,cx:HUB_SCENE.center.x,cy:HUB_SCENE.center.y};
 }
 function hubWarpDraw(g, t){
   const {lo,hi,W,H,cx,cy,up}=g;
@@ -18850,10 +18880,7 @@ function playHubWarp(done){
   avas.forEach((b,i)=>{
     const th = n===1 ? 0 : (i/n)*Math.PI*2 + Math.PI/2;
     const r  = n===1 ? 0 : (n<=3 ? 7 : 9);
-    b.style.transitionDuration=(HUB_WARP.gather/1000)+'s';
-    b.style.transitionDelay='';
-    b.style.left=(HUB_WALK.cx + Math.cos(th)*r)+'%';
-    b.style.top =(HUB_WALK.cy + Math.sin(th)*r*0.45)+'%';
+    hubMoveAvatar(b,{x:Math.round(HUB_WALK.cx+Math.cos(th)*r),y:Math.round(HUB_WALK.cy+Math.sin(th)*r*.45)},HUB_WARP.gather);
     const wrap=b.querySelector('.hub-ava-wrap');
     if(wrap) wrap.style.transform = (Math.cos(th)>0.2 ? 'scaleX(-1)' : 'scaleX(1)');   // 中心を向く
   });
@@ -18868,7 +18895,7 @@ function playHubWarp(done){
   avas.forEach((b,i)=>{
     hubAnimLater(()=>{
       b.style.transition='opacity '+HUB_WARP.vanishMs+'ms ease, transform '+HUB_WARP.vanishMs+'ms ease-in';
-      b.style.transform='translate(-50%,-80%) scale(0.35,1.7)';
+      b.style.transform='translate(-50%,-87.5%) scale(0.35,1.7)';
       b.style.opacity='0';
     }, HUB_WARP.vanish + i*HUB_WARP.vanishGap);
   });
@@ -18880,10 +18907,7 @@ function playHubWarp(done){
     fadeToBlack(HUB_WARP.whiteMs, ()=>{
       hubWarpStop();
       ui.classList.remove('hub-leaving');
-      avas.forEach(b=>{
-        b.style.transitionDelay=''; b.style.transitionDuration='';
-        b.style.transition=''; b.style.opacity=''; b.style.transform='';
-      });
+      hubResetAvatars(avas);
       done();
       flashFade(480);                // 白はもう乗っている。探索画面の上でそれを抜く
       setTimeout(()=>{ if(f) f.style.background=''; }, 560);

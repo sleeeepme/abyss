@@ -303,7 +303,8 @@ R.hubIntroSettles = await pg.evaluate(()=>{
   const hero=document.querySelector('[data-hubava="hero"]');
   const top=parseFloat(hero.style.top);
   const uiShown = !el('hubui').classList.contains('hub-intro');
-  const insidePlaza = top>0 && top<100;
+  const pos=hubAvatarPoint(hero);
+  const insidePlaza = hubCanStand(pos.x,pos.y)&&hubInsidePolygon(pos.x,pos.y,HUB_SCENE.floors[0]);
   const landedOnScreen = hero.getBoundingClientRect().top < innerHeight*0.9;
   return {top, uiShown, insidePlaza, landedOnScreen,
           ok: uiShown && insidePlaza && landedOnScreen};
@@ -320,34 +321,34 @@ R.departureMarch = await pg.evaluate(()=>{
   const stillTown = S.screen==='town';
   const noRunYet  = !S.run;
   const uiHidden  = el('hubui').classList.contains('hub-leaving');
-  /* 縦一列であること：left は全員そろって 50%、top は一人ずつ下へずれる。
+  /* 縦一列であること：原画上の目的地xは敷居と同じ、yは一人ずつ下へずれる。
      横一列だと全員が同時に口へ着いてしまい「一斉に消えた」に見えるので、
      **同じ列で前後に並んでいる**ことがこの演出の形そのもの。 */
-  const sameColumn = avas.length>0 && avas.every(b=>b.style.left==='50%');
-  const tops = avas.map(b=>parseFloat(b.style.top));
+  const sameColumn = avas.length>0 && avas.every(b=>+b.dataset.tx===HUB_SCENE.cave.x);
+  const tops = avas.map(b=>+b.dataset.ty);
   const stacked = tops.every((t,i)=> i===0 || t>tops[i-1]);   // 後ろの人ほど下
   const linedUp = sameColumn && stacked;
   return {n:avas.length, stillTown, noRunYet, uiHidden, tops, sameColumn, stacked, linedUp,
           ok: stillTown && noRunYet && uiHidden && linedUp};
 });
-await pg.waitForTimeout(1500);        // 整列＋行進が終わるころ
+await pg.waitForTimeout(2000);        // 整列＋2人の実移動が終わり、敷居で消えるころ
 /* 5-e. 洞窟の口で**止まる**こと。画面の外まで歩かせると、岩壁より上＝
         宙に浮いて見える（報告：「画面の一番上まで行くと中に浮いているように
         見える」）。止まった位置から、そのまま消えていく。 */
 R.departureStopsAtCave = await pg.evaluate(()=>{
   const avas=[...document.querySelectorAll('#hub-avatars .hub-ava')];
-  const stopsAtCave = avas.length>0 && avas.every(b=>b.style.top===HUB_CAVE_TOP+'%');
+  const stopsAtCave = avas.length>0 && avas.every(b=>+b.dataset.py===HUB_SCENE.cave.y&&+b.dataset.px===HUB_SCENE.cave.x);
   // 画面の中に留まっている（＝外へ歩き抜けていない）
   const staysOnScreen = avas.every(b=>{
     const r=b.getBoundingClientRect(); return r.top>0 && r.bottom<innerHeight;
   });
-  const aboveTheGate = HUB_CAVE_TOP < 27;     // 門（.hub-dive）は 27%
+  const aboveTheGate = HUB_SCENE.cave.y < 112; // 原画の石段上端・霧の敷居
   const fadingOut = avas.some(b=>b.style.opacity==='0');
   return {tops:avas.map(b=>b.style.top), caveTop:HUB_CAVE_TOP,
           stopsAtCave, staysOnScreen, aboveTheGate, fadingOut,
           ok: stopsAtCave && staysOnScreen && aboveTheGate && fadingOut};
 });
-await pg.waitForTimeout(1500);        // 消え切って暗転するまで
+await pg.waitForTimeout(1000);        // 消え切って暗転するまで
 // 5-f. 抜けた先が探索画面。演出用のクラスは残さない
 R.departureArrives = await pg.evaluate(()=>{
   const dove    = S.screen==='game' && !!S.run;
@@ -373,10 +374,10 @@ R.warpGathers = await pg.evaluate(()=>{
   el('ds-go').dispatchEvent(new MouseEvent('click',{bubbles:true}));
   const avas=[...document.querySelectorAll('#hub-avatars .hub-ava')];
   const stillTown = S.screen==='town' && !S.run;
-  // 全員が広場の真ん中（HUB_WALK の中心）のまわりへ向かう。門の列（left:50% の縦一列）ではない
+  // 原画の広場中心へ集まる。移動中は目的地dataset.tx/tyを確認する。
   const nearCenter = avas.length>0 && avas.every(b=>
-    Math.abs(parseFloat(b.style.left)-HUB_WALK.cx)<=10 && Math.abs(parseFloat(b.style.top)-HUB_WALK.cy)<=6);
-  const notMarching = !avas.some(b=>b.style.top===HUB_CAVE_TOP+'%');
+    Math.abs(+b.dataset.tx-HUB_WALK.cx)<=10 && Math.abs(+b.dataset.ty-HUB_WALK.cy)<=6);
+  const notMarching = !avas.some(b=>+b.dataset.ty===HUB_SCENE.cave.y);
   const circleShown = el('hub-warp-lo').style.display==='block' && el('hub-warp-hi').style.display==='block';
   return {n:avas.length, listShowsPortalFloor, stillTown, nearCenter, notMarching, circleShown,
           ok: listShowsPortalFloor && stillTown && nearCenter && notMarching && circleShown};
