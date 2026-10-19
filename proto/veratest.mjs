@@ -83,4 +83,19 @@ R.form2Art = await pg.evaluate(async ()=>{
   const drawn = !!CAVE._sprite(e);
   return {ready:V.ready(0), c0, c1, c1l, c15, drawn, ok: V.ready(0) && c0===0 && c1===1 && c1l===2 && c15===15 && drawn};
 });
+
+/* 部位破壊で破片が飛び、4本目で胴が落ちて着地の演出（揺れ）が1度だけ出る */
+R.breakFx = await pg.evaluate(async ()=>{
+  for(let i=0;i<40 && !(CAVE.vera2 && CAVE.vera2.ready(0)); i++) await new Promise(r=>setTimeout(r,50));
+  TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); TH.immortal();
+  const e=W.enemies.find(x=>x.uniqueBoss===10); bossChangeForm(e); if(S.run.formFx) S.run.formFx=null; e._cf=1;
+  const shot=()=>CAVE._sprite(e);
+  shot(); FEEL.particles=[];
+  const p=e.parts.find(q=>q.id==='SW'); p.hp=1; partHit(e,5,e.x-1.6,e.y+1.4);
+  for(let i=0;i<20 && !FEEL.particles.length; i++){ shot(); await new Promise(r=>setTimeout(r,50)); }
+  const debris=FEEL.particles.length;
+  for(const q of e.parts){ q.hp=1; } for(const [id,dx,dy] of [['SE',1.6,1.4],['NW',-1.6,-1.4],['NE',1.6,-1.4]]) partHit(e,5,e.x+dx,e.y+dy);
+  const t0=performance.now(); while(performance.now()-t0<600){ shot(); await new Promise(r=>setTimeout(r,30)); }
+  return {debris, slam:!!e._v2Slam, ok: debris>40 && !!e._v2Slam};
+});
 await done(b, errs, R);

@@ -3488,6 +3488,10 @@ function vera2Draw(e,t){
   VERA2.need(combo);
   if(!vera2Ready(combo)){ if(!vera2Ready(0)) return null; }
   const useC=vera2Ready(combo)?combo:0;
+  // 壊れ方が増えた：新しい絵が読めたら、消えたドットを破片にして飛ばす（1度だけ）
+  if(e._v2Combo==null) e._v2Combo=useC;
+  if(useC!==e._v2Combo){ if((useC&~e._v2Combo) && !e.dead) e._v2Burst={from:e._v2Combo,to:useC}; e._v2Combo=useC; }
+  if(e.partsAll && e._v2AllT==null) e._v2AllT=t;
   // ---- どのコマか ----
   const down=e.down>0, casting=!down&&(!!e.cast||e.tele>0);
   const moving=!e.partsAll && !down && footSpeed(e,t)>.3;
@@ -3512,13 +3516,68 @@ function vera2Draw(e,t){
     L.set(c,v); return v; };
   // ---- 貼る：コマの錨点 (ax,ay) を PT.ox、足元 feet を PT.oy に ----
   const N=PT.N, u=SPR.u32, W=VERA2.w, H=VERA2.h, SW=VERA2.sw, base=VERA2.baseU, dif=useC?VERA2.diffU[useC]:null;
-  const X0=Math.round(PT.ox-VERA2.ax), Y0=Math.round(PT.oy-VERA2.feet), fx=f*W;
+  const X0=Math.round(PT.ox-VERA2.ax), Y0n=Math.round(PT.oy-VERA2.feet), fx=f*W;
+  const Y0=Y0n+vera2Drop(e,t);                           // 4本折られた：一度浮いて、ズドンと落ちて低く座る
   for(let y=0;y<H;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const row=y*SW+fx, out=Y*N;
     for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue;
       let c=base[row+x];
       if(dif){ const d=dif[row+x]; if(d>>>24) c=(d>>>0)===V2_MAGENTA?0:d; }
       if(c>>>24) u[out+X]=lit(c>>>0); } }
-  return [X0+VERA2.ax-PT.ox, Y0+VERA2.ay-PT.oy];
+  if(e._v2Burst && vera2Ready(e._v2Burst.to)) { vera2Shatter(e,VERA2.anims.idle[0],X0,Y0,face); e._v2Burst=null; }   // 色は被弾の白赤でなく、待機のコマから
+  return [X0+VERA2.ax-PT.ox, Y0n+VERA2.ay-PT.oy];
+}
+/* 4本折られたときの胴の上下（ドット）。キー：浮く→落ちる→着地（ここで揺れ・輪・土煙）→弾んで座る */
+const V2_DROP=[[0,0],[.08,-3],[.15,-4],[.22,7],[.28,4],[.36,6],[.48,5]];
+function vera2Drop(e,t){
+  if(e._v2AllT==null) return 0;
+  const a=t-e._v2AllT; let v=V2_DROP[V2_DROP.length-1][1];
+  for(let i=0;i<V2_DROP.length-1;i++){ const [t0,v0]=V2_DROP[i],[t1,v1]=V2_DROP[i+1];
+    if(a<t1){ v=v0+(v1-v0)*Math.max(0,(a-t0)/(t1-t0)); break; } }
+  if(a>=.22 && !e._v2Slam && !e.dead){ e._v2Slam=true; vera2Slam(e); }
+  return Math.round(v);
+}
+/* 部位破壊の爆散：前の絵にあって今の絵で消えた（変わった）ドットを、その色のまま破片にして外へ飛ばす。
+   折れ口の青緑の火花と、細かい石くずを足す。 */
+function vera2Shatter(e,f,X0,Y0,face){
+  if(typeof FEEL==='undefined' || !FEEL.particles) return;
+  const W=VERA2.w, H=VERA2.h, SW=VERA2.sw, base=VERA2.baseU, dA=e._v2Burst.from?VERA2.diffU[e._v2Burst.from]:null, dB=VERA2.diffU[e._v2Burst.to];
+  const px=(d,i)=>{ let c=base[i]; if(d){ const v=d[i]; if(v>>>24) c=(v>>>0)===V2_MAGENTA?0:v; } return c>>>0; };
+  const pts=[]; let sx=0, sy=0;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const i=y*SW+f*W+x, a=px(dA,i); if(!(a>>>24)) continue;
+    const b=px(dB,i); if(b===a) continue; pts.push([x,y,a]); sx+=x; sy+=y; }
+  if(!pts.length) return;
+  const cx=sx/pts.length, cy=sy/pts.length, sc=.5/Q;                 // ヴェラは主人公と同じ細かさ（半分のドット）
+  const rgb=c=>[c&255,(c>>8)&255,(c>>16)&255];
+  const ax=VERA2.ax, ay=VERA2.ay;
+  const toW=(x,y)=>({x:e.x+(x-ax)*sc*face, y:e.y+(y-ay)*sc});
+  let n=0;
+  for(const [x,y,c] of pts){
+    if((x*7+y*13)%2) continue;                                        // 半分だけ（多すぎると重い）
+    const p=toW(x,y), dx=(x-cx)||((x*31)%5-2), dy=(y-cy)||-1, l=Math.hypot(dx,dy)||1, noise=((x*73+y*151)%97)/97;
+    const sp=2.2+noise*3.2, col=rgb(c);
+    FEEL.particles.push({x:p.x, y:p.y, vx:dx/l*sp*face, vy:dy/l*sp-2.4-noise*1.5, life:.55+noise*.45, max:.55+noise*.45,
+      size:(noise>.7?3:2)*sc, c:'rgb('+col.join(',')+')'}); n++;
+  }
+  const c0=toW(cx,cy);
+  for(let i=0;i<22;i++){ const a=i/22*Math.PI*2+((i*37)%7)*.1, sp=3.5+(i%5)*.9, glow=i%3?[150,232,222]:[226,250,244];
+    FEEL.particles.push({x:c0.x, y:c0.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-1.8, life:.35+(i%4)*.08, max:.6, size:2*sc, c:'rgb('+glow.join(',')+')'}); }
+  for(let i=0;i<16;i++){ const a=(i/16-.5)*Math.PI*.9, sp=1+(i%4)*.5, g=[58+(i%3)*14,64+(i%3)*14,63+(i%3)*14];
+    FEEL.particles.push({x:c0.x, y:c0.y+.15, vx:Math.sin(a)*sp*2, vy:-Math.cos(a)*sp*.6, life:.7+(i%5)*.1, max:1, size:2*sc, c:'rgb('+g.join(',')+')'}); }
+  if(FEEL.particles.length>1600) FEEL.particles.splice(0,FEEL.particles.length-1600);
+}
+/* 4本折られて胴が地面に落ちた瞬間：強い揺れ・大きな衝撃の輪・地面を這う土煙・跳ねる石くず */
+function vera2Slam(e){
+  try{ if(typeof feelKick==='function') feelKick(7.0,.5); }catch(err){}
+  try{ if(typeof W!=='undefined' && W.fx){ W.fx.push({t:'shock', x:e.x, y:e.y+.35, r:2.4, life:.45, max:.45, col:'#c8d4cf'});
+                                            W.fx.push({t:'shock', x:e.x, y:e.y+.35, r:1.3, life:.3, max:.3, col:'#96e8de'}); } }catch(err){}
+  if(typeof FEEL==='undefined' || !FEEL.particles) return;
+  const sc=.5/Q, gy=e.y+(VERA2.feet-VERA2.ay)*sc;
+  for(let i=0;i<70;i++){ const s=i%2?1:-1, k=(i*0.6180339)%1, sp=1.4+k*3.6, g=60+((i*29)%40);
+    const col=[g,g+6,g+5];
+    FEEL.particles.push({x:e.x+s*(0.4+k*1.2), y:gy-k*.15, vx:s*sp, vy:-.4-k*.9, life:.6+k*.6, max:1.2, size:(k>.6?3:2)*sc, c:'rgb('+col.join(',')+')'}); }
+  for(let i=0;i<26;i++){ const a=-Math.PI*(.15+.7*((i*0.381966)%1)), sp=2.5+(i%6)*.7, col=i%4?[102,122,121]:[150,232,222];
+    FEEL.particles.push({x:e.x+((i%9)-4)*.12, y:gy-.1, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:.5+(i%5)*.08, max:.9, size:2*sc, c:'rgb('+col.join(',')+')'}); }
+  if(FEEL.particles.length>1600) FEEL.particles.splice(0,FEEL.particles.length-1600);
 }
 function veraDraw(e,t){
   if(!VERA.ambPos){ VERA.ambPos=[]; VERA_SPR.amb.forEach((v,i)=>VERA.ambPos[v]=i); }
