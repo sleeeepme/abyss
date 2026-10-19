@@ -7456,7 +7456,7 @@ function partHit(e, dmg, sx, sy){
   W.fx.push({t:'shock', x:e.x+p.ox, y:e.y+p.oy, r:0.9, life:0.3, max:0.3, col:'#b8b0a0'});
   if(e.parts.every(q=>q.broken) && !e.partsAll){
     e.partsAll=true; e.def*=P_.allDef;
-    log(e.name+'——脚をすべて失った。守りが大きく崩れた');
+    log(e.name+'——脚をすべて失った。もう歩けない。守りも大きく崩れた');
     W.pops.push({x:e.x, y:e.y-1.2, txt:'防御ダウン', c:'#ff9a6a', life:1.4});
   }
   return p;
@@ -12506,6 +12506,9 @@ function enemyUpdate(e,dt){
        溜めて跳ぶ、を繰り返すのがカエルの動き方でもある。 */
     return;
   }
+  /* 脚を4本とも砕かれた（部位破壊の全部）ボスは、その場から歩けない。技は撃てる。
+     2026-10-19 ユーザー要望「脚がすべて壊されたら動けないようにして」 */
+  if(e.partsAll){ mvx=0; mvy=0; e.vx=0; e.vy=0; }
   e.pathHold = Math.max(0, (e.pathHold||0) - dt);
   if(e.intruder && (mvx||mvy)
      && (e.pathHold>0 || !losClear(e.x, e.y, tg.x, tg.y))){
@@ -22118,7 +22121,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261013-level-color"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261008a"></script>
+<script src="cave-look.js?v=20261019a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

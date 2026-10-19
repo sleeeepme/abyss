@@ -54,4 +54,33 @@ R.legParts = await pg.evaluate(()=>{
   return {none1, n, routed, broke, down0, still, recovered, all, defDrop:+defDrop.toFixed(2),
     ok: none1 && n===4 && routed && broke && down0>2 && still && recovered && all && defDrop<0.5};
 });
+
+/* 脚を4本とも壊したら歩けない（技は撃てる）。1本だけ壊した時はまだ歩く（2026-10-19） */
+R.legsAllImmobile = await pg.evaluate(()=>{
+  TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[]; TH.immortal();
+  const e=W.enemies.find(x=>x.uniqueBoss===10);
+  bossChangeForm(e); if(S.run.formFx) S.run.formFx=null;
+  const hx=e.x, hy=e.y;
+  const walkFor=(sec)=>{ e.x=hx; e.y=hy; P.x=hx+6; P.y=hy; const x0=e.x,y0=e.y; for(let i=0;i<sec*20;i++){ e.cast=null; e.tele=0; e.cd=9; e.down=0; e.roar=0; e.recover=0; e.broken=0; enemyUpdate(e,0.05); } return Math.hypot(e.x-x0,e.y-y0); };
+  const before=walkFor(1.0);
+  e.parts.find(p=>p.id==='SW').broken=true;
+  const oneBroken=walkFor(1.0);
+  for(const p of e.parts) p.broken=true; e.partsAll=true;
+  const allBroken=walkFor(1.5);
+  return {before:+before.toFixed(2), oneBroken:+oneBroken.toFixed(2), allBroken:+allBroken.toFixed(3),
+    ok: before>0.3 && oneBroken>0.3 && allBroken<1e-6};
+});
+/* 第二形態は新しい絵（vera2Draw）で描かれる。脚の壊れ方で絵の組み合わせが変わる */
+R.form2Art = await pg.evaluate(async ()=>{
+  for(let i=0;i<40 && !(CAVE.vera2 && CAVE.vera2.ready(0)); i++) await new Promise(r=>setTimeout(r,50));
+  TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true);
+  const e=W.enemies.find(x=>x.uniqueBoss===10);
+  bossChangeForm(e); if(S.run.formFx) S.run.formFx=null;
+  e._cf=1;
+  const V=CAVE.vera2; const c0=V.combo(e,1);
+  e.parts.find(p=>p.id==='SW').broken=true; const c1=V.combo(e,1), c1l=V.combo(e,-1);
+  for(const p of e.parts) p.broken=true; const c15=V.combo(e,1);
+  const drawn = !!CAVE._sprite(e);
+  return {ready:V.ready(0), c0, c1, c1l, c15, drawn, ok: V.ready(0) && c0===0 && c1===1 && c1l===2 && c15===15 && drawn};
+});
 await done(b, errs, R);
