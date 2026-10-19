@@ -1465,7 +1465,7 @@
     ・<b>5階層ごとにボス</b>。10の倍数は<b style="color:#ffd06a">大ボス</b>、
       それ以外の5の倍数は<b style="color:#d6b34a">中ボス</b>。<br>
     ・<b>ボスを倒すまで穴は封鎖</b>される。倒すと帰還ポータルが開く。<br>
-    ・<b>名前とHPゲージは一撃入れてから</b>出る。それまでは金の輪と王冠だけが目印。<br>
+    ・<b>名前とHPゲージは一撃入れてから</b>出る。それまでは大きさが目印。<br>
     ・ボスは<b>とても大きい</b>。当てやすいが、殴られる範囲も広い。<br>
     ・<b style="color:#ff7050">赤い図形</b>が出たら<b>範囲攻撃</b>。図形の中がそのまま当たる範囲で、
       溜めている間ボスは止まっているので<b>歩いて外へ出れば避けられる</b>。<br>
@@ -15735,21 +15735,8 @@ function draw(){
       ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,R+10,0,7); ctx.stroke();
       ctx.globalAlpha=1;
     }
-    // 金の輪と王冠は「これが主だ」の印。幻が出ているあいだは本体からも外す。
-    if(e.boss && !disg){
-      const gold = e.tier==='final' ? '#ff9a5a' : e.tier==='great' ? '#ffd06a' : '#d6b34a';
-      /* 周りの金の二重の輪はやめた（報告「ボスの周りに出ている円をなくして」）。
-         主の印は王冠と上の HP バーで足りている。 */
-      ctx.globalAlpha=e.dead?Math.max(0,e.fade/0.3):1;
-      // 王冠
-      ctx.fillStyle=gold;
-      const cw=R*0.9, cy2=sy-R-TS*0.30;
-      ctx.beginPath();
-      ctx.moveTo(sx-cw,cy2+TS*0.14); ctx.lineTo(sx-cw,cy2-TS*0.10);
-      ctx.lineTo(sx-cw*0.45,cy2+TS*0.02); ctx.lineTo(sx,cy2-TS*0.14);
-      ctx.lineTo(sx+cw*0.45,cy2+TS*0.02); ctx.lineTo(sx+cw,cy2-TS*0.10);
-      ctx.lineTo(sx+cw,cy2+TS*0.14); ctx.closePath(); ctx.fill();
-    }
+    /* ボスの頭上の王冠もやめた（報告「ボスの上の王冠マークは無くして」）。
+       主の印は上の HP バー（#bossbar）と大きさで足りている。 */
     if(!e.dead){
       /* 頭上のHP帯も伏せる。幻は湧いた直後が満タンなので、
          既に削れている本体だけが帯を出していると、殴る前に本体が割れる。
