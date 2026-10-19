@@ -347,9 +347,15 @@ killEnemy=function(e,byAlly){
     const screen=S.screen,modals=[...document.querySelectorAll('.modal.on')];
     const pending=screen!=='game'?()=>{setScreen(screen);modals.forEach(n=>n.classList.add('on'));}:null;
     if(pending){modals.forEach(n=>n.classList.remove('on'));setScreen('game');}
+    /* ヴェラ第二形態は撃破演出（cave-look.js の vera2DeathDraw、約7.5秒）を流す。
+       そのあいだ世界を止めておき、汎用の金の飛沫と輪は出さない（演出の中で爆散する）。 */
+    const dLen=(window.CAVE&&CAVE.vera2&&CAVE.vera2.deathLen)?CAVE.vera2.deathLen(e):0;
+    if(dLen>0){ FEEL.boss={x:e.x,y:e.y,age:0,pending,screen,dur:dLen+0.25};feelKick(4,.3); }
+    else{
     FEEL.boss={x:e.x,y:e.y,age:0,pending,screen};feelSlow(.32,.2);feelKick(7,.4);
     feelSpray(e.x,e.y,'#ffe5a0',70,4.5);
     W.fx.push({t:'feelring',x:e.x,y:e.y,col:'#ffe5a0',r:4,life:.85,max:.85});
+    }
   }
 };
 function feelDropOffset(d){
@@ -364,7 +370,7 @@ update=function(dt){
   if(FEEL.boss){
     const b=FEEL.boss;b.age+=dt;updateFeel(dt);S.run.elapsed+=dt;
     W.fx=W.fx.filter(f=>{f.life-=dt;return f.life>0;});
-    if(b.age>=FEEL_TUNING.bossSeconds){FEEL.boss=null;FEEL.slow=0;FEEL.slowScale=1;if(b.pending)b.pending();}
+    if(b.age>=(b.dur||FEEL_TUNING.bossSeconds)){FEEL.boss=null;FEEL.slow=0;FEEL.slowScale=1;if(b.pending)b.pending();}
     return;
   }
   const scale=FEEL.slow>0?FEEL.slowScale:1;
@@ -768,7 +774,7 @@ function beginFeelWorld(){
   syncFeel(); ctx.save();
   if(FEEL_REDUCED.matches) return;
   if(FEEL.boss){
-    const b=FEEL.boss,k=Math.sin(Math.PI*clamp(b.age/FEEL_TUNING.bossSeconds,0,1)),zoom=1+FEEL_TUNING.bossZoom*k;
+    const b=FEEL.boss,k=Math.sin(Math.PI*clamp(b.age/(b.dur||FEEL_TUNING.bossSeconds),0,1)),zoom=1+FEEL_TUNING.bossZoom*k;
     const x=innerWidth/2+clamp((b.x-P.x)*TS,-innerWidth*.28,innerWidth*.28);
     const y=innerHeight/2+clamp((b.y-P.y)*TS,-innerHeight*.28,innerHeight*.28);
     ctx.translate(x,y);ctx.scale(zoom,zoom);ctx.translate(-x,-y);

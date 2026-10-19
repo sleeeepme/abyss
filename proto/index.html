@@ -15642,7 +15642,8 @@ function draw(){
     // looksBoss は門番の幻。大きさまで本体と同じにしないと、輪を消しても一目で分かる。
     const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:e.swarmling?0.17:0.32);   // 磯虫は小さい（影・HP帯も合わせる）
     const shadowSize = mossSpriteKey(e) ? R*2.6 : CharacterArt.enemyKey(e) ? (e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1)) : R*2;
-    drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?Math.max(0,e.fade/0.3):1);
+    /* ヴェラ第二形態の撃破演出は、弾けた瞬間（e._v2Boom）に影も消す（体が無いのに影だけ残らないように） */
+    drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?(e._v2Boom?0:Math.max(0,(e.fade??0.3)/0.3)):1);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast && !engulfed) uiLater(()=>drawBossCast(e, sx, sy, R));
@@ -22118,10 +22119,10 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261009a"></script>
-<script src="game-feel.js?v=20261013-level-color"></script>
+<script src="game-feel.js?v=20261019-vera-death"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261019b"></script>
+<script src="cave-look.js?v=20261019c"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
