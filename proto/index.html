@@ -5198,7 +5198,7 @@ function fireAllyArt(a, st, id, tgt, def){
     W.fx.push({t:'ultring', artId:'a_spin', x:a.x, y:a.y, r:0, max:r, life:0.4, maxLife:0.4, col:def.col});
     if(typeof feelPixelArt==='function') feelPixelArt('a_spin', a.x, a.y, {range:r, ent:a, angle:Math.atan2(a.diry||0, a.dirx||1)});
     nearEnemies(a.x, a.y, r+1).forEach(e=>{
-      if(e.dead || Math.hypot(e.x-a.x, e.y-a.y) > r+e.r) return;
+      if(e.dead || eSurf(e, a.x, a.y) > r) return;
       hitEnemyByAlly(a, st, e, 1.5);
       addStatus(e, 'stagger', a.lv);
     });
@@ -5265,11 +5265,12 @@ function hitEnemyByAlly(a, st, e, mult){
   if(eliteEvades(e)) return;           // 精鋭の性質「影の」
   // 背面（BACK_MUL）。敵が主人公を追っているあいだ、仲間は自然に背を取る
   const dmg = Math.max(1, Math.round(st.atk*mult*backAttackMul(e, a.x, a.y)*duelVuln(e)));
-  e.hp -= dmg; e.hit = Math.max(e.hit, 0.12);
+  const hitPart = e.parts ? partFor(e, a.x, a.y) : null;   // 仲間の一撃も、仲間に近い脚に当たれば脚だけに入る
+  if(hitPart) partHit(e, dmg, a.x, a.y, hitPart); else e.hp -= dmg;
+  e.hit = Math.max(e.hit, 0.12);
   linkGain(LINK.hitAlly);
   if(isDuelBoss(e) && e.hp>0) addBreak(e, DUEL.pt.hit*DUEL.pt.allyMul);   // 仲間の手数も崩しに
-  if(e.parts) partHit(e, dmg, a.x, a.y);                // 仲間の一撃も、仲間の側の脚に入る
-  pop(e.x, e.y-0.3, dmg, jobDef(a.job).col);
+  pop(hitPart?e.x+hitPart.ox:e.x, (hitPart?e.y+hitPart.oy:e.y)-0.3, dmg, jobDef(a.job).col);
   applyAllyOnHit(a, e, st);
   if(e.hp<=0) killEnemy(e, a);
 }
@@ -5305,7 +5306,7 @@ function tickArts(dt){
         W.fx.push({t:'ultring', artId:f.artId, x:f.x, y:f.y, r:0, max:f.r, life:0.18, maxLife:0.18, col:f.col});
         if(f.artId && typeof feelPixelArt==='function') feelPixelArt(f.artId+'_hit', f.x, f.y);
         nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
-          if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
+          if(e.dead || eSurf(e, f.x, f.y) > f.r) return;
           e.hp-=f.dmg; e.hit=Math.max(e.hit,0.08);
           if(f.artId && typeof feelImpact==='function') feelImpact(e,{x:f.x,y:f.y},false,'pierce','neutral');
           pop(e.x, e.y-0.3, f.dmg, f.col);
@@ -5318,7 +5319,7 @@ function tickArts(dt){
         f.hit=true;
         if(!f.a || f.a.dead) continue;
         nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
-          if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
+          if(e.dead || eSurf(e, f.x, f.y) > f.r) return;
           hitEnemyByAlly(f.a, f.st, e, f.mult);
         });
       }
@@ -5327,7 +5328,7 @@ function tickArts(dt){
       if(f.tick<=0){
         f.tick = 0.4;                       // 0.4秒ごとに刻む（毎フレームだと数字が読めない）
         nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
-          if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
+          if(e.dead || eSurf(e, f.x, f.y) > f.r) return;
           const dmg=Math.max(1, Math.round(f.dps*0.4));
           e.hp-=dmg; e.hit=Math.max(e.hit,0.08);
           pop(e.x, e.y-0.3, dmg, f.col);
@@ -5369,7 +5370,7 @@ function tickArts(dt){
         f.tick=f.every;
         const bx=f.x+Math.cos(f.a)*f.r, by=f.y+Math.sin(f.a)*f.r;
         nearEnemies(bx, by, 1.2).forEach(e=>{
-          if(e.dead || Math.hypot(e.x-bx, e.y-by) > 0.9+e.r) return;
+          if(e.dead || eSurf(e, bx, by) > 0.9) return;
           artHit(f.c, f.def, e, f.def.mult);
         });
       }
@@ -5383,7 +5384,7 @@ function tickArts(dt){
       if(f.tick<=0){
         f.tick=f.every;
         nearEnemies(f.x, f.y, f.r+1).forEach(e=>{
-          if(e.dead || Math.hypot(e.x-f.x, e.y-f.y) > f.r+e.r) return;
+          if(e.dead || eSurf(e, f.x, f.y) > f.r) return;
           if(f.kind==='artcone'){
             const da=Math.abs(((Math.atan2(e.y-f.y, e.x-f.x)-f.a+Math.PI*3)%(Math.PI*2))-Math.PI);
             if(da>f.arc) return;
@@ -7432,31 +7433,37 @@ function bossChangeForm(e){
    脚は**盤面の上の向き**で持つ：手前（南）と奥（北）×東と西。体の中心からの位置（マス）。
    当てた一撃は、殴った者（弾ならその弾）から見た体の縁にいちばん近い、まだ壊れていない脚にも同じだけ入る。
    ＝回り込んで殴る側の脚が壊れる。片側から殴り続けると、反対側の脚は残る。 */
+/* 2026-10-20 ユーザー指定：「部位にも当たり判定を設定して、部位ごとにHPを設定してそれを壊すことで部位破壊に。
+   部位破壊すると本体に2割程度ダメージが入る」。
+   脚の一撃は**脚にだけ**入る（前は体に入った一撃が脚にも同じだけ入っていた）。体を殴りたければ真ん中を殴る。
+   脚の円は絵（cave-look.js の VERA_PX=1、横7.5マス）の脚の所：手前の脚は内側の下、奥の脚は外側。
+   脚の耐久は 0.10 → 0.18。壊すと本体に最大HPの2割（breakDmg）が入るので、脚に払ったぶんより少し得をする程度にした。 */
 const BOSS_PARTS={
-  legs:{hp:0.10,          // 脚1本の耐久（第二形態の最大HPに対する割合）
+  legs:{hp:0.18,          // 脚1本の耐久（第二形態の最大HPに対する割合）
+        breakDmg:0.20,    // 1本壊したとき本体に入るダメージ（最大HPに対する割合）
         down:3.0,         // 1本壊すごとのダウン（秒）。技・移動が止まる
         allDef:0.35,      // 4本とも壊したときの防御の倍率（＝65%減）
-        list:[{id:'SW',nm:'手前の左脚',ox:-0.95,oy:0.45},{id:'SE',nm:'手前の右脚',ox:0.95,oy:0.45},
-              {id:'NW',nm:'奥の左脚',ox:-0.85,oy:-0.35},{id:'NE',nm:'奥の右脚',ox:0.85,oy:-0.35}]},
+        list:[{id:'SW',nm:'手前の左脚',ox:-1.65,oy:1.35,r:0.7},{id:'SE',nm:'手前の右脚',ox:1.65,oy:1.35,r:0.7},
+              {id:'NW',nm:'奥の左脚',ox:-2.75,oy:1.0,r:0.7},{id:'NE',nm:'奥の右脚',ox:2.75,oy:1.0,r:0.7}]},
 };
 function makeBossParts(e, kind){
   const P_=BOSS_PARTS[kind]; if(!P_) return null;
-  return P_.list.map(q=>({id:q.id, nm:q.nm, ox:q.ox, oy:q.oy, max:Math.max(1,Math.round(e.maxHp*P_.hp)), hp:Math.max(1,Math.round(e.maxHp*P_.hp)), broken:false, hit:0, kind}));
+  return P_.list.map(q=>({id:q.id, nm:q.nm, ox:q.ox, oy:q.oy, r:q.r, max:Math.max(1,Math.round(e.maxHp*P_.hp)), hp:Math.max(1,Math.round(e.maxHp*P_.hp)), broken:false, hit:0, kind}));
 }
-/* 一撃が体のどの脚に入るか。殴った位置（sx,sy）から体の中心へ向かう線が体の縁を横切る所に、いちばん近い脚 */
+/* 一撃がどこに入るか。当たった所（sx,sy：弾の位置・殴った者の位置）からいちばん近い当たりの円が脚なら、その脚。体なら null */
 function partFor(e, sx, sy){
   if(!e.parts) return null;
-  const dx=sx-e.x, dy=sy-e.y, l=Math.hypot(dx,dy)||1, hx=e.x+dx/l*e.r*0.85, hy=e.y+dy/l*e.r*0.85;
-  let best=null, bd=1e9;
-  for(const p of e.parts){ if(p.broken) continue; const d=Math.hypot(e.x+p.ox-hx, e.y+p.oy-hy); if(d<bd){ bd=d; best=p; } }
-  return (best && bd<=e.r*1.25) ? best : null;
+  return eNear(e, sx, sy).part;
 }
-function partHit(e, dmg, sx, sy){
-  const p=partFor(e, sx, sy); if(!p || !(dmg>0) || e.dead) return null;
+/* 脚に入った一撃。脚のHPだけを削る（体のHPは減らさない）。壊れたら本体に最大HPの2割 */
+function partHit(e, dmg, sx, sy, p){
+  p=p||partFor(e, sx, sy); if(!p || !(dmg>0) || e.dead) return null;
   p.hp-=dmg; p.hit=0.25;
   if(p.hp>0) return p;
   p.hp=0; p.broken=true;
   const P_=BOSS_PARTS[p.kind]||BOSS_PARTS.legs;
+  const bd=Math.max(1, Math.round(e.maxHp*(P_.breakDmg||0)));
+  if(bd>0){ e.hp-=bd; pop(e.x, e.y-0.6, bd, '#ffd06a', '', true); }
   e.down=P_.down; e.cast=null; e.tele=0; e.vx=0; e.vy=0; e.hit=0.4; e.combo=null;
   addBreak(e, DUEL.pt.leg);                                     // 脚を砕けば崩しにも大きく入る
   log(e.name+'——'+p.nm+'が砕けた。崩れ落ちた');
@@ -8507,6 +8514,7 @@ function startRun(depth){
   S.runs++;
   _artNamePend=null;        // 前の探索で閃いて、訊きそびれた分は持ち越さない
   _artFlashLog=null;
+  _notifQ=[]; _notifT=0; _feelHold=null;   // 前の探索の知らせの列も持ち越さない
   if(!S.hero) S.hero=newHero();
   const d = depth||S.startDepth||1;
   S.run = {depth:d, loot:[], gold:0, ore:{}, kills:0, elapsed:0, charms:[], healUsed:false, pst:{}, pbu:{},
@@ -9181,7 +9189,7 @@ const GRID_CELL = 2;
 const EGrid = {cw:0, ch:0, cells:null, stamp:-1, n:-1};
 function gridBuild(){
   const f=W.fl; if(!f) return;
-  EGrid.stamp = _tickCount; EGrid.n = W.enemies.length;
+  EGrid.stamp = _tickCount; EGrid.n = W.enemies.length; EGrid.multi=false;
   EGrid.cw = Math.ceil(f.W/GRID_CELL);
   EGrid.ch = Math.ceil(f.H/GRID_CELL);
   const n = EGrid.cw*EGrid.ch;
@@ -9197,7 +9205,15 @@ function gridBuild(){
        効率を少し捨ててでも「1体も落とさない」を優先する。 */
     const cx=clamp(Math.floor(e.x/GRID_CELL), 0, EGrid.cw-1);
     const cy=clamp(Math.floor(e.y/GRID_CELL), 0, EGrid.ch-1);
-    EGrid.cells[cy*EGrid.cw+cx].push(e);
+    /* 部位の当たり（ヴェラ第二形態の脚）は体の中心から3マスほど離れている。
+       脚の届く所までのマスにも入れておく（nearEnemies が同じ敵を2度返さないよう、そちらで重複を外す） */
+    const ext=hitExtent(e);
+    if(ext>GRID_CELL*0.5){
+      const x0=clamp(Math.floor((e.x-ext)/GRID_CELL),0,EGrid.cw-1), x1=clamp(Math.floor((e.x+ext)/GRID_CELL),0,EGrid.cw-1);
+      const y0=clamp(Math.floor((e.y-ext)/GRID_CELL),0,EGrid.ch-1), y1=clamp(Math.floor((e.y+ext)/GRID_CELL),0,EGrid.ch-1);
+      for(let yy=y0;yy<=y1;yy++) for(let xx=x0;xx<=x1;xx++) EGrid.cells[yy*EGrid.cw+xx].push(e);
+      EGrid.multi=true;
+    }else EGrid.cells[cy*EGrid.cw+cx].push(e);
   }
 }
 /* グリッドが古ければ組み直す。
@@ -9218,14 +9234,35 @@ function nearEnemies(x, y, r){
     const cell=EGrid.cells[cy*EGrid.cw+cx];
     for(let i=0;i<cell.length;i++) out.push(cell[i]);
   }
+  return EGrid.multi ? [...new Set(out)] : out;   // 何マスにも入っている敵（部位の当たりを持つ）を1度だけに
+}
+/* ---------- 部位の当たり（2026-10-20 ユーザー指定「敵の当たり判定が中央しかないので、部位にも設定して」） ----------
+   体の当たりは今までどおり中心の円（e.r）。部位（e.parts、今はヴェラ第二形態の脚）は、それぞれ絵の脚の所に
+   自分の円（p.ox/p.oy/p.r）を持つ。壊れた部位の円は消える。
+   eNear(e,x,y)：(x,y) からいちばん近い当たりの円（体か部位）と、その縁までの距離 d。
+   eSurf(e,x,y)：その距離だけ。今まで「中心までの距離 − e.r」で見ていた所は、全部これで見る。 */
+function hitCircles(e){
+  const out=[{x:e.x, y:e.y, r:e.r||0.3, part:null}];
+  if(e.parts) for(const p of e.parts) if(!p.broken) out.push({x:e.x+p.ox, y:e.y+p.oy, r:p.r||0.6, part:p});
   return out;
+}
+function eNear(e, x, y){
+  if(!e.parts){ const d=Math.hypot(e.x-x, e.y-y); return {x:e.x, y:e.y, d:d-(e.r||0.3), part:null}; }
+  let best=null;
+  for(const c of hitCircles(e)){ const d=Math.hypot(c.x-x, c.y-y)-c.r; if(!best||d<best.d) best={x:c.x, y:c.y, d, part:c.part}; }
+  return best;
+}
+function eSurf(e, x, y){ return eNear(e, x, y).d; }
+function hitExtent(e){
+  if(!e.parts) return e.r||0.3;
+  let m=e.r||0.3; for(const p of e.parts) m=Math.max(m, Math.hypot(p.ox,p.oy)+(p.r||0.6)); return m;
 }
 
 function nearestEnemy(maxDist){
   let best=null, bd=maxDist;
   for(const e of nearEnemies(P.x, P.y, maxDist+1)){
     if(e.dead) continue;
-    const d=Math.hypot(e.x-P.x,e.y-P.y)-e.r;
+    const d=eSurf(e,P.x,P.y);
     if(d<bd){ bd=d; best=e; }
   }
   return best;
@@ -9381,9 +9418,13 @@ function hitEnemy(e, st, mult, opt){
      1.8 にすると +17% → 実効 +13.6%。上限の 75% まで積んだときで +60%。 */
   const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm*duelVuln(e)), src.lv,
                           {ailMul: playerAilMul(st)});
-  e.hp-=r.total; e.hit=0.12;
+  /* 部位（ヴェラ第二形態の脚）に当たった一撃は、脚のHPだけを削る。当たった所は弾の位置か、殴った者の位置 */
+  const at = opt.at||(src===S.hero?P:src);
+  const hitPart = e.parts ? partFor(e, at.x, at.y) : null;
+  if(hitPart) partHit(e, r.total, at.x, at.y, hitPart);
+  else e.hp-=r.total;
+  e.hit=0.12;
   linkGain(src===S.hero ? LINK.hitHero : LINK.hitAlly);   // 連携値（一斉攻撃そのものの当たりでは溜まらない——linkGain が弾く）
-  if(e.parts){ const at=opt.at||(src===S.hero?P:src); partHit(e, r.total, at.x, at.y); }   // 部位破壊（ヴェラ第二形態の脚）
   feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
   /* 崩し。武器技・大技は1回の技につき1度だけ（duelCtx が数える）、それ以外は手数で溜まる */
@@ -9404,7 +9445,7 @@ function hitEnemy(e, st, mult, opt){
   const col = crit ? '#ffd06a'
             : weak ? '#8b93a7'
             : (DTYPE[r.mainType] ? DTYPE[r.mainType].col : '#fff');
-  pop(e.x,e.y,r.total,col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')), crit || r.weak);
+  pop(hitPart?e.x+hitPart.ox:e.x, hitPart?e.y+hitPart.oy:e.y, r.total, col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')), crit || r.weak);
   r.procs.forEach(sid=>W.pops.push({x:e.x,y:e.y-0.5,txt:STATUS[sid].nm,c:STATUS[sid].col,life:0.8}));
   if(st.leech) healEnt(src, r.total*st.leech/100);
   /* 命中したときだけ起きるぶん。血河・ノコギリ鉈の出血、トールハンマーの感電と
@@ -9448,8 +9489,8 @@ function meleeSwing(st, ang, mult){
   W.fx.push(sw);
   nearEnemies(P.x, P.y, range+1).forEach(e=>{
     if(e.dead) return;
-    const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
-    if(d>range+e.r) return;
+    const n_=eNear(e,P.x,P.y), dx=n_.x-P.x, dy=n_.y-P.y, d=Math.hypot(dx,dy);   // 脚にも当たる（eNear：体と脚のうち近い方）
+    if(n_.d>range) return;
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da>halfArc) return;
     swingMeets(sw, e, d);
@@ -9483,7 +9524,7 @@ function legendWave(st, ang){
   if(w.shape==='ring'){                       // ゴルディオン：自分を中心に円
     const r=w.r;
     W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:r, life:0.34, maxLife:0.34, col});
-    nearEnemies(P.x,P.y,r+1).forEach(e=>{ if(Math.hypot(e.x-P.x,e.y-P.y)<=r+e.r) hit(e); });
+    nearEnemies(P.x,P.y,r+1).forEach(e=>{ if(eSurf(e,P.x,P.y)<=r) hit(e); });
 
   }else if(w.shape==='line'){                 // ゲイボルグ／ハイペリオン：前方へ一直線
     const len=w.r, wide=w.wide||0.7;
@@ -9504,8 +9545,8 @@ function legendWave(st, ang){
     W.fx.push({t:'lwave', x:P.x, y:P.y, a:ang, life:0.34, max:0.34, r, arc:half, dt});
     nearEnemies(P.x,P.y,r+1).forEach(e=>{
       if(e.dead) return;
-      const dx=e.x-P.x, dy=e.y-P.y;
-      if(Math.hypot(dx,dy)>r+e.r) return;
+      const n_=eNear(e,P.x,P.y), dx=n_.x-P.x, dy=n_.y-P.y;
+      if(n_.d>r) return;
       const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
       if(da<=half) hit(e);
     });
@@ -9877,7 +9918,7 @@ function skHit(e, st, mult, t){
   if(t && t.status && !e.dead && e.hp>0) addStatus(e, t.status, S.hero.lv);
 }
 function skLiving(x, y, r){
-  return nearEnemies(x, y, r+1).filter(e=>!e.dead && Math.hypot(e.x-x, e.y-y) <= r+(e.r||0.3));
+  return nearEnemies(x, y, r+1).filter(e=>!e.dead && eSurf(e, x, y) <= r);
 }
 /* 凍結・呪印で脆くなっている分。duelVuln（ボスの崩れ）と同じ所で掛ける */
 const SK_FROZEN_VULN = 1.25;
@@ -9916,8 +9957,8 @@ const SKILL_FIRE = {
     if(typeof feelPixelArt==='function') feelPixelArt('s_wave', P.x, P.y, {angle:ang, range:v.reach, arc:v.arc});
     nearEnemies(P.x, P.y, v.reach+1).forEach(e=>{
       if(e.dead) return;
-      const dx=e.x-P.x, dy=e.y-P.y, d=Math.hypot(dx,dy);
-      if(d > v.reach+e.r) return;
+      const n_=eNear(e,P.x,P.y), dx=n_.x-P.x, dy=n_.y-P.y, d=Math.hypot(dx,dy);
+      if(n_.d > v.reach) return;
       const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
       if(da > half) return;
       skHit(e, st, v.mul, t);
@@ -10199,7 +10240,7 @@ function artStrikeRing(c, def, ang){
   artNow(c);
   W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:def.r, life:0.34, maxLife:0.34, col:def.col});
   nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
-    if(e.dead || Math.hypot(e.x-c.x, e.y-c.y) > def.r+e.r) return;
+    if(e.dead || eSurf(e, c.x, c.y) > def.r) return;
     artHit(c, def, e, def.mult);
   });
 }
@@ -10210,8 +10251,8 @@ function artStrikeCone(c, def, ang){
              dt:def.dt||c.st.dmgType});
   nearEnemies(c.x, c.y, def.r+1).forEach(e=>{
     if(e.dead) return;
-    const dx=e.x-c.x, dy=e.y-c.y;
-    if(Math.hypot(dx,dy) > def.r+e.r) return;
+    const n_=eNear(e,c.x,c.y), dx=n_.x-c.x, dy=n_.y-c.y;
+    if(n_.d > def.r) return;
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da<=half) artHit(c, def, e, def.mult);
   });
@@ -10271,7 +10312,7 @@ function fireArt(def, src){
       if(e.dead) return;
       const dx=gx-from.x, dy=gy-from.y, len2=dx*dx+dy*dy||1e-6;
       let t=((e.x-from.x)*dx+(e.y-from.y)*dy)/len2; t=clamp(t,0,1);
-      if(Math.hypot(e.x-(from.x+dx*t), e.y-(from.y+dy*t)) <= 0.85+e.r) artHit(c, def, e, def.mult);
+      if(eSurf(e, from.x+dx*t, from.y+dy*t) <= 0.85) artHit(c, def, e, def.mult);
     });
     if(c.isPlayer){ P.x=gx; P.y=gy; } else { c.ally.x=gx; c.ally.y=gy; }
 
@@ -10466,7 +10507,7 @@ function linkGain(v){
 /* 範囲の敵。中心は主人公、半径は弓の届く距離（体の大きさぶん足す——大きいボスの縁にも届く）。 */
 function linkTargets(){
   const R=linkRange();
-  return W.enemies.filter(e=>!e.dead && e.hp>0 && Math.hypot(e.x-P.x, e.y-P.y) <= R + (e.r||0));
+  return W.enemies.filter(e=>!e.dead && e.hp>0 && eSurf(e, P.x, P.y) <= R);
 }
 /* 近い敵を1つの雲にまとめる。雲が敵の数だけ並ぶと、ただの煙の列に見える。 */
 function linkClouds(tg){
@@ -10880,7 +10921,7 @@ function fireUltCore(){
   if(typeof feelSkillZoom==='function') feelSkillZoom();   // ボタンで放つ技は少しだけ寄る
   sayArt(P.x, P.y, u.nm, u.col);        // 技名を頭上に（大技も武器技も同じ作法）
   const ang = Math.atan2(P.diry||0, P.dirx||1);
-  const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && Math.hypot(e.x-P.x, e.y-P.y) <= r + e.r);
+  const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && eSurf(e, P.x, P.y) <= r);
 
   if(u.id==='quake'){
     const r = 3.2 + lv*0.35, mult = 2.6 + lv*0.55;
@@ -10912,7 +10953,7 @@ function fireUltCore(){
       const dx=gx-from.x, dy=gy-from.y, len2=dx*dx+dy*dy||1e-6;
       let t=((e.x-from.x)*dx+(e.y-from.y)*dy)/len2; t=clamp(t,0,1);
       const px=from.x+dx*t, py=from.y+dy*t;
-      if(Math.hypot(e.x-px, e.y-py) <= 0.85+e.r) hitEnemy(e, st, mult);
+      if(eSurf(e, px, py) <= 0.85) hitEnemy(e, st, mult);
     });
     P.invuln = 2.0 + lv*0.12;   // 抜けた直後だけ無敵。逃げにも切り込みにも使える
 
@@ -11706,7 +11747,7 @@ function relicShockwave(st, e){
   W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:RELIC_SHOCK_R, life:0.26, maxLife:0.26, col:'#a97fe0'});
   nearEnemies(e.x, e.y, RELIC_SHOCK_R+1).forEach(o=>{
     if(o.dead || o===e) return;
-    if(Math.hypot(o.x-e.x, o.y-e.y) > RELIC_SHOCK_R+o.r) return;
+    if(eSurf(o, e.x, e.y) > RELIC_SHOCK_R) return;
     hitEnemy(o, st, RELIC_SHOCK_MULT);
   });
 }
@@ -11722,7 +11763,7 @@ function applyAllyOnHit(a, e, st){
     W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:r, life:0.26, maxLife:0.26, col:'#c98adf'});
     nearEnemies(e.x, e.y, r+1).forEach(o=>{
       if(o.dead || o===e) return;
-      if(Math.hypot(o.x-e.x, o.y-e.y) > r+o.r) return;
+      if(eSurf(o, e.x, e.y) > r) return;
       hitEnemy(o, st, 0.45, {src:a});
     });
   }
@@ -11764,8 +11805,8 @@ function allyAttack(a, st, tgt){
   W.fx.push(sw);
   nearEnemies(a.x, a.y, range+1).forEach(e=>{
     if(e.dead) return;
-    const dx=e.x-a.x, dy=e.y-a.y, d=Math.hypot(dx,dy);
-    if(d>range+e.r) return;
+    const n_=eNear(e,a.x,a.y), dx=n_.x-a.x, dy=n_.y-a.y, d=Math.hypot(dx,dy);
+    if(n_.d>range) return;
     const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
     if(da>halfArc) return;
     swingMeets(sw, e, d);
@@ -12054,7 +12095,7 @@ function onLevelUp(h, isPlayer){
     W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:isPlayer?'#ffd06a':jobDef(h.job).col, life:1.2});
     if(isPlayer) _lvFlash = 1.0; // HPバーを光らせる
   };
-  if(_feelHold) _feelHold.fns.push(show); else show();     // ボスの撃破演出中は演出のあとに
+  if(_feelHold) _feelHold.lv.push(show); else show();      // ボスの撃破演出中は演出のあとに
   if(isPlayer){
     showBanner('Lv.'+lv, '', '#ffd06a', 2.2);
     grantCharPotential(h);       // レベルアップごとに1個、必ず潜在が手に入る（ユーザー要望）
@@ -12110,6 +12151,10 @@ let _potNoteT=0;
 function flushCharPotNotice(){
   if(!_charPotPend.length) return;
   if(_feelHold){ _feelHold.pot=true; return; }       // ボスの撃破演出のあいだは溜めておく
+  notify(()=>flushCharPotNow(), NOTIF_SEC.pot, 'pot');   // 帯と同じ列に並ぶ（Lv の帯のあとに出る）
+}
+function flushCharPotNow(){
+  if(!_charPotPend.length) return;
   const pots=_charPotPend; _charPotPend=[];
   const nd=el('potnote'); if(!nd) return;
   // 枠と光の色は、まとめたうちで一番高い色に合わせる
@@ -14876,7 +14921,7 @@ function update(dt){
       // 総当たりではなく、弾のいるマスの近傍だけ見る
       for(const e of nearEnemies(f.x, f.y, 1.6)){
         if(e.dead || f.hitIds.has(e)) continue;
-        if(Math.hypot(f.x-e.x,f.y-e.y) > e.r+0.25) continue;
+        if(eSurf(e,f.x,f.y) > 0.25) continue;
         f.hitIds.add(e);
         hitEnemy(e, stNow, f.mult ?? 1, {foot:f.foot, at:{x:f.x-f.vx*0.05, y:f.y-f.vy*0.05}});
         if(--f.pierce<=0) return false;   // 弓は 1 体で消える、杖は 2 体貫通
@@ -14909,9 +14954,9 @@ function update(dt){
       const ast=allyStats(f.src);
       for(const e of nearEnemies(f.x, f.y, 1.6)){
         if(e.dead || f.hitIds.has(e)) continue;
-        if(Math.hypot(f.x-e.x,f.y-e.y) > e.r+0.25) continue;
+        if(eSurf(e,f.x,f.y) > 0.25) continue;
         f.hitIds.add(e);
-        hitEnemy(e, ast, f.mult ?? 1, {src:f.src, forceCrit:f.crit, foot:f.foot});
+        hitEnemy(e, ast, f.mult ?? 1, {src:f.src, forceCrit:f.crit, foot:f.foot, at:{x:f.x-f.vx*0.05, y:f.y-f.vy*0.05}});
         // 専用技の「命中時」効果と、大魔導士の「炸裂」
   applyAllyOnHit(f.src, e, ast);
   // 魔法使いの「連鎖」: 近くの別の敵へ 1 度だけ跳ねる
@@ -14938,7 +14983,7 @@ function update(dt){
   W.pops=W.pops.filter(p=>p.life>0);
   tickLog(dt);
   tickPotNote(dt);
-  tickBannerQ();
+  tickNotifQ(dt);
 
   /* ---------- 壁にめり込んだ物を引き出す ----------
      落とし物は「敵がいた場所 ± 乱数」で置いている。壁際で倒すと
@@ -15814,6 +15859,17 @@ function draw(){
         uiLater(()=>{
           ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy+visTop-9,R*2,3.5);
           ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy+visTop-9,R*2*hpf,3.5);
+        });
+      }
+      /* 部位（脚）ごとのHP。削れた脚の上にだけ、橙の細い帯を出す（2026-10-20 部位ごとの当たり判定） */
+      if(e.parts && !disg){
+        uiLater(()=>{
+          for(const p of e.parts){
+            if(p.broken || p.hp>=p.max) continue;
+            const w=TS*0.9, px=sx+p.ox*TS-w/2, py=sy+(p.oy-(p.r||0.6))*TS-4;
+            ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(px,py,w,3);
+            ctx.fillStyle='#ffb04a'; ctx.fillRect(px,py,w*Math.max(0,p.hp)/p.max,3);
+          }
         });
       }
       /* 名前と、そのすぐ下に Lv。
@@ -16693,37 +16749,62 @@ function drawFrozen(){
    層の切り替わりと、装備の破損に使う。
    ログは流れて消えるので、見落としてはいけない事だけをここに出す。 */
 let _banner=null;   // {title, sub, col, t, max}
+/* ---------- 知らせは1つずつ、順番に（2026-10-20 ユーザー指定「クリア後にレベルアップや解放要素が一斉に出て情報過多。
+   通知系の要素はゆっくり順番に出したい」） ----------
+   帯（showBanner）と資質のカードは、_notifQ に並べて1つずつ出す。1つ出したら、その知らせの間（sec）だけ次を待つ。
+   空いていればその場で出す（今までと同じ）。同じ題の帯が並んでいたら新しい方に差し替える（熟練の帯が何枚も溜まらない）。
+   「もう入らない」など、押した操作への赤い返事は待たせない（割り込んで出す）。
+   進めるのは update の dt（tickNotifQ）。窓が開いて盤面が止まっているあいだは、知らせも止まって待つ。 */
+const NOTIF_URGENT_COL = '#e0705a';
+let _notifQ=[], _notifT=0;
+function notify(run, sec, key){
+  if(key){ const i=_notifQ.findIndex(q=>q.key===key); if(i>=0){ _notifQ[i]={run, sec, key}; return; } }
+  if(!_notifQ.length && _notifT<=0){ run(); _notifT=sec; return; }
+  if(_notifQ.length>=8) _notifQ.shift();               // 溜まりすぎたら古い方から捨てる
+  _notifQ.push({run, sec, key});
+}
+function tickNotifQ(dt){
+  if(_notifT>0){ _notifT-=dt; if(_notifT>0) return; }
+  const q=_notifQ.shift(); if(!q) return;
+  try{ q.run(); }catch(err){ console.error(err); }
+  _notifT=q.sec;
+}
+function bannerNow(title, sub, col, secs){
+  _banner={title, sub:sub||'', col:col||'#cfd6e4', t:secs||3.0, max:secs||3.0};
+}
 function showBanner(title, sub, col, secs){
   if(_feelHold){ _feelHold.banners.push([title, sub, col, secs]); return; }   // ボスの撃破演出中は後回し（feelReleaseHold）
-  _banner={title, sub:sub||'', col:col||'#cfd6e4', t:secs||3.0, max:secs||3.0};
+  if(col===NOTIF_URGENT_COL){ bannerNow(title, sub, col, secs); return; }
+  /* 次の知らせまでの間は帯の長さより少し短く取る（消えかけの所に次が来る＝間延びしない） */
+  notify(()=>bannerNow(title, sub, col, secs), Math.max(1.2, (secs||3.0)*0.8), 'b:'+title);
 }
 /* ---------- ボスの撃破演出のあいだは、知らせを後回しにする（2026-10-19 ユーザー指定） ----------
    「ボス撃破後の習得演出や潜在選択は撃破演出の後に」。撃破の一撃で経験値が入ると、
    レベルアップの光・LEVEL UP・Lv の帯・資質のカード、大技を覚えた帯が、撃破演出の上に重なって出ていた。
-   game-feel.js の killEnemy がボスのときだけ _feelHold を立て、演出が終わったら feelReleaseHold で順に出す。
-   中身（レベル・資質・大技そのもの）はその場で入る。遅らせるのは見せ方だけ。 */
+   game-feel.js の killEnemy がボスのときだけ _feelHold を立て、演出が終わったら feelReleaseHold で順に並べる。
+   中身（レベル・資質・大技そのもの）はその場で入る。遅らせるのは見せ方だけ。
+   並べる順：報酬の数字（+EXP/+G/+SP）→ レベルアップ（光と Lv の帯）→ 資質のカード → 大技の帯 → 恩寵の選択 → その他の帯（帰還ポータル・中継地点など） */
 let _feelHold=null;
-function feelHoldStart(){ if(_feelHold) return false; _feelHold={fns:[], banners:[], pot:false}; return true; }
-/* 溜めた知らせを出す。帯は重ねず1枚ずつ順に出す（前の帯が消えたら次）。戻り値は全部出し終えるまでの秒数 */
-let _bannerQ=[];
-function feelReleaseHold(){
-  const h=_feelHold; _feelHold=null; if(!h) return 0;
-  h.fns.forEach(f=>{ try{ f(); }catch(err){ console.error(err); } });
-  if(h.pot) flushCharPotNotice();
-  /* 一撃で何レベルも上がると Lv の帯が何枚も溜まる。最後の1枚（いちばん上の Lv）だけ残す。
-     出す順は、覚えた物（大技など）→ Lv → その他（帰還ポータルなど） */
-  const isLv=bn=>/^Lv\./.test(bn[0]);
-  const lastLv=[...h.banners].reverse().find(isLv);
-  const rank=bn=>isLv(bn)?1:(/^大技/.test(bn[0])?0:2);
-  const list=h.banners.filter(bn=>!isLv(bn)||bn===lastLv).map((bn,i)=>[bn,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);
-  let total=0;
-  list.forEach((bn,i)=>{ if(i===0) showBanner(...bn); else _bannerQ.push(bn); if(rank(bn)<2) total+=(bn[3]||3.0); });
-  return Math.max(total, h.fns.length||h.pot ? 1.6 : 0);   // 待つのは「覚えた物」と Lv の帯のぶん（帰還ポータル等の知らせは待たない）
-}
-function tickBannerQ(){
-  if(!_bannerQ.length) return;
-  if(_banner && _banner.t>0) return;
-  showBanner(..._bannerQ.shift());
+function feelHoldStart(){ if(_feelHold) return false; _feelHold={pops:[], lv:[], banners:[], pot:false}; return true; }
+const NOTIF_SEC = {pops:1.1, lv:1.7, pot:1.9};
+function feelReleaseHold(pending){
+  const h=_feelHold; _feelHold=null;
+  const L=[], add=(run,sec)=>L.push({run,sec});
+  if(h){
+    const isLv=bn=>/^Lv\./.test(bn[0]), isLearn=bn=>/^大技/.test(bn[0]);
+    const lastLv=[...h.banners].reverse().find(isLv);
+    if(h.pops.length) add(()=>{ h.pops.forEach((p,i)=>{ p.delay=i*0.35; W.pops.push(p); }); }, NOTIF_SEC.pops);
+    if(h.lv.length || lastLv) add(()=>{ h.lv.forEach(f=>{ try{ f(); }catch(err){ console.error(err); } }); if(lastLv) bannerNow(...lastLv); }, NOTIF_SEC.lv);
+    if(h.pot) add(()=>flushCharPotNow(), NOTIF_SEC.pot);
+    h.banners.filter(isLearn).forEach(bn=>add(()=>bannerNow(...bn), Math.max(1.2,(bn[3]||3.0)*0.8)));
+    if(pending) add(pending, 0);
+    h.banners.filter(bn=>!isLv(bn)&&!isLearn(bn)).forEach(bn=>add(()=>bannerNow(...bn), Math.max(1.2,(bn[3]||3.0)*0.8)));
+  }else if(pending) add(pending, 0);
+  if(!L.length) return;
+  /* ボスの知らせは列の先頭に割り込む（階に入った時の帯などが残っていても、そのあとに回す） */
+  _notifQ.unshift(...L);
+  _notifT=0;
+  tickNotifQ(0);
 }
 /* ---------- 街で読ませる短い知らせ ----------
    showBanner はキャンバスに描くので、街の画面（不透明な .screen）では
@@ -22203,7 +22284,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261009a"></script>
-<script src="game-feel.js?v=20261020-boss-hold"></script>
+<script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
 <script src="cave-look.js?v=20261020b"></script>

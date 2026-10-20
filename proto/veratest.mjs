@@ -57,24 +57,30 @@ R.legParts = await pg.evaluate(()=>{
   const none1=!e.parts;                               // 第一形態には無い
   bossChangeForm(e); if(S.run.formFx) S.run.formFx=null;
   const n=e.parts?e.parts.length:0, def0=e.def;
-  // 手前右（南東）から殴ると、手前右の脚に入る
+  // 手前右の脚の所から殴ると、手前右の脚にだけ入る（体のHPは減らない。2026-10-20 部位ごとの当たり判定）
   const st=stats(S.hero);
-  P.x=e.x+1.6; P.y=e.y+1.4;
   const sePart=e.parts.find(p=>p.id==='SE'), hp0=sePart.hp;
+  P.x=e.x+sePart.ox+0.6; P.y=e.y+sePart.oy+0.5;
+  const bodyHp0=e.hp;
   hitEnemy(e, st, 1);
   const routed = sePart.hp<hp0 && e.parts.filter(p=>p!==sePart).every(p=>p.hp===p.max);
-  // 壊すとダウン（技も移動も止まる）
-  e.hp=e.maxHp*10; sePart.hp=1; hitEnemy(e, st, 1);
-  const broke=sePart.broken, down0=e.down;
+  const bodyUntouched = e.hp===bodyHp0;
+  // 真ん中（体）を殴れば体に入り、脚は減らない
+  P.x=e.x; P.y=e.y-1.6; const bh=e.hp, seHp=sePart.hp; hitEnemy(e, st, 1);
+  const bodyHit = e.hp<bh && sePart.hp===seHp;
+  // 壊すとダウン（技も移動も止まる）。本体に最大HPの2割
+  P.x=e.x+sePart.ox+0.6; P.y=e.y+sePart.oy+0.5;
+  e.hp=e.maxHp*10; const hpB=e.hp; sePart.hp=1; hitEnemy(e, st, 1);
+  const broke=sePart.broken, down0=e.down, breakDmg=+((hpB-e.hp)/e.maxHp).toFixed(2);
   const x0=e.x, y0=e.y; e.cast={id:'slam',t:0,dir:0}; for(let i=0;i<20;i++) enemyUpdate(e, 0.05);
   const still = Math.hypot(e.x-x0,e.y-y0)<1e-6 && !e.cast;
   for(let i=0;i<60;i++) enemyUpdate(e, 0.05);
   const recovered = !(e.down>0);
   // 残り3本を、それぞれの側から殴って壊す
-  for(const [id,dx,dy] of [['SW',-1.6,1.4],['NE',1.6,-1.4],['NW',-1.6,-1.4]]){ const p=e.parts.find(q=>q.id===id); p.hp=1; P.x=e.x+dx; P.y=e.y+dy; hitEnemy(e, st, 1); }
+  for(const id of ['SW','NE','NW']){ const p=e.parts.find(q=>q.id===id); p.hp=1; P.x=e.x+p.ox+Math.sign(p.ox)*0.6; P.y=e.y+p.oy+0.5; hitEnemy(e, st, 1); }
   const all=e.parts.every(p=>p.broken), defDrop=e.def/def0;
-  return {none1, n, routed, broke, down0, still, recovered, all, defDrop:+defDrop.toFixed(2),
-    ok: none1 && n===4 && routed && broke && down0>2 && still && recovered && all && defDrop<0.5};
+  return {none1, n, routed, bodyUntouched, bodyHit, broke, breakDmg, down0, still, recovered, all, defDrop:+defDrop.toFixed(2),
+    ok: none1 && n===4 && routed && bodyUntouched && bodyHit && broke && breakDmg>=0.19 && breakDmg<=0.21 && down0>2 && still && recovered && all && defDrop<0.5};
 });
 
 /* 脚を4本とも壊したら歩けない（技は撃てる）。1本だけ壊した時はまだ歩く（2026-10-19） */
@@ -113,10 +119,10 @@ R.breakFx = await pg.evaluate(async ()=>{
   const e=W.enemies.find(x=>x.uniqueBoss===10); bossChangeForm(e); if(S.run.formFx) S.run.formFx=null; e._cf=1;
   const shot=()=>CAVE._sprite(e);
   shot(); FEEL.particles=[];
-  const p=e.parts.find(q=>q.id==='SW'); p.hp=1; partHit(e,5,e.x-1.6,e.y+1.4);
+  const p=e.parts.find(q=>q.id==='SW'); p.hp=1; partHit(e,5,e.x+p.ox,e.y+p.oy);
   for(let i=0;i<20 && !FEEL.particles.length; i++){ shot(); await new Promise(r=>setTimeout(r,50)); }
   const debris=FEEL.particles.length;
-  for(const q of e.parts){ q.hp=1; } for(const [id,dx,dy] of [['SE',1.6,1.4],['NW',-1.6,-1.4],['NE',1.6,-1.4]]) partHit(e,5,e.x+dx,e.y+dy);
+  for(const q of e.parts){ q.hp=1; } for(const id of ['SE','NW','NE']){ const q=e.parts.find(r=>r.id===id); partHit(e,5,e.x+q.ox,e.y+q.oy); }   // 脚の円の真ん中を叩く（2026-10-20 部位ごとの当たり）
   const t0=performance.now(); while(performance.now()-t0<600){ shot(); await new Promise(r=>setTimeout(r,30)); }
   return {debris, slam:!!e._v2Slam, ok: debris>40 && !!e._v2Slam};
 });

@@ -66,7 +66,7 @@ R.noticeShown = await pg.evaluate(()=>{
   const nd=document.getElementById('potnote');
   nd.classList.remove('on'); nd.innerHTML='';
   const need=xpNeed(S.hero.lv);
-  addXp(S.hero, need, true);
+  addXp(S.hero, need, true);  while(_notifQ.length||_notifT>0){ _notifT=0; tickNotifQ(0); }   // 知らせは順番に出る（Lv の帯のあと）ので、列を進めてから見る
   const pot=S.hero.charPot[S.hero.charPot.length-1];
   const html=nd.innerHTML;
   return {
@@ -94,7 +94,7 @@ R.mergedMultiLevel = await pg.evaluate(()=>{
   const nd=document.getElementById('potnote');
   nd.classList.remove('on'); nd.innerHTML='';
   const big = xpNeed(3)+xpNeed(4)+xpNeed(5)+1;      // 3レベルぶん
-  addXp(S.hero, big, true);
+  addXp(S.hero, big, true);  while(_notifQ.length||_notifT>0){ _notifT=0; tickNotifQ(0); }   // 知らせは順番に出る（Lv の帯のあと）ので、列を進めてから見る
   const gained=S.hero.charPot.length;
   const lines=nd.querySelectorAll('.pn-line').length;
   // 3個ぶんの値がすべて載っている（1個だけ残って他が消えていない）
@@ -110,7 +110,7 @@ R.noticeFades = await pg.evaluate(()=>{
   TH.run(1,{seed:18}); S.hero.party=[];
   S.hero.charPot=[]; _charPotPend=[]; _potNoteT=0;
   setScreen('game');
-  addXp(S.hero, xpNeed(S.hero.lv), true);
+  addXp(S.hero, xpNeed(S.hero.lv), true);  while(_notifQ.length||_notifT>0){ _notifT=0; tickNotifQ(0); }   // 知らせは順番に出る（Lv の帯のあと）ので、列を進めてから見る
   const nd=document.getElementById('potnote');
   const onAtFirst=nd.classList.contains('on');
   tickPotNote(POTNOTE_SEC*0.5);
@@ -135,7 +135,7 @@ R.neverWedges = await pg.evaluate(()=>{
   const shown=[];
   for(let i=0;i<10;i++){
     nd.classList.remove('on'); nd.innerHTML='';       // 消えた状態から始める
-    addXp(S.hero, xpNeed(S.hero.lv), true);
+    addXp(S.hero, xpNeed(S.hero.lv), true);  while(_notifQ.length||_notifT>0){ _notifT=0; tickNotifQ(0); }   // 知らせは順番に出る（Lv の帯のあと）ので、列を進めてから見る
     shown.push(nd.classList.contains('on'));
     // 途中で街に寄って戻る（ここで詰まっていた）
     if(i%3===2){ setScreen('town'); setScreen('game'); }

@@ -12,7 +12,7 @@ const FEEL_TUNING=Object.freeze({justWindow:.12,perfectSlowSeconds:.18,perfectSl
   characterIdleSeconds:1.28,characterMoveThreshold:.16,
   tiltBlur:5,tiltFocus:.50,tiltBand:.40,tiltFade:.30,
   vignetteDarkness:.90,vignetteClear:.15,
-  bossSeconds:1.15,afterBossMax:5.5,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
+  bossSeconds:1.15,bossZoom:.20,criticalShake:4.6,ultimateShake:6});
 const FEEL={floor:null,time:0,kick:0,kickMax:.2,strength:0,step:0,particles:[],dashCd:0,lightX:1,lightY:0,
   motion:new WeakMap(),motes:[],ripples:[],hits:[],weaponArts:[],slow:0,slowScale:1,just:0,justUsed:false,boss:null};
 const FEEL_REDUCED=matchMedia('(prefers-reduced-motion: reduce)');
@@ -342,8 +342,11 @@ killEnemy=function(e,byAlly){
   const drops=new Set(W.drops);
   /* ボスは撃破演出のあいだ、レベルアップ・資質・大技の知らせを溜めておく（index.html の feelHoldStart） */
   const held=!!(e.boss&&typeof feelHoldStart==='function'&&feelHoldStart());
+  const pops0=W.pops.length;
   resolveEnemyDeath(e,byAlly);
   if(!e.dead){ if(held) feelReleaseHold(); return; }
+  /* 撃破の報酬の数字（+EXP/+G/+SP）も、撃破演出のあとに出す（演出の上に数字が重ならないように） */
+  if(held&&_feelHold){ const fresh=W.pops.splice(pops0).filter(p=>{ if(p.reward){ _feelHold.pops.push(p); return false; } return true; }); W.pops.push(...fresh); }
   for(const d of W.drops)if(!drops.has(d))d.feelDrop={age:0,x:e.x,y:e.y};
   if(e.boss){
     const screen=S.screen,modals=[...document.querySelectorAll('.modal.on')];
@@ -373,12 +376,10 @@ update=function(dt){
     const b=FEEL.boss;b.age+=dt;updateFeel(dt);S.run.elapsed+=dt;
     W.fx=W.fx.filter(f=>{f.life-=dt;return f.life>0;});
     if(b.age>=(b.dur||FEEL_TUNING.bossSeconds)){FEEL.boss=null;FEEL.slow=0;FEEL.slowScale=1;
-      /* 演出が終わってから、溜めた知らせ（レベルアップ・資質・大技）を出し、それを見せてから恩寵の選択へ */
-      const wait=(typeof feelReleaseHold==='function')?feelReleaseHold():0;
-      if(b.pending){ if(wait>0) FEEL.afterBoss={t:Math.min(wait,FEEL_TUNING.afterBossMax),fn:b.pending}; else b.pending(); }}
+      /* 演出が終わってから、溜めた知らせ（報酬の数字・レベルアップ・資質・大技）を順に並べ、そのあとに恩寵の選択（index.html の feelReleaseHold） */
+      if(typeof feelReleaseHold==='function') feelReleaseHold(b.pending); else if(b.pending) b.pending(); }
     return;
   }
-  if(FEEL.afterBoss){ const a=FEEL.afterBoss; a.t-=dt; if(a.t<=0){ FEEL.afterBoss=null; a.fn(); } }
   const scale=FEEL.slow>0?FEEL.slowScale:1;
   FEEL.slow=Math.max(0,FEEL.slow-dt);if(!FEEL.slow)FEEL.slowScale=1;
   const sim=dt*scale,run=S.run;
@@ -739,7 +740,6 @@ function drawFeelMagic(f,camX,camY,col){
 function resetFeel(){
   FEEL.floor=W.fl; FEEL.particles=[]; FEEL.kick=0; FEEL.step=0; FEEL.dashCd=0;
   FEEL.motion=new WeakMap();FEEL.motes=[];FEEL.ripples=[];FEEL.hits=[];FEEL.weaponArts=[];FEEL.slow=0;FEEL.just=0;FEEL.boss=null;FEEL.skillZoom=null;
-  if(FEEL.afterBoss){ const a=FEEL.afterBoss; FEEL.afterBoss=null; a.fn(); }
   if(typeof feelReleaseHold==='function') feelReleaseHold();
   FEEL.lightX=P.dirx||1; FEEL.lightY=P.diry||0; P.dash=null;
 }
