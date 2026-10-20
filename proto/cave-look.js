@@ -1529,6 +1529,10 @@ function genDeco(f,Z){
   /* 大広間の柱（ヴェラの階）。柱のマスの周り1.6マスの置き物は外す（柱に重なる・柱を壁と見て貼り付くため） */
   if(f.cover&&f.cover.length){
     out=out.filter(o=>!f.cover.some(c=>Math.hypot(o.x/Q-c.x,o.y/Q-c.y)<1.6));
+    /* 立ち物（岩・石筍・葦など、絵に高さのある物）はこの広間には置かない（2026-10-20）。
+       第二形態の体（横7.5マス）が柱にも壁にも掛からないように動ける場所を絞っているので（本編の veraBodyFree）、
+       床の上の立ち物まで避けさせると動ける所がほとんど残らない。平たい物（水溜り・骨・小石・苔）は残す。 */
+    out=out.filter(o=>!standBox(o));
     for(const c of f.cover) out.push({k:'column', x:Math.round(c.x*Q), y:Math.round(c.y*Q+2), s:hs(c.tx*31+c.ty*977,5), ok:1, ext:40});
   }
   const ROCKS={rock:22,stalagC:16}, SMALL={skel:1,pebble:1,mossbed:1};

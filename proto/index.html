@@ -6827,7 +6827,10 @@ function tileWalk(fl,x,y){ const t=fl.g[y][x]; return t!==T.WALL && t!==T.PIT; }
 function isArenaDepth(depth){ return bossTierAt(depth)==='great' || bossTierAt(depth)==='final'; }
 function genArena(depth){
   const big = bossTierAt(depth)==='final';
-  const W = big ? 40 : 34, H = big ? 34 : 28;
+  const vera = uniqueBossAt(depth)===UNIQUE_BOSSES[10];
+  /* ヴェラの広間は一回り広い（2026-10-19：第二形態を主人公と同じドットの大きさ＝横7.5マスに描くようになったので、
+     体が柱にも壁にも掛からずに動ける広さを取る）。 */
+  const W = big ? 40 : vera ? ARENA_VERA_W : 34, H = big ? 34 : vera ? ARENA_VERA_H : 28;
   const g = Array.from({length:H},()=>new Uint8Array(W));
   // 角を落とした楕円の広間。四角い部屋だと隅に籠れてしまう
   const cx=(W-1)/2, cy=(H-1)/2, rx=W/2-2.5, ry=H/2-2.5;
@@ -6842,14 +6845,17 @@ function genArena(depth){
   rooms.push(start);
   const sx=W-5, sy=Math.floor(cy);
   g[sy][sx]=T.STAIR;
-  /* ヴェラの大広間には、広間の真ん中から見て時計の1・3・5・7・9・11時の方向に柱を1本ずつ立てる
+  /* ヴェラの大広間には、広間の真ん中から見て斜め4方向（時計の1時半・4時半・7時半・10時半）に柱を1本ずつ立てる
      （2026-10-03 ユーザー要望「技から退避できるようにしたい」）。
+     2026-10-20 に、1・3・5・7・9・11時の6本（輪の大きさ 0.55）から変えた。第二形態の体（横7.5マス）が
+     柱にも壁にも掛からないようにすると（veraBodyFree）、6本の輪の内側では体の中心が2マス四方しか動けなかった。
+     斜め4本を壁寄り（0.8）に置くと、体の中心が動ける範囲は柱が無い時の7割ほど（十字の形）で、柱の裏には3マス残る。
      柱は1マスの壁：歩けない・矢と礫（bolt）は当たって消える・貫き（帯）と波動（輪）も柱の陰には届かない（coverBlocks）。
      見た目は洞窟版が石灰岩の柱として描く（壁の岩としては描かない：cover のマスは描画では床扱い）。 */
   const cover=[];
   if(uniqueBossAt(depth)===UNIQUE_BOSSES[10]){
     const pr=ARENA_PILLAR_R;
-    for(const h of [1,3,5,7,9,11]){ const a=h*Math.PI/6;
+    for(const h of ARENA_PILLAR_HOURS){ const a=h*Math.PI/6;
       const tx=Math.floor(cx+0.5+Math.sin(a)*rx*pr), ty=Math.floor(cy+0.5-Math.cos(a)*ry*pr);
       if(g[ty][tx]!==T.FLOOR) continue;
       g[ty][tx]=T.WALL; cover.push({x:tx+0.5, y:ty+0.5, tx, ty, h}); }
@@ -6857,7 +6863,9 @@ function genArena(depth){
   return {W,H,g,rooms,start,stair:{x:sx+0.5,y:sy+0.5},
           arena:true, zone:zoneAt(depth), cycle:zoneCycle(depth), cover};
 }
-const ARENA_PILLAR_R = 0.55;     // 柱を立てる輪の大きさ（広間の楕円の半径に対する割合）
+const ARENA_PILLAR_R = 0.8;      // 柱を立てる輪の大きさ（広間の楕円の半径に対する割合）
+const ARENA_PILLAR_HOURS = [1.5, 4.5, 7.5, 10.5];   // 柱を立てる向き（時計の何時か）
+const ARENA_VERA_W = 40, ARENA_VERA_H = 32;         // ヴェラの広間の大きさ（他の大ボスは 34×28）
 /* 柱（fl.cover）が、2点のあいだを遮っているか。帯・輪の技の「陰」に使う。普通の壁は見ない（他の階の技の当たり方を変えない） */
 function coverAt(tx,ty){ const c=W.fl&&W.fl.cover; if(!c||!c.length) return false; for(const p of c) if(p.tx===tx&&p.ty===ty) return true; return false; }
 function coverBlocks(x0,y0,x1,y1){
@@ -7414,6 +7422,7 @@ function bossChangeForm(e){
   if(e.revealed) log(e.name+'——姿が変わった');
   const U=uniqueBossAt(e.uniqueBoss);
   if(U && U.parts) e.parts=makeBossParts(e, U.parts);
+  veraKeepClear(e);                // 第二形態の大きな体が柱や壁に掛かる所で変わったら、掛からない所へずらす
   startBossFormFx(e);
 }
 
@@ -9097,10 +9106,52 @@ function dashStop(x0, y0, ang, dist, r){
    仲間は canFall:false で作るようになったが、既に保存されている仲間は
    true を持ったままなので、種別のほうでも締めておく。 */
 function blockedFor(e,x,y){ return solid(x,y) || ((!e.canFall || e.ally) && pitAt(x,y)); }
+/* ---------- ヴェラ第二形態の体の枠（2026-10-20 ユーザー指定「第二形態で柱とか壁に接触及び被らないように」） ----------
+   第二形態は当たり判定（e.r）よりずっと大きく描く（横7.5マス・上2.4マス・下2.4マス）。
+   描いた絵の四角（＋少しの余白）が、壁のマスにも、柱の絵（根元から上へ約3マス）にも掛からない所だけを歩ける。
+   当たり判定そのものは変えない——動ける場所だけを絵に合わせる。 */
+const VERA2_BODY = {hx:3.85, up:2.5, dn:2.55};      // 体の中心から、左右・上・下（マス）。cave-look.js の VERA_PX=1 の絵に合わせた値
+const PILLAR_ART = {hx:0.7, up:2.6, dn:0.9};        // 柱の絵の範囲（柱のマスの中心から）
+function veraBody(e){
+  return (e && e.boss && e.uniqueBoss===10 && !e.form2 && W.fl && W.fl.arena) ? VERA2_BODY : null;
+}
+function veraBodyFree(x, y, B){
+  const fl=W.fl; if(!fl) return true;
+  B=B||VERA2_BODY;
+  for(const c of (fl.cover||[])){
+    if(x+B.hx>c.x-PILLAR_ART.hx && x-B.hx<c.x+PILLAR_ART.hx && y+B.dn>c.y-PILLAR_ART.up && y-B.up<c.y+PILLAR_ART.dn) return false;
+  }
+  const nx=Math.ceil(B.hx*2/0.5), ny=Math.ceil((B.up+B.dn)/0.5);
+  for(let i=0;i<=nx;i++){ const px=x-B.hx+B.hx*2*i/nx, tx=Math.floor(px);
+    for(let j=0;j<=ny;j++){ const ty=Math.floor(y-B.up+(B.up+B.dn)*j/ny);
+      if(tx<0||ty<0||tx>=fl.W||ty>=fl.H) return false;
+      const t=fl.g[ty][tx]; if(t===T.WALL||t===T.PIT) return false; } }
+  return true;
+}
+/* 体が掛からない、いちばん近い場所（外から押し込まれた・形が変わった直後に使う）。見つからなければ null */
+function veraBodyNearest(x, y, B){
+  if(veraBodyFree(x,y,B)) return {x,y};
+  for(let r=0.25; r<16; r+=0.25){
+    const n=Math.max(8, Math.round(r*8));
+    for(let i=0;i<n;i++){ const a=i/n*Math.PI*2, px=x+Math.cos(a)*r, py=y+Math.sin(a)*r;
+      if(veraBodyFree(px,py,B)) return {x:px, y:py}; }
+  }
+  return null;
+}
+function veraKeepClear(e){
+  const B=veraBody(e); if(!B || veraBodyFree(e.x,e.y,B)) return;
+  const p=veraBodyNearest(e.x,e.y,B); if(p){ e.x=p.x; e.y=p.y; }
+}
 function moveEnt(e,dx,dy){
   // 壊れた移動量は捨てる。座標に NaN を書き込むと、そこから先が全部 NaN になる。
   if(!Number.isFinite(dx) || !Number.isFinite(dy)) return;
   if(!Number.isFinite(e.x) || !Number.isFinite(e.y)) return;
+  const VB=veraBody(e);
+  if(VB){                                        // ヴェラ第二形態：描いた体の枠で壁と柱を見る（軸ごとに滑らせる）
+    if(veraBodyFree(e.x+dx, e.y, VB)) e.x+=dx;
+    if(veraBodyFree(e.x, e.y+dy, VB)) e.y+=dy;
+    return;
+  }
   // cr = 壁との判定だけに使う半径。ボスは見た目より小さい値を持つ（通路を通れるように）
   const r=e.cr||e.r||0.3;
   const B=(x,y)=>blockedFor(e,x,y);
@@ -12359,6 +12410,7 @@ function rollNewLegend(){
 
 function enemyUpdate(e,dt){
   if(e.dead) return;
+  veraKeepClear(e);   // ヴェラ第二形態：何かに押されて体が柱や壁に掛かっていたら戻す（moveEnt を通らない動きの保険）
 
   // 門番の分身（一時的なものだけ）。寿命が尽きたら跡形も残さず消える。
   if(e.mirror && e.ttl!=null){
@@ -12885,7 +12937,9 @@ function randomArenaPoint(pad){
 /* ボスを広間内のランダムな1点へ跳ばせる。演出は行き先・元の場所の両方に輪を出すだけ
    （専用の瞬間移動エフェクトは無いので、既存の ultring を使い回す）。 */
 function warpBossRandom(e){
-  const pt = randomArenaPoint(1.0);
+  let pt = randomArenaPoint(1.0);
+  const VB=veraBody(e);
+  if(VB){ pt=null; for(let i=0;i<24&&!pt;i++){ const q=randomArenaPoint(1.0); if(q&&veraBodyFree(q.x,q.y,VB)) pt=q; } }
   if(!pt) return false;
   W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.2, life:0.4, maxLife:0.4, col:'#a97fe0'});
   e.x=pt.x; e.y=pt.y;
@@ -13056,9 +13110,11 @@ function resolveBossMove(e){
     if(e.cast.id==='charge'){
       // 走り抜ける。壁は抜けない（抜けると部屋の外へ消えてしまう）
       let gx=e.x, gy=e.y;
+      const VB=veraBody(e);
       for(let d=0; d<len; d+=0.3){
         const nx=gx+cx*0.3, ny=gy+cy*0.3;
         if(solid(nx,ny)) break;
+        if(VB && !veraBodyFree(nx,ny,VB)) break;   // ヴェラ第二形態は体の枠で止まる
         gx=nx; gy=ny;
       }
       W.fx.push({t:'ultline', x:e.x, y:e.y, x2:gx, y2:gy, life:0.3, maxLife:0.3,
@@ -22150,7 +22206,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261020-boss-hold"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261020a"></script>
+<script src="cave-look.js?v=20261020b"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

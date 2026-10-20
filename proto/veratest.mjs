@@ -7,7 +7,7 @@ const R = {};
 R.pillars = await pg.evaluate(()=>{
   TH.run(10,{seed:44}); const f=W.fl, c=f.cover||[];
   const cx=(f.W-1)/2+.5, cy=(f.H-1)/2+.5;
-  const hours=c.map(p=>{ let a=Math.atan2(p.x-cx, -(p.y-cy)); if(a<0) a+=Math.PI*2; return Math.round(a/(Math.PI/6)); }).sort((a,b)=>a-b);
+  const hours=c.map(p=>{ let a=Math.atan2(p.x-cx, -(p.y-cy)); if(a<0) a+=Math.PI*2; return Math.round(a/(Math.PI/6)*2)/2; }).sort((a,b)=>a-b);
   const walls=c.every(p=>solid(p.x,p.y));
   // 入口から穴まで歩ける
   const H=f.H, Wd=f.W, seen=new Uint8Array(H*Wd), q=[[f.start.cx,f.start.cy]]; seen[f.start.cy*Wd+f.start.cx]=1;
@@ -15,12 +15,12 @@ R.pillars = await pg.evaluate(()=>{
   const reach=!!seen[Math.floor(f.stair.y)*Wd+Math.floor(f.stair.x)];
   // 5階（中ボス）・11階には柱が無い
   TH.run(5,{seed:44}); const n5=(W.fl.cover||[]).length; TH.run(20,{seed:44}); const n20=(W.fl.cover||[]).length;
-  return {n:c.length, hours, walls, reach, n5, n20, ok: c.length===6 && hours.join()==='1,3,5,7,9,11' && walls && reach && n5===0 && n20===0};
+  return {n:c.length, hours, walls, reach, n5, n20, ok: c.length===4 && hours.join()==='1.5,4.5,7.5,10.5' && walls && reach && n5===0 && n20===0};   // 2026-10-20 斜め4本に（第二形態の体が掛からないように）
 });
 R.coverBlocksAttacks = await pg.evaluate(()=>{
   /* 毎回まっさらな広間で：ボス—（柱）—主人公 を一直線に置き、柱の陰と陰でない所で比べる */
   const fresh=(behind)=>{ TH.run(10,{seed:44}); W.enemies.filter(x=>!x.boss).forEach(x=>x.dead=true); S.hero.party=[];
-    const e=W.enemies.find(x=>x.uniqueBoss===10), p=W.fl.cover.find(c=>c.h===3), oy=behind?0:2.5;
+    const e=W.enemies.find(x=>x.uniqueBoss===10), p=W.fl.cover.find(c=>c.h===10.5), oy=behind?0:2.5;
     e.x=p.x+3; e.y=p.y+oy; e.moveCd=99; e.cd=99; P.x=p.x-2; P.y=p.y+oy; W.fx.length=0; S.hero.hpNow=99999; P.invuln=0; return e; };
   const beam=(behind)=>{ const e=fresh(behind), h=S.hero.hpNow; e.cast={id:'beam', dir:Math.PI, t:0}; resolveBossMove(e); e.cast=null; return S.hero.hpNow<h; };
   const bolt=(behind)=>{ fresh(behind); const h=S.hero.hpNow; W.fx.push({t:'bolt',x:P.x+3.2,y:P.y,vx:-5.6,vy:0,life:2,dmg:50,lv:10,dt:'pierce'}); for(let i=0;i<40;i++) stepSim(1/30); return S.hero.hpNow<h; };
@@ -28,6 +28,28 @@ R.coverBlocksAttacks = await pg.evaluate(()=>{
   const r={beamBehind:beam(true), beamOpen:beam(false), boltBehind:bolt(true), boltOpen:bolt(false), waveBehind:wave(true), waveOpen:wave(false)};
   r.ok = !r.beamBehind && r.beamOpen && !r.boltBehind && r.boltOpen && !r.waveBehind && r.waveOpen;
   return r;
+});
+/* 第二形態の体（絵の四角）は、柱にも壁にも掛からない（2026-10-20 ユーザー指定）。
+   主人公を4本の柱の陰へ順に歩かせ、そのあいだずっと見る。動ける広さも見る（柱の位置の見直しで、狭い所に閉じ込めない） */
+R.form2BodyClear = await pg.evaluate(()=>{
+  TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[]; TH.immortal();
+  const e=W.enemies.find(x=>x.uniqueBoss===10); P.x=e.x-4; P.y=e.y;
+  bossChangeForm(e); if(S.run.formFx) S.run.formFx=null;
+  const startClear=veraBodyFree(e.x,e.y);
+  let bad=0, n=0, x0=1e9, x1=-1e9, y0=1e9, y1=-1e9;
+  const goals=W.fl.cover.map(c=>({x:c.x+(c.x<W.fl.W/2?-1.2:1.2), y:c.y+(c.y<W.fl.H/2?-1.2:1.2)}));
+  for(const g of goals) for(let i=0;i<240;i++){
+    const dx=g.x-P.x, dy=g.y-P.y, d=Math.hypot(dx,dy);
+    if(d>0.3){ P.x+=dx/d*0.08; P.y+=dy/d*0.08; if(solid(P.x,P.y)){ P.x-=dx/d*0.08; P.y-=dy/d*0.08; } }
+    stepSim(1/30); n++;
+    if(!veraBodyFree(e.x,e.y)) bad++;
+    x0=Math.min(x0,e.x); x1=Math.max(x1,e.x); y0=Math.min(y0,e.y); y1=Math.max(y1,e.y);
+  }
+  // 柱を外しても、体の中心が動ける広さの何割が残っているか（0.5マス刻みで数える）
+  const cnt=(cov)=>{ const keep=W.fl.cover; W.fl.cover=cov; let k=0; for(let y=0;y<W.fl.H;y+=.5) for(let x=0;x<W.fl.W;x+=.5) if(veraBodyFree(x,y)) k++; W.fl.cover=keep; return k; };
+  const room=cnt(W.fl.cover)/cnt([]);
+  return {startClear, bad, n, spanX:+(x1-x0).toFixed(1), spanY:+(y1-y0).toFixed(1), room:+room.toFixed(2),
+    ok: startClear && bad===0 && room>0.6 && (x1-x0)>8};
 });
 R.legParts = await pg.evaluate(()=>{
   TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[];
@@ -61,7 +83,7 @@ R.legsAllImmobile = await pg.evaluate(()=>{
   const e=W.enemies.find(x=>x.uniqueBoss===10);
   bossChangeForm(e); if(S.run.formFx) S.run.formFx=null;
   const hx=e.x, hy=e.y;
-  const walkFor=(sec)=>{ e.x=hx; e.y=hy; P.x=hx+6; P.y=hy; const x0=e.x,y0=e.y; for(let i=0;i<sec*20;i++){ e.cast=null; e.tele=0; e.cd=9; e.down=0; e.roar=0; e.recover=0; e.broken=0; enemyUpdate(e,0.05); } return Math.hypot(e.x-x0,e.y-y0); };
+  const walkFor=(sec)=>{ e.x=hx; e.y=hy; P.x=hx+(hx>W.fl.W/2?-6:6); P.y=hy; /* 広間の真ん中の側に立つ（壁の側だと体の枠で止まって歩けない） */ const x0=e.x,y0=e.y; for(let i=0;i<sec*20;i++){ e.cast=null; e.tele=0; e.cd=9; e.down=0; e.roar=0; e.recover=0; e.broken=0; enemyUpdate(e,0.05); } return Math.hypot(e.x-x0,e.y-y0); };
   const before=walkFor(1.0);
   e.parts.find(p=>p.id==='SW').broken=true;
   const oneBroken=walkFor(1.0);
