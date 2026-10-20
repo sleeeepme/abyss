@@ -72,7 +72,7 @@ R.unlockWithoutDescending = await pg.evaluate(() => {
   const boss = W.enemies.find(e => e.boss && !e.dead);
   if (!boss) throw Error('第5階層にボスがいない');
   boss.hp = 1; killEnemy(boss);
-  stepSim(1.3);                       // 撃破演出を進める
+  stepSim(7.5);   // 撃破演出（1.15秒）＋演出のあとに出すレベルアップ・大技の帯（最大5.5秒）
   const clearedAt = S.bossClear;
   const deepestStill = S.deepest;     // 降りていないので 5 のまま
   const openAfter = !upgLocked(UPGRADES.find(u => u.id === 'revive'));

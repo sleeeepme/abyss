@@ -1669,6 +1669,25 @@ function drawOccluders(camX,camY){
   ents.forEach(e=>{ e._occS=serial; });
   occCount+=occludeEnts(ents,camX,camY); CAVE.occDrawn=occCount; return occCount;
 }
+/* 描き戻し用の画用紙は、**貼るたびに別の1枚**を使う（2026-10-19 ユーザー報告「柱の裏に行くと左上あたりに柱が表示される」）。
+   前は1枚を使い回し、1フレームに何人ぶんも putImageData→drawImage していた。iPhone の Safari では
+   drawImage が「貼った時点の中身」ではなく後で書き換えた中身を貼ることがあり、主人公のぶんの柱の切り抜きが、
+   同じフレームで先に描き戻した別の者（大きいボスなど）の枠の位置＝主人公から見て左上にも出ていた。
+   当たりの火花のズレ（weapon-art-pixel.js の blit）と同じ原因・同じ直し方。フレームの頭で先頭から使い直す。 */
+const occPool=[]; let occPoolSerial=-2, occPoolI=0;
+function occTake(w,h){
+  const s=(typeof _drawSerial!=='undefined')?_drawSerial:null;
+  if(s!==occPoolSerial){ occPoolSerial=s; occPoolI=0; }
+  if(occPoolI>=32) occPoolI=0;
+  let o=occPool[occPoolI];
+  if(!o||o.cv.width<w||o.cv.height<h){
+    const cv=document.createElement('canvas'); cv.width=Math.max(w,64,o?o.cv.width:0); cv.height=Math.max(h,64,o?o.cv.height:0);
+    const x=cv.getContext('2d'), img=x.createImageData(cv.width,cv.height);
+    o={cv,x,img,u:new Uint32Array(img.data.buffer)}; occPool[occPoolI]=o;
+  }
+  occPoolI++;
+  occCv=o.cv; occX=o.x; occImg=o.img; occU=o.u;
+}
 function occludeEnts(ents,camX,camY){
   const ps=TS/Q, ox=lastT.bx0, oy=lastT.by0;
   let n=0;
@@ -1680,7 +1699,7 @@ function occludeEnts(ents,camX,camY){
     // 手前（足もとより南に地面がある）立ち物のドットがあるかを先に見る
     let any=false; for(let y=y0;y<y1&&!any;y++){ const row=y*bw; for(let x=x0;x<x1;x++) if(occD[row+x]>foot){ any=true; break; } }
     if(!any) continue;
-    if(!occCv||occCv.width<w||occCv.height<h){ occCv=document.createElement('canvas'); occCv.width=Math.max(w,64); occCv.height=Math.max(h,64); occX=occCv.getContext('2d'); occImg=occX.createImageData(occCv.width,occCv.height); occU=new Uint32Array(occImg.data.buffer); }
+    occTake(w,h);
     occU.fill(0);
     const OW=occCv.width;
     for(let y=y0;y<y1;y++){ const row=y*bw, orow=(y-y0)*OW; for(let x=x0;x<x1;x++){ const k=row+x; if(occD[k]>foot) occU[orow+x-x0]=buf[k]; } }
@@ -3491,6 +3510,10 @@ const VERA2_DEATH={"n":57,"w":260,"h":190,"cols":8,"d":[70,240,240,240,240,170,1
     const x=c.getContext('2d'); x.drawImage(im,0,0); VERA2_DEATH.u=new Uint32Array(x.getImageData(0,0,im.width,im.height).data.buffer); VERA2_DEATH.sw=im.width; }catch(err){ console.error(err); } };
   im.src=VERA2_DEATH.src; })();
 VERA2_DEATH.len=VERA2_DEATH.d.reduce((a,b)=>a+b,0)/1000;
+/* ヴェラの絵の1ドットの大きさ（盤面の1/16マスに対する倍率）。2026-10-19 まで .5（主人公の半分の細かさ）だったのを、
+   ユーザー指定「ドットサイズをプレイヤーと合わせて」で 1 に。絵はそのままなので画面上は2倍になる（当たり判定は変えない）。
+   VERA_K は .5 の頃に合わせて置いた輪・土煙の大きさを、同じ見え方に保つための倍率。 */
+const VERA_PX=1, VERA_K=VERA_PX/.5;
 function vera2DeathReady(){ return !!VERA2_DEATH.u; }
 function vera2DeathDraw(e,t){
   const D=VERA2_DEATH, N=PT.N, u=SPR.u32;
@@ -3500,8 +3523,8 @@ function vera2DeathDraw(e,t){
   const X0=Math.round(N/2-D.w/2), Y0=Math.round((N-D.h)/2);
   if(f>=D.boom && !e._v2Boom){ e._v2Boom=true;                       // 弾けた瞬間：大きく揺らして輪を出す
     try{ if(typeof feelKick==='function') feelKick(8,.55); }catch(err){}
-    try{ if(typeof W!=='undefined'&&W.fx){ W.fx.push({t:'shock',x:e.x,y:e.y,r:3.2,life:.6,max:.6,col:'#e8fffa'});
-                                         W.fx.push({t:'shock',x:e.x,y:e.y,r:1.8,life:.4,max:.4,col:'#78e6dc'}); } }catch(err){}
+    try{ if(typeof W!=='undefined'&&W.fx){ W.fx.push({t:'shock',x:e.x,y:e.y,r:3.2*VERA_K,life:.6,max:.6,col:'#e8fffa'});
+                                         W.fx.push({t:'shock',x:e.x,y:e.y,r:1.8*VERA_K,life:.4,max:.4,col:'#78e6dc'}); } }catch(err){}
   }
   if(f>=0){ const fx=(f%D.cols)*D.w, fy=Math.floor(f/D.cols)*D.h, SW=D.sw;
     for(let y=0;y<D.h;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const row=(fy+y)*SW+fx, out=Y*N;
@@ -3572,7 +3595,7 @@ function vera2Shatter(e,f,X0,Y0,face){
   for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const i=y*SW+f*W+x, a=px(dA,i); if(!(a>>>24)) continue;
     const b=px(dB,i); if(b===a) continue; pts.push([x,y,a]); sx+=x; sy+=y; }
   if(!pts.length) return;
-  const cx=sx/pts.length, cy=sy/pts.length, sc=.5/Q;                 // ヴェラは主人公と同じ細かさ（半分のドット）
+  const cx=sx/pts.length, cy=sy/pts.length, sc=VERA_PX/Q;            // 絵の1ドット＝盤面の VERA_PX/16 マス
   const rgb=c=>[c&255,(c>>8)&255,(c>>16)&255];
   const ax=VERA2.ax, ay=VERA2.ay;
   const toW=(x,y)=>({x:e.x+(x-ax)*sc*face, y:e.y+(y-ay)*sc});
@@ -3594,15 +3617,15 @@ function vera2Shatter(e,f,X0,Y0,face){
 /* 4本折られて胴が地面に落ちた瞬間：強い揺れ・大きな衝撃の輪・地面を這う土煙・跳ねる石くず */
 function vera2Slam(e){
   try{ if(typeof feelKick==='function') feelKick(7.0,.5); }catch(err){}
-  try{ if(typeof W!=='undefined' && W.fx){ W.fx.push({t:'shock', x:e.x, y:e.y+.35, r:2.4, life:.45, max:.45, col:'#c8d4cf'});
-                                            W.fx.push({t:'shock', x:e.x, y:e.y+.35, r:1.3, life:.3, max:.3, col:'#96e8de'}); } }catch(err){}
+  try{ if(typeof W!=='undefined' && W.fx){ W.fx.push({t:'shock', x:e.x, y:e.y+.35*VERA_K, r:2.4*VERA_K, life:.45, max:.45, col:'#c8d4cf'});
+                                            W.fx.push({t:'shock', x:e.x, y:e.y+.35*VERA_K, r:1.3*VERA_K, life:.3, max:.3, col:'#96e8de'}); } }catch(err){}
   if(typeof FEEL==='undefined' || !FEEL.particles) return;
-  const sc=.5/Q, gy=e.y+(VERA2.feet-VERA2.ay)*sc;
+  const sc=VERA_PX/Q, gy=e.y+(VERA2.feet-VERA2.ay)*sc;
   for(let i=0;i<70;i++){ const s=i%2?1:-1, k=(i*0.6180339)%1, sp=1.4+k*3.6, g=60+((i*29)%40);
     const col=[g,g+6,g+5];
-    FEEL.particles.push({x:e.x+s*(0.4+k*1.2), y:gy-k*.15, vx:s*sp, vy:-.4-k*.9, life:.6+k*.6, max:1.2, size:(k>.6?3:2)*sc, c:'rgb('+col.join(',')+')'}); }
+    FEEL.particles.push({x:e.x+s*(0.4+k*1.2)*VERA_K, y:gy-k*.15, vx:s*sp*VERA_K, vy:-.4-k*.9, life:.6+k*.6, max:1.2, size:(k>.6?3:2)*sc, c:'rgb('+col.join(',')+')'}); }
   for(let i=0;i<26;i++){ const a=-Math.PI*(.15+.7*((i*0.381966)%1)), sp=2.5+(i%6)*.7, col=i%4?[102,122,121]:[150,232,222];
-    FEEL.particles.push({x:e.x+((i%9)-4)*.12, y:gy-.1, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:.5+(i%5)*.08, max:.9, size:2*sc, c:'rgb('+col.join(',')+')'}); }
+    FEEL.particles.push({x:e.x+((i%9)-4)*.12*VERA_K, y:gy-.1, vx:Math.cos(a)*sp*VERA_K, vy:Math.sin(a)*sp, life:.5+(i%5)*.08, max:.9, size:2*sc, c:'rgb('+col.join(',')+')'}); }
   if(FEEL.particles.length>1600) FEEL.particles.splice(0,FEEL.particles.length-1600);
 }
 function veraDraw(e,t){
@@ -3739,6 +3762,8 @@ function enemy(e,sx,sy,R){
   for(let Y=0;Y<N;Y++){ const row=Y*N; for(let X=0;X<N;X++) if(u[row+X]){ if(X<x0)x0=X; if(X>x1)x1=X; if(Y<y0)y0=Y; if(Y>y1)y1=Y; } }
   const cxA = r.anchor ? r.anchor[0] : x1>=0 ? (x0+x1+1)/2 : N/2, cyA = r.anchor ? r.anchor[1] : y1>=0 ? (y0+y1+1)/2 : PT.oy;   // ヴェラは固定の錨点（脚が壊れても体が跳ねない）
   const W2=N*ps;
+  /* 見えている絵の上端・下端・幅（画面のpx、(sx,sy) から）。大きく描くボスの頭上の帯・名前・影を絵に合わせるのに使う */
+  if(x1>=0) e._vis={top:(y0-cyA)*ps, bot:(y1+1-cyA)*ps, w:(x1-x0+1)*ps};
   ctx.save(); ctx.imageSmoothingEnabled=false;
   ctx.translate(Math.round(sx), Math.round(sy));
   if(face<0) ctx.scale(-1,1);
@@ -3800,7 +3825,7 @@ function renderFoe(e,noFlash){
     const an=an2||veraDraw(e,t);
     if(!an2 && !noFlash && e.hit>0 && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
     SPR.cx.putImageData(SPR.id,0,0);
-    return {N,face,mid,k,fam,arch,anchor:[PT.ox+an[0],PT.oy+an[1]],px:.5};
+    return {N,face,mid,k,fam,arch,anchor:[PT.ox+an[0],PT.oy+an[1]],px:VERA_PX};
   }
   else if(e.moss){
     /* 苔玉は本編の絵と同じ大きさにする（本編は 16px の絵を R*2.6 で置いていた）。

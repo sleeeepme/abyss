@@ -456,7 +456,7 @@ R.finalKill = await pg.evaluate(()=>{
   boss.hp=1; killEnemy(boss);
   /* ボス撃破は 1.15 秒の演出を挟んでから画面へ進む（game-feel.js）。
      報酬の確定は killEnemy の中で済んでいるので、遅れるのは画面だけ。 */
-  stepSim(1.3);
+  stepSim(7.5);   // 撃破演出（1.15秒）＋演出のあとに出すレベルアップ・大技の帯（最大5.5秒）
   const clearOpen=document.getElementById('m-clear').classList.contains('on');
   const drops=W.drops.length;
   document.getElementById('clr-ok').click();

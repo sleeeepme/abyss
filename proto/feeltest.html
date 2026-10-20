@@ -207,7 +207,7 @@ frame.onload=async()=>{
       fresh();enterFloor(51);syncFeel();const e=W.enemies.find(e=>e.boss);if(!e)throw Error('no final boss');
       const before=S.cleared||0;killEnemy(e);
       const delayed=S.screen==='game'&&!!FEEL.boss&&!el('m-clear').classList.contains('on');
-      stepSim(1.3,{draw:true});const ok=delayed&&S.screen==='clear'&&el('m-clear').classList.contains('on')&&S.cleared===before+1;
+      stepSim(7.5,{draw:true});const ok=delayed&&S.screen==='clear'&&el('m-clear').classList.contains('on')&&S.cleared===before+1;
       el('m-clear').classList.remove('on');setScreen('game');return ok;
     });
     check('All damage-type trails and enemy magic render without context leakage',()=>{

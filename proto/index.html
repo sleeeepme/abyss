@@ -11996,12 +11996,16 @@ function addXp(h, amount, isPlayer){
    HPバーが一気に満ちて光る（_lvFlash）ので、見ていれば分かる——
    分かることを重ねて書くと、Lv がいくつになったかが読み飛ばされる。 */
 function onLevelUp(h, isPlayer){
-  const x = isPlayer ? P.x : h.x, y = isPlayer ? P.y : h.y;
-  W.fx.push({t:'levelup', x, y, life:1.1, max:1.1, col:isPlayer?'#ffd06a':jobDef(h.job).col});
-  W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:isPlayer?'#ffd06a':jobDef(h.job).col, life:1.2});
+  const lv=h.lv;
+  const show=()=>{
+    const x = isPlayer ? P.x : h.x, y = isPlayer ? P.y : h.y;   // 後回しにした時は、出す瞬間の居場所で光らせる
+    W.fx.push({t:'levelup', x, y, life:1.1, max:1.1, col:isPlayer?'#ffd06a':jobDef(h.job).col});
+    W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:isPlayer?'#ffd06a':jobDef(h.job).col, life:1.2});
+    if(isPlayer) _lvFlash = 1.0; // HPバーを光らせる
+  };
+  if(_feelHold) _feelHold.fns.push(show); else show();     // ボスの撃破演出中は演出のあとに
   if(isPlayer){
-    showBanner('Lv.'+h.lv, '', '#ffd06a', 2.2);
-    _lvFlash = 1.0;              // HPバーを光らせる
+    showBanner('Lv.'+lv, '', '#ffd06a', 2.2);
     grantCharPotential(h);       // レベルアップごとに1個、必ず潜在が手に入る（ユーザー要望）
   }
 }
@@ -12054,6 +12058,7 @@ let _potNoteT=0;
    溜めた物をその場で出し切るこの形なら、詰まりようがない。 */
 function flushCharPotNotice(){
   if(!_charPotPend.length) return;
+  if(_feelHold){ _feelHold.pot=true; return; }       // ボスの撃破演出のあいだは溜めておく
   const pots=_charPotPend; _charPotPend=[];
   const nd=el('potnote'); if(!nd) return;
   // 枠と光の色は、まとめたうちで一番高い色に合わせる
@@ -14877,6 +14882,7 @@ function update(dt){
   W.pops=W.pops.filter(p=>p.life>0);
   tickLog(dt);
   tickPotNote(dt);
+  tickBannerQ();
 
   /* ---------- 壁にめり込んだ物を引き出す ----------
      落とし物は「敵がいた場所 ± 乱数」で置いている。壁際で倒すと
@@ -15642,8 +15648,14 @@ function draw(){
     // looksBoss は門番の幻。大きさまで本体と同じにしないと、輪を消しても一目で分かる。
     const R = (e.boss||e.looksBoss) ? TS*e.r : TS*(e.intruder?0.54:e.uniq?0.46:e.elite?0.42:e.swarmling?0.17:0.32);   // 磯虫は小さい（影・HP帯も合わせる）
     const shadowSize = mossSpriteKey(e) ? R*2.6 : CharacterArt.enemyKey(e) ? (e.uniqueBoss===5 ? R*2.25 : TS*(e.elite?1.12:1)) : R*2;
+    /* ヴェラは絵を当たり判定より大きく描く（ドットを主人公と同じ大きさに、2026-10-19）。
+       頭上の帯・名前・影は、当たりの半径ではなく描いた絵の上端・下端（cave-look.js の e._vis）に合わせる */
+    const VIS = (e.uniqueBoss===10 && e._vis && window.CAVE && CAVE.on) ? e._vis : null;
+    const visTop = VIS ? VIS.top : -R, visBot = VIS ? VIS.bot : R;
     /* ヴェラ第二形態の撃破演出は、弾けた瞬間（e._v2Boom）に影も消す（体が無いのに影だけ残らないように） */
-    drawFeelGroundShadow(sx,sy,shadowSize,1,e.dead?(e._v2Boom?0:Math.max(0,(e.fade??0.3)/0.3)):1);
+    const shA = e.dead?(e._v2Boom?0:Math.max(0,(e.fade??0.3)/0.3)):1;
+    if(VIS){ const s=Math.max(shadowSize, VIS.w*0.6/0.52); drawFeelGroundShadow(sx, sy+VIS.bot-TS*0.12-s*0.39, s, 1, shA); }
+    else drawFeelGroundShadow(sx,sy,shadowSize,1,shA);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
     // 範囲攻撃の予兆（当たる範囲をそのまま描く）
     if(e.boss && e.cast && !engulfed) uiLater(()=>drawBossCast(e, sx, sy, R));
@@ -15744,8 +15756,8 @@ function draw(){
       if(e.hp<e.maxHp && !disg){
         const hpf=e.hp/e.maxHp;
         uiLater(()=>{
-          ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy-R-9,R*2,3.5);
-          ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy-R-9,R*2*hpf,3.5);
+          ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(sx-R,sy+visTop-9,R*2,3.5);
+          ctx.fillStyle='#e05a52'; ctx.fillRect(sx-R,sy+visTop-9,R*2*hpf,3.5);
         });
       }
       /* 名前と、そのすぐ下に Lv。
@@ -15758,19 +15770,19 @@ function draw(){
         label('Lv.'+e.lv, sx, y+Math.max(9,TS*0.36*sc)*1.05, feelEnemyLevelColor(), sc*0.82);
       };
       if(e.intruder)
-        nameTag(sy+R+TS*0.42, '#ff6a5a', 1);
+        nameTag(sy+visBot+TS*0.42, '#ff6a5a', 1);
       else if(e.uniq)
-        nameTag(sy+R+TS*0.40, '#c07fe0', 1);
+        nameTag(sy+visBot+TS*0.40, '#c07fe0', 1);
       /* 名前を全部出すと、乱戦で足元が文字の山になって**逆に何も読めない**。
          精鋭は「見分けが付くこと」自体が情報なので出す。
          ただの雑魚は今狙っている1体だけ——それ以外は名前を知る必要がない。 */
       else if(Math.hypot(e.x-P.x,e.y-P.y)<7.5 && (e.elite || P.target===e))
-        nameTag(sy+R+TS*0.36, e.elite?'#d6b34a':'#c3cad8', 0.8);
+        nameTag(sy+visBot+TS*0.36, e.elite?'#d6b34a':'#c3cad8', 0.8);
       // 状態異常アイコン（頭上の小さな点）
       if(e.st){
         const ids=Object.keys(e.st).filter(k=>e.st[k].t>0);
         ids.forEach((k,i)=>{
-          const bx=sx-(ids.length-1)*5+i*10, by=sy-R-15;
+          const bx=sx-(ids.length-1)*5+i*10, by=sy+visTop-15;
           ctx.fillStyle=STATUS[k].col;
           ctx.beginPath(); ctx.arc(bx,by,3.4,0,7); ctx.fill();
           ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=1; ctx.stroke();
@@ -16626,7 +16638,36 @@ function drawFrozen(){
    ログは流れて消えるので、見落としてはいけない事だけをここに出す。 */
 let _banner=null;   // {title, sub, col, t, max}
 function showBanner(title, sub, col, secs){
+  if(_feelHold){ _feelHold.banners.push([title, sub, col, secs]); return; }   // ボスの撃破演出中は後回し（feelReleaseHold）
   _banner={title, sub:sub||'', col:col||'#cfd6e4', t:secs||3.0, max:secs||3.0};
+}
+/* ---------- ボスの撃破演出のあいだは、知らせを後回しにする（2026-10-19 ユーザー指定） ----------
+   「ボス撃破後の習得演出や潜在選択は撃破演出の後に」。撃破の一撃で経験値が入ると、
+   レベルアップの光・LEVEL UP・Lv の帯・資質のカード、大技を覚えた帯が、撃破演出の上に重なって出ていた。
+   game-feel.js の killEnemy がボスのときだけ _feelHold を立て、演出が終わったら feelReleaseHold で順に出す。
+   中身（レベル・資質・大技そのもの）はその場で入る。遅らせるのは見せ方だけ。 */
+let _feelHold=null;
+function feelHoldStart(){ if(_feelHold) return false; _feelHold={fns:[], banners:[], pot:false}; return true; }
+/* 溜めた知らせを出す。帯は重ねず1枚ずつ順に出す（前の帯が消えたら次）。戻り値は全部出し終えるまでの秒数 */
+let _bannerQ=[];
+function feelReleaseHold(){
+  const h=_feelHold; _feelHold=null; if(!h) return 0;
+  h.fns.forEach(f=>{ try{ f(); }catch(err){ console.error(err); } });
+  if(h.pot) flushCharPotNotice();
+  /* 一撃で何レベルも上がると Lv の帯が何枚も溜まる。最後の1枚（いちばん上の Lv）だけ残す。
+     出す順は、覚えた物（大技など）→ Lv → その他（帰還ポータルなど） */
+  const isLv=bn=>/^Lv\./.test(bn[0]);
+  const lastLv=[...h.banners].reverse().find(isLv);
+  const rank=bn=>isLv(bn)?1:(/^大技/.test(bn[0])?0:2);
+  const list=h.banners.filter(bn=>!isLv(bn)||bn===lastLv).map((bn,i)=>[bn,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);
+  let total=0;
+  list.forEach((bn,i)=>{ if(i===0) showBanner(...bn); else _bannerQ.push(bn); if(rank(bn)<2) total+=(bn[3]||3.0); });
+  return Math.max(total, h.fns.length||h.pot ? 1.6 : 0);   // 待つのは「覚えた物」と Lv の帯のぶん（帰還ポータル等の知らせは待たない）
+}
+function tickBannerQ(){
+  if(!_bannerQ.length) return;
+  if(_banner && _banner.t>0) return;
+  showBanner(..._bannerQ.shift());
 }
 /* ---------- 街で読ませる短い知らせ ----------
    showBanner はキャンバスに描くので、街の画面（不透明な .screen）では
@@ -22106,10 +22147,10 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261009a"></script>
-<script src="game-feel.js?v=20261019-vera-death"></script>
+<script src="game-feel.js?v=20261020-boss-hold"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261019c"></script>
+<script src="cave-look.js?v=20261020a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
