@@ -5267,7 +5267,7 @@ function hitEnemyByAlly(a, st, e, mult){
   const dmg = Math.max(1, Math.round(st.atk*mult*backAttackMul(e, a.x, a.y)*duelVuln(e)));
   const hitPart = e.parts ? partFor(e, a.x, a.y) : null;   // 仲間の一撃も、仲間に近い脚に当たれば脚だけに入る
   if(hitPart) partHit(e, dmg, a.x, a.y, hitPart); else e.hp -= dmg;
-  e.hit = Math.max(e.hit, 0.12);
+  e.hit = Math.max(e.hit, 0.12)+1e-3; e._hitWho = hitPart ? hitPart.id : 'body';
   linkGain(LINK.hitAlly);
   if(isDuelBoss(e) && e.hp>0) addBreak(e, DUEL.pt.hit*DUEL.pt.allyMul);   // 仲間の手数も崩しに
   pop(hitPart?e.x+hitPart.ox:e.x, (hitPart?e.y+hitPart.oy:e.y)-0.3, dmg, jobDef(a.job).col);
@@ -7385,7 +7385,7 @@ function applyBossFirstForm(e, spec, nm2){
   e.form2 = {
     maxHp: Math.max(1, Math.round(baseHp*BOSS_FORM_HP.second)),
     arch:e.arch, moves:e.moves.slice(), r:e.r, cr:e.cr,
-    atkV:e.atkV, def:e.def, ms:e.ms,
+    atkV:e.atkV*(spec.secondAtkMul!=null ? spec.secondAtkMul : 1), def:e.def, ms:e.ms,   // secondAtkMul：第二形態の攻撃の倍率（ヴェラの調整用）
     nm:nm2 || null                 // 姿が変われば名前も変わる（無ければ据え置き）
   };
   const a = ARCH.find(x=>x.id===spec.arch) || e.arch;
@@ -7439,7 +7439,8 @@ function bossChangeForm(e){
    脚の円は絵（cave-look.js の VERA_PX=1、横7.5マス）の脚の所：手前の脚は内側の下、奥の脚は外側。
    脚の耐久は 0.10 → 0.18。壊すと本体に最大HPの2割（breakDmg）が入るので、脚に払ったぶんより少し得をする程度にした。 */
 const BOSS_PARTS={
-  legs:{hp:0.18,          // 脚1本の耐久（第二形態の最大HPに対する割合）
+  legs:{hp:0.25,          // 脚1本の耐久（第二形態の最大HPに対する割合）。2026-10-20「もう少し堅く」で 0.18 → 0.25
+        lameAt:2,         // この本数が壊れたら歩けない（2026-10-20 ユーザー指定。前は4本とも壊れたら）
         breakDmg:0.20,    // 1本壊したとき本体に入るダメージ（最大HPに対する割合）
         down:3.0,         // 1本壊すごとのダウン（秒）。技・移動が止まる
         allDef:0.35,      // 4本とも壊したときの防御の倍率（＝65%減）
@@ -7470,9 +7471,14 @@ function partHit(e, dmg, sx, sy, p){
   W.pops.push({x:e.x+p.ox, y:e.y+p.oy-0.4, txt:'部位破壊', c:'#ffd06a', life:1.1});
   if(typeof feelKick==='function') feelKick(3.0, 0.25);
   W.fx.push({t:'shock', x:e.x+p.ox, y:e.y+p.oy, r:0.9, life:0.3, max:0.3, col:'#b8b0a0'});
+  if(e.parts.filter(q=>q.broken).length>=(P_.lameAt||4) && !e.lame){
+    e.lame=true;
+    log(e.name+'——脚を2本失い、もう歩けない');
+    W.pops.push({x:e.x, y:e.y-1.6, txt:'移動不能', c:'#ff9a6a', life:1.4});
+  }
   if(e.parts.every(q=>q.broken) && !e.partsAll){
     e.partsAll=true; e.def*=P_.allDef;
-    log(e.name+'——脚をすべて失った。もう歩けない。守りも大きく崩れた');
+    log(e.name+'——脚をすべて失った。守りも大きく崩れた');
     W.pops.push({x:e.x, y:e.y-1.2, txt:'防御ダウン', c:'#ff9a6a', life:1.4});
   }
   return p;
@@ -9423,7 +9429,7 @@ function hitEnemy(e, st, mult, opt){
   const hitPart = e.parts ? partFor(e, at.x, at.y) : null;
   if(hitPart) partHit(e, r.total, at.x, at.y, hitPart);
   else e.hp-=r.total;
-  e.hit=0.12;
+  e.hit=0.12; e._hitWho = hitPart ? hitPart.id : 'body';   // 赤く光らせる所（cave-look.js の vera2Draw：当たった部位だけ）
   linkGain(src===S.hero ? LINK.hitHero : LINK.hitAlly);   // 連携値（一斉攻撃そのものの当たりでは溜まらない——linkGain が弾く）
   feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
@@ -12610,7 +12616,7 @@ function enemyUpdate(e,dt){
   }
   /* 脚を4本とも砕かれた（部位破壊の全部）ボスは、その場から歩けない。技は撃てる。
      2026-10-19 ユーザー要望「脚がすべて壊されたら動けないようにして」 */
-  if(e.partsAll){ mvx=0; mvy=0; e.vx=0; e.vy=0; }
+  if(e.partsAll||e.lame){ mvx=0; mvy=0; e.vx=0; e.vy=0; }   // 脚が2本以上壊れたら歩けない（技は撃てる）
   e.pathHold = Math.max(0, (e.pathHold||0) - dt);
   if(e.intruder && (mvx||mvy)
      && (e.pathHold>0 || !losClear(e.x, e.y, tg.x, tg.y))){
@@ -15815,7 +15821,8 @@ function draw(){
     if(litSt==='shadow'){ drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody); ctx.globalAlpha=1; return; }
     drawBody();
     if(engulfed){ ctx.globalAlpha=1; return; }       // 一斉攻撃の煙の中：体だけ（名前・HP帯・印は出さない）
-    if(!e.dead) drawFeelFlash(e,sx,sy,spr?R*2.6:e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1));
+    /* 部位を持つヴェラは、当たった部位だけを cave-look.js が光らせる。体ごとの白い被せは出さない */
+    if(!e.dead && !(e.parts && window.CAVE && CAVE.on)) drawFeelFlash(e,sx,sy,spr?R*2.6:e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1));
     // ボスは大きいぶん面がのっぺりするので、内側にもう一段シルエットを重ねる
     if((e.boss||e.looksBoss) && !e.dead && !spriteDrawn){
       ctx.globalAlpha=0.35;
@@ -22287,7 +22294,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261020b"></script>
+<script src="cave-look.js?v=20261020c"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

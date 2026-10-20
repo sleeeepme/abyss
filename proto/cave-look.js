@@ -3518,6 +3518,7 @@ VERA2_DEATH.len=VERA2_DEATH.d.reduce((a,b)=>a+b,0)/1000;
    ユーザー指定「ドットサイズをプレイヤーと合わせて」で 1 に。絵はそのままなので画面上は2倍になる（当たり判定は変えない）。
    VERA_K は .5 の頃に合わせて置いた輪・土煙の大きさを、同じ見え方に保つための倍率。 */
 const VERA_PX=1, VERA_K=VERA_PX/.5;
+const V2_FLASH=.3;   // 被弾の光り（白→赤→消える）の長さ（秒）
 function vera2DeathReady(){ return !!VERA2_DEATH.u; }
 function vera2DeathDraw(e,t){
   const D=VERA2_DEATH, N=PT.N, u=SPR.u32;
@@ -3547,15 +3548,15 @@ function vera2Draw(e,t){
   if(e.partsAll && e._v2AllT==null) e._v2AllT=t;
   // ---- どのコマか ----
   const down=e.down>0, casting=!down&&(!!e.cast||e.tele>0);
-  const moving=!e.partsAll && !down && footSpeed(e,t)>.3;
-  const hit=e.hit||0; if(hit>(e._v2Hit||0)+1e-4 && !e.dead) e._v2Dmg=t; e._v2Hit=hit;
+  const moving=!e.partsAll && !e.lame && !down && footSpeed(e,t)>.3;
+  const hit=e.hit||0; if(hit>(e._v2Hit||0)+1e-4 && !e.dead){ e._v2Dmg=t; e._v2DmgWho=e._hitWho||'body'; } e._v2Hit=hit;
   if(e._v2Cast && !casting && !down && !e.dead) e._v2Atk=t;   // 溜めが切れた瞬間＝攻撃（振り下ろし）
   e._v2Cast=casting;
   const A=VERA2.anims, hurtLen=A.hurt[2].reduce((a,b)=>a+b,0)/1000;
   const atk=A.atk, strikeLen=atk[2].slice(VERA2.strike).reduce((a,b)=>a+b,0)/1000;
   let f;
-  if(e._v2Dmg!=null && t-e._v2Dmg<hurtLen) f=vera2Pick('hurt',t-e._v2Dmg);
-  else if(casting) f=vera2Pick('tele',t,true);
+  /* 被弾のコマ（体ごと白→赤）は使わない。当たった部位だけを光らせる（下の「被弾の光り」） */
+  if(casting) f=vera2Pick('tele',t,true);
   else if(e._v2Atk!=null && t-e._v2Atk<strikeLen){
     let x=t-e._v2Atk, i=VERA2.strike; while(i<atk[1]-1 && x>=atk[2][i]/1000){ x-=atk[2][i]/1000; i++; } f=atk[0]+i; }
   else if(moving) f=vera2Pick('walk',t,true);
@@ -3576,6 +3577,26 @@ function vera2Draw(e,t){
       let c=base[row+x];
       if(dif){ const d=dif[row+x]; if(d>>>24) c=(d>>>0)===V2_MAGENTA?0:d; }
       if(c>>>24) u[out+X]=lit(c>>>0); } }
+  /* ---- 被弾の光り（2026-10-20 ユーザー指定「ヒット時に赤くフラッシュするのはダメージを受けている部位に」）----
+     当たった円（体か脚。本編の hitCircles）に、いちばん近いドットだけを白→赤に光らせる。
+     脚の絵は当たりの円より大きく伸びるので、脚の円は 1.7 倍、体は 1.25 倍まで見る。 */
+  if(e._v2Dmg!=null && t-e._v2Dmg<V2_FLASH && !e.dead){
+    const k=(t-e._v2Dmg)/V2_FLASH, who=e._v2DmgWho||'body';
+    const S16=Q/VERA_PX, ax=X0+VERA2.ax, ay=Y0+VERA2.ay;
+    const cs=[{id:'body', x:ax, y:ay, r:(e.r||1)*S16, g:1.25}];
+    for(const p of (e.parts||[])) if(!p.broken||p.id===who) cs.push({id:p.id, x:ax+p.ox*S16*face, y:ay+p.oy*S16, r:(p.r||.6)*S16, g:1.7});
+    const tg=cs.find(c=>c.id===who)||cs[0];
+    const white=k<.25, a=white?.85:.6*(1-(k-.25)/.75), tr=white?255:255, tg_=white?255:60, tb=white?255:50;
+    const x0=Math.max(0,Math.floor(tg.x-tg.r*tg.g)), x1=Math.min(N-1,Math.ceil(tg.x+tg.r*tg.g)), y0=Math.max(0,Math.floor(tg.y-tg.r*tg.g)), y1=Math.min(N-1,Math.ceil(tg.y+tg.r*tg.g));
+    for(let Y=y0;Y<=y1;Y++) for(let X=x0;X<=x1;X++){
+      const i=Y*N+X, c=u[i]; if(!(c>>>24)) continue;
+      const dT=Math.hypot(X-tg.x,Y-tg.y)/tg.r; if(dT>tg.g) continue;
+      let mine=true; for(const o of cs){ if(o===tg) continue; if(Math.hypot(X-o.x,Y-o.y)/o.r<dT){ mine=false; break; } }
+      if(!mine) continue;
+      const r=c&255, g=(c>>8)&255, b=(c>>16)&255;
+      u[i]=(0xff000000|((b+(tb-b)*a)<<16)|((g+(tg_-g)*a)<<8)|(r+(tr-r)*a))>>>0;
+    }
+  }
   if(e._v2Burst && vera2Ready(e._v2Burst.to)) { vera2Shatter(e,VERA2.anims.idle[0],X0,Y0,face); e._v2Burst=null; }   // 色は被弾の白赤でなく、待機のコマから
   return [X0+VERA2.ax-PT.ox, Y0n+VERA2.ay-PT.oy];
 }

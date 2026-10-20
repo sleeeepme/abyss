@@ -89,11 +89,13 @@ FAIL partytest .fallen.deadAfter,.uniqKill.blockedBefore
 |---|---|
 | `_balance.mjs` | 累計SP別の到達階分布。階ごとの入場HP／最低HP／滞在秒／ボス残HP |
 | `_wall.mjs` | ボス戦だけを取り出し「倒しきる秒数 ÷ 倒される秒数」の比。1.0未満で勝てる |
+| `_vera.mjs` | 10Fのヴェラ戦を操縦で何十本も回した勝率（Lv・SP・死の圧・仲間・避け方を指定）。目標は1回あたり35〜45%＝2〜3回で倒せる |
 | `_perf.mjs` | 描画の内訳 |
 | `_bb` / `_h` / `_intrperf` / `_shot` | 補助（撮影・個別計測） |
 
 ```
 node proto/_balance.mjs --seeds 24 --sp 0,60,130,300,450 --maxdepth 20
+node proto/_vera.mjs --seeds 50 --sp 200 --lv 10 --bot dodge   # --dp 1（2回目）/ --ally 1 / --see 0.85（上手い人）
 node proto/_wall.mjs --depth 5 --sp 130
 ```
 

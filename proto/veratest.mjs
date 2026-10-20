@@ -83,7 +83,7 @@ R.legParts = await pg.evaluate(()=>{
     ok: none1 && n===4 && routed && bodyUntouched && bodyHit && broke && breakDmg>=0.19 && breakDmg<=0.21 && down0>2 && still && recovered && all && defDrop<0.5};
 });
 
-/* 脚を4本とも壊したら歩けない（技は撃てる）。1本だけ壊した時はまだ歩く（2026-10-19） */
+/* 脚を2本以上壊したら歩けない（技は撃てる）。1本だけ壊した時はまだ歩く（2026-10-19、2本に変えたのは 2026-10-20） */
 R.legsAllImmobile = await pg.evaluate(()=>{
   TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[]; TH.immortal();
   const e=W.enemies.find(x=>x.uniqueBoss===10);
@@ -91,12 +91,15 @@ R.legsAllImmobile = await pg.evaluate(()=>{
   const hx=e.x, hy=e.y;
   const walkFor=(sec)=>{ e.x=hx; e.y=hy; P.x=hx+(hx>W.fl.W/2?-6:6); P.y=hy; /* 広間の真ん中の側に立つ（壁の側だと体の枠で止まって歩けない） */ const x0=e.x,y0=e.y; for(let i=0;i<sec*20;i++){ e.cast=null; e.tele=0; e.cd=9; e.down=0; e.roar=0; e.recover=0; e.broken=0; enemyUpdate(e,0.05); } return Math.hypot(e.x-x0,e.y-y0); };
   const before=walkFor(1.0);
-  e.parts.find(p=>p.id==='SW').broken=true;
+  const st=stats(S.hero), brk=id=>{ const p=e.parts.find(q=>q.id===id); p.hp=1; P.x=e.x+p.ox+Math.sign(p.ox)*0.6; P.y=e.y+p.oy+0.5; hitEnemy(e,st,1); e.hp=e.maxHp; };
+  brk('SW');
   const oneBroken=walkFor(1.0);
-  for(const p of e.parts) p.broken=true; e.partsAll=true;
+  brk('NE');                                   // 2本目：ここで歩けなくなる（2026-10-20 ユーザー指定）
+  const twoBroken=walkFor(1.5);
+  brk('SE'); brk('NW');
   const allBroken=walkFor(1.5);
-  return {before:+before.toFixed(2), oneBroken:+oneBroken.toFixed(2), allBroken:+allBroken.toFixed(3),
-    ok: before>0.3 && oneBroken>0.3 && allBroken<1e-6};
+  return {before:+before.toFixed(2), oneBroken:+oneBroken.toFixed(2), twoBroken:+twoBroken.toFixed(3), allBroken:+allBroken.toFixed(3),
+    ok: before>0.3 && oneBroken>0.3 && twoBroken<1e-6 && allBroken<1e-6};
 });
 /* 第二形態は新しい絵（vera2Draw）で描かれる。脚の壊れ方で絵の組み合わせが変わる */
 R.form2Art = await pg.evaluate(async ()=>{
