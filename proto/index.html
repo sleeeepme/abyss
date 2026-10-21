@@ -3494,6 +3494,10 @@ const HAZARDS={
           slow:0.35, glow:false, desc:'足を取られる。深みは底が無い'},
   void_: {nm:'虚',     col:'#2a2340', edge:'#a07fe0', dt:'arcane', dps:14, st:'stagger',
           slow:0.25, glow:true,  desc:'引きずり込まれる'},
+  /* ヴェラの広間（10F）だけの床。ヴェラの体に生えた鉱石の元になる成分が溶け出した、青緑に光る有毒な液だまり
+     （2026-10-21 ユーザー指定「今のダメージ床が何かわからない」）。強さは同じ層の「石の棘」と同じにして、見た目と名前だけ替える */
+  ore:   {nm:'鉱毒の溜り', col:'#2f8f86', edge:'#9ff0e2', dt:'arcane', dps:9,  st:null,
+          slow:0.20, glow:true,  desc:'石の毒に灼かれる'},
 };
 /* 層ごとに置くハザードの種類。第10階層より手前には一切置かない。 */
 const ZONE_HAZARD = {stone:'grit', sump:'water', root:'spore', ruin:'slick', furnace:'lava', pale:'void_'};
@@ -3551,7 +3555,8 @@ function spawnHazards(fl, depth){
   }
   const cov = hazardCoverage(depth);
   if(cov<=0) return null;
-  const kind = hazardKindFor(fl.zone ? fl.zone.id : 'stone');
+  const kind = (fl.arena && uniqueBossAt(depth)===UNIQUE_BOSSES[10]) ? 'ore'   // ヴェラの広間は鉱毒の溜り
+             : hazardKindFor(fl.zone ? fl.zone.id : 'stone');
   const g = Array.from({length:fl.H}, ()=>new Uint8Array(fl.W));
   const rooms = fl.rooms.filter(r=>r!==fl.start);   // 開始部屋には置かない
   let placed=0;
@@ -22290,11 +22295,11 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20261009a"></script>
+<script src="weapon-art-pixel.js?v=20261021a"></script>
 <script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261020c"></script>
+<script src="cave-look.js?v=20261021a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

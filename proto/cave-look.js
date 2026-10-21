@@ -292,6 +292,9 @@ const HZ={
   grit:{ramp:cs(['#1a1814','#2e2a22','#4a4436','#8a806a']), hi:C('#e0d6b4'), glow:false},
   slick:{ramp:cs(['#101c28','#1a3044','#2a4a68','#5a8ab0']), hi:C('#e8f6ff'), glow:false},
   void_:{ramp:cs(['#0a0614','#160c28','#2a1848','#5a3a90']), hi:C('#e0ccff'), glow:true},
+  /* 鉱毒の溜り（ヴェラの広間）：ヴェラの体の鉱石と同じ青緑に、内から光る液。縁は灰緑の岩が結晶になりかけた殻 */
+  ore:{ramp:cs(['#0a2321','#113a35','#1b5850','#2f8478']), hi:C('#c8fff4'), glow:true,
+       crust:cs(['#1c2a29','#33484a','#56706c']), shard:C('#7fe0d4'), shard2:C('#3fa89c')},
 };
 
 /* ---------- 波打ち際（水の層） ----------
@@ -1031,6 +1034,28 @@ function terrain(f,Z,camX,camY,blinded){
           lv=Math.max(0,Math.min(3,lv));
           let col=hz.ramp[lv];
           const n=NZB[((wy&255)<<8)|(wx&255)];
+          if(haz.kind==='ore'){
+            /* 鉱毒の溜り（2026-10-21）：
+               縁＝灰緑の岩の殻（ところどころ結晶の粒が光る）。
+               液＝青緑。ゆっくり脈打つ明るさ（glow）に、細い揺らぎの筋がゆっくり流れる。
+               ところどころに結晶のかけらが浮いて瞬き、ときどき泡が浮いて弾ける。 */
+            const cr=hz.crust;
+            if(hv<.64){ const e=(hv-.5)/.14;                          // 0（外）→1（液）
+              let c=cr[Math.min(2,Math.max(0,Math.floor(e*1.6+b*.7+Math.max(Lv,Cv*.8)*.9)))];
+              if(ihash(wx,wy)%19===0) c=(Math.sin(t*2+wx*.7)>-.2)?hz.shard:hz.shard2;     // 殻に食い込んだ結晶
+              buf[k]=c; continue; }
+            /* 液の明るさは網点で揺らさない（市松の粒が目立つ）。奥ほど明るく、ゆっくり脈打つ */
+            const pulse=Math.sin(t*1.3+(wx+wy)*.03)*.5+.5;
+            lv=Math.max(0,Math.min(3,Math.floor(.6+(hv-.64)*5+pulse*.9+(b-.5)*.35)));
+            col=hz.ramp[lv];
+            const fl=Math.sin(wx*.21+wy*.13+t*.9+n*5)+Math.sin(wx*.07-wy*.19-t*.6);
+            if(fl>1.5) col=hz.ramp[Math.min(3,lv+1)];                         // 揺らぎの筋
+            const h=ihash(wx,wy);
+            if(h%61===0){ col=(Math.sin(t*2.6+h)>.3)?hz.shard:hz.shard2; }      // 浮いた結晶のかけら
+            const bb=ihash(wx>>2,wy>>2), ph=(t*.55+(bb%97)/97)%1;                // 泡：4ドットの区画ごとに周期をずらす
+            if(bb%9===0 && ph>.8 && ((wx&3)===1) && ((wy&3)===1)) col=ph>.93?hz.hi:hz.shard;
+            buf[k]=col; continue;
+          }
           if(hv<.56) col=hz.ramp[Math.min(3,lv+1)];               // 縁
           else if(haz.kind==='water'||haz.kind==='slick'){ if(Math.sin(wy*.28+t*1.4+n*7+Math.sin(wx*.08)*1.5)>.82&&((wx+wy)&1)) col=hz.ramp[Math.min(3,lv+1)]; if(Lv>.2&&ihash(wx,wy+((t*4)|0)*13)%53===0) col=hz.hi; }
           else if(haz.kind==='lava'){ if(Math.abs(NZR[((wy&255)<<8)|(wx&255)]-.5)<.02) col=hz.hi; }
@@ -1533,6 +1558,8 @@ function genDeco(f,Z){
        第二形態の体（横7.5マス）が柱にも壁にも掛からないように動ける場所を絞っているので（本編の veraBodyFree）、
        床の上の立ち物まで避けさせると動ける所がほとんど残らない。平たい物（水溜り・骨・小石・苔）は残す。 */
     out=out.filter(o=>!standBox(o));
+    /* 水溜りは2つまで（2026-10-21 ユーザー指定「ヴェラのフロアの水溜りが多いので減らしたい」）。床の毒の溜りと紛れないように */
+    { let pk=0; out=out.filter(o=>o.k!=='pool' || (pk++<VERA_POOLS)); }
     for(const c of f.cover) out.push({k:'column', x:Math.round(c.x*Q), y:Math.round(c.y*Q+2), s:hs(c.tx*31+c.ty*977,5), ok:1, ext:40});
   }
   const ROCKS={rock:22,stalagC:16}, SMALL={skel:1,pebble:1,mossbed:1};
@@ -1540,7 +1567,7 @@ function genDeco(f,Z){
   let res=out.filter(o=>o.k!=='pool'||!rocks.some(r=>Math.hypot(r.x-o.x,r.y-o.y)<o.ext*.8+ROCKS[r.k]));
   const pools=res.filter(o=>o.k==='pool');
   res=res.filter(o=>!SMALL[o.k]||!pools.some(p=>Math.hypot(p.x-o.x,p.y-o.y)<p.ext+4));
-  G.pools=pools;
+  G.pools=pools; CAVE.poolCount=pools.length;   // テスト用（ヴェラの広間の水溜りの数）
   G.drips=genDrips(f,pools,depth);
   /* 水の層の立った柱は、岩と同じく当たり判定を持つ（すり抜けると柱に見えない）。
      壁際にしか立たないので、通路を塞ぐことは無い。倒れた柱（fallen）は跨げる高さなので持たない。 */
@@ -3518,6 +3545,7 @@ VERA2_DEATH.len=VERA2_DEATH.d.reduce((a,b)=>a+b,0)/1000;
    ユーザー指定「ドットサイズをプレイヤーと合わせて」で 1 に。絵はそのままなので画面上は2倍になる（当たり判定は変えない）。
    VERA_K は .5 の頃に合わせて置いた輪・土煙の大きさを、同じ見え方に保つための倍率。 */
 const VERA_PX=1, VERA_K=VERA_PX/.5;
+const VERA_POOLS=2;   // ヴェラの広間に置く水溜りの数の上限
 const V2_FLASH=.3;   // 被弾の光り（白→赤→消える）の長さ（秒）
 function vera2DeathReady(){ return !!VERA2_DEATH.u; }
 function vera2DeathDraw(e,t){

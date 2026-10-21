@@ -51,6 +51,13 @@ R.form2BodyClear = await pg.evaluate(()=>{
   return {startClear, bad, n, spanX:+(x1-x0).toFixed(1), spanY:+(y1-y0).toFixed(1), room:+room.toFixed(2),
     ok: startClear && bad===0 && room>0.6 && (x1-x0)>8};
 });
+/* ヴェラの広間の床：毒の溜りは「鉱毒の溜り」（ore）、水溜りは2つまで（2026-10-21 ユーザー指定）。他の10階台の層は今までどおり石の棘 */
+R.floorOre = await pg.evaluate(async ()=>{
+  TH.run(10,{seed:44}); await new Promise(r=>setTimeout(r,300));
+  const kind=W.haz&&W.haz.kind, def=hazardDef(kind), pools=CAVE.poolCount;
+  TH.run(12,{seed:44}); const k12=W.haz&&W.haz.kind;
+  return {kind, nm:def.nm, pools, k12, ok: kind==='ore' && def.nm==='鉱毒の溜り' && pools<=2 && k12!=='ore'};
+});
 R.legParts = await pg.evaluate(()=>{
   TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[];
   const e=W.enemies.find(x=>x.uniqueBoss===10);
