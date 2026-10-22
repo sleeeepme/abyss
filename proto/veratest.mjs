@@ -58,6 +58,23 @@ R.floorOre = await pg.evaluate(async ()=>{
   TH.run(12,{seed:44}); const k12=W.haz&&W.haz.kind;
   return {kind, nm:def.nm, pools, k12, ok: kind==='ore' && def.nm==='鉱毒の溜り' && pools<=2 && k12!=='ore'};
 });
+/* 2026-10-22 鉱毒の溜りは大きな池が数ヶ所（水の層と同じ作り）。形はなめらかな場で、削れる判定も同じ場。
+   菱形の小池（半径1〜2の円をマスで拾った物）にしない。湯気の口があり、池の中でだけ削れる。 */
+R.orePools = await pg.evaluate(()=>{
+  const res=[];
+  for(const seed of [44,7,123,9]){
+    TH.run(10,{seed}); const h=W.haz;
+    const n=(h.pools||[]).length, big=(h.pools||[]).every(c=>c.r>=2.0), tiles=h.n;
+    const c=h.pools[0], inside=!!hazardAt(c.x,c.y), outside=!hazardAt(c.x+c.r+2.2,c.y) || oreSd(c.x+c.r+2.2,c.y)<0;
+    // 縁の内と外で判定が分かれる（マス単位ではない）：縁の 0.1 マス内側は削れ、0.1 マス外側は削れない
+    let edgeOk=true; for(let a=0;a<6.28;a+=.7){ let r=0; while(oreSd(c.x+Math.cos(a)*r,c.y+Math.sin(a)*r)<0&&r<8) r+=.02;
+      const ix=c.x+Math.cos(a)*(r-.1), iy=c.y+Math.sin(a)*(r-.1), ex=c.x+Math.cos(a)*(r+.1), ey=c.y+Math.sin(a)*(r+.1);
+      if(tileWalk(W.fl,Math.floor(ix),Math.floor(iy)) && (!hazardAt(ix,iy)||hazardAt(ex,ey))) edgeOk=false; }
+    const stairDry=!hazardAt(W.fl.stair.x,W.fl.stair.y);
+    res.push({seed,n,big,tiles,inside,outside,edgeOk,stairDry,vents:oreVents(h).length});
+  }
+  return {res, ok: res.every(r=>r.n>=2&&r.big&&r.inside&&r.outside&&r.edgeOk&&r.stairDry&&r.vents>5&&r.tiles>=30)};
+});
 R.legParts = await pg.evaluate(()=>{
   TH.run(10,{seed:44}); W.enemies.filter(e=>!e.boss).forEach(e=>e.dead=true); S.hero.party=[];
   const e=W.enemies.find(x=>x.uniqueBoss===10);

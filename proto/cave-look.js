@@ -293,7 +293,7 @@ const HZ={
   slick:{ramp:cs(['#101c28','#1a3044','#2a4a68','#5a8ab0']), hi:C('#e8f6ff'), glow:false},
   void_:{ramp:cs(['#0a0614','#160c28','#2a1848','#5a3a90']), hi:C('#e0ccff'), glow:true},
   /* 鉱毒の溜り（ヴェラの広間）：ヴェラの体の鉱石と同じ青緑に、内から光る液。縁は灰緑の岩が結晶になりかけた殻 */
-  ore:{ramp:cs(['#0a2321','#113a35','#1b5850','#2f8478']), hi:C('#c8fff4'), glow:true,
+  ore:{ramp:cs(['#0c2a26','#144640','#1f6a5e','#34a08e']), hi:C('#d8fff6'), glow:true, froth:C('#b4f2e4'),
        crust:cs(['#1c2a29','#33484a','#56706c']), shard:C('#7fe0d4'), shard2:C('#3fa89c')},
 };
 
@@ -424,6 +424,58 @@ function hazAt(g,px,py){
   return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy + (NZS[((py&255)<<8)|(px&255)]-.5)*.5;
 }
 
+/* ---------- 鉱毒の溜り（2026-10-22） ----------
+   形はマスではなく本編の oreSd（円の集まりをなめらかに繋いだ縁までの距離）で決める。
+   これに滑らかな揺らぎ（NZS）を足して岸をわずかに波打たせる。削れる判定は揺らぎ無しの oreSd<0。
+   返す値は他のハザードの hazAt と同じ尺度（.5 を越えたら描く）にそろえる：
+     .5〜ORE_HV0 が殻（縁の外の岩）、ORE_HV0 より上が液。液の深さ＝(hv-ORE_HV0)/ORE_HVK マス。 */
+const ORE_HV0=.64, ORE_CRUST=.2, ORE_HVK=(ORE_HV0-.5)/ORE_CRUST, ORE_WOB=.32;
+/* 毎ドット円を9つ測ると重い（実測で描画が倍になった）。縁までの距離はマスごとに16×16を一度だけ測って控える。 */
+function oreTileSd(haz,tx,ty){
+  const C=haz._sdc||(haz._sdc=new Map()), key=ty*4096+tx;
+  let a=C.get(key); if(a) return a;
+  a=new Float32Array(Q*Q);
+  for(let y=0;y<Q;y++) for(let x=0;x<Q;x++){ const px=tx*Q+x, py=ty*Q+y;
+    a[y*Q+x]=oreSd((px+.5)/Q,(py+.5)/Q)+(NZS[((py&255)<<8)|(px&255)]-.5)*ORE_WOB; }
+  C.set(key,a); return a;
+}
+function oreHv(haz,px,py){
+  const tx=(px/Q)|0, ty=(py/Q)|0, r=haz.gr[ty];
+  if(!r||!r[tx]||typeof oreSd!=='function') return 0;
+  return ORE_HV0-oreTileSd(haz,tx,ty)[(py-ty*Q)*Q+(px-tx*Q)]*ORE_HVK;
+}
+/* 泡（ボコボコ）。8ドットの区画ごとに1つ泡の種があり（奥ほど多い）、ゆっくり膨らんで、弾けて、しぶきが散る。
+   周期も大きさも区画ごとに変える。状態は持たない（時刻だけで決まる）。泡は隣の区画まではみ出すので3×3を見る。 */
+const ORE_BUB={cell:7, life:[1.3,2.8], swell:.76, pop:.2, rMax:[1.5,2.9], drops:5};
+function oreBubble(wx,wy,t,dep,hz,lv){
+  if(dep<.3) return 0;
+  const B=ORE_BUB, gx0=Math.floor(wx/B.cell), gy0=Math.floor(wy/B.cell);
+  for(let cy=-1;cy<=1;cy++) for(let cx=-1;cx<=1;cx++){
+    const gx=gx0+cx, gy=gy0+cy, h=ihash(gx*7+3,gy*13+5);
+    if(h%(dep>.8?3:7)) continue;
+    const per=B.life[0]+((h>>>3)%100)/100*(B.life[1]-B.life[0]);
+    const ph=(t/per+((h>>>10)%1000)/1000)%1;
+    const bx=gx*B.cell+2+((h>>>4)%5), by=gy*B.cell+2+((h>>>7)%5), R=B.rMax[0]+((h>>>13)%5)/4*(B.rMax[1]-B.rMax[0]);
+    const dx=wx-bx, dy=wy-by;
+    if(ph<B.swell){                                                    // 膨らむ
+      const r=.5+(ph/B.swell)*R, d=Math.sqrt(dx*dx+dy*dy*1.25);
+      if(d>r) continue;
+      if(r<1.3) return hz.froth;                                       // 生まれたての粒
+      if(Math.round(dx)===Math.round(-r*.45)&&Math.round(dy)===Math.round(-r*.45)) return hz.hi;   // 左上の照り（1点）
+      if(d>r-1) return dy<.5?hz.froth:hz.ramp[Math.max(0,lv-1)];      // 膜：上は光を拾って明るく、下は影
+      return hz.ramp[Math.min(3,lv+1)];                                // 中は液より一段明るい
+    }
+    const q=(ph-B.swell)/B.pop;
+    if(q>1) continue;
+    if(q<.25){ const d=Math.sqrt(dx*dx+dy*dy*1.25), rr=R*(1+q*1.4); if(Math.abs(d-rr)<.5) return hz.shard2; }   // 弾けた輪（すぐ消える）
+    for(let i=0;i<B.drops;i++){                                        // しぶき：外へ跳ねて落ちる
+      const a=i/B.drops*6.283+((h>>>16)%7)*.4, rr=R*.6+q*(3+((h>>>(i+5))&3));
+      const px=Math.round(bx+Math.cos(a)*rr), py=Math.round(by+Math.sin(a)*rr*.75-Math.sin(q*3.1416)*3);
+      if(px===wx&&py===wy) return q<.6?hz.hi:hz.shard;
+    }
+  }
+  return 0;
+}
 /* ---------- 水面（以前の本編の「生きた水面」を、洞窟のドットで描き直したもの） ----------
    本編の drawLivingLiquid は、1マスずつ半透明の横線を重ねて
      ・屈折の帯（2行おきの短い横線が、行ごとに揺れてずれる）
@@ -998,7 +1050,7 @@ function terrain(f,Z,camX,camY,blinded){
         }
         if(pitOn&&!RB&&!(cv2&8)){const pv=tileKindAt(f,wx,wy,T.PIT); if(pv>.5){ buf[k]= pv<.58 ? (((wx+wy)&1)?rim[Math.min(4,1+Math.floor(Lv*4+b))]:Pp.pit) : ((ihash(wx,wy)%211===0)?Pp.pit:0xff020203); continue; }}
         /* ---- 地形ハザード ---- */
-        if(hg&&!(cv2&4)){const hv=hazAt(hg,wx,wy); if(swOn&&hv>SW_LO&&hv<=.5){ SWK[swN]=k; SWV[swN++]=hv; } if(hv>.5){
+        if(hg&&!(cv2&4)){const hv=haz.circ?oreHv(haz,wx,wy):hazAt(hg,wx,wy); if(swOn&&hv>SW_LO&&hv<=.5){ SWK[swN]=k; SWV[swN++]=hv; } if(hv>.5){
           let lv = hz.glow ? 1+((Math.sin(t*1.6+(wx+wy)*.05)*.5+.5)*1.6+b)|0 : Math.floor(Math.max(Lv,Cv*.8)*4+b*.9);
           if(haz.kind==='water'){
             /* 深さはマスごとの段（1浅瀬/2深み/3淵）を**マスの中心どうしで混ぜた値**で塗る。
@@ -1035,25 +1087,28 @@ function terrain(f,Z,camX,camY,blinded){
           let col=hz.ramp[lv];
           const n=NZB[((wy&255)<<8)|(wx&255)];
           if(haz.kind==='ore'){
-            /* 鉱毒の溜り（2026-10-21）：
-               縁＝灰緑の岩の殻（ところどころ結晶の粒が光る）。
-               液＝青緑。ゆっくり脈打つ明るさ（glow）に、細い揺らぎの筋がゆっくり流れる。
-               ところどころに結晶のかけらが浮いて瞬き、ときどき泡が浮いて弾ける。 */
+            /* 鉱毒の溜り（2026-10-21、形と泡は 2026-10-22）：
+               縁＝灼けた灰緑の岩の殻（ところどころ結晶の粒）。殻のすぐ内側に白っぽい泡の輪（酸が岩を噛んでいる所）。
+               液＝青緑。奥ほど明るく光り、ゆっくり脈打つ。揺らぎの筋が流れ、結晶のかけらが浮いて瞬く。
+               泡（ボコボコ）：奥ほど多く、膨らんでは弾けて、しぶきが散る（oreBubble）。 */
+            const dep=(hv-ORE_HV0)/ORE_HVK;                          // 縁からの深さ（マス）。負＝殻
             const cr=hz.crust;
-            if(hv<.64){ const e=(hv-.5)/.14;                          // 0（外）→1（液）
-              let c=cr[Math.min(2,Math.max(0,Math.floor(e*1.6+b*.7+Math.max(Lv,Cv*.8)*.9)))];
-              if(ihash(wx,wy)%19===0) c=(Math.sin(t*2+wx*.7)>-.2)?hz.shard:hz.shard2;     // 殻に食い込んだ結晶
+            if(dep<0){ const e=1+dep/ORE_CRUST;                       // 0（外）→1（液の際）
+              let c=cr[Math.min(2,Math.max(0,Math.floor(e*1.7+b*.6+Math.max(Lv,Cv*.8)*.9)))];
+              if(ihash(wx,wy)%37===0) c=(Math.sin(t*2+wx*.7)>-.2)?hz.shard:hz.shard2;     // 殻に食い込んだ結晶
               buf[k]=c; continue; }
-            /* 液の明るさは網点で揺らさない（市松の粒が目立つ）。奥ほど明るく、ゆっくり脈打つ */
             const pulse=Math.sin(t*1.3+(wx+wy)*.03)*.5+.5;
-            lv=Math.max(0,Math.min(3,Math.floor(.6+(hv-.64)*5+pulse*.9+(b-.5)*.35)));
+            lv=Math.max(0,Math.min(3,Math.floor(.35+Math.min(dep,1.6)*1.25+pulse*.8+(b-.5)*.3)));
             col=hz.ramp[lv];
             const fl=Math.sin(wx*.21+wy*.13+t*.9+n*5)+Math.sin(wx*.07-wy*.19-t*.6);
-            if(fl>1.5) col=hz.ramp[Math.min(3,lv+1)];                         // 揺らぎの筋
+            if(fl>1.72) col=hz.ramp[Math.min(3,lv+1)];                        // 揺らぎの筋
+            if(dep<.07) col=hz.shard2;                                        // 液の際の細い光る線
+            else if(dep<.24){ const fh=ihash(wx>>1,wy>>1), fp=Math.sin(t*1.7+(fh%628)/100);   // 際の泡の輪（ゆっくり湧いては消える）
+              if(fh%3===0&&fp>.1) col=fp>.75?hz.froth:hz.shard2; }
             const h=ihash(wx,wy);
-            if(h%61===0){ col=(Math.sin(t*2.6+h)>.3)?hz.shard:hz.shard2; }      // 浮いた結晶のかけら
-            const bb=ihash(wx>>2,wy>>2), ph=(t*.55+(bb%97)/97)%1;                // 泡：4ドットの区画ごとに周期をずらす
-            if(bb%9===0 && ph>.8 && ((wx&3)===1) && ((wy&3)===1)) col=ph>.93?hz.hi:hz.shard;
+            if(h%137===0){ col=(Math.sin(t*2.6+h)>.3)?hz.shard:hz.shard2; }     // 浮いた結晶のかけら
+            const bc=oreBubble(wx,wy,t,dep,hz,lv);
+            if(bc) col=bc;
             buf[k]=col; continue;
           }
           if(hv<.56) col=hz.ramp[Math.min(3,lv+1)];               // 縁

@@ -3558,6 +3558,7 @@ function spawnHazards(fl, depth){
   const kind = (fl.arena && uniqueBossAt(depth)===UNIQUE_BOSSES[10]) ? 'ore'   // ヴェラの広間は鉱毒の溜り
              : hazardKindFor(fl.zone ? fl.zone.id : 'stone');
   const g = Array.from({length:fl.H}, ()=>new Uint8Array(fl.W));
+  if(kind==='ore') return spawnOrePools(fl, g);
   const rooms = fl.rooms.filter(r=>r!==fl.start);   // 開始部屋には置かない
   let placed=0;
   const want = Math.round(fl.W*fl.H*cov*0.35);
@@ -3675,6 +3676,67 @@ function spawnHazards(fl, depth){
   }
   return {kind, g, n:placed};
 }
+/* ---------- ヴェラの広間の鉱毒の溜り（2026-10-22） ----------
+   報告「毒床の形が違和感がある。水の層の水溜りと同じような作り方に」。
+   以前は他のハザードと同じ半径1〜2の小円を散らしていたので、マスの格子で
+   菱形や十字に見えていた。水の層と同じく**大きな池を数ヶ所**にする。
+   1つの池は大きな円＋脇に寄り添う2つの小円（瘤）の重なり。円1つだと
+   どれも同じ丸に見えるので、瘤で形を崩す。
+   池の中は縁からの距離で 1（浅い縁）/2（奥）に分ける。奥は絵だけの違い
+   （泡と湯気が多い。削れる量は同じ）。 */
+const ORE_POOLS = {n:3, rad:[2.1, 2.9], lobes:2, apart:9, fromStart:6, fromStair:4};
+function spawnOrePools(fl, g){
+  const O=ORE_POOLS, cs=[];
+  const sx=fl.start.cx+0.5, sy=fl.start.cy+0.5;
+  for(let guard=0; cs.length<O.n && guard<400; guard++){
+    const cx=ri(3, fl.W-4)+0.5, cy=ri(3, fl.H-4)+0.5;
+    if(!tileWalk(fl, Math.floor(cx), Math.floor(cy))) continue;
+    if(Math.hypot(cx-sx, cy-sy)<O.fromStart || Math.hypot(cx-fl.stair.x, cy-fl.stair.y)<O.fromStair) continue;
+    if(cs.some(c=>Math.hypot(c.x-cx, c.y-cy)<O.apart)) continue;
+    const r=rf(O.rad[0], O.rad[1]);
+    // 壁に貼りつかせない（池の縁が壁の下に潜ると、形が切れて見える）
+    let open=true;
+    for(let a=0;a<8&&open;a++){ const ax=cx+Math.cos(a*0.785)*(r+0.6), ay=cy+Math.sin(a*0.785)*(r+0.6);
+      if(!tileWalk(fl, Math.floor(ax), Math.floor(ay))) open=false; }
+    if(!open) continue;
+    cs.push({x:cx, y:cy, r});
+  }
+  const circ=[];
+  cs.forEach(c=>{
+    circ.push(c);
+    const a0=rf(0, Math.PI*2);
+    for(let i=0;i<O.lobes;i++){
+      const a=a0+i*rf(2.0,3.4), d=c.r*rf(0.6,0.9);
+      circ.push({x:c.x+Math.cos(a)*d, y:c.y+Math.sin(a)*d*0.8, r:c.r*rf(0.45,0.7)});
+    }
+  });
+  /* 形は「円の距離」をなめらかに繋いだ場（oreSdOf）で決める。マスの格子に引きずられないので、
+     縁は丸く、瘤のくびれもなめらかになる。踏んで削れるかどうかも同じ場で判定する（絵と当たりが一致）。
+     g … 中心が池の中のマス（地図・AI 用）／gr … 縁の殻まで含めた描く範囲のマス */
+  const gr = Array.from({length:fl.H}, ()=>new Uint8Array(fl.W));
+  let placed=0;
+  for(let y=1;y<fl.H-1;y++) for(let x=1;x<fl.W-1;x++){
+    if(!tileWalk(fl,x,y)) continue;
+    const px=x+0.5, py=y+0.5;
+    if(Math.hypot(px-fl.stair.x, py-fl.stair.y) < 2.2) continue;   // 穴の上と隣は空ける
+    const d=oreSdOf(circ, px, py, fl.stair);
+    if(d<0.95) gr[y][x]=1;
+    if(d<0){ g[y][x]=1; placed++; }
+  }
+  if(!placed) return null;
+  return {kind:'ore', g, gr, circ, n:placed, pools:cs, stair:{x:fl.stair.x, y:fl.stair.y}};
+}
+/* 円の集まりの「縁までの距離」（マス単位。負＝池の中）。円どうしは k の幅でなめらかに繋ぐ。
+   穴の周り（半径 ORE_STAIR_R）は池から削る。 */
+const ORE_SMOOTH = 0.9, ORE_STAIR_R = 1.7;
+function oreSdOf(circ, x, y, st){
+  let d=1e9;
+  for(let i=0;i<circ.length;i++){ const c=circ[i], e=Math.hypot(x-c.x, y-c.y)-c.r;
+    const h=Math.max(ORE_SMOOTH-Math.abs(d-e),0)/ORE_SMOOTH; d=Math.min(d,e)-h*h*ORE_SMOOTH*0.25; }
+  if(st){ const s=ORE_STAIR_R-Math.hypot(x-st.x, y-st.y); if(s>d) d=s; }
+  return d;
+}
+function oreSd(x,y){ const h=W.haz; return (h&&h.circ) ? oreSdOf(h.circ, x, y, h.stair) : 1e9; }
 /* ---------- 水の深さ ----------
    水の層だけ、g に 1/2/3 を入れる（他のハザードは 1 のまま）。
    0/1 の真偽で読んでいる場所はそのまま動く——**深さは足す情報**であって、
@@ -3703,6 +3765,10 @@ function waterVoidAt(x,y){
 function hazardAt(x,y){
   const h=W.haz; if(!h) return null;
   const gx=Math.floor(x), gy=Math.floor(y);
+  if(h.circ){                                   // 鉱毒の溜り：縁の形のとおりに（マス単位ではなく）
+    if(gx<0||gy<0||!h.gr[gy]||!h.gr[gy][gx] || oreSd(x,y)>=0) return null;
+    return hazardDef(h.kind);
+  }
   if(gx<0||gy<0||!h.g[gy]||!h.g[gy][gx]) return null;
   return hazardDef(h.kind);
 }
@@ -15619,6 +15685,7 @@ function draw(){
     label(canDescendFrom(S.run.depth)?'次の階へ':'底', stx, sty-TS*0.80, '#7fc3e0');
   }
   }   // if(stairRevealed())
+  if(W.haz && W.haz.circ) drawOreSteam(camX, camY);
   drawReturnPortal(camX, camY);
 
   // 遺体（前のキャラが死んだ場所）
@@ -16950,6 +17017,108 @@ function drawStairChill(cx, cy){
     ctx.fillStyle=(i%3===0)?'#e8f6ff':'#9fd2ff';                 // 粒も青い光を拾う
     ctx.fillRect(Math.round(x/q)*q, Math.round(y/q)*q, q, q);
   }
+  ctx.restore();
+}
+/* ---------- 鉱毒の溜りの湯気（2026-10-22） ----------
+   報告「湯気を出したりボコボコを出したり、酸の池のような雰囲気でダメージを受けると分からせたい」。
+   泡は地形の側（cave-look の oreBubble）。ここでは池から立ちのぼる湯気を描く。
+   ・池の中に湯気の口（vent）を散らしておき、口ごとに湯気のかたまり（puff）がゆっくり昇り、広がって薄れる
+   ・昇り始めは液の光を拾って青緑、上へ行くほど白っぽくなる
+   ・誰か（主人公・仲間）が池に入っていると、足元から「ジュッ」と強い湯気と飛沫が上がる——削られている合図
+   描き方は冷気と同じく1ドット（TS/16）単位：段のついた透明度のかたまりを、ぼかさずに拡大して貼る。
+   puff は状態を持たない（番号と時刻で位置が決まる）。 */
+const ORE_STEAM = {life:4.2, rise:2.2, r0:0.16, r1:0.62, alpha:0.60, gain:2.6, perVent:1, ventP:0.8,
+  low:[150,236,214], high:[226,238,234], hiAt:1.4,       // 液の色を拾った湯気 → 昇るにつれて白っぽく（hiAt マスで白に）
+  sizzle:{n:7, life:0.8, rise:1.2, k:1.4, bits:7}};
+const _steamCv = document.createElement('canvas');
+let _steamD = null;
+function oreVents(h){
+  if(h._vents) return h._vents;
+  const V=[]; let i=0;
+  for(let y=0;y<h.g.length;y++) for(let x=0;x<h.g[y].length;x++){
+    if(!h.g[y][x]) continue;
+    for(let j=0;j<ORE_STEAM.perVent;j++){
+      const px=x+0.15+chillRnd(i,0,11)*0.7, py=y+0.15+chillRnd(i,0,12)*0.7;
+      i++;
+      if(oreSd(px,py)<-0.25 && chillRnd(i,0,13)<ORE_STEAM.ventP) V.push({x:px, y:py, o:chillRnd(i,0,14), s:0.75+0.5*chillRnd(i,0,15)});
+    }
+  }
+  return (h._vents=V);
+}
+function drawOreSteam(camX, camY){
+  /* 冷気と同じ作り：画面ぶんの1ドット画用紙に、puff を「濃さの場」として足し込み、
+     最後に濃さ→透明度に直して1枚で貼る。かたまりどうしが溶け合うので、斑点ではなく湯気の筋に見える。 */
+  const O=ORE_STEAM, q=Math.max(1,Math.round(TS/16)), now=performance.now()/1000;
+  const gw=Math.ceil(innerWidth/q)+2, gh=Math.ceil(innerHeight/q)+2, T=TS/q;
+  if(_steamCv.width!==gw||_steamCv.height!==gh){ _steamCv.width=gw; _steamCv.height=gh; _steamD=null; }
+  if(!_steamD||_steamD.length!==gw*gh*2) _steamD=new Float32Array(gw*gh*2);
+  const D=_steamD, N=gw*gh;                                // D[0..N) 濃さ／D[N..2N) 高さ（白っぽさ）の重み付き和
+  const ox=Math.floor(camX/q), oy=Math.floor(camY/q);
+  let any=false, bx0=gw, by0=gh, bx1=-1, by1=-1;           // 触った範囲だけ塗る（画面全体を毎回舐めると重い）
+  const puff=(wx, wy, r, k, lift)=>{                      // wx,wy：マス。r：半径（マス）。lift：口からの高さ（マス）
+    const cx=wx*T-ox, cy=wy*T-oy, rx=r*T, ry=r*T*1.35;
+    const x0=Math.max(0,Math.floor(cx-rx)), x1=Math.min(gw-1,Math.ceil(cx+rx));
+    const y0=Math.max(0,Math.floor(cy-ry)), y1=Math.min(gh-1,Math.ceil(cy+ry));
+    if(x0>x1||y0>y1) return;
+    if(!any){ any=true; } if(x0<bx0) bx0=x0; if(y0<by0) by0=y0; if(x1>bx1) bx1=x1; if(y1>by1) by1=y1;
+    for(let y=y0;y<=y1;y++){ const dy=(y-cy)/ry;
+      for(let x=x0;x<=x1;x++){ const dx=(x-cx)/rx, e=dx*dx+dy*dy; if(e>=1) continue;
+        const w=k*(1-e)*(1-e), i=y*gw+x; D[i]+=w; D[N+i]+=w*lift; } }
+  };
+  const V=oreVents(W.haz);
+  for(let i=0;i<V.length;i++){
+    const v=V[i];
+    if(!W.seen[Math.floor(v.y)]?.[Math.floor(v.x)]) continue;
+    const ph=now/(O.life*v.s)+v.o, cyc=Math.floor(ph), p=ph-cyc;
+    if(chillRnd(i,cyc,21)<0.3) continue;                  // ときどき休む（同じ所から出続けない）
+    const lift=p*O.rise*v.s;
+    const sway=Math.sin(now*0.7+i*1.9)*0.22*p + (chillRnd(i,cyc,22)-0.5)*0.35*p;
+    puff(v.x+sway, v.y-lift, O.r0+(O.r1-O.r0)*p, Math.min(1,p*4)*Math.pow(1-p,1.4), lift);
+  }
+  // 池に入っている者の足元：ジュッと強い湯気（削られている合図）
+  const Z=O.sizzle, who=[];
+  if(S.hero && !P.fallAnim) who.push(P);
+  livingParty().forEach(a=>who.push(a));
+  const hot=who.filter(e=>oreSd(e.x, e.y)<0);
+  hot.forEach((e,wi)=>{
+    for(let j=0;j<Z.n;j++){
+      const ph=now/Z.life+j/Z.n, cyc=Math.floor(ph), p=ph-cyc;
+      const ox2=(chillRnd(j+wi*17,cyc,31)-0.5)*0.6;
+      const lift=p*Z.rise;
+      puff(e.x+ox2+Math.sin(now*3+j)*0.08*p, e.y+0.15-lift, 0.14+0.32*p, Z.k*Math.min(1,p*6)*Math.pow(1-p,1.1), lift+0.6);
+    }
+  });
+  if(!any) return;
+  const bw=bx1-bx0+1, bh=by1-by0+1;
+  const g=_steamCv.getContext('2d'), im=g.createImageData(bw,bh), u=new Uint32Array(im.data.buffer);
+  const L=O.low, H=O.high, AM=255*O.alpha;
+  // 揺らぎ（縁をちぎれさせる）は列と行の積なので、先に列ぶん・行ぶんを出しておく
+  const sx=new Float32Array(bw); for(let x=0;x<bw;x++) sx[x]=Math.sin((x+bx0+ox)*0.45+now*0.8);
+  for(let y=0;y<bh;y++){ const sy=0.28*Math.sin((y+by0+oy)*0.6+now*1.1), row=(y+by0)*gw+bx0;
+    for(let x=0;x<bw;x++){
+      const i=row+x, d=D[i]; if(d<=0.03){ D[i]=0; D[N+i]=0; continue; }
+      const w=0.72+sx[x]*sy;
+      const k=Math.min(1, D[N+i]/d/O.hiAt);
+      D[i]=0; D[N+i]=0;                                    // 次の回のために消しておく
+      const al=(Math.min(1,d*w*O.gain)*AM)|0;
+      if(al<=3) continue;
+      const r=(L[0]+(H[0]-L[0])*k)|0, gg=(L[1]+(H[1]-L[1])*k)|0, bb=(L[2]+(H[2]-L[2])*k)|0;
+      u[y*bw+x]=(al<<24)|(bb<<16)|(gg<<8)|r;
+    } }
+  g.clearRect(0,0,bw,bh); g.putImageData(im,0,0);
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(_steamCv, 0,0,bw,bh, (ox+bx0)*q-camX, (oy+by0)*q-camY, bw*q, bh*q);
+  // 跳ねる飛沫（液の色）
+  hot.forEach((e,wi)=>{
+    for(let j=0;j<Z.bits;j++){
+      const life=0.55+0.3*((j*37)%11)/11, ph=now/life+j*0.37, cyc=Math.floor(ph), p=ph-cyc;
+      const a=chillRnd(j+wi*31,cyc,41)*6.283, rr=0.15+0.4*p;
+      const x=(e.x+Math.cos(a)*rr)*TS-camX, y=(e.y+0.15+Math.sin(a)*rr*0.5-Math.sin(p*Math.PI)*0.4)*TS-camY;
+      ctx.globalAlpha=0.9*(1-p);
+      ctx.fillStyle=(j%3===0)?'#d8fff6':'#7fe0d4';
+      ctx.fillRect(Math.round(x/q)*q, Math.round(y/q)*q, q, q);
+    }
+  });
   ctx.restore();
 }
 function label(text,x,y,color,scale){
@@ -22299,7 +22468,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261021a"></script>
+<script src="cave-look.js?v=20261022a"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
