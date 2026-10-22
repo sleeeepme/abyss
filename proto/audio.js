@@ -199,7 +199,7 @@
     if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0))duplicate.options.distance=event.options.distance;return drop(id,'同時ヒットを統合');}
     if(queue.length>=32)return drop(id,'フレーム上限');queue.push(event);if(!timer)timer=setTimeout(flush,16);return true;
   }
-  /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲） ----------
+  /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲・中ボス戦の曲） ----------
      効果音（GB合成・短い・上限つき）とは別の通り道。曲ごとに <audio loop> を1つ持ち、Web Audio に繋いで
      master だけを通す（効果音の圧縮・ダッキングには入れない）。stop()（画面切替のたびに呼ばれる）では止めない。
      ・music(id) で「今流したい曲」を指定（null で止める）。実際に鳴らすのは、音が解錠済み・有効・前面・外部消音なしのときだけ
@@ -210,6 +210,7 @@
   const TRACKS={
     hub:  {src:'assets/bgm/hub_beyond_the_stone_gate.mp3', gain:1},     // 拠点「Beyond the Stone Gate」
     stone:{src:'assets/bgm/stone_the_forgotten_archway.mp3', gain:1},   // 石の層「The Forgotten Archway」
+    midboss:{src:'assets/bgm/midboss_the_weight_of_stone.mp3', gain:1, restart:true}, // 5階ごとの中ボス戦「The Weight of Stone」（頭の無音は詰めてある。戦いのたびに頭から）
   };
   const FADE_IN=1.2,FADE_OUT=.8,RESTART_AFTER=30;
   let mWant=null,mFault='';const players={};
@@ -242,7 +243,7 @@
     const p=player(mWant);if(!p)return;
     clearTimeout(p.pauseT);p.pauseT=0;
     if(p.el.paused){
-      if(p.stoppedAt&&performance.now()-p.stoppedAt>RESTART_AFTER*1000)try{p.el.currentTime=0;}catch{}
+      if(p.stoppedAt&&(TRACKS[p.id].restart||performance.now()-p.stoppedAt>RESTART_AFTER*1000))try{p.el.currentTime=0;}catch{}
       const r=p.el.play();if(r&&r.catch)r.catch(()=>{});
     }
     musicRamp(p,musicLevel(mWant),FADE_IN);

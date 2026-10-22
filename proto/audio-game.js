@@ -25,12 +25,24 @@
   wrap('startRun',()=>emit('floor'));
   wrap('setScreen',()=>A.stop());
   wrap('openAd',()=>A.stop());
-  /* BGM（2026-10-22）。拠点（潜っていない間）は拠点の曲、潜っている間は層の曲（今は石の層だけ）。タイトル・広告中は止める。
+  /* BGM（2026-10-22）。拠点（潜っていない間）は拠点の曲、潜っている間は層の曲（今は石の層だけ）、中ボス戦はその曲。タイトル・広告中は止める。
      画面の切り替わり方が多い（死亡・帰還・各メニュー）ので、決まった間隔で「今どこか」を見て合わせる。 */
+  /* 中ボス戦（5・15・25…階、bossTier==='mid'）。階に入っただけでは替えない——ボスは一撃入れるまで正体を伏せているので、
+     「戦いが始まった」と分かる時に替える：正体が割れた（revealed）か、BOSS_NEAR マス以内まで近づいたとき。
+     一度始まったらその個体が倒れるまで続ける（離れても戻さない）。倒したら層の曲へ戻る。
+     覚えておくのは音の側の WeakSet（敵の中身には書かない＝保存や判定に混ざらない）。 */
+  const BOSS_NEAR=6, fought=new WeakSet();
+  const midBossFight=()=>{
+    if(S.run.bossTier!=='mid'||!W||!W.enemies)return false;
+    const b=W.enemies.find(e=>e.boss&&!e.dead);if(!b)return false;
+    if(!fought.has(b)&&(b.revealed||Math.hypot(b.x-P.x,b.y-P.y)<=BOSS_NEAR))fought.add(b);
+    return fought.has(b);
+  };
   const bgmWant=()=>{try{
     if(typeof _adSession!=='undefined'&&_adSession)return null;
     if(!S.hero||S.screen==='title')return null;
     if(!S.run)return 'hub';
+    if(midBossFight())return 'midboss';
     // 潜っている間は層の曲（曲のある層だけ。層は一周するので階の数ではなく層で見る）
     const z=typeof zoneAt==='function'?zoneAt(S.run.depth):null;
     return z&&z.id==='stone'?'stone':null;
