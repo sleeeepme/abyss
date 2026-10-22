@@ -446,13 +446,47 @@ function oreHv(haz,px,py){
 }
 /* 泡（ボコボコ）。8ドットの区画ごとに1つ泡の種があり（奥ほど多い）、ゆっくり膨らんで、弾けて、しぶきが散る。
    周期も大きさも区画ごとに変える。状態は持たない（時刻だけで決まる）。泡は隣の区画まではみ出すので3×3を見る。 */
-const ORE_BUB={cell:7, life:[1.3,2.8], swell:.76, pop:.2, rMax:[1.5,2.9], drops:5};
+const ORE_BUB={cell:6, life:[1.1,2.4], swell:.76, pop:.2, rMax:[1.3,2.7], drops:5};
+/* 泡の湧く所（2026-10-22 ユーザー指定「ボコボコが出ている箇所が多くてうるさい→局所的に」）。
+   池ごとに1〜2ヶ所だけ湧き口を決め、その周り（半径 r マス）でだけ泡が出る。湧き口に近いほど多い。
+   湧き口は息をするように強まったり弱まったりする（ずっと同じ勢いだと機械的に見える）。
+   湧き口は池の円から決まった値で引く（生成の乱数を消費しない＝間取りやヴェラ戦の再現が変わらない）。 */
+const ORE_BOIL={per:[1,2], r:[0.9,1.2], cycle:[5,9], low:.45, dens:2.4};
+function boilHash(a,b){ let h=Math.imul(a|0,0x27d4eb2d)^Math.imul(b|0,0x165667b1); h=Math.imul(h^(h>>>15),0x2c1b3c6d); return (h^(h>>>12))>>>0; }
+function oreBoils(haz){
+  if(haz._boils) return haz._boils;
+  const B=[], O=ORE_BOIL;
+  (haz.pools||[]).forEach((c,i)=>{
+    const h=boilHash(Math.round(c.x*16)+i*31, Math.round(c.y*16)+77);
+    const n=O.per[0]+(h%(O.per[1]-O.per[0]+1));
+    for(let j=0;j<n;j++) for(let k=0;k<16;k++){
+      const hk=boilHash(h+j*101, k*7+5), a=(hk%628)/100, d=((hk>>>10)%100)/100*c.r*0.75;
+      const x=c.x+Math.cos(a)*d, y=c.y+Math.sin(a)*d;
+      if(oreSd(x,y)>=-0.9 || B.some(b=>Math.hypot(b.x-x,b.y-y)<1.8)) continue;
+      B.push({x, y, r:O.r[0]+((hk>>>3)%100)/100*(O.r[1]-O.r[0]),
+              cyc:O.cycle[0]+((hk>>>17)%100)/100*(O.cycle[1]-O.cycle[0]), ph:((hk>>>7)%100)/100});
+      break;
+    }
+  });
+  return (haz._boils=B);
+}
 function oreBubble(wx,wy,t,dep,hz,lv){
   if(dep<.3) return 0;
+  const BL=oreBoils(W.haz); if(!BL.length) return 0;
+  const tx=(wx+.5)/Q, ty=(wy+.5)/Q;
+  let near=false;
+  for(let i=0;i<BL.length;i++){ const b=BL[i], dx=tx-b.x, dy=ty-b.y, rr=b.r+.35; if(dx*dx+dy*dy<rr*rr){ near=true; break; } }
+  if(!near) return 0;                                                  // 湧き口から遠い所には泡を出さない
   const B=ORE_BUB, gx0=Math.floor(wx/B.cell), gy0=Math.floor(wy/B.cell);
   for(let cy=-1;cy<=1;cy++) for(let cx=-1;cx<=1;cx++){
     const gx=gx0+cx, gy=gy0+cy, h=ihash(gx*7+3,gy*13+5);
-    if(h%(dep>.8?3:7)) continue;
+    // この区画の泡の出やすさ＝いちばん近い湧き口への近さ × 湧き口の今の勢い
+    const ux=(gx*B.cell+B.cell/2)/Q, uy=(gy*B.cell+B.cell/2)/Q;
+    let w=0;
+    for(let i=0;i<BL.length;i++){ const b=BL[i], d=Math.hypot(ux-b.x,uy-b.y); if(d>=b.r) continue;
+      const act=ORE_BOIL.low+(1-ORE_BOIL.low)*(Math.sin((t/b.cyc+b.ph)*6.283)*.5+.5);
+      w=Math.max(w,(1-d/b.r)*act); }
+    if((boilHash(gx,gy)%1000)/1000>=w*ORE_BOIL.dens) continue;
     const per=B.life[0]+((h>>>3)%100)/100*(B.life[1]-B.life[0]);
     const ph=(t/per+((h>>>10)%1000)/1000)%1;
     const bx=gx*B.cell+2+((h>>>4)%5), by=gy*B.cell+2+((h>>>7)%5), R=B.rMax[0]+((h>>>13)%5)/4*(B.rMax[1]-B.rMax[0]);
