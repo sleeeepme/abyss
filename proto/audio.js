@@ -199,50 +199,57 @@
     if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0))duplicate.options.distance=event.options.distance;return drop(id,'同時ヒットを統合');}
     if(queue.length>=32)return drop(id,'フレーム上限');queue.push(event);if(!timer)timer=setTimeout(flush,16);return true;
   }
-  /* ---------- BGM（2026-10-22：拠点の曲） ----------
-     効果音（GB合成・短い・上限つき）とは別の通り道。1曲を <audio loop> で流し、Web Audio に繋いで
+  /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲） ----------
+     効果音（GB合成・短い・上限つき）とは別の通り道。曲ごとに <audio loop> を1つ持ち、Web Audio に繋いで
      master だけを通す（効果音の圧縮・ダッキングには入れない）。stop()（画面切替のたびに呼ばれる）では止めない。
      ・music(id) で「今流したい曲」を指定（null で止める）。実際に鳴らすのは、音が解錠済み・有効・前面・外部消音なしのときだけ
-     ・入りは 1.2 秒でフェードイン、抜けは 0.8 秒でフェードアウトしてから一時停止。同じ曲に戻れば続きから
+     ・入りは 1.2 秒でフェードイン、抜けは 0.8 秒でフェードアウトしてから一時停止。曲が替わるときは重ねて入れ替える
+     ・止めてから RESTART_AFTER 秒以上たった曲は頭から（潜って戻った拠点・次に潜った層の曲は頭から始まる）。すぐ戻れば続きから
      ・iOS は要素ごとに操作での再生開始が要るので、解錠と同じ指の操作の中で play() を呼ぶ（musicKick）
      ・file:// で開いたときは Web Audio に繋がない（別オリジン扱いで無音になる）。要素の音量で代わりにする */
-  const TRACKS={hub:{src:'assets/bgm/hub_beyond_the_stone_gate.mp3',gain:1}};
-  let mWant=null,mEl=null,mId=null,mNode=null,mGain=null,mPauseT=0,mFault='';
-  const FADE_IN=1.2,FADE_OUT=.8;
-  function musicLevel(){return settings.enabled&&!externalMutes.size?settings.music*(TRACKS[mId]?.gain??1):0;}
+  const TRACKS={
+    hub:  {src:'assets/bgm/hub_beyond_the_stone_gate.mp3', gain:1},     // 拠点「Beyond the Stone Gate」
+    stone:{src:'assets/bgm/stone_the_forgotten_archway.mp3', gain:1},   // 石の層「The Forgotten Archway」
+  };
+  const FADE_IN=1.2,FADE_OUT=.8,RESTART_AFTER=30;
+  let mWant=null,mFault='';const players={};
+  function musicLevel(id){return settings.enabled&&!externalMutes.size?settings.music*(TRACKS[id]?.gain??1):0;}
   function musicCanPlay(){return !!mWant&&settings.enabled&&!externalMutes.size&&!document.hidden&&settings.music>0&&!!ctx&&ctx.state==='running';}
-  function musicEnsure(){
-    if(mEl&&mId===mWant)return true;
-    if(mEl){try{mEl.pause();}catch{}if(mNode)try{mNode.disconnect();}catch{}mEl=null;mNode=null;mGain=null;}
-    const t=TRACKS[mWant];if(!t)return false;
-    mEl=new Audio();mEl.loop=true;mEl.preload='auto';mEl.src=t.src;mId=mWant;mEl.setAttribute('playsinline','');
-    mEl.addEventListener('error',()=>{mFault='BGMを読み込めません';});
-    if(location.protocol!=='file:'&&ctx){try{mNode=ctx.createMediaElementSource(mEl);mGain=ctx.createGain();mGain.gain.value=0;mNode.connect(mGain);mGain.connect(master);}catch{mNode=null;mGain=null;}}
-    if(!mGain)mEl.volume=0;
-    return true;
+  function player(id){
+    if(players[id])return players[id];
+    const t=TRACKS[id];if(!t)return null;
+    const el=new Audio();el.loop=true;el.preload='auto';el.src=t.src;el.setAttribute('playsinline','');
+    el.addEventListener('error',()=>{mFault='BGMを読み込めません：'+id;});
+    const p={id,el,node:null,gain:null,pauseT:0,stoppedAt:0};
+    if(location.protocol!=='file:'&&ctx){try{p.node=ctx.createMediaElementSource(el);p.gain=ctx.createGain();p.gain.gain.value=0;p.node.connect(p.gain);p.gain.connect(master);}catch{p.node=null;p.gain=null;}}
+    if(!p.gain)el.volume=0;
+    return (players[id]=p);
   }
-  function musicRamp(to,sec){
-    if(mGain){const now=ctx.currentTime;mGain.gain.cancelScheduledValues(now);mGain.gain.setValueAtTime(mGain.gain.value,now);mGain.gain.linearRampToValueAtTime(to,now+sec);}
-    else if(mEl){mEl.volume=Math.max(0,Math.min(1,to*settings.master));}
+  function musicRamp(p,to,sec){
+    if(p.gain){const now=ctx.currentTime;p.gain.gain.cancelScheduledValues(now);p.gain.gain.setValueAtTime(p.gain.gain.value,now);p.gain.gain.linearRampToValueAtTime(to,now+sec);}
+    else p.el.volume=Math.max(0,Math.min(1,to*settings.master));
+  }
+  function musicHalt(p,hard){
+    clearTimeout(p.pauseT);p.pauseT=0;if(p.el.paused)return;
+    const end=()=>{p.pauseT=0;if(musicCanPlay()&&mWant===p.id)return;try{p.el.pause();}catch{}p.stoppedAt=performance.now();if(p.gain&&ctx)p.gain.gain.setValueAtTime(0,ctx.currentTime);};
+    if(hard){end();return;}
+    musicRamp(p,0,FADE_OUT);p.pauseT=setTimeout(end,FADE_OUT*1000+50);
   }
   function musicSync(){
-    clearTimeout(mPauseT);mPauseT=0;
-    if(!musicCanPlay()){
-      if(mEl&&!mEl.paused){
-        if(document.hidden||!ctx||ctx.state!=='running'){try{mEl.pause();}catch{}}
-        else{musicRamp(0,FADE_OUT);mPauseT=setTimeout(()=>{mPauseT=0;if(!musicCanPlay()&&mEl)try{mEl.pause();}catch{}},FADE_OUT*1000+50);}
-      }
-      return;
+    const can=musicCanPlay(),hard=document.hidden||!ctx||ctx.state!=='running';
+    for(const id in players)if(!(can&&id===mWant))musicHalt(players[id],hard);
+    if(!can)return;
+    const p=player(mWant);if(!p)return;
+    clearTimeout(p.pauseT);p.pauseT=0;
+    if(p.el.paused){
+      if(p.stoppedAt&&performance.now()-p.stoppedAt>RESTART_AFTER*1000)try{p.el.currentTime=0;}catch{}
+      const r=p.el.play();if(r&&r.catch)r.catch(()=>{});
     }
-    if(!musicEnsure())return;
-    if(mEl.paused){const p=mEl.play();if(p&&p.catch)p.catch(()=>{});}
-    musicRamp(musicLevel(),mEl.paused?FADE_IN:FADE_IN*.5);
+    musicRamp(p,musicLevel(mWant),FADE_IN);
   }
-  function music(id){const want=id&&TRACKS[id]?id:null;if(want===mWant)return;
-    if(mEl&&want&&mId!==want){try{mEl.pause();}catch{}}   // 別の曲へは切り替え（今は拠点の1曲だけ）
-    mWant=want;musicSync();}
-  function musicKick(){if(musicCanPlay()&&(!mEl||mEl.paused))musicSync();}
-  function inspect(){prune();return {state:ctx?.state||'locked',music:{want:mWant,id:mId,playing:!!mEl&&!mEl.paused,volume:mGain?mGain.gain.value:mEl?mEl.volume:0,routed:!!mGain,fault:mFault},externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
+  function music(id){const want=id&&TRACKS[id]?id:null;if(want===mWant)return;mWant=want;musicSync();}
+  function musicKick(){if(musicCanPlay()&&(!players[mWant]||players[mWant].el.paused))musicSync();}
+  function inspect(){prune();return {state:ctx?.state||'locked',music:(()=>{const p=players[mWant];return {want:mWant,id:p?p.id:null,playing:!!p&&!p.el.paused,volume:p?(p.gain?p.gain.gain.value:p.el.volume):0,routed:!!(p&&p.gain),time:p?p.el.currentTime:0,others:Object.values(players).filter(q=>q!==p&&!q.el.paused).map(q=>q.id),fault:mFault};})(),externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
   window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,music,tracks:Object.freeze(Object.keys(TRACKS)),
     subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},resetStats(){counters={requested:0,played:0,dropped:0,stolen:0,peakEvents:0,peakPulse:0,peakNoise:0};history=[];},
     async audition(id){if(await unlock()){stop();return emit(id);}return false;}};

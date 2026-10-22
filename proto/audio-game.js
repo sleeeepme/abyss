@@ -25,12 +25,15 @@
   wrap('startRun',()=>emit('floor'));
   wrap('setScreen',()=>A.stop());
   wrap('openAd',()=>A.stop());
-  /* 拠点のBGM（2026-10-22）。拠点（潜っていない間）だけ流す。タイトル・潜行中・広告中は止める。
+  /* BGM（2026-10-22）。拠点（潜っていない間）は拠点の曲、潜っている間は層の曲（今は石の層だけ）。タイトル・広告中は止める。
      画面の切り替わり方が多い（死亡・帰還・各メニュー）ので、決まった間隔で「今どこか」を見て合わせる。 */
   const bgmWant=()=>{try{
     if(typeof _adSession!=='undefined'&&_adSession)return null;
-    if(!S.hero||S.run||S.screen==='title')return null;
-    return 'hub';
+    if(!S.hero||S.screen==='title')return null;
+    if(!S.run)return 'hub';
+    // 潜っている間は層の曲（曲のある層だけ。層は一周するので階の数ではなく層で見る）
+    const z=typeof zoneAt==='function'?zoneAt(S.run.depth):null;
+    return z&&z.id==='stone'?'stone':null;
   }catch{return null;}};
   if(A.music){A.music(bgmWant());setInterval(()=>A.music(bgmWant()),400);}
   // Capture touchend because existing bindTap handlers stop bubbling and prevent click.
