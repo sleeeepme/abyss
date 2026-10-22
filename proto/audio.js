@@ -25,14 +25,14 @@
     ui:{name:'選択／決定',bus:'ui',gain:.30,priority:60,cooldown:90,length:.10,pulse:1,noise:0,notes:[1175,1760]},
     back:{name:'閉じる／戻る',bus:'ui',gain:.25,priority:60,cooldown:100,length:.085,pulse:1,noise:0,notes:[880,587]}
   };
-  const defaults={version:1,enabled:true,master:.35,maxEvents:2,maxStarts:8,ally:.25,distance:8,duck:.3,tail:1,
+  const defaults={version:1,enabled:true,master:.35,music:.6,maxEvents:2,maxStarts:8,ally:.25,distance:8,duck:.3,tail:1,
     buses:{combat:.70,feedback:.90,world:.65,ui:.6},sounds:Object.fromEntries(Object.entries(defs).map(([k,d])=>[k,{enabled:true,gain:d.gain,cooldown:d.cooldown}]))};
   const copy=x=>JSON.parse(JSON.stringify(x));
   const clamp=(x,a,b,f)=>Number.isFinite(Number(x))?Math.max(a,Math.min(b,Number(x))):f;
   function sanitize(v={}){
     if(!v||typeof v!=='object'||Array.isArray(v))v={};
     const n=copy(defaults);n.enabled=typeof v.enabled==='boolean'?v.enabled:n.enabled;
-    for(const [k,a,b] of [['master',0,.8],['maxEvents',1,3],['maxStarts',3,12],['ally',0,.5],['distance',3,12],['duck',.1,.65],['tail',.5,1]])n[k]=clamp(v[k],a,b,n[k]);
+    for(const [k,a,b] of [['master',0,.8],['music',0,1],['maxEvents',1,3],['maxStarts',3,12],['ally',0,.5],['distance',3,12],['duck',.1,.65],['tail',.5,1]])n[k]=clamp(v[k],a,b,n[k]);
     n.maxEvents=Math.round(n.maxEvents);n.maxStarts=Math.round(n.maxStarts);
     for(const k in n.buses)n.buses[k]=clamp(v.buses?.[k],0,1,n.buses[k]);
     for(const k in n.sounds){const s=v.sounds?.[k];if(!s)continue;n.sounds[k]={enabled:typeof s.enabled==='boolean'?s.enabled:true,gain:clamp(s.gain,0,1,n.sounds[k].gain),cooldown:clamp(s.cooldown,60,3000,n.sounds[k].cooldown)};}
@@ -43,6 +43,7 @@
   function setExternalMute(reason,on){
     if(on)externalMutes.add(reason);else externalMutes.delete(reason);
     if(on)stop();
+    musicSync();
     if(master){master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(settings.enabled&&!externalMutes.size?settings.master:0,ctx.currentTime);}
   }
   let ctx,master,duck,compressor,queue=[],timer=0,active=[],last={},lastFamily={},starts=[],cache=new Map(),duckUntil=0;
@@ -51,7 +52,7 @@
   function notify(){for(const f of listeners){try{f();}catch{}}}
   function drop(id,why){counters.dropped++;report(id,'skip',why);return false;}
   function stop(){clearTimeout(timer);timer=0;queue=[];if(ctx){for(const a of active){try{a.gain.gain.cancelScheduledValues(ctx.currentTime);a.gain.gain.setTargetAtTime(0,ctx.currentTime,.003);a.source.stop(ctx.currentTime+.015);}catch{}}}active=[];last={};lastFamily={};starts=[];duckUntil=0;if(duck){duck.gain.cancelScheduledValues(ctx.currentTime);duck.gain.setValueAtTime(1,ctx.currentTime);}}
-  function configure(value,persist=true){settings=sanitize(value);stop();if(master)master.gain.setTargetAtTime(settings.enabled&&!externalMutes.size?settings.master:0,ctx.currentTime,.02);let saved=true;if(persist)try{localStorage.setItem(KEY,JSON.stringify(settings));}catch{saved=false;fault='端末に保存できません。JSONを書き出してください。';}notify();return saved;}
+  function configure(value,persist=true){settings=sanitize(value);stop();musicSync();if(master)master.gain.setTargetAtTime(settings.enabled&&!externalMutes.size?settings.master:0,ctx.currentTime,.02);let saved=true;if(persist)try{localStorage.setItem(KEY,JSON.stringify(settings));}catch{saved=false;fault='端末に保存できません。JSONを書き出してください。';}notify();return saved;}
   async function unlock(){
     if(document.hidden||!settings.enabled||externalMutes.size)return false;
     try{
@@ -63,7 +64,7 @@
         // Important sounds bypass only ducking, not output filtering/limiting.
         ctx._sfxInput=low;
       }
-      if(ctx.state!=='running')await ctx.resume();notify();return ctx.state==='running';
+      if(ctx.state!=='running')await ctx.resume();musicSync();notify();return ctx.state==='running';
     }catch{fault='音声を開始できません。もう一度「音を有効にする」を押してください';notify();return false;}
   }
   // Each list is one physical GB channel. Segments on a list never overlap.
@@ -198,13 +199,56 @@
     if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0))duplicate.options.distance=event.options.distance;return drop(id,'同時ヒットを統合');}
     if(queue.length>=32)return drop(id,'フレーム上限');queue.push(event);if(!timer)timer=setTimeout(flush,16);return true;
   }
-  function inspect(){prune();return {state:ctx?.state||'locked',externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
-  window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,
+  /* ---------- BGM（2026-10-22：拠点の曲） ----------
+     効果音（GB合成・短い・上限つき）とは別の通り道。1曲を <audio loop> で流し、Web Audio に繋いで
+     master だけを通す（効果音の圧縮・ダッキングには入れない）。stop()（画面切替のたびに呼ばれる）では止めない。
+     ・music(id) で「今流したい曲」を指定（null で止める）。実際に鳴らすのは、音が解錠済み・有効・前面・外部消音なしのときだけ
+     ・入りは 1.2 秒でフェードイン、抜けは 0.8 秒でフェードアウトしてから一時停止。同じ曲に戻れば続きから
+     ・iOS は要素ごとに操作での再生開始が要るので、解錠と同じ指の操作の中で play() を呼ぶ（musicKick）
+     ・file:// で開いたときは Web Audio に繋がない（別オリジン扱いで無音になる）。要素の音量で代わりにする */
+  const TRACKS={hub:{src:'assets/bgm/hub_beyond_the_stone_gate.mp3',gain:1}};
+  let mWant=null,mEl=null,mId=null,mNode=null,mGain=null,mPauseT=0,mFault='';
+  const FADE_IN=1.2,FADE_OUT=.8;
+  function musicLevel(){return settings.enabled&&!externalMutes.size?settings.music*(TRACKS[mId]?.gain??1):0;}
+  function musicCanPlay(){return !!mWant&&settings.enabled&&!externalMutes.size&&!document.hidden&&settings.music>0&&!!ctx&&ctx.state==='running';}
+  function musicEnsure(){
+    if(mEl&&mId===mWant)return true;
+    if(mEl){try{mEl.pause();}catch{}if(mNode)try{mNode.disconnect();}catch{}mEl=null;mNode=null;mGain=null;}
+    const t=TRACKS[mWant];if(!t)return false;
+    mEl=new Audio();mEl.loop=true;mEl.preload='auto';mEl.src=t.src;mId=mWant;mEl.setAttribute('playsinline','');
+    mEl.addEventListener('error',()=>{mFault='BGMを読み込めません';});
+    if(location.protocol!=='file:'&&ctx){try{mNode=ctx.createMediaElementSource(mEl);mGain=ctx.createGain();mGain.gain.value=0;mNode.connect(mGain);mGain.connect(master);}catch{mNode=null;mGain=null;}}
+    if(!mGain)mEl.volume=0;
+    return true;
+  }
+  function musicRamp(to,sec){
+    if(mGain){const now=ctx.currentTime;mGain.gain.cancelScheduledValues(now);mGain.gain.setValueAtTime(mGain.gain.value,now);mGain.gain.linearRampToValueAtTime(to,now+sec);}
+    else if(mEl){mEl.volume=Math.max(0,Math.min(1,to*settings.master));}
+  }
+  function musicSync(){
+    clearTimeout(mPauseT);mPauseT=0;
+    if(!musicCanPlay()){
+      if(mEl&&!mEl.paused){
+        if(document.hidden||!ctx||ctx.state!=='running'){try{mEl.pause();}catch{}}
+        else{musicRamp(0,FADE_OUT);mPauseT=setTimeout(()=>{mPauseT=0;if(!musicCanPlay()&&mEl)try{mEl.pause();}catch{}},FADE_OUT*1000+50);}
+      }
+      return;
+    }
+    if(!musicEnsure())return;
+    if(mEl.paused){const p=mEl.play();if(p&&p.catch)p.catch(()=>{});}
+    musicRamp(musicLevel(),mEl.paused?FADE_IN:FADE_IN*.5);
+  }
+  function music(id){const want=id&&TRACKS[id]?id:null;if(want===mWant)return;
+    if(mEl&&want&&mId!==want){try{mEl.pause();}catch{}}   // 別の曲へは切り替え（今は拠点の1曲だけ）
+    mWant=want;musicSync();}
+  function musicKick(){if(musicCanPlay()&&(!mEl||mEl.paused))musicSync();}
+  function inspect(){prune();return {state:ctx?.state||'locked',music:{want:mWant,id:mId,playing:!!mEl&&!mEl.paused,volume:mGain?mGain.gain.value:mEl?mEl.volume:0,routed:!!mGain,fault:mFault},externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
+  window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,music,tracks:Object.freeze(Object.keys(TRACKS)),
     subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},resetStats(){counters={requested:0,played:0,dropped:0,stolen:0,peakEvents:0,peakPulse:0,peakNoise:0};history=[];},
     async audition(id){if(await unlock()){stop();return emit(id);}return false;}};
   addEventListener('storage',e=>{if(e.key===KEY)try{configure(JSON.parse(e.newValue||'{}'),false);}catch{}});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();if(ctx)ctx.suspend().catch(()=>{});}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stop();musicSync();if(ctx)ctx.suspend().catch(()=>{});}});
   addEventListener('pagehide',stop);
   // Gesture activation only; never autoplay or replay events accumulated while locked.
-  for(const name of ['pointerdown','touchend','keydown'])document.addEventListener(name,()=>{if(settings.enabled&&(!ctx||ctx.state!=='running'))void unlock();},{capture:true,passive:true});
+  for(const name of ['pointerdown','touchend','keydown'])document.addEventListener(name,()=>{if(settings.enabled&&(!ctx||ctx.state!=='running'))void unlock();else musicKick();},{capture:true,passive:true});
 })();

@@ -3,7 +3,7 @@
   const A=ABYSS_AUDIO,$=s=>document.querySelector(s),busNames={combat:'攻撃・通常命中',feedback:'被弾・重要な結果',world:'取得・探索',ui:'UI操作'};
   if(new URLSearchParams(location.search).has('embedded'))document.body.classList.add('embedded');
   let config=A.settings(),filter='all',timers=[],runId=0;
-  const globals=[['master','全体音量',0,.8,.01,'percent'],['maxEvents','同時に鳴る効果音',1,3,1,'件'],['maxStarts','1秒あたりの通常音',3,12,1,'件'],['tail','余韻の長さ',.5,1,.05,'ratio'],['ally','仲間の音量',0,.5,.01,'percent'],['distance','聞こえる距離',3,12,1,'マス'],['duck','重要音中の通常音量',.1,.65,.05,'percent']];
+  const globals=[['master','全体音量',0,.8,.01,'percent'],['music','BGM（拠点の曲）',0,1,.01,'percent'],['maxEvents','同時に鳴る効果音',1,3,1,'件'],['maxStarts','1秒あたりの通常音',3,12,1,'件'],['tail','余韻の長さ',.5,1,.05,'ratio'],['ally','仲間の音量',0,.5,.01,'percent'],['distance','聞こえる距離',3,12,1,'マス'],['duck','重要音中の通常音量',.1,.65,.05,'percent']];
   const fmt=(n,unit)=>unit==='percent'?Math.round(n*100)+'%':unit==='ratio'?Math.round(n*100)+'%':n+' '+unit;
   function status(message){$('#status').textContent=message;}
   async function audition(id){stop();const d=A.defs[id],s=config.sounds[id];if(!config.enabled||!s.enabled||!s.gain||!config.master||!config.buses[d.bus]){status('この音は消音設定です。音量またはON/OFFを変更してください。');return;}await A.audition(id);status(d.name+'を試聴');}

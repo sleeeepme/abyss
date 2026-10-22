@@ -25,6 +25,14 @@
   wrap('startRun',()=>emit('floor'));
   wrap('setScreen',()=>A.stop());
   wrap('openAd',()=>A.stop());
+  /* 拠点のBGM（2026-10-22）。拠点（潜っていない間）だけ流す。タイトル・潜行中・広告中は止める。
+     画面の切り替わり方が多い（死亡・帰還・各メニュー）ので、決まった間隔で「今どこか」を見て合わせる。 */
+  const bgmWant=()=>{try{
+    if(typeof _adSession!=='undefined'&&_adSession)return null;
+    if(!S.hero||S.run||S.screen==='title')return null;
+    return 'hub';
+  }catch{return null;}};
+  if(A.music){A.music(bgmWant());setInterval(()=>A.music(bgmWant()),400);}
   // Capture touchend because existing bindTap handlers stop bubbling and prevent click.
   let lastTouch=-Infinity;
   function ui(e){
