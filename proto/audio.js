@@ -199,40 +199,83 @@
     if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0))duplicate.options.distance=event.options.distance;return drop(id,'同時ヒットを統合');}
     if(queue.length>=32)return drop(id,'フレーム上限');queue.push(event);if(!timer)timer=setTimeout(flush,16);return true;
   }
-  /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲・中ボス戦の曲） ----------
-     効果音（GB合成・短い・上限つき）とは別の通り道。曲ごとに <audio loop> を1つ持ち、Web Audio に繋いで
-     master だけを通す（効果音の圧縮・ダッキングには入れない）。stop()（画面切替のたびに呼ばれる）では止めない。
+  /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲・中ボス戦の曲、10-23 ヴェラ第二形態の曲） ----------
+     効果音（GB合成・短い・上限つき）とは別の通り道。Web Audio に繋いで master だけを通す
+     （効果音の圧縮・ダッキングには入れない）。stop()（画面切替のたびに呼ばれる）では止めない。
      ・music(id) で「今流したい曲」を指定（null で止める）。実際に鳴らすのは、音が解錠済み・有効・前面・外部消音なしのときだけ
-     ・入りは 1.2 秒でフェードイン、抜けは 0.8 秒でフェードアウトしてから一時停止。曲が替わるときは重ねて入れ替える
-     ・止めてから RESTART_AFTER 秒以上たった曲は頭から（潜って戻った拠点・次に潜った層の曲は頭から始まる）。すぐ戻れば続きから
+     ・入りは fadeIn（既定 1.2 秒）、抜けは 0.8 秒でフェードアウトしてから止める。曲が替わるときは重ねて入れ替える
+     ・止めてから RESTART_AFTER 秒以上たった曲は頭から（restart の曲は毎回頭から）。すぐ戻れば続きから
+       ただし画面が隠れた・音が止まった等で止まったとき（suspended）は、戻ったら続きから（戦いの途中で頭に戻さない）
+     ・曲の鳴らし方は2通り：
+         el  … <audio loop>（MediaElementSource）。軽い。ループは曲の頭へ戻る（拠点・層・中ボス）
+         buf … 取ってきて AudioBuffer に解いて、loop:[開始,終わり] の区間を継ぎ目なしで回す（ヴェラ第二形態）。
+               前奏は1回だけ流れ、あとは区間をくり返す。解いた音は重い（2分で約40MB）ので、止めたら手放す。
+               継ぎ目は曲のファイルの側で作ってある：終わりの手前 0.06 秒は区間の頭の直前の音そのもの
+               ——デコーダが頭に足す遅れ（ブラウザで 0〜約0.04 秒違う）がずれても、跳んだ先とつながる。
      ・iOS は要素ごとに操作での再生開始が要るので、解錠と同じ指の操作の中で play() を呼ぶ（musicKick）
-     ・file:// で開いたときは Web Audio に繋がない（別オリジン扱いで無音になる）。要素の音量で代わりにする */
+     ・file:// で開いたときは Web Audio に繋がない（別オリジン扱いで無音になる）。要素の音量で代わりにする（buf の曲も el で鳴らす） */
   const TRACKS={
     hub:  {src:'assets/bgm/hub_beyond_the_stone_gate.mp3', gain:1},     // 拠点「Beyond the Stone Gate」
     stone:{src:'assets/bgm/stone_the_forgotten_archway.mp3', gain:1},   // 石の層「The Forgotten Archway」
     midboss:{src:'assets/bgm/midboss_the_weight_of_stone.mp3', gain:1, restart:true}, // 5階ごとの中ボス戦「The Weight of Stone」（頭の無音は詰めてある。戦いのたびに頭から）
+    /* ヴェラ第二形態「Strike of the Stone Giant」。元の曲は 160BPM で、53.75秒〜119.75秒（176拍＝44小節）が
+       後半でもう一度くり返される作り。そこを区間にして回す。継ぎ目は小節の頭（区間の頭の強拍）の直前0.3秒で重ねてある。
+       曲の終わり（119.75秒より後の変奏と締め）は使わない。 */
+    vera2:{src:'assets/bgm/vera2_strike_of_the_stone_giant.mp3', gain:1, restart:true, fadeIn:.35, loop:[53.751, 119.751]},
   };
   const FADE_IN=1.2,FADE_OUT=.8,RESTART_AFTER=30;
   let mWant=null,mFault='';const players={};
   function musicLevel(id){return settings.enabled&&!externalMutes.size?settings.music*(TRACKS[id]?.gain??1):0;}
   function musicCanPlay(){return !!mWant&&settings.enabled&&!externalMutes.size&&!document.hidden&&settings.music>0&&!!ctx&&ctx.state==='running';}
+  const useEl=t=>!t.loop||location.protocol==='file:'||!ctx||typeof fetch!=='function';
   function player(id){
     if(players[id])return players[id];
     const t=TRACKS[id];if(!t)return null;
-    const el=new Audio();el.loop=true;el.preload='auto';el.src=t.src;el.setAttribute('playsinline','');
-    el.addEventListener('error',()=>{mFault='BGMを読み込めません：'+id;});
-    const p={id,el,node:null,gain:null,pauseT:0,stoppedAt:0};
-    if(location.protocol!=='file:'&&ctx){try{p.node=ctx.createMediaElementSource(el);p.gain=ctx.createGain();p.gain.gain.value=0;p.node.connect(p.gain);p.gain.connect(master);}catch{p.node=null;p.gain=null;}}
-    if(!p.gain)el.volume=0;
+    const p={id,kind:useEl(t)?'el':'buf',el:null,node:null,gain:null,pauseT:0,stoppedAt:0,suspended:false,
+             buf:null,loading:null,src:null,t0:0,offset:0,playing:false};
+    if(ctx&&location.protocol!=='file:'){p.gain=ctx.createGain();p.gain.gain.value=0;p.gain.connect(master);}
+    if(p.kind==='el'){
+      const el=p.el=new Audio();el.loop=true;el.preload='auto';el.src=t.src;el.setAttribute('playsinline','');
+      el.addEventListener('error',()=>{mFault='BGMを読み込めません：'+id;});
+      if(p.gain){try{p.node=ctx.createMediaElementSource(el);p.node.connect(p.gain);}catch{p.node=null;p.gain.disconnect();p.gain=null;}}
+      if(!p.gain)el.volume=0;
+    }
     return (players[id]=p);
+  }
+  function bufLoad(p){
+    if(p.buf||p.loading)return p.loading;
+    const t=TRACKS[p.id];
+    p.loading=fetch(t.src).then(r=>{if(!r.ok)throw Error(r.status);return r.arrayBuffer();})
+      .then(ab=>new Promise((res,rej)=>{const q=ctx.decodeAudioData(ab,res,rej);if(q&&q.catch)q.catch(rej);}))
+      .then(b=>{p.buf=b;p.loading=null;musicSync();return b;})
+      .catch(()=>{p.loading=null;mFault='BGMを読み込めません：'+p.id;});
+    return p.loading;
+  }
+  function bufPos(p){
+    const t=TRACKS[p.id],[ls,le]=t.loop;if(!p.playing)return p.offset;
+    let x=ctx.currentTime-p.t0;if(x>=le)x=ls+(x-ls)%(le-ls);return x;
+  }
+  const isPlaying=p=>p.kind==='el'?!p.el.paused:p.playing;
+  function startP(p,fromHead){
+    if(p.kind==='el'){if(fromHead)try{p.el.currentTime=0;}catch{}const r=p.el.play();if(r&&r.catch)r.catch(()=>{});return;}
+    if(!p.buf){bufLoad(p);return;}                           // 解き終わったら musicSync がもう一度呼ばれる
+    const t=TRACKS[p.id],off=fromHead?0:p.offset,s=ctx.createBufferSource();
+    s.buffer=p.buf;s.loop=true;s.loopStart=t.loop[0];s.loopEnd=Math.min(t.loop[1],p.buf.duration);s.connect(p.gain);
+    s.start(0,off);p.src=s;p.t0=ctx.currentTime-off;p.playing=true;
+  }
+  function stopP(p){
+    if(p.kind==='el'){try{p.el.pause();}catch{}return;}
+    if(p.src){p.offset=bufPos(p);try{p.src.stop();}catch{}try{p.src.disconnect();}catch{}p.src=null;}p.playing=false;
   }
   function musicRamp(p,to,sec){
     if(p.gain){const now=ctx.currentTime;p.gain.gain.cancelScheduledValues(now);p.gain.gain.setValueAtTime(p.gain.gain.value,now);p.gain.gain.linearRampToValueAtTime(to,now+sec);}
-    else p.el.volume=Math.max(0,Math.min(1,to*settings.master));
+    else if(p.el)p.el.volume=Math.max(0,Math.min(1,to*settings.master));
   }
   function musicHalt(p,hard){
-    clearTimeout(p.pauseT);p.pauseT=0;if(p.el.paused)return;
-    const end=()=>{p.pauseT=0;if(musicCanPlay()&&mWant===p.id)return;try{p.el.pause();}catch{}p.stoppedAt=performance.now();if(p.gain&&ctx)p.gain.gain.setValueAtTime(0,ctx.currentTime);};
+    clearTimeout(p.pauseT);p.pauseT=0;if(!isPlaying(p))return;
+    const end=()=>{p.pauseT=0;if(musicCanPlay()&&mWant===p.id)return;stopP(p);
+      p.suspended=hard;if(!hard){p.stoppedAt=performance.now();if(p.kind==='buf')p.buf=null;}   // 解いた音は重いので、ほんとうに止めたら手放す
+      if(p.gain&&ctx)p.gain.gain.setValueAtTime(0,ctx.currentTime);};
     if(hard){end();return;}
     musicRamp(p,0,FADE_OUT);p.pauseT=setTimeout(end,FADE_OUT*1000+50);
   }
@@ -242,16 +285,20 @@
     if(!can)return;
     const p=player(mWant);if(!p)return;
     clearTimeout(p.pauseT);p.pauseT=0;
-    if(p.el.paused){
-      if(p.stoppedAt&&(TRACKS[p.id].restart||performance.now()-p.stoppedAt>RESTART_AFTER*1000))try{p.el.currentTime=0;}catch{}
-      const r=p.el.play();if(r&&r.catch)r.catch(()=>{});
+    const t=TRACKS[p.id];
+    if(!isPlaying(p)){
+      const head=!p.suspended&&!!p.stoppedAt&&(t.restart||performance.now()-p.stoppedAt>RESTART_AFTER*1000);
+      startP(p,head);if(!isPlaying(p))return;                 // buf の曲がまだ解けていない
+      p.suspended=false;if(head)p.stoppedAt=0;
     }
-    musicRamp(p,musicLevel(mWant),FADE_IN);
+    musicRamp(p,musicLevel(mWant),t.fadeIn||FADE_IN);
   }
   function music(id){const want=id&&TRACKS[id]?id:null;if(want===mWant)return;mWant=want;musicSync();}
-  function musicKick(){if(musicCanPlay()&&(!players[mWant]||players[mWant].el.paused))musicSync();}
-  function inspect(){prune();return {state:ctx?.state||'locked',music:(()=>{const p=players[mWant];return {want:mWant,id:p?p.id:null,playing:!!p&&!p.el.paused,volume:p?(p.gain?p.gain.gain.value:p.el.volume):0,routed:!!(p&&p.gain),time:p?p.el.currentTime:0,others:Object.values(players).filter(q=>q!==p&&!q.el.paused).map(q=>q.id),fault:mFault};})(),externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
-  window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,music,tracks:Object.freeze(Object.keys(TRACKS)),
+  /* 先に取ってきて解いておく（ヴェラの階に入った時点で。第二形態に変わった瞬間に鳴らしたい） */
+  function musicPrefetch(id){const t=TRACKS[id];if(!t||!ctx||ctx.state!=='running')return;const p=player(id);if(p&&p.kind==='buf')bufLoad(p);}
+  function musicKick(){if(musicCanPlay()&&(!players[mWant]||!isPlaying(players[mWant])))musicSync();}
+  function inspect(){prune();return {state:ctx?.state||'locked',music:(()=>{const p=players[mWant];return {want:mWant,id:p?p.id:null,kind:p?p.kind:null,playing:!!p&&isPlaying(p),volume:p?(p.gain?p.gain.gain.value:p.el?p.el.volume:0):0,routed:!!(p&&p.gain),time:p?(p.kind==='el'?p.el.currentTime:bufPos(p)):0,loaded:!!(p&&(p.kind==='el'||p.buf)),others:Object.values(players).filter(q=>q!==p&&isPlaying(q)).map(q=>q.id),fault:mFault};})(),externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
+  window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,music,musicPrefetch,tracks:Object.freeze(Object.keys(TRACKS)),
     subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},resetStats(){counters={requested:0,played:0,dropped:0,stolen:0,peakEvents:0,peakPulse:0,peakNoise:0};history=[];},
     async audition(id){if(await unlock()){stop();return emit(id);}return false;}};
   addEventListener('storage',e=>{if(e.key===KEY)try{configure(JSON.parse(e.newValue||'{}'),false);}catch{}});
