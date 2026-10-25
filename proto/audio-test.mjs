@@ -14,12 +14,15 @@ try{
 await page.goto(base+'/sound-admin.html');
 await test('locked audio drops events without backlog',async()=>{const r=await page.evaluate(()=>{ABYSS_AUDIO.emit('hurt');return ABYSS_AUDIO.inspect();});assert.equal(r.state,'locked');assert.equal(r.queued,0);});
 await page.click('#enable');
-await test('gesture starts audio; all 20 original buffers are finite and bounded',async()=>{
+await test('gesture starts audio; all 32 buffers (17 GB + 15 low-tone UI/scene) are finite and bounded',async()=>{
   const values=await page.evaluate(async()=>{
     const out=[],original=AudioBufferSourceNode.prototype.start;
-    AudioBufferSourceNode.prototype.start=function(...args){const x=this.buffer.getChannelData(0);let peak=0,power=0,bad=false;for(const v of x){peak=Math.max(peak,Math.abs(v));power+=v*v;if(!Number.isFinite(v))bad=true;}out.push({peak,rms:Math.sqrt(power/x.length),bad,seconds:this.buffer.duration,lateRms:Math.sqrt(x.slice(Math.floor(x.length*.60),Math.floor(x.length*.85)).reduce((a,v)=>a+v*v,0)/(Math.floor(x.length*.85)-Math.floor(x.length*.60)))});return original.apply(this,args);};
-    try{for(const id of Object.keys(ABYSS_AUDIO.defs)){await ABYSS_AUDIO.audition(id);await new Promise(r=>setTimeout(r,45));}}finally{AudioBufferSourceNode.prototype.start=original;ABYSS_AUDIO.stop();}return out;
-  });assert.equal(values.length,20);for(const v of values){assert(!v.bad);assert(v.peak<.7&&v.rms>.008);assert(v.seconds<=1.3);}assert(values.find(v=>v.seconds>1).lateRms>.02);await fs.writeFile('/tmp/abyss-audio-signals.json',JSON.stringify(values,null,2));
+    AudioBufferSourceNode.prototype.start=function(...args){const x=this.buffer.getChannelData(0),id=window.__auditionId;let peak=0,power=0,bad=false;for(const v of x){peak=Math.max(peak,Math.abs(v));power+=v*v;if(!Number.isFinite(v))bad=true;}out.push({id,c:!!ABYSS_AUDIO.defs[id]?.c,peak,rms:Math.sqrt(power/x.length),bad,seconds:this.buffer.duration,lateRms:Math.sqrt(x.slice(Math.floor(x.length*.60),Math.floor(x.length*.85)).reduce((a,v)=>a+v*v,0)/(Math.floor(x.length*.85)-Math.floor(x.length*.60)))});return original.apply(this,args);};
+    try{for(const id of Object.keys(ABYSS_AUDIO.defs)){window.__auditionId=id;await ABYSS_AUDIO.audition(id);await new Promise(r=>setTimeout(r,45));}}finally{AudioBufferSourceNode.prototype.start=original;ABYSS_AUDIO.stop();}return out;
+  });assert.equal(values.length,32);for(const v of values){assert(!v.bad);
+    // GBの音（20種のうち c:true でない17種）は従来どおり。UI・場面の「低い響き」（15種）は静かで長めのものがあるので、その分だけ緩める
+    if(v.c){assert(v.peak<.7&&v.peak>.1&&v.rms>.001,v.id);assert(v.seconds<=2.1,v.id);}else{assert(v.peak<.7&&v.rms>.008,v.id);assert(v.seconds<=1.3,v.id);}}
+  assert.equal(values.filter(v=>v.c).length,15);assert(values.find(v=>v.id==='level').lateRms>.004);await fs.writeFile('/tmp/abyss-audio-signals.json',JSON.stringify(values,null,2));
 });
 await test('featured revision buttons play the new parry',async()=>{assert.equal(await page.locator('[data-featured]').count(),6);await page.click('[data-featured=parry]');await page.waitForFunction(()=>ABYSS_AUDIO.inspect().active.some(a=>a.id==='parry'));await page.click('#stop');});
 await test('100 simultaneous hits coalesce and hurt wins',async()=>{
