@@ -3496,8 +3496,9 @@ const HAZARDS={
           slow:0.25, glow:true,  desc:'引きずり込まれる'},
   /* ヴェラの広間（10F）だけの床。ヴェラの体に生えた鉱石の元になる成分が溶け出した、青緑に光る有毒な液だまり
      （2026-10-21 ユーザー指定「今のダメージ床が何かわからない」）。強さは同じ層の「石の棘」と同じにして、見た目と名前だけ替える */
+  /* 足の重さ 0.20→0.40（2026-10-28 ユーザー指定「歩く速度も遅くしたい」。水の深み手前くらい） */
   ore:   {nm:'鉱毒の溜り', col:'#2f8f86', edge:'#9ff0e2', dt:'arcane', dps:9,  st:null,
-          slow:0.20, glow:true,  desc:'石の毒に灼かれる'},
+          slow:0.40, glow:true,  desc:'石の毒に灼かれ、足を取られる'},
 };
 /* 層ごとに置くハザードの種類。第10階層より手前には一切置かない。 */
 const ZONE_HAZARD = {stone:'grit', sump:'water', root:'spore', ruin:'slick', furnace:'lava', pale:'void_'};
@@ -3552,6 +3553,9 @@ function spawnHazards(fl, depth){
       g[y][x]=1;
     }
     return {kind:'poison', g};
+  }
+  if(ORE_PRE_DEPTHS.includes(depth) && !fl.arena){
+    return spawnOrePools(fl, Array.from({length:fl.H}, ()=>new Uint8Array(fl.W)), ORE_POOLS_PRE);
   }
   const cov = hazardCoverage(depth);
   if(cov<=0) return null;
@@ -3685,8 +3689,12 @@ function spawnHazards(fl, depth){
    池の中は縁からの距離で 1（浅い縁）/2（奥）に分ける。奥は絵だけの違い
    （泡と湯気が多い。削れる量は同じ）。 */
 const ORE_POOLS = {n:3, rad:[2.1, 2.9], lobes:2, apart:9, fromStart:6, fromStair:4};
-function spawnOrePools(fl, g){
-  const O=ORE_POOLS, cs=[];
+/* 8〜9階にも少しだけ（2026-10-28 ユーザー指定「8-9階にもこの毒沼を少し配置したい」）。
+   ヴェラの広間の前触れ。広間より小さく少なく、入口と穴から離す。他のハザード（10階から）とは別枠 */
+const ORE_POOLS_PRE = {n:2, rad:[1.5, 2.1], lobes:1, apart:12, fromStart:8, fromStair:5};
+const ORE_PRE_DEPTHS = [8, 9];
+function spawnOrePools(fl, g, O=ORE_POOLS){
+  const cs=[];
   const sx=fl.start.cx+0.5, sy=fl.start.cy+0.5;
   for(let guard=0; cs.length<O.n && guard<400; guard++){
     const cx=ri(3, fl.W-4)+0.5, cy=ri(3, fl.H-4)+0.5;
@@ -22468,7 +22476,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261027-vera1"></script>
+<script src="cave-look.js?v=20261028-ore"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

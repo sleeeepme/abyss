@@ -93,7 +93,9 @@ R.gen = await pg.evaluate(()=>{
     return {avgTiles:+(cov/n).toFixed(1), kinds:[...kinds], onStair}; };
   return {d5:at(5), d9:at(9), d12:at(12), d25:at(25), d35:at(35), d45:at(45),
           from:HAZARD_FROM_DEPTH,
-          noneBefore10: at(5).avgTiles===0 && at(9).avgTiles===0,
+          noneBefore10: at(5).avgTiles===0,
+          /* 8〜9階だけは鉱毒の溜りを少し（2026-10-28 ユーザー指定）。種類は ore だけ、広さはヴェラの広間より狭い */
+          preOreOnly89: at(9).kinds.join()==='ore' && at(9).avgTiles>0 && at(9).avgTiles<40 && at(9).onStair===0,
           appearsAt10: at(12).avgTiles>0,
           /* ---------- 「深いほど広い」は、もう成り立たない ----------
              水の層（第11〜20階層）だけ、覆う量を意図して倍にしてある

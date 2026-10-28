@@ -573,7 +573,7 @@ function waterPost(bx0,by0,t){
     const o=by*bw; let any=false;
     for(let x=0;x<bw;x++){ const m=wmask[o+x]; wrow[x]=buf[o+x]; if(m) any=true; }
     if(!any) continue;
-    for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
+    for(let x=1;x<bw-1;x++){ const m=wmask[o+x]; if(m&&m!==3&&wmask[o+x+sh]===m) buf[o+x]=wrow[x+sh]; }
   }
   if(!reduced) ripDraw(bx0,by0);
 }
@@ -594,6 +594,7 @@ function ripWet(px,py){
   const tx=Math.floor(px/Q), ty=Math.floor(py/Q), f=G&&G.f; if(!f||!f.g[ty]) return false;
   const t=f.g[ty][tx]; if(t===undefined||t===T.WALL) return false;
   if(W.haz&&W.haz.kind==='water'&&W.haz.g[ty]&&W.haz.g[ty][tx]) return true;
+  if(W.haz&&W.haz.circ&&typeof oreSd==='function'&&oreSd(px/Q,py/Q)<0) return true;     // 鉱毒の溜り（2026-10-28）
   return !!(G.pools&&G.pools.length&&poolU(G.pools,px,py)>0);
 }
 function ripAdd(x,y,amp){                      // x,y はマス単位の足もと
@@ -615,7 +616,7 @@ function ripFeed(){
 function ripStep(dt){ for(const r of RIPS) r.t+=dt; RIPS=RIPS.filter(r=>r.t<RP_LIFE+(r.n-1)*RP_GAP2); }
 function ripDraw(bx0,by0){
   if(!RIPS.length||!wmask) return;
-  const hiW=HZ.water.hi, hiP=DECO_PAL.poolGleam, done=new Set();
+  const hiW=HZ.water.hi, hiP=DECO_PAL.poolGleam, hiO=HZ.ore.froth, done=new Set();
   for(const r of RIPS) for(let i=0;i<r.n;i++){
     const u=(r.t-i*RP_GAP2)/RP_LIFE; if(u<=0||u>=1) continue;
     const e=1-(1-u)*(1-u), rx=RP_R0+(RP_R-RP_R0)*e*(i?0.75:1), ry=rx*.5;
@@ -627,7 +628,7 @@ function ripDraw(bx0,by0){
       const k=Y*bw+X; if(done.has(k)) continue; done.add(k);
       if(dotted&&((X+Y+bx0+by0)&1)) continue;
       const m=wmask[k]; if(!m) continue;
-      buf[k]=mixU(buf[k], m===2?hiP:hiW, a);
+      buf[k]=mixU(buf[k], m===2?hiP:m===3?hiO:hiW, m===3?Math.min(1,a*1.1):a);
     }
   }
 }
@@ -1143,7 +1144,7 @@ function terrain(f,Z,camX,camY,blinded){
             if(h%137===0){ col=(Math.sin(t*2.6+h)>.3)?hz.shard:hz.shard2; }     // 浮いた結晶のかけら
             const bc=oreBubble(wx,wy,t,dep,hz,lv);
             if(bc) col=bc;
-            buf[k]=col; continue;
+            buf[k]=col; wmask[k]=3; continue;                              // 3＝鉱毒の液（波紋だけ描く。屈折・映り込みはしない）
           }
           if(hv<.56) col=hz.ramp[Math.min(3,lv+1)];               // 縁
           else if(haz.kind==='water'||haz.kind==='slick'){ if(Math.sin(wy*.28+t*1.4+n*7+Math.sin(wx*.08)*1.5)>.82&&((wx+wy)&1)) col=hz.ramp[Math.min(3,lv+1)]; if(Lv>.2&&ihash(wx,wy+((t*4)|0)*13)%53===0) col=hz.hi; }
@@ -4101,6 +4102,13 @@ function install(){
   if(typeof oldStep==='function') window.feelFootstep=function(e){
     oldStep(e);
     if(!CAVE.on||!e||!Number.isFinite(e.x)||!Number.isFinite(e.y)) return;
+    /* 鉱毒の溜り（2026-10-28 ユーザー指定「水の層の池のように歩いたら波紋が出るように」）：
+       岸の形（oreSd）で見る。足もと（絵の中心の0.3マス下）が液の中なら、水と同じ輪と液色の飛沫 */
+    if(W.haz&&W.haz.circ&&typeof oreSd==='function'&&oreSd(e.x,e.y+.3)<0){
+      FEEL.ripples.push({x:e.x,y:e.y,age:0,col:'#9ff0e2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift();
+      if(typeof feelSpray==='function') feelSpray(e.x,e.y+.16,'#7fe0cc',4,.6,'water');
+      return;
+    }
     if(W.haz&&W.haz.g[Math.floor(e.y)]?.[Math.floor(e.x)]) return;          // 水の層の水は本編が出している
     if(!puddleAt(e.x,e.y)) return;
     FEEL.ripples.push({x:e.x,y:e.y,age:0,col:'#5a7ea2'}); if(FEEL.ripples.length>28) FEEL.ripples.shift();
