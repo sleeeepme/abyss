@@ -11506,6 +11506,36 @@ function resolveAllyOverlap(){
    体の周りに大きな空白の輪ができて、群がっている絵にならない。 */
 const ENEMY_GAP_MAX = 0.62;      // どれだけ体が大きくても、これ以上は空けない
 function sepGap(a,b){ return Math.min(ENEMY_GAP_MAX, ((a.r||0.3)+(b.r||0.3))*0.78); }
+/* ---------- 敵どうしは絵の幅で離す（2026-10-28 ユーザー指定「敵にもコリジョンを設定して重ならないようにして」）----------
+   当たりの半径（e.r＝0.34）で離すと中心どうしが 0.53 マスまで寄るが、絵の幅は 0.6〜1.6 マスある
+   （洞窟版のドット絵の実測）。囲まれると絵が半分ずつ重なって読めなかった。
+   敵×敵だけ、描いた絵の大きさ（e._vis：見えている形の幅と高さ）から間合いを決める：
+     横に並ぶ向きは2体の絵の幅の平均、前後に並ぶ向きは高さの平均に ENEMY_BODY_K を掛けた楕円（足や尻尾の先は
+     少しだけ重なってよい）。上限 ENEMY_BODY_MAX（細い通路でも一列で進める）。
+   ボスが絡む組と、主人公・仲間との間合いは今まで通り（近接の届く距離を変えない）。
+   絵をまだ描いていない敵（画面の外など）は今まで通りの間合い。 */
+const ENEMY_BODY_K = 0.85, ENEMY_BODY_MAX = 1.1;
+function bodyWH(e){
+  if(!(e && e._vis && e._vis.w>0 && typeof TS!=='undefined')) return null;
+  return {w:e._vis.w/TS, h:Math.max(.3,(e._vis.bot-e._vis.top)/TS)};
+}
+/* 2体の向き（dx,dy）に沿った間合い。横に並ぶときは絵の幅、縦（前後）に並ぶときは絵の高さで決める楕円 */
+function enemyGap(a,b,dx,dy){
+  const base=sepGap(a,b);
+  if(a.boss||b.boss) return base;
+  const A=bodyWH(a), B=bodyWH(b); if(!A||!B) return base;
+  const gx=Math.min(ENEMY_BODY_MAX,(A.w+B.w)/2*ENEMY_BODY_K), gy=Math.min(ENEMY_BODY_MAX,(A.h+B.h)/2*ENEMY_BODY_K);
+  const d=Math.hypot(dx,dy)||1, c=dx/d, s=dy/d;
+  return Math.max(base, 1/Math.sqrt((c/gx)*(c/gx)+(s/gy)*(s/gy)));
+}
+/* 主人公とも絵の分だけ離す。ただし近接の届く距離（寄り 0.9・溜め 0.8）より内側に収める */
+const ENEMY_PLAYER_GAP_MAX = 0.70, HERO_BODY_W = 0.8;
+function heroGap(e){
+  const base=sepGap(e,P);
+  if(e.boss) return base;
+  const A=bodyWH(e); if(!A) return base;
+  return Math.max(base, Math.min(ENEMY_PLAYER_GAP_MAX, (A.w+HERO_BODY_W)/2*ENEMY_BODY_K));
+}
 /* 押される側か。飛びかかり・跳ねの最中は触らない——
    軌道の途中で横へずらすと、狙った所に着地しない。 */
 function sepMovable(e){
@@ -11517,10 +11547,10 @@ function resolveEnemyOverlap(){
   for(const e of W.enemies){
     if(!sepMovable(e)) continue;
     let px=0, py=0;
-    const push=(o)=>{
+    const push=(o,foe)=>{
       if(!o || o===e || o.dead) return;
-      const gap=sepGap(e,o);
       let dx=e.x-o.x, dy=e.y-o.y, d=Math.hypot(dx,dy);
+      const gap=foe ? enemyGap(e,o,dx,dy) : o===P ? heroGap(e) : sepGap(e,o);
       if(d>=gap) return;
       if(d<1e-4){                      // 完全に重なったら座標から決めた向きへ逃がす
         const t=(e.x*7.3+e.y*3.1); dx=Math.cos(t); dy=Math.sin(t); d=1;
@@ -11531,7 +11561,7 @@ function resolveEnemyOverlap(){
       const need=(gap-d)*(sepMovable(o) ? 0.5 : 1);
       px+=dx/d*need; py+=dy/d*need;
     };
-    for(const o of nearEnemies(e.x, e.y, ENEMY_GAP_MAX+0.8)) push(o);
+    for(const o of nearEnemies(e.x, e.y, ENEMY_BODY_MAX+0.8)) push(o,true);
     for(const a of allies) push(a);
     push(P);
     if(px||py) moveEnt(e, px, py);
