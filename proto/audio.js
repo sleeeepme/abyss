@@ -8,27 +8,27 @@
     slash:{name:'斬撃',bus:'combat',gain:.58,priority:42,cooldown:180,length:.13,pulse:0,noise:1,shape:'slash'},
     blunt:{name:'打撃',bus:'combat',gain:.6,priority:43,cooldown:210,length:.15,pulse:1,noise:1,shape:'blunt'},
     arrow:{name:'弓の発射',bus:'combat',gain:.42,priority:40,cooldown:220,length:.10,pulse:0,noise:1,shape:'arrow'},
-    magic:{name:'魔弾',bus:'combat',gain:.50,priority:45,cooldown:240,length:.23,pulse:1,noise:1,shape:'magic'},
+    magic:{name:'魔弾',bus:'combat',gain:.46,priority:45,cooldown:240,length:.26,pulse:2,noise:1,shape:'magic',texture:'上へ回るアルペジオと細いきらめき'},
     // 敵の攻撃（2026-10-29）。主人公の攻撃の音より低く・鈍くして、「来た」と分かるようにする
-    foeSwing:{name:'敵の近接',bus:'combat',gain:.42,priority:36,cooldown:200,length:.15,pulse:1,noise:1,shape:'foeSwing'},
-    foeShot:{name:'敵の弾',bus:'combat',gain:.36,priority:34,cooldown:220,length:.13,pulse:1,noise:1,shape:'foeShot'},
-    foeBow:{name:'ヴェラの矢',bus:'combat',gain:.46,priority:48,cooldown:260,length:.16,pulse:1,noise:1,shape:'foeBow'},
-    foeLunge:{name:'敵の飛びかかり',bus:'combat',gain:.38,priority:38,cooldown:260,length:.12,pulse:1,noise:1,shape:'foeLunge'},
-    foeHeavy:{name:'ボスの大技（叩きつけ・衝撃）',bus:'feedback',gain:.62,priority:72,cooldown:380,length:.34,pulse:1,noise:1,shape:'foeHeavy'},
-    foeCleave:{name:'ボスの薙ぎ払い',bus:'feedback',gain:.56,priority:70,cooldown:380,length:.24,pulse:1,noise:1,shape:'foeCleave'},
-    foeBeam:{name:'ボスの光線・弾幕',bus:'feedback',gain:.5,priority:70,cooldown:380,length:.34,pulse:2,noise:1,shape:'foeBeam'},
+    foeSwing:{name:'敵の近接',bus:'combat',gain:.42,priority:36,cooldown:200,length:.16,pulse:1,noise:1,shape:'foeSwing',texture:'低く沈む「ブン」と下がる風'},
+    foeShot:{name:'敵の弾',bus:'combat',gain:.34,priority:34,cooldown:220,length:.14,pulse:1,noise:1,shape:'foeShot',texture:'下へ落ちる「ピュン」'},
+    foeBow:{name:'ヴェラの矢',bus:'combat',gain:.44,priority:48,cooldown:260,length:.22,pulse:1,noise:1,shape:'foeBow',texture:'弦が震える「ビィン」'},
+    foeLunge:{name:'敵の飛びかかり',bus:'combat',gain:.38,priority:38,cooldown:260,length:.13,pulse:1,noise:1,shape:'foeLunge',texture:'下から上がる「シュバッ」'},
+    foeHeavy:{name:'ボスの大技（叩きつけ・衝撃）',bus:'feedback',gain:.62,priority:72,cooldown:380,length:.52,pulse:1,noise:1,shape:'foeHeavy',texture:'深く落ちる「ドゴォン」と長い地鳴り'},
+    foeCleave:{name:'ボスの薙ぎ払い',bus:'feedback',gain:.56,priority:70,cooldown:380,length:.34,pulse:1,noise:1,shape:'foeCleave',texture:'低い唸りが大きく上がる「ブォン」と、最後に高く鳴る「シャキン」'},
+    foeBeam:{name:'ボスの光線',bus:'feedback',gain:.48,priority:70,cooldown:380,length:.62,pulse:2,noise:1,shape:'foeBeam',texture:'溜めて上がり、揺れながら伸びる「ギュイィーン」'},
     hit:{name:'敵への命中',bus:'combat',gain:.30,priority:30,cooldown:150,length:.075,pulse:0,noise:1,shape:'hit'},
-    critical:{name:'会心',bus:'feedback',gain:.52,priority:65,cooldown:260,length:.22,pulse:2,noise:1,texture:'刃が食い込む衝撃と短い金属の響き'},
+    critical:{name:'会心',bus:'feedback',gain:.56,priority:65,cooldown:260,length:.46,pulse:2,noise:1,texture:'重い打ちのあとに高い「キィン」が5度で鳴り、細く残る'},
     hurt:{name:'自分の被弾',bus:'feedback',gain:.65,priority:90,cooldown:330,length:.19,pulse:1,noise:1,shape:'hurt'},
     guard:{name:'盾の防御',bus:'feedback',gain:.48,priority:82,cooldown:230,length:.17,pulse:2,noise:1,texture:'盾の面で受ける鈍い金属音'},
     parry:{name:'パリイ／ジャスト回避',bus:'feedback',gain:.6,priority:95,cooldown:350,length:.30,pulse:2,noise:1,texture:'刃を弾く鋭い接触と細い残響'},
-    dash:{name:'ダッシュ',bus:'combat',gain:.28,priority:50,cooldown:300,length:.085,pulse:0,noise:1,shape:'arrow'},
-    skill:{name:'武器技／大技',bus:'feedback',gain:.54,priority:75,cooldown:650,length:.32,pulse:1,noise:1,shape:'skill'},
-    defeat:{name:'敵の消滅',bus:'combat',gain:.25,priority:24,cooldown:350,length:.27,pulse:1,noise:1,texture:'崩れる短い衝撃と散る気配'},
+    dash:{name:'ダッシュ',bus:'combat',gain:.28,priority:50,cooldown:300,length:.09,pulse:0,noise:1,shape:'dash',texture:'低い所から上がる短い風'},
+    skill:{name:'武器技／大技',bus:'feedback',gain:.54,priority:75,cooldown:650,length:.36,pulse:1,noise:1,shape:'skill',texture:'低くうねって上がる溜めと、はじける衝撃'},
+    defeat:{name:'敵の消滅',bus:'combat',gain:.27,priority:24,cooldown:350,length:.27,pulse:1,noise:1,texture:'崩れて、3段で下がる小さな音'},
     boss:{name:'ボス撃破',bus:'feedback',gain:.6,priority:99,cooldown:2000,length:.82,pulse:1,noise:1,texture:'重い崩落、二度の瓦解、静まる余韻'},
     death:{name:'戦闘不能',bus:'feedback',gain:.58,priority:100,cooldown:2000,length:.52,pulse:1,noise:1,texture:'身体が落ちる衝撃と装備の擦れ'},
-    pickup:{name:'アイテム取得',bus:'world',gain:.38,priority:55,cooldown:300,length:.12,pulse:1,noise:1,texture:'小物を手に取る乾いた接触'},
-    heal:{name:'消耗品の使用',bus:'world',gain:.45,priority:70,cooldown:450,length:.25,pulse:0,noise:1,texture:'栓を抜く音と柔らかな気流'},
+    pickup:{name:'アイテム取得',bus:'world',gain:.34,priority:55,cooldown:300,length:.13,pulse:1,noise:0,texture:'上がる2音の「ピコッ」'},
+    heal:{name:'消耗品の使用',bus:'world',gain:.40,priority:70,cooldown:450,length:.28,pulse:1,noise:1,texture:'ド・ミ・ソと上がる柔らかい音と、薄い気流'},
     level:{name:'レベルアップ',bus:'feedback',gain:.8,priority:80,cooldown:1600,length:1.4,pulse:2,noise:0,music:true,c:true,texture:'低い音がすべり上がり、5度を重ねて開く。被弾・防御を優先'},
     floor:{name:'階層移動（ポータル）',bus:'world',gain:.32,priority:68,cooldown:1000,length:.3,pulse:1,noise:1,texture:'低い足場の響きと空気の移ろい'},
     fall:{name:'穴に落ちる',bus:'world',gain:.5,priority:68,cooldown:600,length:1.0,pulse:0,noise:1,c:true,texture:'三角波がG4から深く沈む・低い風'},
@@ -99,26 +99,26 @@
     slash:{n:[[0,.04,1,2,0,12,1],[.04,.085,3,3,0,9,1]]},
     blunt:{p:[[[0,.07,108,8,1,.5,73]]],n:[[0,.025,3,2,0,15,1],[.025,.11,5,4,0,9,1]]},
     arrow:{n:[[0,.015,2,2,0,10,1],[.015,.075,1,3,0,8,1]]},
-    magic:{p:[[[0,.045,131,5,1,.125,98]]],n:[[0,.025,3,1,1,10,1],[.025,.09,1,3,0,12,1],[.115,.10,3,4,0,6,1]]},
+    magic:{p:[[[0,.24,880,11,2,.125,0,{arp:[1,1.5,2,1.5],arpHz:38,to:1320}]],[[.02,.22,440,6,3,.5,0,{vib:.03,vibHz:14,to:660}]]],n:[[0,.22,1,0,1,5,3]]},
     hit:{n:[[0,.017,2,1,0,12,1],[.017,.05,4,4,0,8,1]]},
-    foeSwing:{p:[[[.03,.07,82,7,1,.5,64]]],n:[[0,.05,5,3,0,10,1],[.05,.09,6,4,0,6,1]]},
-    foeShot:{p:[[[0,.09,165,6,1,.25,247]]],n:[[0,.02,3,2,1,8,1],[.02,.07,4,4,0,5,1]]},
-    foeBow:{p:[[[0,.12,220,8,1,.125,294]]],n:[[0,.012,1,2,0,11,1],[.012,.07,2,3,0,6,1]]},
-    foeLunge:{p:[[[0,.06,98,5,1,.5,131]]],n:[[0,.10,4,3,0,9,1]]},
-    foeHeavy:{p:[[[0,.17,58,12,1,.5,92]]],n:[[0,.07,6,4,0,15,1],[.07,.12,7,5,0,9,2],[.19,.14,5,5,0,5,3]]},
-    foeCleave:{p:[[[.05,.10,73,9,1,.5,55]]],n:[[0,.06,3,3,0,11,1],[.06,.06,5,3,0,12,1],[.12,.11,6,4,0,6,1]]},
-    foeBeam:{p:[[[0,.30,139,7,2,.25,104]],[[.02,.26,208,4,2,.125]]],n:[[0,.04,2,2,1,10,1],[.04,.26,3,4,0,5,2]]},
-    critical:{p:[[[0,.085,1320,7,1,.125]],[[0,.055,2030,5,1,.125]]],n:[[0,.035,1,1,0,15,1],[.035,.13,3,3,0,7,1]]},
+    foeSwing:{p:[[[0,.13,147,9,2,.5,0,{to:73}]]],n:[[0,.14,2,3,0,8,1,{shiftTo:6}]]},
+    foeShot:{p:[[[0,.13,784,10,1,.25,0,{to:262}]]],n:[[0,.02,2,1,0,7,1]]},
+    foeBow:{p:[[[0,.21,294,11,2,.5,0,{vib:.05,vibHz:28,dutyTo:.125}]]],n:[[0,.012,1,2,0,11,1],[.012,.05,2,3,0,5,1]]},
+    foeLunge:{p:[[[0,.08,98,6,1,.5,0,{to:196}]]],n:[[0,.12,4,5,0,10,1,{shiftTo:2}]]},
+    foeHeavy:{p:[[[0,.40,120,14,3,.5,0,{to:38}]]],n:[[0,.06,4,3,0,15,1],[.06,.45,7,6,0,11,4]]},
+    foeCleave:{p:[[[0,.20,82,12,3,.5,0,{to:330}],[.20,.15,1319,10,2,.125,0,{vib:.006,vibHz:11}]]],n:[[0,.20,4,5,0,8,3,{shiftTo:1}],[.20,.06,1,1,0,7,1]]},
+    foeBeam:{p:[[[0,.09,220,9,6,.5,0,{to:880,rise:.06}],[.09,.52,880,12,7,.25,0,{vib:.035,vibHz:22,dutyTo:.125}]],[[0,.60,441,7,8,.5,0,{to:452,vib:.02,vibHz:7}]]],n:[[0,.60,1,1,1,6,6,{rise:.05}]]},
+    critical:{p:[[[0,.05,196,13,1,.5,0,{to:82}],[.05,.40,1568,12,3,.125,0,{vib:.004,vibHz:9}]],[[.04,.05,2093,10,1,.125],[.09,.36,2349,9,3,.25]]],n:[[0,.03,1,1,0,15,1],[.03,.06,2,2,0,10,1],[.09,.26,1,1,1,4,3]]},
     hurt:{p:[[[0,.065,104,9,1,.5,73]]],n:[[0,.026,4,2,0,13,1],[.026,.14,6,4,0,8,1]]},
     guard:{p:[[[0,.11,643,8,1,.125]],[[0,.075,1047,5,1,.125]]],n:[[0,.045,3,2,1,12,1],[.045,.075,5,3,0,5,1]]},
     parry:{p:[[[0,.19,1640,9,1,.125]],[[0,.105,2533,6,1,.125]]],n:[[0,.018,1,1,0,15,1],[.018,.05,3,1,1,8,1]]},
-    dash:{n:[[0,.07,2,3,0,9,1]]},
-    skill:{p:[[[0,.09,146,8,1,.5,82]]],n:[[0,.035,1,2,0,14,1],[.035,.12,3,3,0,10,1],[.155,.15,5,4,0,6,1]]},
-    defeat:{p:[[[0,.065,91,6,1,.5,67]]],n:[[0,.025,3,3,0,12,1],[.025,.08,4,4,0,9,1],[.105,.13,2,5,0,5,1]]},
+    dash:{n:[[0,.085,3,4,0,9,1,{shiftTo:1}]]},
+    skill:{p:[[[0,.33,147,10,3,.5,0,{to:392,vib:.02,vibHz:10}]]],n:[[0,.04,1,2,0,14,1],[.04,.28,3,4,0,9,2]]},
+    defeat:{p:[[[0,.05,196,8,1,.5,0,{to:131}],[.07,.05,147,6,1,.5],[.14,.07,110,5,1,.5]]],n:[[0,.04,3,3,0,12,1],[.04,.20,4,5,0,8,2]]},
     boss:{p:[[[0,.18,83,12,1,.5,66],[.20,.11,69,6,1,.5]]],n:[[0,.10,5,4,0,15,1],[.10,.10,3,5,0,10,1],[.20,.13,5,4,0,10,1],[.33,.18,7,5,0,8,2],[.51,.25,3,6,0,4,3]]},
     death:{p:[[[0,.115,92,10,1,.5,66]]],n:[[0,.05,4,3,0,14,1],[.05,.11,6,4,0,8,1],[.16,.16,3,3,1,5,1],[.32,.15,4,5,0,3,2]]},
-    pickup:{p:[[[0,.022,1530,4,1,.125]]],n:[[0,.024,4,1,1,8,1],[.029,.045,5,3,0,4,1]]},
-    heal:{n:[[0,.019,5,1,1,9,1],[.025,.20,2,4,0,8,1]]},
+    pickup:{p:[[[0,.04,1047,10,1,.25],[.045,.08,1568,10,1,.25]]]},
+    heal:{p:[[[0,.06,523,9,1,.25],[.065,.06,659,9,1,.25],[.13,.14,784,9,2,.25]]],n:[[0,.24,2,4,0,4,2]]},
     floor:{p:[[[0,.08,78,4,1,.5]]],n:[[0,.07,6,5,0,10,1],[.07,.20,3,5,0,5,2]]},
     level:{p:[
       [[0,.105,523.25,11,1,.25],[.14,.105,523.25,10,1,.25],[.28,.15,659.25,11,1,.25],[.46,.15,783.99,11,1,.25],[.66,.56,1046.5,12,3,.25]],
@@ -134,21 +134,31 @@
       const t=i/(sr*os);let x=0;
       for(const v of voices){
         const j=v.segments.findIndex(s=>t>=s[0]&&t<s[0]+s[1]);if(j<0)continue;
-        const [at,len,f,vol,pace,duty,settle]=v.segments[j],age=t-at;
+        const [at,len,f,vol,pace,duty,settle,o]=v.segments[j],age=t-at;
         if(j!==v.index){v.index=j;v.phase=0;}
         // Fast settling ends inside 24 ms: impact body, not an audible laser glide.
-        const hz=settle?settle+(f-settle)*Math.max(0,1-Math.floor(age*128)/128/.024):f;
+        let hz=settle?settle+(f-settle)*Math.max(0,1-Math.floor(age*128)/128/.024):f,du=duty,amp=1;
+        /* 8番目の欄（2026-10-29）：GB の掃引（to：segment の間に音程を指数で動かす）・アルペジオ（arp：音程の倍率を arpHz で回す）・
+           ビブラート（vib：深さの比、vibHz）・デューティの移り（dutyTo）・立ち上がり（rise 秒）。光線や魔法の「伸びる音」用 */
+        if(o){const k=Math.min(1,age/(o.glide||len));
+          if(o.to)hz=f*Math.pow(o.to/f,k);
+          if(o.arp)hz*=o.arp[Math.floor(age*(o.arpHz||30))%o.arp.length];
+          if(o.vib)hz*=1+o.vib*Math.sin(TAU*(o.vibHz||12)*age);
+          if(o.dutyTo!=null)du=duty+(o.dutyTo-duty)*k;
+          if(o.rise)amp=Math.min(1,age/o.rise);}
         const period=Math.max(0,Math.min(2047,Math.round(2048-131072/hz)));
         v.phase+=131072/(2048-period)/(sr*os);
-        x+=(v.phase%1<duty?1:-1)*.21*envelope(age,len,vol,pace);
+        x+=(v.phase%1<du?1:-1)*.21*envelope(age,len,vol,pace)*amp;
       }
       const j=noise.findIndex(s=>t>=s[0]&&t<s[0]+s[1]);
       if(j>=0){
-        const [at,len,div,shift,short,vol,pace]=noise[j];
+        const [at,len,div,shift0,short,vol,pace,o]=noise[j];
         if(j!==noiseIndex){noiseIndex=j;nphase=0;state=0;}
+        // 8番目の欄：shiftTo（雑音の高さを segment の間に段階で動かす＝風切りの上がり下がり）・rise
+        const age=t-at,k=o?Math.min(1,age/len):0,shift=o&&o.shiftTo!=null?Math.round(shift0+(o.shiftTo-shift0)*k):shift0;
         nphase+=262144/(div*2**shift)/(sr*os);
         while(nphase>=1){const bit=1^((state&1)^((state>>1)&1));state=(state>>1)|(bit<<14);if(short)state=(state&~64)|(bit<<6);nphase--;}
-        x+=(state&1?1:-1)*.30*envelope(t-at,len,vol,pace);
+        x+=(state&1?1:-1)*.30*envelope(age,len,vol,pace)*(o&&o.rise?Math.min(1,age/o.rise):1);
       }
       hp+=.00075*(x-hp);lp+=.21*(x-hp-lp);data[Math.floor(i/os)]+=lp/os;
     }
