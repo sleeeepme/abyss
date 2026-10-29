@@ -16,6 +16,13 @@
   wrap('feelImpact',([target,src,crit])=>{if(target===P)return; if(target?.arch)emit(crit?'critical':'hit',where(target,src!==P));});
   wrap('hitPlayer',(_,blocked)=>{if(blocked===false)emit(P.guard&&stats(S.hero).hasShield?'guard':'hurt');});
   wrap('feelPerfect',()=>emit('parry'));
+  /* 敵の攻撃（2026-10-29 ユーザー指定「敵の攻撃時にもSEを作ってほしい」）。出た瞬間に鳴らす（当たったかどうかは被弾の音が受け持つ）。
+     遠い敵ほど小さく（where の距離）。たくさんの敵が同時に振っても、音ごとの間隔（cooldown）で間引かれる。 */
+  const FOE={swing:'foeSwing',shot:'foeShot',bow:'foeBow',lunge:'foeLunge'};
+  wrap('feelFoeAttack',([e,kind])=>{const id=FOE[kind];if(id)emit(id,where(e));});
+  const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam'};
+  wrap('resolveBossMove',([e],r,id)=>{const s=BOSS_SFX[id];if(s)emit(s,where(e));},e=>e&&e.cast&&e.cast.id);
+  wrap('zakoBurst',([e])=>emit('foeHeavy',where(e)));
   wrap('tapDash',(_,success)=>{if(success)emit('dash');});
   wrap('feelWeaponArtStart',([ent])=>emit('skill',where(ent,ent!==P)));
   wrap('feelUltimate',([ent])=>emit('skill',where(ent,ent!==P)));

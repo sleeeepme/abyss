@@ -7114,10 +7114,14 @@ function lungeStart(e, dx, dy, d){
 }
 /* 踏み込み中の1フレーム。true を返したら、この敵はこのフレームぶんの
    通常の移動・攻撃判定を行わない（踏み込みが全部を持っていく）。 */
+/* 敵の攻撃が出た瞬間（2026-10-29 ユーザー指定「敵の攻撃時にもSEを作ってほしい」）。
+   本編では何もしない。audio-game.js がこれを包んで音を鳴らす。kind：swing（近接）・shot（弾）・bow（ヴェラの矢）・lunge（飛びかかり） */
+function feelFoeAttack(e, kind){}
 function lungeTick(e, dt, slow){
   const L=e.lunge; if(!L) return false;
   if(L.tele>0){                       // 溜め。その場で止まって身構える
     L.tele-=dt*slow;
+    if(L.tele<=0) feelFoeAttack(e, 'lunge');
     return true;
   }
   L.t+=dt*slow;
@@ -9234,6 +9238,38 @@ function veraBodyNearest(x, y, B){
 function veraKeepClear(e){
   const B=veraBody(e); if(!B || veraBodyFree(e.x,e.y,B)) return;
   const p=veraBodyNearest(e.x,e.y,B); if(p){ e.x=p.x; e.y=p.y; }
+}
+/* ---------- ヴェラ第二形態の体に主人公・仲間が入らない（2026-10-29 ユーザー指摘「ヴェラの第2形態にコリジョンが設定されていない？」） ----------
+   ボスは押されない作りで、主人公との間合いも取っていなかったので、主人公は第二形態の胴の下をそのまま歩き抜けられた。
+   胴の下の地面（足元の影のあたり）を楕円、まだ壊れていない脚の先を小さな円として、そこへ入った主人公・仲間を外へ押し出す。
+   近接は届く：胴の楕円の縁から体の当たりの円（e.r＝1.25）の縁まで 0.7 マス以内、脚の円（0.7）の縁は押し出した位置のすぐ先。
+   ヴェラが歩いて来ても、押されるのは主人公の側（ボスは今まで通り押されない）。押した先が壁なら moveEnt が止める。 */
+const VERA2_SOLID = {cy:0.45, ax:1.55, ay:1.05, leg:0.42, me:0.3};
+function vera2Solid(e){ return !!(e && e.boss && e.uniqueBoss===10 && !e.form2 && !e.dead && W.fl && W.fl.arena); }
+function vera2PushOut(e, a){
+  if(!a || a.dead || a.fallAnim) return;
+  const B=VERA2_SOLID, ax=B.ax+B.me, ay=B.ay+B.me;
+  let dx=a.x-e.x, dy=a.y-(e.y+B.cy);
+  const k=(dx/ax)*(dx/ax)+(dy/ay)*(dy/ay);
+  if(k<1){
+    if(k<1e-6){ dx=0; dy=ay; }                       // 真ん中に重なったら手前（画面の下）へ出す
+    const s=1/Math.sqrt((dx/ax)*(dx/ax)+(dy/ay)*(dy/ay));
+    moveEnt(a, e.x+dx*s-a.x, e.y+B.cy+dy*s-a.y);
+  }
+  for(const p of (e.parts||[])){
+    if(p.broken) continue;
+    const R=B.leg+B.me; let qx=a.x-(e.x+p.ox), qy=a.y-(e.y+p.oy), d=Math.hypot(qx,qy);
+    if(d>=R) continue;
+    if(d<1e-4){ qx=0; qy=1; d=1; }
+    moveEnt(a, qx/d*(R-d), qy/d*(R-d));
+  }
+}
+function vera2KeepOut(){
+  for(const e of (W.enemies||[])){
+    if(!vera2Solid(e)) continue;
+    vera2PushOut(e, P);
+    for(const a of livingParty()) vera2PushOut(e, a);
+  }
 }
 function moveEnt(e,dx,dy){
   // 壊れた移動量は捨てる。座標に NaN を書き込むと、そこから先が全部 NaN になる。
@@ -12656,6 +12692,7 @@ function enemyUpdate(e,dt){
         zakoBurst(e);
       }else if(d < a.range+0.6+(e.boss?e.r*0.8:0) || a.range>3){
         const BA = e.boss && typeof feelBossArt==='function' ? feelBossArt(e) : null;
+        feelFoeAttack(e, a.range>3 ? (BA&&BA.pre==='bv' ? 'bow' : 'shot') : 'swing');   // 効果音（audio-game.js が拾う）
         if(a.range>3){ // 遠距離: 弾
           W.fx.push({t:'bolt',x:e.x,y:e.y,vx:dx/d*7.5,vy:dy/d*7.5,life:1.6,
                      dmg:e.atkV, lv:e.lv, dt:e.dt,
@@ -15004,6 +15041,7 @@ function update(dt){
   if(!S.hero || !S.run) return;
   W.enemies.forEach(e=>enemyUpdate(e,dt));
   resolveEnemyOverlap();          // 敵も、動かしたあとにめり込みだけ直す
+  vera2KeepOut();                 // ヴェラ第二形態の胴と脚の下には入れない
   if(!S.hero || !S.run) return;   // このフレームで死亡した場合はここで抜ける
   // 弾（敵の弾と主人公の飛び道具）
   W.fx=W.fx.filter(f=>{
@@ -22556,7 +22594,7 @@ if(typeof tapDash === 'function'){
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261013pressure-f5"></script>
-<script src="audio.js?v=20261025c"></script>
-<script src="audio-game.js?v=20261025c"></script>
+<script src="audio.js?v=20261029-foe"></script>
+<script src="audio-game.js?v=20261029-foe"></script>
 </body>
 </html>
