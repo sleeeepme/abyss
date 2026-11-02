@@ -15931,7 +15931,14 @@ function draw(){
     let spriteDrawn=false;
     const drawBody=()=>{
     ctx.save(); ctx.globalAlpha*=feelBlink(e);
-    if(window.CAVE && CAVE.on && CAVE.enemy(e,sx,sy,R)){ spriteDrawn=true; }
+    const caveDrawn = !!(window.CAVE && CAVE.on && CAVE.enemy(e,sx,sy,R));   // 洞窟版の絵は激昂の輪郭・オーラ・目を絵のドットで足す
+    /* 激昂（2026-11-02 ユーザー指定）：洞窟版の絵が無い敵は、絵の形に沿った赤い光の縁取りを明滅させ、火の粉を昇らせる */
+    if(!caveDrawn && e.rage && !e.dead){
+      const pl=Math.sin(nowSec()*7.5)*.5+.5;
+      ctx.shadowColor='rgba(255,'+(40+pl*30|0)+',30,'+(.7+pl*.3).toFixed(2)+')'; ctx.shadowBlur=TS*(.45+pl*.45);
+      if(Math.random()<.25) feelSpray(e.x+(Math.random()-.5)*R/TS*1.6, e.y-R/TS*.8, '#ff6a3a', 1, .35, 'spark');
+    }
+    if(caveDrawn){ spriteDrawn=true; }
     else if(spr && sprite(spr)){
       // 被弾の白フラッシュは、絵の上から薄く重ねる（塗り分けを潰さない程度に）
       const drawSpriteArt=typeof drawFeelSpriteImage==='function' ? drawFeelSpriteImage : null;
@@ -22544,7 +22551,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261020-notif"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261029-vera1c"></script>
+<script src="cave-look.js?v=20261102-rage"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

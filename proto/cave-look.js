@@ -3972,6 +3972,70 @@ const BODY_SIZE={ beast:{range:.70}, slater:{swarm:.40} };   // 磯虫は半分�
 CAVE.enemy=function(e,sx,sy,R){
   try{ return enemy(e,sx,sy,R); }catch(err){ console.error(err); return false; }
 };
+/* ---------- 激昂の見た目（2026-11-02 ユーザー指定「敵が激昂状態の時はアウトラインを赤く明滅したり
+   オーラを纏ったり目を光らせたりして、緊張感を出したい」）----------
+   絵のドット（SPR、1ドット＝絵の1ドット）の上で：
+     ・輪郭：絵のすぐ外の1ドットを赤に。明るい赤と暗い赤のあいだを約0.8秒で明滅
+     ・オーラ：外側2〜RAGE_AURA ドットに、下から上へ流れる炎の粒（網点で間引いて透けて見せる）。頭の上ほど高く伸び、
+       ときどき火の粉が昇る
+     ・目：絵の上の方にある、明るく鮮やかな小さなドットの塊（目・光る宝石）を赤く灼け、まわりに赤い照り
+   光の色はランタンで暗くしない（暗がりでも激昂が読めるように）。錨点・見えている形の大きさ（e._vis）は
+   効果を足す前に測るので、オーラで絵が跳ねたり、名前の帯がずれたりしない。CAVE.rageFx=false で止まる。 */
+const RAGE_AURA=5, RAGE_BLINK=7.5;
+const RAGE_COL={out:[[0x7a,0x0c,0x0c],[0xff,0x3a,0x2a]], aura:['#ff5a2a','#d42a18','#9a1410','#5c0a0a'], ember:'#ffb060', eye:'#ff3a26', eyeHot:'#ffe0c8', glow:'#ff2a1a'};
+const rgbU=(r,g,b)=>(0xff000000|(b<<16)|(g<<8)|r)>>>0;
+const hexU=h=>{ const n=parseInt(h.slice(1),16); return rgbU(n>>16,(n>>8)&255,n&255); };
+const RAGE_U={aura:RAGE_COL.aura.map(hexU), ember:hexU(RAGE_COL.ember), eye:hexU(RAGE_COL.eye), eyeHot:hexU(RAGE_COL.eyeHot), glow:hexU(RAGE_COL.glow)};
+let rageD=null;
+function rageFx(N,u,t,x0,y0,x1,y1,seed){
+  if(x1<0) return;
+  const NN=N*N; if(!rageD||rageD.length<NN) rageD=new Uint8Array(NN);
+  const D=rageD; D.fill(0,0,NN);
+  // 1) 絵からの距離（チェビシェフ）を RAGE_AURA まで
+  let front=[];
+  for(let i=0;i<NN;i++) if(u[i]>>>24){ D[i]=255; }
+  for(let i=0;i<NN;i++){ if(D[i]!==255) continue; const X=i%N, Y=(i/N)|0;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=X+dx, yy=Y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const k=yy*N+xx; if(!D[k]){ D[k]=1; front.push(k); } } }
+  for(let d=2; d<=RAGE_AURA; d++){ const nf=[];
+    for(const i of front){ const X=i%N, Y=(i/N)|0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=X+dx, yy=Y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const k=yy*N+xx; if(!D[k]){ D[k]=d; nf.push(k); } } }
+    front=nf; }
+  const p=Math.sin(t*RAGE_BLINK)*.5+.5;                         // 明滅
+  const o0=RAGE_COL.out[0], o1=RAGE_COL.out[1];
+  const outU=rgbU(o0[0]+(o1[0]-o0[0])*p|0, o0[1]+(o1[1]-o0[1])*p|0, o0[2]+(o1[2]-o0[2])*p|0);
+  const cyMid=(y0+y1)/2, hgt=Math.max(1,y1-y0);
+  for(let i=0;i<NN;i++){ const d=D[i]; if(!d||d===255) continue;
+    if(d===1){ u[i]=outU; continue; }
+    const X=i%N, Y=(i/N)|0;
+    // 炎：上へ流れるゆらぎ。頭より上（Y が小さい）ほど遠くまで伸びる
+    const up=Math.max(0,Math.min(1,(cyMid-Y)/hgt+.3));
+    const fy=Y+t*16, n=(ihash(X, Math.floor(fy/2))%97)/97*.55 + (Math.sin(X*.7+fy*.35+seed)*.5+.5)*.45;
+    const reach=1.6+up*3.4+p*.6;                                   // その場所で炎の届く距離
+    if(d>reach) continue;
+    const thr=.30+(d-1)/reach*.55;
+    if(n<thr) continue;
+    if(d>=3&&((X+Y+((t*12)|0))&1)) continue;                       // 網点で透かす
+    u[i]=RAGE_U.aura[Math.min(3,Math.max(0,d-2+(n>.85?-1:0)))];
+  }
+  // 火の粉：頭の上から昇って消える
+  const w=x1-x0+1;
+  for(let k=0;k<5;k++){ const h=ihash(k*31+seed,7), sp=10+h%9, ph=((t*sp+h%23)%22);
+    const X=x0+((h>>3)%w), Y=Math.round(y0+2-ph); if(Y<0||Y>=N||X<0||X>=N) continue;
+    const i=Y*N+X; if(!(u[i]>>>24)||D[i]!==255) u[i]=ph<14?RAGE_U.ember:RAGE_U.aura[1]; }
+  // 目：上の方の明るく鮮やかなドットの小さな塊
+  const yEye=y0+hgt*.68, eyes=[];
+  for(let Y=y0;Y<=yEye&&Y<N;Y++) for(let X=x0;X<=x1;X++){ const i=Y*N+X, c=u[i]; if(!(c>>>24)||D[i]!==255) continue;
+    const r=c&255,g=(c>>8)&255,b=(c>>16)&255, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+    if((mx>140 && (mx-mn)/mx>.42) || (r>90 && r>g+35 && r>b+60)) eyes.push(i); }   // 鮮やかな色か、琥珀・橙（ヴェラの目など）
+  if(eyes.length && eyes.length<=Math.max(10,w*hgt*.04)){
+    for(const i of eyes){ const X=i%N, Y=(i/N)|0;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=X+dx, yy=Y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const k=yy*N+xx;
+        if(D[k]===255&&u[k]>>>24) u[k]=mixU(u[k],RAGE_U.glow,.45+.25*p); } }
+    for(const i of eyes) u[i]=p>.55&&(i&1)?RAGE_U.eyeHot:RAGE_U.eye;
+  }
+  CAVE.rageLast={eyes:eyes.length, t};                                // テスト用
+}
+CAVE.rageFx=true;
 function enemy(e,sx,sy,R){
   const r=renderFoe(e); if(!r) return false;
   const {N,face,mid,k,fam,arch}=r, ps=TS/Q*(r.px||1);   // r.px：ヴェラは主人公と同じ細かさ（半分のドット）
@@ -3982,6 +4046,8 @@ function enemy(e,sx,sy,R){
   const W2=N*ps;
   /* 見えている絵の上端・下端・幅（画面のpx、(sx,sy) から）。大きく描くボスの頭上の帯・名前・影を絵に合わせるのに使う */
   if(x1>=0) e._vis={top:(y0-cyA)*ps, bot:(y1+1-cyA)*ps, w:(x1-x0+1)*ps};
+  if(e.rage && !e.dead && CAVE.rageFx!==false)
+    rageFx(N,u,(performance.now()-T0)/1000,x0,y0,x1,y1,(e.uid||0)%97);   // 激昂：赤い輪郭の明滅・オーラ・目の光
   ctx.save(); ctx.imageSmoothingEnabled=false;
   ctx.translate(Math.round(sx), Math.round(sy));
   if(face<0) ctx.scale(-1,1);
