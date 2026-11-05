@@ -4145,25 +4145,73 @@ function veraMorphDraw(e,t,m){
   }
   return [X0+VERA2.ax-PT.ox, Y0+VERA2.ay-PT.oy];
 }
-/* 床の石が浮いて、弧を描いて胸へ吸い寄せられる。enemy() が見えている形を測ったあとに SPR へ足す */
-function veraMorphStones(N,u,m,ax,ay){
-  const F=BOSS_FORM_FX, n=34, cx=ax, cy=ay-(VERA2.ay-40);      // 目の位置
-  const t0=F.rise[0]-.1, t1=F.grow[1]-.25;
-  const dark=0xff242018>>>0, mid=0xff6b6b5d>>>0, hi=0xffadb09f>>>0;   // ABGR
-  const put=(x,y,c)=>{ x=Math.round(x); y=Math.round(y); if(x>=0&&y>=0&&x<N&&y<N) u[y*N+x]=c; };
-  for(let i=0;i<n;i++){
-    const a=i*2.399+.7, rad=34+vmHash(i,1,5)*36, s=t0+.3+(i/n)*(t1-t0-.6)+vmHash(i,2,5)*.12, dur=.42+vmHash(i,3,5)*.3;
-    const gx=cx+Math.cos(a)*rad, gy=ay+12+Math.sin(a)*rad*.42;  // 床（第一形態の足元の高さのまわり）
-    if(m<s-.3 || m>s+dur) continue;
-    let x,y;
-    if(m<s){ x=gx+((((m*40)|0)+i)%2?.5:-.5); y=gy; }           // 震える
-    else { const p=(m-s)/dur, q=p*p; x=gx+(cx-gx)*q; y=gy+(cy-gy)*q-Math.sin(p*Math.PI)*(10+vmHash(i,4,5)*14);
-      put(x-(cx-gx)*.06, y-(cy-gy)*.06+2, ((i+((m*30)|0))%2)?VM_COL.glow:VM_COL.rim); }   // 尾
-    const big=vmHash(i,6,5)>.55;
-    for(let yy=-1;yy<=(big?2:1);yy++) for(let xx=-1;xx<=(big?2:1);xx++) put(x+xx,y+yy,dark);
-    put(x,y,hi); put(x+1,y,mid); put(x,y+1,mid); put(x+1,y+1,mid);
-    if(big){ put(x+1,y,hi); put(x+1,y+1,mid); }
+/* 床の石が浮いて、弧を描いて胸へ吸い寄せられる。enemy() が見えている形を測ったあとに SPR へ足す。
+   2026-11-05 ユーザー指定「吸い上げている石が全て同じサイズなので大中サイズの石と岩も混ぜて欲しい」：
+     小石（2ドット）20・石（4〜5ドット）10・岩（7〜10ドット）6 の3段。形は1つずつ違う（楕円をでこぼこにした塊、
+     左上が明るく右下が暗い。暗い縁取り）。大きいほど遠くから・早めに浮き、重そうにゆっくり低い弧で来て、
+     浮くまでの震えが大きい。床には浮いた高さに合わせて縮む影が残る。岩にはひびが1本入り、真ん中がときどき光る。
+     行き先は目そのものではなく、広がっている石の影の中（来た向きの側）——体の一部になって見えるように。 */
+const VM_STONE_TIERS=[{n:6,r:[3.6,5],rad:[44,70],dur:[.75,.95],lift:[5,9],shake:1.5},
+                      {n:10,r:[2,2.6],rad:[32,66],dur:[.55,.75],lift:[8,16],shake:1},
+                      {n:20,r:[1,1],rad:[26,70],dur:[.42,.65],lift:[10,24],shake:.5}];
+const VM_STONE_CACHE=new Map();
+function vmStoneShape(id,r){
+  let S_=VM_STONE_CACHE.get(id); if(S_) return S_;
+  const rx=r, ry=Math.max(1,r*(.68+vmHash(id,9,1)*.2)), px=[];
+  const R=Math.ceil(rx)+1;
+  for(let y=-R;y<=R;y++) for(let x=-R;x<=R;x++){
+    const ang=Math.atan2(y,x), bump=1+.13*Math.sin(ang*3+id)+.07*Math.sin(ang*5+id*2.3);
+    const q=(x/(rx+.5))**2+(y/(ry+.5))**2; if(q>bump*bump) continue;
+    px.push([x,y]);
   }
+  const has=new Set(px.map(([x,y])=>x+','+y));
+  const out=[];
+  for(const [x,y] of px){
+    const edge=!has.has((x-1)+','+y)||!has.has((x+1)+','+y)||!has.has(x+','+(y-1))||!has.has(x+','+(y+1));
+    const l=(-x/(rx+1))+(-y/(ry+1))*1.3;                  // 左上ほど明るい
+    out.push([x,y, edge?0 : l>.55?3 : l>-.1?2 : 1]);       // 0 縁・1 影・2 中・3 明
+  }
+  S_={px:out, crack: r>3 ? {a:vmHash(id,11,1)*Math.PI, n:Math.round(r*1.2)} : null};
+  VM_STONE_CACHE.set(id,S_); return S_;
+}
+function veraMorphStones(N,u,m,ax,ay){
+  const F=BOSS_FORM_FX, cx=ax, cy=ay-(VERA2.ay-40);      // 目の位置
+  const t0=F.rise[0]-.1, t1=F.grow[1]-.2;
+  const COL=[0xff242018>>>0, 0xff4f5044>>>0, 0xff787a6b>>>0, 0xffadb09f>>>0];   // ABGR：縁 #182024・影 #44504f・中 #6b7a78・明 #9fb0ad
+  const SHADOW=0xff1a1612>>>0;
+  const put=(x,y,c)=>{ x=Math.round(x); y=Math.round(y); if(x>=0&&y>=0&&x<N&&y<N) u[y*N+x]=c; };
+  const sm=x=>{ x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+  const Rg=sm((m-F.grow[0])/(F.grow[1]-F.grow[0]))*(VM_RMAX||80);   // 広がっている影の大きさ
+  const lerp=(a,b,k)=>a+(b-a)*k;
+  VM_STONE_TIERS.forEach((T,ti)=>{
+    for(let j=0;j<T.n;j++){
+      const id=ti*100+j, h=k=>vmHash(id,k,5);
+      const a=j*2.399+ti*1.1+.7, rad=lerp(T.rad[0],T.rad[1],h(1));
+      const early=ti===0 ? .0 : ti===1 ? .15 : .3;                       // 大きいほど早く浮く
+      const span=t1-t0-.35-T.dur[1];
+      const s=t0+.3+early*span*.5+((j+h(2))/T.n)*span*(1-early*.5), dur=lerp(T.dur[0],T.dur[1],h(3));
+      const gx=cx+Math.cos(a)*rad, gy=ay+12+Math.sin(a)*rad*.42;          // 床（第一形態の足元の高さのまわり）
+      const pre=ti===0 ? .45 : .3;
+      if(m<s-pre || m>s+dur) continue;
+      const r=lerp(T.r[0],T.r[1],h(4)), shape=vmStoneShape(id,r);
+      const tx=cx+Math.cos(a)*Math.min(Rg*.4,26), ty=cy+Math.sin(a)*Math.min(Rg*.25,14);   // 影の中、来た側
+      let x,y,z=0;
+      if(m<s){ const k=(m-(s-pre))/pre; x=gx+((((m*40)|0)+j)%2?1:-1)*T.shake*k*.6; y=gy-(k>.8?1:0); }   // 震えて、少し持ち上がる
+      else { const p=(m-s)/dur, q=ti===0 ? p*p*p : p*p;                   // 岩は出だしが重い
+        x=lerp(gx,tx,q); y=lerp(gy,ty,q); z=Math.sin(p*Math.PI)*lerp(T.lift[0],T.lift[1],h(6)); y-=z;
+        if(ti<2){ const back=.08; put(lerp(gx,tx,Math.max(0,q-back)), lerp(gy,ty,Math.max(0,q-back))-z*.9+r, ((j+((m*30)|0))%2)?VM_COL.glow:VM_COL.rim); }   // 尾
+      }
+      // 床の影：浮くほど小さく薄く（網点）
+      if(m>=s){ const p=(m-s)/dur; if(p<.7){ const sr=Math.max(1,r*(1-p)), sx=lerp(gx,tx,p*.5), sy=lerp(gy,ty,p*.3)+r*.6;
+        for(let xx=-Math.ceil(sr);xx<=Math.ceil(sr);xx++){ const w=(xx*xx)/(sr*sr+.5); if(w>1) continue;
+          if(w<.55||((xx+j)&1)===0) put(sx+xx,sy,SHADOW); } } }
+      const flip=ti===1 && m>=s && (((m*8)|0)%2===1);                     // 石は転がる
+      for(const [px,py,c] of shape.px) put(x+(flip?-px:px), y+py, COL[c]);
+      if(shape.crack){ const ca=shape.crack.a, on=((m*10+j)|0)%3===0;      // 岩のひび：暗い筋に、ときどき光が走る
+        for(let i=-shape.crack.n+2;i<=shape.crack.n-2;i++){ const X=x+Math.cos(ca)*i*.5, Y=y+Math.sin(ca)*i*.4+((i&1)?.5:0);
+          put(X,Y, i===0||(on&&Math.abs(i)<=1) ? VM_COL.glow : COL[0]); } }
+    }
+  });
 }
 function renderFoe(e,noFlash){
   if(!canDraw(e)) return null;
