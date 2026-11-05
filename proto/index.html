@@ -16720,12 +16720,17 @@ function draw(){
       ctx.strokeStyle='rgba(127,224,192,'+(1-p)+')'; ctx.lineWidth=3;
       ctx.beginPath(); ctx.arc(f.x*TS-camX,f.y*TS-camY,TS*(0.4+p*2.2),0,7); ctx.stroke();
     }
-    if(f.t==='shock'){          // ボスの叩きつけ（着弾）
-      const p=1-f.life/f.max, bx=f.x*TS-camX, by=f.y*TS-camY, rad=f.r*TS;
-      ctx.fillStyle=rgba(f.col, (1-p)*0.35);
+    if(f.t==='shock'){          // ボスの叩きつけ（着弾）・咆哮・変身・部位破壊の輪
+      /* 2026-11-05 ユーザー指定「発生する円形の衝撃波は消えるまでの尺はそのままで拡がりながら消えていくようにして」：
+         前は出た瞬間から半径 r いっぱいの円で、その場で薄れて消えていた。
+         消えるまでの長さ（life）は同じまま、中心の小さな輪から r の1.1倍まで広がりながら薄れる。
+         広がりは出だしが速く終わりがゆっくり（1-(1-p)²）。面の塗りは輪の内側だけ、輪の線は細くなっていく。 */
+      const p=1-f.life/f.max, bx=f.x*TS-camX, by=f.y*TS-camY;
+      const grow=1-(1-p)*(1-p), rad=f.r*TS*(0.18+0.92*grow), a=1-p;
+      ctx.fillStyle=rgba(f.col, a*a*0.32);
       ctx.beginPath(); ctx.arc(bx,by,rad,0,7); ctx.fill();
-      ctx.strokeStyle=rgba('#ffffff',(1-p)*0.9); ctx.lineWidth=3+(1-p)*4;
-      ctx.beginPath(); ctx.arc(bx,by,rad*(0.85+p*0.2),0,7); ctx.stroke();
+      ctx.strokeStyle=rgba('#ffffff', a*0.9); ctx.lineWidth=1.5+a*5;
+      ctx.beginPath(); ctx.arc(bx,by,rad,0,7); ctx.stroke();
     }
     if(f.t==='cleave'){         // ボスの薙ぎ払い（着弾）
       const p=1-f.life/f.max, bx=f.x*TS-camX, by=f.y*TS-camY, rad=f.r*TS;
