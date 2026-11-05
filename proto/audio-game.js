@@ -41,6 +41,7 @@
   wrap('tickPits',()=>{if(P.fallAnim&&!fellSeen.has(P.fallAnim)){fellSeen.add(P.fallAnim);emit('fall');}});
   wrap('tickDropIn',(_,r,d)=>{if(d&&d.kind!=='portal'&&d.t>=0&&!landSeen.has(d)){landSeen.add(d);emit('land',{variant:d.list.length});sceneAt=performance.now();}},()=>W.dropIn);
   wrap('bossFormRoar',()=>emit('roar'));
+  wrap('bossFormShatter',([e])=>emit('foeHeavy',where(e)));   // 変身の殻が割れる
   wrap('duelPhase',([e],r,old)=>{if(e&&e.roar>0&&!(old>0))emit('roar');},e=>e&&e.roar);
   /* ---------- UIの意味のある音 ----------
      押したボタンの汎用音（選択）より、何が起きたかの音を優先する：買えた／払えた、できなかった、装備した、知らせが出た。

@@ -3674,7 +3674,9 @@ function vera2Draw(e,t){
   const atk=A.atk, strikeLen=atk[2].slice(VERA2.strike).reduce((a,b)=>a+b,0)/1000;
   let f;
   /* 被弾のコマ（体ごと白→赤）は使わない。当たった部位だけを光らせる（下の「被弾の光り」） */
-  if(casting) f=vera2Pick('tele',t,true);
+  const vmT=veraMorphT(e);
+  if(vmT!=null && vmT<BOSS_FORM_FX.pose) f=vera2Pick('tele',t,true);   // 変身の殻が割れてから吠え終わるまで：溜めの構え
+  else if(casting) f=vera2Pick('tele',t,true);
   else if(e._v2Atk!=null && t-e._v2Atk<strikeLen){
     let x=t-e._v2Atk, i=VERA2.strike; while(i<atk[1]-1 && x>=atk[2][i]/1000){ x-=atk[2][i]/1000; i++; } f=atk[0]+i; }
   else if(moving) f=vera2Pick('walk',t,true);
@@ -4046,6 +4048,8 @@ function enemy(e,sx,sy,R){
   const W2=N*ps;
   /* 見えている絵の上端・下端・幅（画面のpx、(sx,sy) から）。大きく描くボスの頭上の帯・名前・影を絵に合わせるのに使う */
   if(x1>=0) e._vis={top:(y0-cyA)*ps, bot:(y1+1-cyA)*ps, w:(x1-x0+1)*ps};
+  { const vm=(caveMid(e)==='vera' && !e.form2) ? veraMorphT(e) : null;
+    if(vm!=null && vm<BOSS_FORM_FX.grow[1] && r.anchor) veraMorphStones(N,u,vm,r.anchor[0],r.anchor[1]); }   // 変身：吸い寄せられる床の石
   if(e.rage && !e.dead && CAVE.rageFx!==false)
     rageFx(N,u,(performance.now()-T0)/1000,x0,y0,x1,y1,(e.uid||0)%97);   // 激昂：赤い輪郭の明滅・オーラ・目の光
   ctx.save(); ctx.imageSmoothingEnabled=false;
@@ -4070,6 +4074,96 @@ function canDraw(e){
   if(!CAVE.on||!e||!e.fam||!e.arch||e.moss||e.intruder) return false;
   const mid=caveMid(e); if(mid==='none') return false; if(mid) return true;
   return !!(BODY[e.fam.id]&&BODY[e.fam.id][e.arch.id]);
+}
+/* ---------- ヴェラの変身（2026-11-05 ユーザー指定「ヴェラが変身する演出を作って欲しい」）----------
+   本編の S.run.formFx（変身のあいだ盤面を止める）の経過時間 m と、index.html の BOSS_FORM_FX の時刻で描く。
+     崩れる（0〜stag）     ：第一形態の被弾のコマ（正面）。最初の一瞬は白く点滅
+     浮く（rise）          ：体が第二形態の目の高さまで持ち上がる。輪郭が青緑に脈打つ
+     組み上がる（grow）    ：目の位置から外へ、第二形態の形が「暗い石の影」として広がる。縁は青緑に光り、
+                             中に光の粒が瞬く。広がりが体を越えると、体は網点で消えていく
+     軋む（grow の後）     ：影が全部そろい、1ドットずつ揺れ、もとの絵の光る所（目・ひび）が明るくなっていく
+     割れる（reveal）〜    ：本来の色の第二形態（vera2Draw）。pose までは溜めの構えで吠える
+   吸い寄せられる床の石は、見えている形の大きさ（e._vis：影・名前の位置）に入れないよう、測ったあとに足す（veraMorphStones）。
+   錨点は第二形態と同じ（[0, ay-feet]）なので、割れた瞬間に絵が跳ねない。 */
+function veraMorphT(e){
+  const f=(typeof S!=='undefined') && S.run && S.run.formFx;
+  return (f && f.e===e && typeof BOSS_FORM_FX!=='undefined') ? f.t : null;
+}
+const VM_COL={glow:0xffdce678>>>0, glowHi:0xffeefff0>>>0, rim:0xffc8d656>>>0};   // ABGR：#78e6dc・#f0ffee・#56d6c8
+const vmHash=(x,y,k)=>{ let h=(x*374761393+y*668265263+k*2147483647)|0; h=(h^(h>>>13))*1274126177|0; return ((h^(h>>>16))>>>0)/4294967296; };
+let VM_RMAX=0;
+function veraMorphDraw(e,t,m){
+  if(!vera2Ready(0) || !vera1Ready()) return null;
+  const F=BOSS_FORM_FX, N=PT.N, u=SPR.u32, white=0xffffffff;
+  const sm=x=>{ x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+  const W2=VERA2.w, H2=VERA2.h, SW2=VERA2.sw, base=VERA2.baseU;
+  const X0=Math.round(PT.ox-VERA2.ax), Y0=Math.round(PT.oy-VERA2.feet);
+  const CX=73, CY=40;                                   // 第二形態の目（ここから組み上がる）
+  if(!VM_RMAX){ for(let y=0;y<H2;y++) for(let x=0;x<W2;x++) if(base[y*SW2+x]>>>24) VM_RMAX=Math.max(VM_RMAX,Math.hypot(x-CX,y-CY)); VM_RMAX+=8; }
+  // ---- 石の影（第二形態の待機の1コマ目を、目からの距離で少しずつ出す） ----
+  const g=sm((m-F.grow[0])/(F.grow[1]-F.grow[0])), R=g*VM_RMAX;
+  const settle=m>=F.grow[1] ? Math.min(1,(m-F.grow[1])/(F.reveal-F.grow[1])) : 0;   // 軋み（0→1）
+  const sh=settle>0 ? (((t*36)|0)%2 ? 1 : -1) : 0;
+  const tk=(t*12)|0;
+  if(R>0) for(let y=0;y<H2;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const row=y*SW2, out=Y*N;
+    for(let x=0;x<W2;x++){ const c=base[row+x]; if(!(c>>>24)) continue; const X=X0+x+sh; if(X<0||X>=N) continue;
+      const d=Math.hypot(x-CX,(y-CY)*1.15)+vmHash(x,y,7)*7;          // 縁をでこぼこに
+      if(d>R) continue;
+      let v;
+      if(d>R-2.5 && g<1) v=(vmHash(x,y,tk)<.5)?VM_COL.glowHi:VM_COL.glow;     // 広がりの縁
+      else {
+        const r=c&255, gg=(c>>8)&255, b=(c>>16)&255;
+        const em=vera2Emis(c>>>0);
+        const k=.22+.18*settle;                                        // 暗い石。軋むほど少し明るく
+        let R_=r*k+8, G_=gg*k+14, B_=b*k+14;
+        if(em){ const q=.25+.75*settle; R_=R_+(r-R_)*q; G_=G_+(gg-G_)*q; B_=B_+(b-B_)*q; }   // 目・ひびが灯る
+        v=(0xff000000|(Math.min(255,B_|0)<<16)|(Math.min(255,G_|0)<<8)|Math.min(255,R_|0))>>>0;
+        if(vmHash(x,y,tk)<.012+.03*settle) v=VM_COL.glow;            // 中で瞬く光の粒
+      }
+      u[out+X]=v; } }
+  // ---- 第一形態（崩れる→浮く→呑まれる） ----
+  const fade=R<14 ? 1 : Math.max(0,1-(R-14)/14);
+  if(fade>0){
+    const A=VERA1.anims, row=Math.max(0,VERA1.dirs.indexOf('front'));
+    let f;
+    if(m<F.stag){ const h=A.hurt; let x=m, i=0; while(i<h[1]-1 && x>=h[2][i]/1000){ x-=h[2][i]/1000; i++; } f=h[0]+i; }
+    else f=A.hurt[0]+A.hurt[1]-1;
+    const rise=sm((m-F.rise[0])/(F.rise[1]-F.rise[0]));
+    const cyBody=Math.round(PT.oy-(VERA2.feet-VERA2.ay) - rise*(VERA2.ay-CY) + (m<F.stag?Math.min(2,m*8):2*(1-rise)) + Math.sin(m*9)*rise);
+    const bx=Math.round(PT.ox-VERA1.ax), by=cyBody-(VERA1.feet+V1_ANCHOR_Y);
+    const flash=m<.16 && ((m*25)|0)%2===0;
+    const pulse=rise>0 && (Math.sin(m*14)>-.2);
+    const SW=VERA1.sw, src=VERA1.u, W1=VERA1.w, H1=VERA1.h, fx=f*W1, fy=row*H1;
+    const isOn=(x,y)=>x>=0&&y>=0&&x<W1&&y<H1&&(src[(fy+y)*SW+fx+x]>>>24);
+    for(let y=0;y<H1;y++){ const Y=by+y; if(Y<0||Y>=N) continue; const r0=(fy+y)*SW+fx, out=Y*N;
+      for(let x=0;x<W1;x++){ const c=src[r0+x]; if(!(c>>>24)) continue; const X=bx+x; if(X<0||X>=N) continue;
+        if(fade<1 && vmHash(x,y,3)>fade) continue;
+        let v=c>>>0;
+        if(flash) v=white;
+        else if(pulse && (!isOn(x-1,y)||!isOn(x+1,y)||!isOn(x,y-1)||!isOn(x,y+1))) v=VM_COL.glow;   // 輪郭が光る
+        u[out+X]=v; } }
+  }
+  return [X0+VERA2.ax-PT.ox, Y0+VERA2.ay-PT.oy];
+}
+/* 床の石が浮いて、弧を描いて胸へ吸い寄せられる。enemy() が見えている形を測ったあとに SPR へ足す */
+function veraMorphStones(N,u,m,ax,ay){
+  const F=BOSS_FORM_FX, n=34, cx=ax, cy=ay-(VERA2.ay-40);      // 目の位置
+  const t0=F.rise[0]-.1, t1=F.grow[1]-.25;
+  const dark=0xff242018>>>0, mid=0xff6b6b5d>>>0, hi=0xffadb09f>>>0;   // ABGR
+  const put=(x,y,c)=>{ x=Math.round(x); y=Math.round(y); if(x>=0&&y>=0&&x<N&&y<N) u[y*N+x]=c; };
+  for(let i=0;i<n;i++){
+    const a=i*2.399+.7, rad=34+vmHash(i,1,5)*36, s=t0+.3+(i/n)*(t1-t0-.6)+vmHash(i,2,5)*.12, dur=.42+vmHash(i,3,5)*.3;
+    const gx=cx+Math.cos(a)*rad, gy=ay+12+Math.sin(a)*rad*.42;  // 床（第一形態の足元の高さのまわり）
+    if(m<s-.3 || m>s+dur) continue;
+    let x,y;
+    if(m<s){ x=gx+((((m*40)|0)+i)%2?.5:-.5); y=gy; }           // 震える
+    else { const p=(m-s)/dur, q=p*p; x=gx+(cx-gx)*q; y=gy+(cy-gy)*q-Math.sin(p*Math.PI)*(10+vmHash(i,4,5)*14);
+      put(x-(cx-gx)*.06, y-(cy-gy)*.06+2, ((i+((m*30)|0))%2)?VM_COL.glow:VM_COL.rim); }   // 尾
+    const big=vmHash(i,6,5)>.55;
+    for(let yy=-1;yy<=(big?2:1);yy++) for(let xx=-1;xx<=(big?2:1);xx++) put(x+xx,y+yy,dark);
+    put(x,y,hi); put(x+1,y,mid); put(x,y+1,mid); put(x+1,y+1,mid);
+    if(big){ put(x+1,y,hi); put(x+1,y+1,mid); }
+  }
 }
 function renderFoe(e,noFlash){
   if(!canDraw(e)) return null;
@@ -4105,9 +4199,15 @@ function renderFoe(e,noFlash){
   else if(mid==='eye') eye(p,t,e);
   else if(mid==='vera'){
     PT.ox=N/2; PT.oy=N-8;
-    const an2=!e.form2 ? vera2Draw(e,t) : null;          // 第二形態は新しい絵（被弾の光りはコマに入っている）
+    const vm=!e.form2 ? veraMorphT(e) : null;            // 変身の途中（割れるまで）は veraMorphDraw
+    const an2=!e.form2 ? ((vm!=null && vm<BOSS_FORM_FX.reveal && veraMorphDraw(e,t,vm)) || vera2Draw(e,t)) : null;   // 第二形態は新しい絵（被弾の光りはコマに入っている）
     const an1=e.form2 ? vera1Draw(e,t) : null;           // 第一形態は4方向の新しい絵（読めるまでは古い絵）
     const an=an2||an1||veraDraw(e,t);
+    if(vm!=null && vm>=BOSS_FORM_FX.reveal && vm<BOSS_FORM_FX.reveal+.16){   // 変身：殻が割れた瞬間に白く光って、本来の色へ戻る
+      const k=1-(vm-BOSS_FORM_FX.reveal)/.16, u=SPR.u32;
+      for(let i=0;i<u.length;i++){ const c=u[i]; if(!c) continue;
+        const r=c&255, g=(c>>8)&255, b=(c>>16)&255;
+        u[i]=(0xff000000|((b+(255-b)*k)<<16)|((g+(255-g)*k)<<8)|(r+(255-r)*k|0))>>>0; } }
     if(!an2 && !noFlash && e.hit>0 && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
     SPR.cx.putImageData(SPR.id,0,0);
     /* 第一形態の正面・背面の絵は左右反転しない（射撃の形が左右で違う）。横の向きは vera1Draw が狙い・歩く向きで決める */

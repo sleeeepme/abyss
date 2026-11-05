@@ -765,9 +765,9 @@ R.formChangeFreezesThenRoars = await pg.evaluate(()=>{
   const heldStill = Math.abs(P.x-px)+Math.abs(P.y-py)<1e-6
                  && Math.abs(e.x-ex)+Math.abs(e.y-ey)<1e-6;
   const stillFrozen = !!S.run.formFx;
-  stepSim(0.4);                       // 咆哮の頃
+  stepSim(BOSS_FORM_FX.roarAt);       // 咆哮の頃（2026-11-05 変身の演出で約3.6秒に延びた。時刻は表から読む）
   const roared = !S.run.formFx || S.run.formFx.roared===true;
-  stepSim(1.4);                       // 明ける
+  stepSim(BOSS_FORM_FX.dur);          // 明ける
   const resumed = !S.run.formFx;
   const stillAlive = !e.dead;
   return {froze, heldStill, stillFrozen, roared, resumed, stillAlive,

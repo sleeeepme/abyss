@@ -913,6 +913,7 @@ function tapDash(cx,cy){
       const row=W.fl.g[Math.floor(y+oy)],t=row?.[Math.floor(x+ox)];
       return t===undefined||t===T.WALL||t===T.PIT;
     })) break;
+    if(typeof vera2Blocked==='function'&&vera2Blocked(x,y)) break;   // ヴェラ第二形態の絵の中へは突っ込まない（抜けもしない）
     gx=x;gy=y;
   }
   if(Math.hypot(gx-P.x,gy-P.y)<.12) return false;
