@@ -20,7 +20,7 @@
      遠い敵ほど小さく（where の距離）。たくさんの敵が同時に振っても、音ごとの間隔（cooldown）で間引かれる。 */
   const FOE={swing:'foeSwing',shot:'foeShot',bow:'foeBow',lunge:'foeLunge'};
   wrap('feelFoeAttack',([e,kind])=>{const id=FOE[kind];if(id)emit(id,where(e));});
-  const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam'};
+  const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam',tentacle:'foeCleave',grab:'foeLunge',ink:'foeShot',pinch:'foeSwing',bubble:'foeShot',roll:'foeLunge'};
   wrap('resolveBossMove',([e],r,id)=>{const s=BOSS_SFX[id];if(s)emit(s,where(e));},e=>e&&e.cast&&e.cast.id);
   wrap('zakoBurst',([e])=>emit('foeHeavy',where(e)));
   wrap('tapDash',(_,success)=>{if(success)emit('dash');});

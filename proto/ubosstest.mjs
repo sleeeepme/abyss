@@ -144,7 +144,7 @@ R.allMovesFire = await pg.evaluate(()=>{
   const all=Object.keys(BOSS_MOVES);
   const missing=all.filter(id=>!fired.has(id));
   return {all, missing, threw, count:all.length,
-          ok: threw===null && missing.length===0 && all.length===9};
+          ok: threw===null && missing.length===0 && all.length===15};   // 9 ＋ ブレヒトの中身の技6つ（2026-11-06）
 });
 
 /* 2-b. 落石は**溜めの時点で**落ちる場所が決まっている。

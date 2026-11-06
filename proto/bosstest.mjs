@@ -176,7 +176,7 @@ R.arenaAware = await pg.evaluate(()=>{
 
 /* --- 12. 第20階層の双子は先に倒した方では終わらない。
    片方を倒しても：確定ドロップは出ない・恩寵は出ない・階段は解禁されない。
-   代わりに残った方の攻撃が速くなる（teleMul低下・ms上昇）。
+   代わりに残った方が合体して第3形態になる（teleMul低下・ms上昇。2026-11-06 ブレヒトの三つの形）。
    両方倒して初めて、通常のボス撃破処理が1回だけ流れる。 */
 R.twinSequential = await pg.evaluate(()=>{
   S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
@@ -192,7 +192,8 @@ R.twinSequential = await pg.evaluate(()=>{
     drops:W.drops.length, bossStillAlive: S.run.bossAlive===true,
     boonNotShownYet: !document.getElementById('m-boon').classList.contains('on'),
     t1Dead:t1.dead, t2Alive:!t2.dead,
-    teleFaster: t2.teleMul<teleBefore, msFaster: t2.ms>msBefore};
+    // 2026-11-06：20階の双子（打ち直しのブレヒト）は、片方を倒すと残った方に合体する（BRECHT.merge）。溜めが短く、速くなる
+    teleFaster: t2.teleMul<teleBefore, msFaster: t2.ms>msBefore, merged: !!(t2.brecht && t2.brecht.merged)};
   t2.hp=1; killEnemy(t2);
   stepSim(10);   // 撃破演出（1.15秒）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
   const afterSecond = {
@@ -204,7 +205,7 @@ R.twinSequential = await pg.evaluate(()=>{
           buffedOnFirst: afterFirst.teleFaster && afterFirst.msFaster,
           rewardOnSecond: afterSecond.drops>0 && afterSecond.bossCleared && afterSecond.boonShown,
           ok: bothTwins && afterFirst.drops===0 && afterFirst.bossStillAlive && afterFirst.boonNotShownYet
-              && afterFirst.teleFaster && afterFirst.msFaster
+              && afterFirst.teleFaster && afterFirst.msFaster && afterFirst.merged
               && afterSecond.drops>0 && afterSecond.bossCleared && afterSecond.boonShown};
 });
 
