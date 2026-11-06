@@ -7637,7 +7637,7 @@ function bossFormShatter(e){
     feelSpray(e.x, e.y+1.8, '#9a907c', 24, 2.2, 'dust');  // 足元の土煙
   }
 }
-/* 咆哮。三重の輪を外へ抜けさせ、画面を揺らし、塵を外向きに散らす。音（roar）は audio-game.js が包んで鳴らす */
+/* 咆哮。三重の輪を外へ抜けさせ、画面を揺らし、塵を外向きに散らす。音（roar）は audio-game.js が包んで鳴らす。名前の帯は出さない */
 function bossFormRoar(e){
   if(!e || e.dead) return;
   [[2.2,0.55],[4.4,0.52],[7.0,0.50]].forEach(([r,life])=>{
@@ -7645,7 +7645,8 @@ function bossFormRoar(e){
   });
   if(typeof feelKick==='function') feelKick(7.5, 0.42);
   if(typeof feelSpray==='function') feelSpray(e.x, e.y, e.col||'#cfd6e4', 46, 3.4);
-  if(e.revealed) showBanner(e.name, '石が起き上がった', e.col||'#cfd6e4', 2.4);
+  /* 名前と説明の帯（「礫の狩人、ヴェラ」「石が起き上がった」）は出さない（2026-11-06 ユーザー指定
+     「ヴェラが変身した際に出るボス名と説明テキストを無くしたい」）。変身の絵と咆哮だけで見せる。 */
 }
 /* 画面の寄り（0〜1）。崩れてから組み上がるまで寄っていき、咆哮で戻る */
 function bossFormZoomK(t){
