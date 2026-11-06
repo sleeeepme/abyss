@@ -6464,6 +6464,32 @@ function outfitForBeacon(h, depth){
   h.hpNow = stats(h).maxHp;
   return (given.lv || given.gear.length || given.potentials) ? given : null;
 }
+/* 仲間も同じ下駄を履かせる（2026-11-06 ユーザー報告「デバッグで10階から仲間4人を連れてヴェラ戦に行ったら味方がワンパンされる」）。
+   仲間は加入した時点の主人公のレベルと階で作られる。拠点で雇ってから中継地点へ飛ぶと、主人公だけが
+   引き上げられて、仲間は Lv1・1階の装備のまま10階に立っていた（最大HP 44〜73、ヴェラの矢1発で倒れる）。
+   引き上げ先は、主人公の支給レベルから仲間の差（ALLY_LV_GAP の真ん中＝2）を引いたところ。
+   装備は加入時と同じ階の割合（depth×0.8）まで。白・緑（Uncommon 以下）で低い物だけを同じ種類で作り直す。
+   Rare 以上・高い物は触らない（自分で渡した良い装備を上書きしない）。下回っているぶんだけ。 */
+function outfitAlliesForBeacon(depth){
+  if(!S.hero || depth<=1) return 0;
+  const want = Math.max(1, beaconLevel(depth) - Math.round((ALLY_LV_GAP[0]+ALLY_LV_GAP[1])/2));
+  const ilvl = clamp(Math.round(depth*0.8), 1, 60);
+  let n=0;
+  for(const a of party()){
+    let up=false;
+    if(a.lv < want){ const gain=want-a.lv; a.lv=want; a.xp=0; a.str+=gain; a.dex+=gain; a.vit+=gain; up=true; }
+    const j=jobDef(a.job);
+    for(const [slot, base] of [['weapon', j.weapon], ['armor', j.armor], ['shield', j.shield]]){
+      if(!base) continue;
+      const cur=a.equip[slot];
+      if(cur && (cur.rar>ALLY_RAR_MAX || (cur.ilvl||0)>=ilvl)) continue;
+      a.equip[slot]=genBaseItem(cur ? cur.base : base, ilvl, ALLY_RAR_MAX); up=true;
+    }
+    a.hpNow = allyStats(a).maxHp;
+    if(up) n++;
+  }
+  return n;
+}
 /* ---------- 名前と、その先の代 ----------
    名前を1回だけ聞くのは、そこが愛着の入口だから。
    死んだら別人になるが、**名前は受け継がれる**（二代目・三代目…）。
@@ -8694,6 +8720,8 @@ function startRun(depth){
   S.deathAdBonus = 0;             // 死亡時の広告ぶんは持ち越さない
   // 中継地点から始めるなら、歩かずに来たぶんの装備を支給する
   const kit = outfitForBeacon(S.hero, beaconKitDepth(d));
+  const kitAllies = outfitAlliesForBeacon(beaconKitDepth(d));
+  if(kitAllies) log('<i class="pi pi-tent"></i> 中継地点の支給：仲間 '+kitAllies+'人を Lv.'+Math.max(1, beaconLevel(beaconKitDepth(d))-2)+' まで・装備を階に合わせた');
   if(kit){
     const parts=[];
     if(kit.lv) parts.push('Lv.'+S.hero.lv+' まで引き上げ');
@@ -12048,7 +12076,14 @@ function allyAttack(a, st, tgt){
 }
 
 /* 仲間の被弾。主人公と違って盾のパリイは無い（構える操作を持たないので）。 */
-function hitAlly(a, e, boltDmg, dmgType, boltLv){
+/* ---------- ボスの一撃は仲間の最大HPの3割まで ----------
+   2026-11-06 ユーザー指定「（仲間が）3発くらいは耐えたい」。
+   ボスの強さは主人公（避ける・回復する・HPが多い）に合わせてある。10階に見合った仲間でも、
+   重騎士以外はヴェラの矢2発（1発で最大HPの56〜79%）、叩きつけ・貫きなら1発で倒れていた（主人公は1発31〜41%）。
+   ボス（e.boss）から仲間に入る1発は、仲間の最大HPの ALLY_BOSS_HIT_CAP までに抑える＝どの職でも3発は立っている。
+   重騎士のように元から小さい一撃はそのまま（上限に届かない）。雑魚・精鋭・状態異常の継続ダメージは変えない。 */
+const ALLY_BOSS_HIT_CAP = 0.30;
+function hitAlly(a, e, boltDmg, dmgType, boltLv, from){
   if(!a || a.dead) return;
   const j = jobDef(a.job);
   // 回避。盗賊はここが本体で、薄い装備のまま前に出られる理由になっている。
@@ -12091,6 +12126,7 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv){
      そうなると「当たっているのに何も起きない」＝実質無敵になる。
      重装のジョブが低レベルのボスに完全耐性を持つ、といった事故がここで起きていた。 */
   dm = Math.max(1, dm);
+  if((e && e.boss) || (from && from.boss)) dm = Math.min(dm, Math.max(1, Math.floor(st.maxHp*ALLY_BOSS_HIT_CAP)));   // ボスの一撃は3割まで
   if(st.allyDR) dm=Math.max(1, Math.round(dm*(1-st.allyDR/100)));                 // 専用技・聖盾
   if(S.run && S.run.ward) dm=Math.max(1, Math.round(dm*(1-S.run.ward.cut/100)));   // 大技「守護」
   if(st.allyThorns && e && !e.dead){                                               // 「反撃」
@@ -12774,7 +12810,7 @@ function enemyUpdate(e,dt){
         feelFoeAttack(e, a.range>3 ? (BA&&BA.pre==='bv' ? 'bow' : 'shot') : 'swing');   // 効果音（audio-game.js が拾う）
         if(a.range>3){ // 遠距離: 弾
           W.fx.push({t:'bolt',x:e.x,y:e.y,vx:dx/d*7.5,vy:dy/d*7.5,life:1.6,
-                     dmg:e.atkV, lv:e.lv, dt:e.dt,
+                     dmg:e.atkV, lv:e.lv, dt:e.dt, from:e,         // from：撃った者（仲間に当たったときボスの上限を見る）
                      artId:BA&&BA.pre==='bv'?'bv_arrow':undefined, artKind:BA&&BA.kind});
         }else{
           // 灰の大蛙の通常攻撃は舌。届く所まで伸ばして引っ込める（当たりは下の通り）
@@ -15130,10 +15166,10 @@ function update(dt){
       if(solid(f.x,f.y)) return false;
       // 敵の弾は当たった者に入る。仲間が前に出ていれば仲間が受ける。
       if(npcAwake() && Math.hypot(f.x-W.npc.x,f.y-W.npc.y)<0.45){
-        hitAlly(W.npc,null,f.dmg,f.dt,f.lv); return false;
+        hitAlly(W.npc,null,f.dmg,f.dt,f.lv,f.from||f.bsrc); return false;
       }
       for(const a of livingParty()){
-        if(Math.hypot(f.x-a.x,f.y-a.y)<0.45){ hitAlly(a,null,f.dmg,f.dt,f.lv); return false; }
+        if(Math.hypot(f.x-a.x,f.y-a.y)<0.45){ hitAlly(a,null,f.dmg,f.dt,f.lv,f.from||f.bsrc); return false; }
       }
       if(Math.hypot(f.x-P.x,f.y-P.y)<0.45){ duelBoltSrc=f.bsrc||null; try{ hitPlayer(null,f.dmg,f.dt,f.lv); } finally{ duelBoltSrc=null; } return false; }
     }
