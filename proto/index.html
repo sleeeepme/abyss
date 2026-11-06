@@ -7614,7 +7614,7 @@ function partHit(e, dmg, sx, sy, p){
      2.25 軋む：石の影が全部そろい、小刻みに揺れて、ひびが明るくなる
      2.45 割れる：白く光って殻が弾け、石の欠片が外へ飛び、本来の色の第二形態が現れる。三重の衝撃波が広がる
      2.95 咆哮（2026-11-06 ユーザー指定「変身した後の衝撃波が出た後に咆哮をして欲しい。効果線もしくは空気の歪みのような表現を」）：
-          衝撃波が抜けてから吠える。口元（目の高さ）から外へ走る効果線と、空気が歪んで広がる輪（W.fx 'roar'、drawRoarFx）。
+          衝撃波が抜けてから吠える。口元（目の高さ）から画面が放射状に歪む（さざ波＋ブレ。W.fx 'roar'、drawRoarFx）。
           吠えているあいだ画面が小刻みに揺れ続ける。溜めの構えのまま。寄りは吠え終わってから戻る
      4.30 戦闘へ戻る
    絵の側（石の影の広がり・浮く体・吸い寄せられる石）は cave-look.js の veraMorphDraw が、この表の時刻で描く。
@@ -7642,7 +7642,7 @@ function bossFormShatter(e){
     feelSpray(e.x, e.y+1.8, '#9a907c', 24, 2.2, 'dust');  // 足元の土煙
   }
 }
-/* 咆哮。衝撃波が抜けたあとに吠える：口元から外へ走る効果線と空気の歪み（drawRoarFx）、揺れ、塵。
+/* 咆哮。衝撃波が抜けたあとに吠える：口元から画面が放射状に歪む（drawRoarFx）、揺れ、塵。
    音（roar）は audio-game.js が包んで鳴らす。名前の帯は出さない */
 function bossFormRoar(e){
   if(!e || e.dead) return;
@@ -7653,49 +7653,43 @@ function bossFormRoar(e){
   /* 名前と説明の帯（「礫の狩人、ヴェラ」「石が起き上がった」）は出さない（2026-11-06 ユーザー指定
      「ヴェラが変身した際に出るボス名と説明テキストを無くしたい」）。変身の絵と咆哮だけで見せる。 */
 }
-/* 咆哮の絵。世界を描き終える直前（主人公・数字のあと）に重ねる。
-   ・空気の歪み：口元から3本の輪が時間差で広がる。輪の帯の中だけ、いま描いた画面を口元を中心に少し拡大して写し直す
-     （レンズのように外へ押し出されて見える）。広がるほど弱く。キャンバスを自分自身に描くので、端末の画素で行う。
-   ・効果線：口元の少し外から放射状に走る白い細い楔。0.05秒ごとに本数・角度・長さを引き直してちらつかせる。
-     前半だけ（life の 75% まで）。動きを減らす設定では、歪みを出さず効果線だけを薄く出す。 */
+/* 咆哮の絵。世界を描き終える直前（主人公・数字のあと、HUD の前）に、いま描いた画面そのものを歪ませる。
+   2026-11-06 ユーザー指定「効果線が安っぽいので、画面を放射状に歪ませるような表現はできないか」で、白い効果線をやめた。
+   ・放射状のさざ波：口元から外へ走る波。口元を中心にした細い輪の帯ごとに、画面を少しだけ拡大・縮小して写し直す
+     （拡大率を半径と時間の sin で揺らす＝輪が外へ押し出されては戻る。空気の圧が走って見える）。
+     口元の近くと遠くは弱く、波の先頭（速さ ROAR_RIP.speed）より外は揺らさない。
+   ・放射状のブレ：口元を中心に少しずつ大きくした画面を薄く重ねる（ズームブラー）。中心は動かず、外ほど流れる。
+   どちらも出だし0.08秒で立ち上がり、終わりへ向けて弱まる。キャンバスを自分自身に描くので端末の画素で行い、
+   ドットをぼかさない。動きを減らす設定では出さない。 */
+const ROAR_RIP = {amp:0.04, wave:2.0, speed:11, band:0.42, r0:1.0, r1:10.0, blur:5, blurAmt:0.07};
 function drawRoarFx(f, camX, camY){
-  const p=1-f.life/f.max, t=p*f.max, cx=f.x*TS-camX, cy=f.y*TS-camY;
-  const reduced=typeof FEEL_REDUCED!=='undefined' && FEEL_REDUCED.matches;
-  const hash=(a,b)=>{ let h=(a*374761393+b*668265263)|0; h=(h^(h>>>13))*1274126177|0; return ((h^(h>>>16))>>>0)/4294967296; };
-  // 空気の歪み
-  if(!reduced){
-    const m=ctx.getTransform(), c=m.transformPoint(new DOMPoint(cx,cy)), k=Math.hypot(m.a,m.b), cv=ctx.canvas;
-    ctx.save(); ctx.setTransform(1,0,0,1,0,0);
-    for(let i=0;i<3;i++){
-      const q=(t-i*0.17)/0.62; if(q<0 || q>1) continue;
-      const R=TS*k*(0.9+8.0*(1-(1-q)*(1-q))), w=TS*k*(0.55+0.5*q), s=1+0.05*(1-q);
-      ctx.save();
-      ctx.beginPath(); ctx.arc(c.x,c.y,R+w/2,0,Math.PI*2); ctx.arc(c.x,c.y,Math.max(0,R-w/2),0,Math.PI*2,true); ctx.clip();
-      ctx.globalAlpha=0.9*(1-q*0.7); ctx.imageSmoothingEnabled=false;   // ドットをぼかさない
-      ctx.translate(c.x,c.y); ctx.scale(s,s); ctx.translate(-c.x,-c.y);
-      ctx.drawImage(cv,0,0);
-      ctx.restore();
-      ctx.strokeStyle='rgba(255,255,255,'+(0.16*(1-q))+')'; ctx.lineWidth=Math.max(1,k*1.5);
-      ctx.beginPath(); ctx.arc(c.x,c.y,R+w/2,0,Math.PI*2); ctx.stroke();
-    }
+  if(typeof FEEL_REDUCED!=='undefined' && FEEL_REDUCED.matches) return;
+  const t=(1-f.life/f.max)*f.max, R_=ROAR_RIP;
+  const sm=x=>{ x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+  const E=Math.min(1,t/0.08)*(1-sm((t-0.25)/(f.max-0.25)));
+  if(!(E>0.01)) return;
+  const cx=f.x*TS-camX, cy=f.y*TS-camY;
+  const m=ctx.getTransform(), c=m.transformPoint(new DOMPoint(cx,cy)), k=Math.hypot(m.a,m.b), cv=ctx.canvas, U=TS*k;   // U：1マスの端末画素
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=false;
+  // 放射状のさざ波
+  const front=R_.r0+t*R_.speed;
+  for(let r=R_.r0; r<Math.min(R_.r1, front); r+=R_.band){
+    const mid=r+R_.band/2;
+    const fall=sm((mid-R_.r0)/1.2)*(1-sm((mid-(R_.r1-3))/3))*sm((front-mid)/1.5);
+    const s=1+R_.amp*E*fall*Math.sin((mid/R_.wave - t*R_.speed/R_.wave)*Math.PI*2);
+    if(Math.abs(s-1)<0.002) continue;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(c.x,c.y,(r+R_.band)*U,0,Math.PI*2); ctx.arc(c.x,c.y,r*U,0,Math.PI*2,true); ctx.clip();
+    ctx.translate(c.x,c.y); ctx.scale(s,s); ctx.translate(-c.x,-c.y);
+    ctx.drawImage(cv,0,0);
     ctx.restore();
   }
-  // 効果線
-  const lp=p/0.75; if(lp>=1) return;
-  const fr=Math.floor((performance.now()/1000)/0.05), n=44;
-  ctx.save(); ctx.fillStyle='#ffffff';
-  for(let i=0;i<n;i++){
-    const h1=hash(fr,i), h2=hash(fr,i+97), h3=hash(fr,i+211);
-    if(h1<0.3) continue;
-    const a=(i/n)*Math.PI*2+(h2-0.5)*0.12;
-    const r0=TS*(1.9+h2*1.0+lp*1.2), r1=r0+TS*(2.2+h3*5.5), w=TS*(0.05+h1*0.09);
-    const ca=Math.cos(a), sa=Math.sin(a);
-    ctx.globalAlpha=(reduced?0.3:0.65)*(1-lp)*(0.5+h3*0.5);
-    ctx.beginPath();
-    ctx.moveTo(cx+ca*r0-sa*w, cy+sa*r0*0.82+ca*w);
-    ctx.lineTo(cx+ca*r0+sa*w, cy+sa*r0*0.82-ca*w);
-    ctx.lineTo(cx+ca*r1, cy+sa*r1*0.82);
-    ctx.closePath(); ctx.fill();
+  // 放射状のブレ
+  for(let i=1;i<=R_.blur;i++){
+    const s=1+R_.blurAmt*E*i/R_.blur;
+    ctx.globalAlpha=0.32*E*(1-(i-1)/R_.blur);
+    ctx.setTransform(s,0,0,s,c.x*(1-s),c.y*(1-s));
+    ctx.drawImage(cv,0,0);
   }
   ctx.restore();
 }
@@ -16989,7 +16983,7 @@ function draw(){
   // 閃きの電球（ピコーン！）。数字より上に出す
   for(const f of W.fx) if(f.t==='flashbulb' && f.life>0) drawFlashBulb(f, camX, camY);
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
-  for(const f of W.fx) if(f.t==='roar' && f.life>0) drawRoarFx(f, camX, camY);   // ヴェラの咆哮：効果線と空気の歪み（主人公も歪む）
+  for(const f of W.fx) if(f.t==='roar' && f.life>0) drawRoarFx(f, camX, camY);   // ヴェラの咆哮：画面を放射状に歪ませる（主人公も歪む）
   _drawStage='空気';
   drawAir(Z, _drawDt);
   _drawStage='カメラ復帰';
