@@ -834,10 +834,111 @@ function feelCharacterSpritePose(ent,blob=false){
   const breath=Math.sin(FEEL.time*Math.PI*2/FEEL_TUNING.characterIdleSeconds+m.idlePhase)>.55;
   return {upperY:breath?-1:1,leftLegY:0,rightLegY:0,moving:false};
 }
+
+/* 敵の表面照明。元絵・アニメの現在コマと同じグリッドに法線を作る。
+   キャラを追加しても同じ入口を通る。視界・当たり判定・敵AIは変更しない。 */
+const FEEL_ENEMY_SURFACE=window.FEEL_ENEMY_SURFACE={
+  on:new URLSearchParams(location.search).get('surface')!=='off',
+  maxFrames:256,maxPixels:360000,hz:15,
+  stats:{builds:0,hits:0,shades:0,pixels:0,entries:0,ms:0}
+};
+const feelSurfaceFrames=new Map(),feelSurfaceStates=new WeakMap(),feelSurfaceImages=new WeakMap(),feelSurfaceShapes=new Map();
+function feelEnemySurfaceOn(e){
+  return FEEL_ENEMY_SURFACE.on&&!!window.AbyssSurfaceLight&&!!window.PixelArtLighterCore&&
+    !!e&&e!==P&&!!e.arch&&!!e.fam&&e.hpNow===undefined;
+}
+function feelSurfaceEnvironment(e,x=e.x,y=e.y){
+  if(window.CAVE&&CAVE.on&&typeof CAVE.surfaceLighting==='function'){
+    const sample=CAVE.surfaceLighting(x,y);if(sample)return sample;
+  }
+  const range=Math.min(8,W.fl?.zone?.lightR||7),d=Math.hypot(x-P.x,y-P.y);
+  const visible=typeof losClear!=='function'||losClear(P.x,P.y,x,y);
+  return {ambient:.38,lights:visible&&d<range?[{x:P.x,y:P.y,radius:range,power:1.9*(1-d/range),z:.85,color:[255,230,195]}]:[]};
+}
+function feelShadeEnemyFrame(e,id,face=1,options={}){
+  if(!feelEnemySurfaceOn(e)||e.dead||e.hit>0||e.fallAnim)return id;
+  if(typeof enemyLit==='function'&&enemyLit(e)!=='lit')return id;
+  const begin=performance.now(),C=FEEL_ENEMY_SURFACE,stats=C.stats,w=id.width,h=id.height,src=id.data;
+  let [x0,y0,x1,y1]=options.bounds||[0,0,w,h];
+  x0=Math.max(0,Math.floor(x0));y0=Math.max(0,Math.floor(y0));x1=Math.min(w,Math.ceil(x1));y1=Math.min(h,Math.ceil(y1));
+  if(!options.bounds){
+    x0=w;y0=h;x1=y1=0;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(src[(y*w+x)*4+3]){x0=Math.min(x0,x);x1=Math.max(x1,x+1);y0=Math.min(y0,y);y1=Math.max(y1,y+1);}
+  }
+  const cw=x1-x0,ch=y1-y0;if(cw<=0||ch<=0)return id;
+  let hash=2166136261,hash2=5381,emissionHash=0;
+  const crop=new Uint8ClampedArray(cw*ch*4);
+  for(let y=0;y<ch;y++){
+    crop.set(src.subarray(((y+y0)*w+x0)*4,((y+y0)*w+x1)*4),y*cw*4);
+    for(let x=0;x<cw;x++){
+      const i=(y*cw+x)*4;const v=crop[i+3]?((crop[i]|crop[i+1]<<8|crop[i+2]<<16|crop[i+3]<<24)>>>0):0;
+      hash=Math.imul(hash^v,16777619);hash2=(Math.imul(hash2,33)^v)>>>0;
+      if(options.emissive?.[(y+y0)*w+x+x0])emissionHash=(Math.imul(emissionHash,33)^((y*cw+x)+1))>>>0;
+    }
+  }
+  const key=cw+','+ch+','+(hash>>>0)+','+hash2;
+  let entry=feelSurfaceFrames.get(key);
+  if(entry){feelSurfaceFrames.delete(key);feelSurfaceFrames.set(key,entry);stats.hits++;}
+  else{
+    const prepared=AbyssSurfaceLight.generate(cw,ch,crop);
+    entry={key,prepared,pixels:cw*ch};feelSurfaceFrames.set(key,entry);stats.builds++;stats.pixels+=entry.pixels;
+    while(feelSurfaceFrames.size>C.maxFrames||stats.pixels>C.maxPixels){const first=feelSurfaceFrames.keys().next().value;if(first===key)break;stats.pixels-=feelSurfaceFrames.get(first).pixels;feelSurfaceFrames.delete(first);}
+    stats.entries=feelSurfaceFrames.size;
+  }
+  const tile=options.pixelTiles||1/16,anchor=options.anchor||[w/2,h/2],ax=anchor[0],ay=anchor[1];
+  const wx=options.worldX??e.x,wy=options.worldY??e.y,env=feelSurfaceEnvironment(e,wx,wy);
+  const lights=env.lights.map(l=>({x:ax+(l.x-wx)/tile*face-x0,y:ay+(l.y-wy)/tile-y0,
+    z:l.z/tile,radius:l.radius/tile,power:l.power,color:l.color}));
+  const lightKey=lights.map(l=>[Math.round(l.x/2),Math.round(l.y/2),Math.round(l.power*10),Math.round(l.radius),l.color.join(',')].join('/')).join('|');
+  const signature=[key,x0,y0,w,h,face,emissionHash,env.ambient,lightKey].join(';');
+  let state=feelSurfaceStates.get(e);
+  if(!state){state={};feelSurfaceStates.set(e,state);}
+  // Current artwork is checked every draw. Only an unchanged pose/light sample is reused.
+  if(state.signature===signature&&begin-state.at<1000/C.hz)return state.frame;
+  if(!state.frame||state.frame.width!==w||state.frame.height!==h)state.frame=new ImageData(w,h);
+  state.frame.data.set(src);
+  const lit=AbyssSurfaceLight.shade(entry.prepared,{ambient:env.ambient,steps:6,maskMix:.6,lights});
+  const emission=options.emissive;
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){
+    const si=(y*cw+x)*4,di=((y+y0)*w+x+x0)*4;
+    if(!src[di+3]||(emission&&emission[(y+y0)*w+x+x0]))continue;
+    state.frame.data[di]=lit[si];state.frame.data[di+1]=lit[si+1];state.frame.data[di+2]=lit[si+2];
+  }
+  state.signature=signature;state.at=begin;stats.shades++;stats.ms=performance.now()-begin;
+  return state.frame;
+}
+function feelSurfaceSprite(im,e,size,face){
+  if(!feelEnemySurfaceOn(e)||e.dead||e.hit>0||e.fallAnim)return im;
+  if(typeof glowFoe==='function'&&glowFoe(e))return im;
+  let source=feelSurfaceImages.get(im);
+  if(!source){
+    const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;if(!w||!h)return im;
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    const c=canvas.getContext('2d',{willReadFrequently:true});c.drawImage(im,0,0);
+    source=c.getImageData(0,0,w,h);feelSurfaceImages.set(im,source);
+  }
+  const frame=feelShadeEnemyFrame(e,source,face,{pixelTiles:size/TS/source.width});
+  const state=feelSurfaceStates.get(e);if(!state)return im;
+  if(!state.canvas||state.canvas.width!==frame.width||state.canvas.height!==frame.height){state.canvas=document.createElement('canvas');state.canvas.width=frame.width;state.canvas.height=frame.height;}
+  state.canvas.getContext('2d').putImageData(frame,0,0);return state.canvas;
+}
+function drawFeelEnemyShape(e,x,y,r){
+  if(!feelEnemySurfaceOn(e)||e.hit>0||e.dead)return false;
+  const n=40,ratio=n/2.6,outline=e.boss?3.5:2,color=e.col||e.arch.col;
+  const key=[e.arch.id,color,outline,Math.round(r)].join('|');let image=feelSurfaceShapes.get(key);
+  if(!image){
+    image=document.createElement('canvas');image.width=image.height=n;const original=ctx;ctx=image.getContext('2d');
+    try{ctx.fillStyle=color;ctx.strokeStyle='rgba(0,0,0,.55)';ctx.lineWidth=outline*ratio/r;shape(e.arch.id,n/2,n/2,ratio);ctx.fill();ctx.stroke();}finally{ctx=original;}
+    feelSurfaceShapes.set(key,image);if(feelSurfaceShapes.size>64)feelSurfaceShapes.delete(feelSurfaceShapes.keys().next().value);
+  }
+  const shaded=feelSurfaceSprite(image,e,n*r/ratio,1),size=n*r/ratio;
+  ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(shaded,x-size/2,y-size/2,size,size);ctx.restore();return true;
+}
 function drawFeelSpriteImage(im,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0,blob=false){
   if(!im) return false;
   if(Math.abs(dx||0)>Math.abs(dy||0)+.02) ent._artFace=dx<0?-1:1;
   const face=ent._artFace||1,n=Math.max(2,Math.round(size));
+  im=feelSurfaceSprite(im,ent,n,face);
   // Death, falling and reduced-motion stay on the uncut source frame.
   if(ent?.dead||ent?.fallAnim||FEEL_REDUCED.matches){
     ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha*=alpha;
@@ -847,7 +948,7 @@ function drawFeelSpriteImage(im,x,y,size,ent,dx,dy,alpha=1,scale=1,rot=0,blob=fa
     return true;
   }
   const pose=feelCharacterSpritePose(ent,blob);
-  const sw=im.naturalWidth,sh=im.naturalHeight,unitY=sh/16,hipY=9*unitY,legY=11*unitY;
+  const sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height,unitY=sh/16,hipY=9*unitY,legY=11*unitY;
   const coreL=Math.round(sw*4/16),coreM=Math.round(sw*8/16),coreR=Math.round(sw*12/16);
   // Movement remains on the sprite's logical grid even when the viewport resizes.
   const pixel=Math.max(1,Math.round(n/16)),ox=-Math.round(n/2),oy=-Math.round(n/2);

@@ -16384,15 +16384,21 @@ function draw(){
                                 e.dead?Math.max(0,e.fade/0.3):1])
         || CharacterArt.put(charKey,sx,sy,artSize);
       if(!spriteDrawn){
+        if(typeof drawFeelEnemyShape==='function'&&drawFeelEnemyShape(e,sx,sy,R))spriteDrawn=true;
+        else{
         ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
         shape(e.arch.id, sx, sy, R); ctx.fill(); ctx.stroke();
+        }
       }
     }else{
+      if(typeof drawFeelEnemyShape==='function'&&drawFeelEnemyShape(e,sx,sy,R))spriteDrawn=true;
+      else{
       ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
       shape(e.arch.id, sx, sy, R);
       ctx.fill(); ctx.stroke();
+      }
     }
     ctx.restore();
     };
@@ -23032,10 +23038,12 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
 <script src="weapon-art-pixel.js?v=20261021a"></script>
-<script src="game-feel.js?v=20261105-v2col"></script>
+<script src="pixel-art-lighter-core.js?v=20261107a"></script>
+<script src="enemy-surface-light.js?v=20261107a"></script>
+<script src="game-feel.js?v=20261107-surface"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261105-morph2"></script>
+<script src="cave-look.js?v=20261107-surface"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

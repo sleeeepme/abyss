@@ -669,6 +669,21 @@ CAVE.lightAt=function(xT,yT){
   for(const m of CAVE.emit){const e=Math.hypot(xT*Q-m.x,yT*Q-m.y); if(e<m.r) L=Math.max(L,(1-e/m.r)*m.it*.8);}
   return L;
 };
+/* Surface lights use the terrain's already-cast wall rays and current lamp radius.
+   Visibility still belongs to enemyLit()/the world darkness pass. */
+CAVE.surfaceLighting=function(xT,yT){
+  if(!G)return null;
+  if(!shadowOn)return {ambient:1,lights:[]};
+  const dx=xT*Q-lampX,dy=yT*Q-lampY,d=Math.hypot(dx,dy),lights=[];
+  const a=((Math.atan2(dy,dx)+Math.PI)/6.2831853*NA|0)%NA;
+  if(d<Rpx&&d<=ray[a]+6)lights.push({x:lampX/Q,y:lampY/Q,radius:Rpx/Q,z:.85,
+    power:2.1*Math.pow(Math.max(0,1-d/Rpx),.7),color:[255,230,195]});
+  const local=[];
+  for(const m of CAVE.emit){const distance=Math.hypot(xT*Q-m.x,yT*Q-m.y);if(distance<m.r)
+    local.push({x:m.x/Q,y:m.y/Q,radius:m.r/Q,z:.65,power:Math.min(1.5,m.it*1.6)*(1-distance/m.r),color:[145,213,226]});}
+  local.sort((a,b)=>b.power-a.power);lights.push(...local.slice(0,2));
+  return {ambient:.38,lights};
+};
 
 /* ---------- 地形を描く（draw() のマス塗りの代わり） ---------- */
 const bufC=document.createElement('canvas'), bufX=bufC.getContext('2d');
@@ -3226,12 +3241,13 @@ const SPR={N:0,cv:document.createElement('canvas'),id:null,u32:null};
 SPR.cx=SPR.cv.getContext('2d');
 const PT={k:1,ox:0,oy:0,N:0,lx:.6,ly:-.5,lz:.6,lit:1,glows:[]};
 function sBegin(N,k,lx,ly,lit){
-  PT.alpha=1; PT.outA=1;
+  PT.alpha=1; PT.outA=1;PT.surface=false;
   if(SPR.N!==N){SPR.N=N;SPR.cv.width=SPR.cv.height=N;SPR.id=SPR.cx.createImageData(N,N);SPR.u32=new Uint32Array(SPR.id.data.buffer);}
   else SPR.u32.fill(0);
+  if(!SPR.emissive||SPR.emissive.length!==N*N)SPR.emissive=new Uint8Array(N*N);else SPR.emissive.fill(0);
   PT.N=N;PT.k=k;PT.ox=N/2;PT.oy=N-Math.max(3,Math.round(3*k));const l=Math.hypot(lx,ly)||1;PT.lx=lx/l;PT.ly=ly/l;PT.lit=lit;PT.glows.length=0;
 }
-function put(X,Y,c){ if(X>=0&&Y>=0&&X<PT.N&&Y<PT.N) SPR.u32[Y*PT.N+X]=PT.alpha<1?(((c&0xffffff)|((PT.alpha*255|0)<<24))>>>0):c; }   // PT.alpha：半透明の体（シルトジェリー）
+function put(X,Y,c,emissive=false){ if(X>=0&&Y>=0&&X<PT.N&&Y<PT.N){ SPR.u32[Y*PT.N+X]=PT.alpha<1?(((c&0xffffff)|((PT.alpha*255|0)<<24))>>>0):c;SPR.emissive[Y*PT.N+X]=emissive?1:0; } }   // PT.alpha：半透明の体（シルトジェリー）
 const sx_=x=>Math.round(PT.ox+x*PT.k), sy_=y=>Math.round(PT.oy+y*PT.k);
 function dot(x,y,c){ const s=Math.max(1,Math.round(PT.k)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c); }
 function glow(x,y,c,sz=1,a=1){ PT.glows.push([x,y,c,sz,a]); }
@@ -3241,7 +3257,7 @@ function ell(cx,cy,rx,ry,ramp,emis){
   const ccx=PT.ox+cx*k, ccy=PT.oy+cy*k, amb=emis?.45:.16+.22*PT.lit, dif=emis?.55:.22+.78*PT.lit;
   for(let Y=Y0;Y<=Y1;Y++)for(let X=X0;X<=X1;X++){const nx=(X+.5-ccx)/(rx*k), ny=(Y+.5-ccy)/(ry*k), d=nx*nx+ny*ny; if(d>1) continue;
     const nz=Math.sqrt(1-d), I=amb+dif*Math.max(0,nx*PT.lx*.8+ny*PT.ly*.8+nz*.5);
-    put(X,Y,ramp[shadeIdx(I,X,Y)]);}
+    put(X,Y,ramp[shadeIdx(I,X,Y)],!!emis);}
 }
 function hole(cx,cy,rx,ry,c){ const k=PT.k,ccx=PT.ox+cx*k,ccy=PT.oy+cy*k;
   for(let Y=Math.floor(ccy-ry*k);Y<=Math.ceil(ccy+ry*k);Y++)for(let X=Math.floor(ccx-rx*k);X<=Math.ceil(ccx+rx*k);X++){const nx=(X+.5-ccx)/(rx*k),ny=(Y+.5-ccy)/(ry*k);if(nx*nx+ny*ny<=1)put(X,Y,c);} }
@@ -3264,7 +3280,7 @@ function sEnd(p,flash){
     for(let Y=0;Y<N;Y++)for(let X=0;X<N;X++){const i=Y*N+X; if(src[i]) continue;
       if((X>0&&src[i-1])||(X<N-1&&src[i+1])||(Y>0&&src[i-N])||(Y<N-1&&src[i+N])) u[i]=o;} }
   else { for(let i=0;i<u.length;i++){ if(u[i]&&((i*7+(i/N|0))%5===0)&&!( (u[i-1]&&u[i+1]&&u[i-N]&&u[i+N]) )) u[i]=0; } }  // 輪郭が滲む
-  for(const [x,y,c,sz,a] of PT.glows){ PT.alpha=a==null?1:a; const s=Math.max(1,Math.round(PT.k*sz)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c); }
+  for(const [x,y,c,sz,a] of PT.glows){ PT.alpha=a==null?1:a; const s=Math.max(1,Math.round(PT.k*sz)),X=sx_(x),Y=sy_(y); for(let j=0;j<s;j++)for(let i=0;i<s;i++)put(X+i,Y+j,c,true); }
   PT.alpha=1;
   SPR.cx.putImageData(SPR.id,0,0);
 }
@@ -3682,9 +3698,9 @@ function vera2Draw(e,t){
   else if(moving) f=vera2Pick('walk',t,true);
   else f=vera2Pick('idle',t*(down?0.6:1),true);
   // ---- 明るさ ----
-  const q=Math.round(Math.min(1,Math.max(0,PT.lit))*15);
+  const q=PT.surface?16:Math.round(Math.min(1,Math.max(0,PT.lit))*15);
   let L=VERA2.lit.get(q); if(!L){ L=new Map(); VERA2.lit.set(q,L); }
-  const lf=Math.min(1.05,.38+.72*(q/15));
+  const lf=PT.surface?1:Math.min(1.05,.38+.72*(q/15));
   const lit=c=>{ let v=L.get(c); if(v!==undefined) return v;
     if(vera2Emis(c)) v=c; else { const r=c&255,g=(c>>8)&255,b=(c>>16)&255; v=(0xff000000|(Math.min(255,b*lf|0)<<16)|(Math.min(255,g*lf|0)<<8)|Math.min(255,r*lf|0))>>>0; }
     L.set(c,v); return v; };
@@ -3696,7 +3712,7 @@ function vera2Draw(e,t){
     for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue;
       let c=base[row+x];
       if(dif){ const d=dif[row+x]; if(d>>>24) c=(d>>>0)===V2_MAGENTA?0:d; }
-      if(c>>>24) u[out+X]=lit(c>>>0); } }
+      if(c>>>24){u[out+X]=lit(c>>>0);if(vera2Emis(c>>>0))SPR.emissive[out+X]=1;} } }
   /* ---- 被弾の光り（2026-10-20 ユーザー指定「ヒット時に赤くフラッシュするのはダメージを受けている部位に」）----
      当たった円（体か脚。本編の hitCircles）に、いちばん近いドットだけを白→赤に光らせる。
      脚の絵は当たりの円より大きく伸びるので、脚の円は 1.7 倍、体は 1.25 倍まで見る。 */
@@ -3833,9 +3849,9 @@ function vera1Draw(e,t){
   else f=vera1Pick('idle',t,true);
   const row=VERA1.dirs.indexOf(e._v1D); e._v1F=f;
   // ---- 明るさ ----
-  const q=Math.round(Math.min(1,Math.max(0,PT.lit))*15);
+  const q=PT.surface?16:Math.round(Math.min(1,Math.max(0,PT.lit))*15);
   let L=VERA1.lit.get(q); if(!L){ L=new Map(); VERA1.lit.set(q,L); }
-  const lf=Math.min(1.05,.38+.72*(q/15));
+  const lf=PT.surface?1:Math.min(1.05,.38+.72*(q/15));
   const lit=c=>{ let v=L.get(c); if(v!==undefined) return v;
     if(V1_EMIS.has(c)) v=c; else { const r=c&255,g=(c>>8)&255,b=(c>>16)&255; v=(0xff000000|(Math.min(255,b*lf|0)<<16)|(Math.min(255,g*lf|0)<<8)|Math.min(255,r*lf|0))>>>0; }
     L.set(c,v); return v; };
@@ -3843,7 +3859,7 @@ function vera1Draw(e,t){
   const N=PT.N, u=SPR.u32, W=VERA1.w, H=VERA1.h, SW=VERA1.sw, src=VERA1.u;
   const X0=Math.round(PT.ox-VERA1.ax), Y0=Math.round(PT.oy-VERA1.feet), fx=f*W, fy=row*H;
   for(let y=0;y<H;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const r0=(fy+y)*SW+fx, out=Y*N;
-    for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue; const c=src[r0+x]; if(c>>>24) u[out+X]=lit(c>>>0); } }
+    for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue; const c=src[r0+x]; if(c>>>24){u[out+X]=lit(c>>>0);if(V1_EMIS.has(c>>>0))SPR.emissive[out+X]=1;} } }
   return [0, V1_ANCHOR_Y];
 }
 CAVE.vera1={ready:()=>vera1Ready(), dir:e=>e&&e._v1D, frame:e=>e&&e._v1F};   // テスト用
@@ -3938,13 +3954,13 @@ function pxAnimDraw(H,rgb,e,t,k){
   else f=pxPick(H.idle.f,H.idle.d,t+(e._cg||0)*.7,H.idleLen);
   const N=PT.N, u=SPR.u32, W=H.w, Hh=H.h, cols=H.cols;
   const x0=N/2-H.cx*k, y0=PT.oy-H.feet*k;
-  const lf=Math.min(1.05,.38+.72*PT.lit);
+  const lf=PT.surface?1:Math.min(1.05,.38+.72*PT.lit);
   for(let i=0;i<rgb.length;i++){ const [r,g,b]=rgb[i], m=H.emisSet.has(i)?1:lf;
     cols[i]=(0xff000000|(Math.min(255,b*m|0)<<16)|(Math.min(255,g*m|0)<<8)|Math.min(255,r*m|0))>>>0; }
   const X0=Math.floor(x0), Y0=Math.floor(y0), X1=Math.ceil(x0+W*k), Y1=Math.ceil(y0+Hh*k);
   for(let Y=Math.max(0,Y0);Y<Math.min(N,Y1);Y++)for(let X=Math.max(0,X0);X<Math.min(N,X1);X++){
     const sx=Math.floor((X+.5-x0)/k), sy=Math.floor((Y+.5-y0)/k); if(sx<0||sy<0||sx>=W||sy>=Hh) continue;
-    const c=f[sy*W+sx]; if(c>=0) u[Y*N+X]=cols[c]; }
+    const c=f[sy*W+sx]; if(c>=0){u[Y*N+X]=cols[c];SPR.emissive[Y*N+X]=H.emisSet.has(c)?1:0;} }
   return [N/2, PT.oy-(H.feet-H.cy)*k];
 }
 const TOAD_ART=pxArtPrep({"idle":{"d":[220,200,240,160,200,90,160],"f":["................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACAC......................AHCCCBADDACADDDAAA...............AAHCCEHAHCBACCDH.................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCCCCDA.................AABDBCBCCCCAACBA...............ADBDBCBCCBECCCCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................."]},"walk":{"d":[110,90,110,90],"f":["................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................",".................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................................................",".................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................."]},"atk":{"d":[90,120,240,70,80,90,110],"f":["................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACAC......................AHCCCBADDACADDDAAA...............AAHCCEHAHCBACCDH.................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................AAAAA...........................BCBCDA.......................AAACCFGFDA..................AAAABEBCCGAACBA................AABDBCBCBEFGFCCBA..............ADBDBCBCCCHBCCBACA.B............ABCBHCCCCHAAAACCCACCB..........ABDBEAHCHC.AIIIIIA.BC...........ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................AAAAA...........................BCBCDA..........................CCFGFDA......................AAACCGAACBA.................AAAABEBBEFGFCCBA...............AABDBCBCCHBCCBACA..............ADBDBCBCCHAAAACCCA...B..........ABCBHCCCC.AIIIIIA...CC.H.......ABDBEAHCHC.AJJJJJA...B.B........ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................AAAAA...........................BCBCDA.......................AAACCFGFDA..................AAAABEBCCGAACBA................AABDBCBCBEFGFCCBA..............ADBDBCBCCCHBCCBACA.....B........ABCBHCCCCHAAAACCCA.............ABDBEAHCHC.AIIIIIA.......H......ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA.........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................."]},"dmg":{"d":[50,70,90,90,140],"f":["...............................................................................................................................................................................AAAAA........................AAAKKKKKA...................AAAAKKKKKKKKKA.................AAKKKKKKKKKAAKKA...L...........AKKKKKKKKKKKKKKKKA.L.M..........AKKKKKKKKKKKKKKAKA..L..........AKKKKAKKKKKAAAAKKKA.............AKKKKKAKAKKAKKKAAA..............AKKKKKAKKAKKAKKKK...............AAKKKKKAKAAKAAKK.................AAKKKKKAKAKKKAA..................AAAAAAAAKAAAAAA..........................................","..............................................................................................................................................................................NNNNN....C.B.................NNNOPOPQN.C.................NNNNOROPPSTSQN......C..........NNOQOPOPPPTNNPON...............NQOQOPOPPORSTSPPON..............NOPOUPPPPPUOPPONPN.............NOQORNUPUPUNNNNPPPN.....C.......NPPPOONPNPPNQQQNNN..............NUPPPONQQNPONPPQU...............NNUPPPUNQNNPNNQU.................NNUPPRUNUNOPPNN..................NNNNNNNNUNNNNNN...........................................",".........................................................................................................................H.........................B..........................AAAAA........................AAABCBCDA.........B.........AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.......B.....ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA...........................................","...............................................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA..........................................","................................................................................................................................................................................AAAAA........................AAABCBCDA...................AAAABEBCCFGFDA.................AABDBCBCCCGAACBA...............ADBDBCBCCBEFGFCCBA..............ABCBHCCCCCHBCCBACA.............ABDBEAHCHCHAAAACCCA.............ACCCBBACACCADDDAAA..............AHCCCBADDACBACCDH...............AAHCCCHADAACAADH.................AAHCCEHAHABCCAA..................AAAAAAAAHAAAAAA........................................."]},"pal":["#000000","#948a82","#c0bbb0","#fafaf6","#b8b0aa","#f2d623","#aa8600","#5d5755","#781e18","#3c0e0c","#ffffff","#f0cb38","#ff8931","#3c0804","#c25338","#d16347","#e4785e","#ce6045","#e26c18","#ca520c","#b04229"],"emis":[5,6,10,11,12],"w":32,"h":18,"feet":17,"cx":15.5,"cy":11.0,"strike":3,"lunge":[3,4]});     // アッシュトード（獣・飛ばし）19×12。tools/toad_boar_anim.py
@@ -4050,15 +4066,21 @@ function enemy(e,sx,sy,R){
   if(x1>=0) e._vis={top:(y0-cyA)*ps, bot:(y1+1-cyA)*ps, w:(x1-x0+1)*ps};
   { const vm=(caveMid(e)==='vera' && !e.form2) ? veraMorphT(e) : null;
     if(vm!=null && vm<BOSS_FORM_FX.grow[1] && r.anchor) veraMorphStones(N,u,vm,r.anchor[0],r.anchor[1]); }   // 変身：吸い寄せられる床の石
+  let display=typeof feelShadeEnemyFrame==='function'?feelShadeEnemyFrame(e,SPR.id,face,{
+    pixelTiles:(r.px||1)/Q,anchor:[cxA,cyA],bounds:[x0,y0,x1+1,y1+1],emissive:SPR.emissive,
+    worldX:(sx-innerWidth/2)/TS+P.x,worldY:(sy-innerHeight/2)/TS+P.y}):SPR.id;
+  // Rage glows are drawn after lighting and do not enter the normal-map cache.
+  if(e.rage&&!e.dead)display=new ImageData(new Uint8ClampedArray(display.data),N,N);
+  const displayU=new Uint32Array(display.data.buffer);
   if(e.rage && !e.dead && CAVE.rageFx!==false)
-    rageFx(N,u,(performance.now()-T0)/1000,x0,y0,x1,y1,(e.uid||0)%97);   // 激昂：赤い輪郭の明滅・オーラ・目の光
+    rageFx(N,displayU,(performance.now()-T0)/1000,x0,y0,x1,y1,(e.uid||0)%97);   // 激昂：赤い輪郭の明滅・オーラ・目の光
   ctx.save(); ctx.imageSmoothingEnabled=false;
   ctx.translate(Math.round(sx), Math.round(sy));
   if(face<0) ctx.scale(-1,1);
   /* 敵ごとに自分のキャンバスへ書いてから貼る。1枚を使い回して書き換えると、
      Safari では同じフレームで先に貼った敵まで最後の絵に化ける（ボア→ハウンド等）。 */
   let cv=FOE_CV.get(e); if(!cv||cv.width!==N){ cv=document.createElement('canvas'); cv.width=cv.height=N; FOE_CV.set(e,cv); }
-  cv.getContext('2d').putImageData(SPR.id,0,0);
+  cv.getContext('2d').putImageData(display,0,0);
   ctx.drawImage(cv, -cxA*ps, -cyA*ps, W2, W2);
   ctx.restore();
   // 自分で光るものは次のフレームの地形に光を落とす
@@ -4238,7 +4260,9 @@ function renderFoe(e,noFlash){
   const lit = CAVE.lightAt(e.x, e.y);
   // ランタンの向き（スプライトの座標で。左向きなら反転）
   const ldx=(P.x-e.x)*face, ldy=(P.y-.3-e.y);
-  sBegin(N,k,ldx,ldy,Math.max(G&&G.L.sprAmb||.12,Math.min(1,lit*1.3)));
+  const surface=typeof feelEnemySurfaceOn==='function'&&feelEnemySurfaceOn(e)&&!e.dead&&!(e.hit>0);
+  sBegin(N,k,surface?-.65:ldx,surface?-1:ldy,surface?1:Math.max(G&&G.L.sprAmb||.12,Math.min(1,lit*1.3)));
+  PT.surface=surface;
   const g=e._cg;
   if(mid==='toad') toad(p,t,e);
   else if(mid==='leech') leech(p,t);
