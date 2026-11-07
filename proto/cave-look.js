@@ -676,13 +676,13 @@ CAVE.surfaceLighting=function(xT,yT){
   if(!shadowOn)return {ambient:1,lights:[]};
   const dx=xT*Q-lampX,dy=yT*Q-lampY,d=Math.hypot(dx,dy),lights=[];
   const a=((Math.atan2(dy,dx)+Math.PI)/6.2831853*NA|0)%NA;
-  if(d<Rpx&&d<=ray[a]+6)lights.push({x:lampX/Q,y:lampY/Q,radius:Rpx/Q,z:.85,
-    power:2.1*Math.pow(Math.max(0,1-d/Rpx),.7),color:[255,230,195]});
+  if(d<Rpx&&d<=ray[a]+6)lights.push({kind:'hero',x:lampX/Q,y:lampY/Q,radius:Rpx/Q,z:.85,
+    power:(window.FEEL_ENEMY_SURFACE?.keyPower??3.2)*Math.pow(Math.max(0,1-d/Rpx),.7),color:[255,230,195]});
   const local=[];
   for(const m of CAVE.emit){const distance=Math.hypot(xT*Q-m.x,yT*Q-m.y);if(distance<m.r)
     local.push({x:m.x/Q,y:m.y/Q,radius:m.r/Q,z:.65,power:Math.min(1.5,m.it*1.6)*(1-distance/m.r),color:[145,213,226]});}
   local.sort((a,b)=>b.power-a.power);lights.push(...local.slice(0,2));
-  return {ambient:.38,lights};
+  return {ambient:window.FEEL_ENEMY_SURFACE?.ambient??.24,lights};
 };
 
 /* ---------- 地形を描く（draw() のマス塗りの代わり） ---------- */

@@ -839,6 +839,7 @@ function feelCharacterSpritePose(ent,blob=false){
    キャラを追加しても同じ入口を通る。視界・当たり判定・敵AIは変更しない。 */
 const FEEL_ENEMY_SURFACE=window.FEEL_ENEMY_SURFACE={
   on:new URLSearchParams(location.search).get('surface')!=='off',
+  ambient:.24,keyPower:3.2,maskMix:.35,normalStrength:190,
   maxFrames:256,maxPixels:360000,hz:15,
   stats:{builds:0,hits:0,shades:0,pixels:0,entries:0,ms:0}
 };
@@ -848,12 +849,23 @@ function feelEnemySurfaceOn(e){
     !!e&&e!==P&&!!e.arch&&!!e.fam&&e.hpNow===undefined;
 }
 function feelSurfaceEnvironment(e,x=e.x,y=e.y){
+  const C=FEEL_ENEMY_SURFACE;
+  let sample=null;
   if(window.CAVE&&CAVE.on&&typeof CAVE.surfaceLighting==='function'){
-    const sample=CAVE.surfaceLighting(x,y);if(sample)return sample;
+    sample=CAVE.surfaceLighting(x,y);
   }
-  const range=Math.min(8,W.fl?.zone?.lightR||7),d=Math.hypot(x-P.x,y-P.y);
-  const visible=typeof losClear!=='function'||losClear(P.x,P.y,x,y);
-  return {ambient:.38,lights:visible&&d<range?[{x:P.x,y:P.y,radius:range,power:1.9*(1-d/range),z:.85,color:[255,230,195]}]:[]};
+  if(!sample){
+    const range=Math.min(8,W.fl?.zone?.lightR||7),d=Math.hypot(x-P.x,y-P.y);
+    const visible=typeof losClear!=='function'||losClear(P.x,P.y,x,y);
+    sample={ambient:C.ambient,lights:visible&&d<range?[{kind:'hero',x:P.x,y:P.y,radius:range,power:C.keyPower*(1-d/range),z:.85,color:[255,230,195]}]:[]};
+  }
+  // Match the directional cone and close-range safety light of feelHeroLightImage.
+  // Turning the lantern must change sprite lighting even when neither actor moves.
+  const dx=x-P.x,dy=y-P.y,d=Math.hypot(dx,dy),length=Math.hypot(FEEL.lightX,FEEL.lightY)||1;
+  const cosine=d>.001?(dx*FEEL.lightX+dy*FEEL.lightY)/(d*length):1;
+  const cone=feelSmoothstep(.44,.84,cosine),safety=1-feelSmoothstep(12,32,d*16);
+  const beam=Math.max(safety*.86+.12,cone);
+  return {ambient:sample.ambient,lights:sample.lights.map(l=>l.kind==='hero'?{...l,power:l.power*beam}:l)};
 }
 function feelShadeEnemyFrame(e,id,face=1,options={}){
   if(!feelEnemySurfaceOn(e)||e.dead||e.hit>0||e.fallAnim)return id;
@@ -876,11 +888,11 @@ function feelShadeEnemyFrame(e,id,face=1,options={}){
       if(options.emissive?.[(y+y0)*w+x+x0])emissionHash=(Math.imul(emissionHash,33)^((y*cw+x)+1))>>>0;
     }
   }
-  const key=cw+','+ch+','+(hash>>>0)+','+hash2;
+  const key=C.normalStrength+','+cw+','+ch+','+(hash>>>0)+','+hash2;
   let entry=feelSurfaceFrames.get(key);
   if(entry){feelSurfaceFrames.delete(key);feelSurfaceFrames.set(key,entry);stats.hits++;}
   else{
-    const prepared=AbyssSurfaceLight.generate(cw,ch,crop);
+    const prepared=AbyssSurfaceLight.generate(cw,ch,crop,{normalStrength:C.normalStrength});
     entry={key,prepared,pixels:cw*ch};feelSurfaceFrames.set(key,entry);stats.builds++;stats.pixels+=entry.pixels;
     while(feelSurfaceFrames.size>C.maxFrames||stats.pixels>C.maxPixels){const first=feelSurfaceFrames.keys().next().value;if(first===key)break;stats.pixels-=feelSurfaceFrames.get(first).pixels;feelSurfaceFrames.delete(first);}
     stats.entries=feelSurfaceFrames.size;
@@ -897,7 +909,7 @@ function feelShadeEnemyFrame(e,id,face=1,options={}){
   if(state.signature===signature&&begin-state.at<1000/C.hz)return state.frame;
   if(!state.frame||state.frame.width!==w||state.frame.height!==h)state.frame=new ImageData(w,h);
   state.frame.data.set(src);
-  const lit=AbyssSurfaceLight.shade(entry.prepared,{ambient:env.ambient,steps:6,maskMix:.6,lights});
+  const lit=AbyssSurfaceLight.shade(entry.prepared,{ambient:env.ambient,steps:6,maskMix:C.maskMix,lights});
   const emission=options.emissive;
   for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){
     const si=(y*cw+x)*4,di=((y+y0)*w+x+x0)*4;

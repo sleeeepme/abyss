@@ -46,7 +46,7 @@
  function generate(w,h,albedo,options={}){
   const core=options.generator||root.PixelArtLighterCore;
   if(!core)return prepare(w,h,albedo);
-  const common={hide:false,bg:[0,0,0],hints:null,merge:true,edgeWidth:2,normalStrength:140};
+  const common={hide:false,bg:[0,0,0],hints:null,merge:true,edgeWidth:2,normalStrength:options.normalStrength??140};
   const input={w,h,data:albedo};
   const normal=core.generateTexture(input,{...common,kind:'normal',preset:'character',strength:75,facets:15}).data;
   const mask=core.generateTexture(input,{...common,kind:'mask',preset:'object',strength:100,floor:24,ceiling:255,cavity:30}).data;
