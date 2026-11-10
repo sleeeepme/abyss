@@ -6,7 +6,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const {b,pg,errs}=await boot();const out='output/hub-compositor-motion';
 try{
  await mkdir(out,{recursive:true});await install(pg);await pg.setViewportSize({width:390,height:844});
- await pg.waitForFunction(()=>HUB_BG.ready&&innerHeight===844&&el('hubbg').getBoundingClientRect().height===844);
+ await pg.waitForFunction(()=>{hubBgWant(0);return HUB_BG.ready&&innerHeight===844&&el('hubbg').getBoundingClientRect().height===844});
  await pg.evaluate(()=>{S.hero.party=[];S.hero.artKey='hero_scout';el('hub-avatars').dataset.hubKey='';setScreen('town');stopHubWander();stopHubBg();});
  await pg.waitForFunction(()=>+getComputedStyle(document.getElementById('scr-fade')).opacity===0);
  await pg.addStyleTag({content:'#scr-town{background:rgb(255,0,255)!important} #hub-bgwrap,.hub-top,.hub-bottom,.hub-dive,.hub-ava-sh,.hub-ava .nm{visibility:hidden!important} .hub-ava-art{animation:none!important}'});
