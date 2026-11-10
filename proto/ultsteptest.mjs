@@ -18,7 +18,7 @@ await pg.evaluate(()=>{
     startRun(20); W.ores.length=0;
     if(!opt.party) S.hero.party=[];
     S.hero.hpNow=stats(S.hero).maxHp; W.enemies.length=0;
-    const n = opt.n || 8, rr = opt.r || 2.4;
+    const n = opt.n ?? 8, rr = opt.r || 2.4;
     for(let i=0;i<n;i++){ const ang=i/n*6.28;
       W.enemies.push({x:P.x+Math.cos(ang)*rr, y:P.y+Math.sin(ang)*rr, arch:ARCH[0],
         fam:FAMILY[0], lv:20, elite:false, aff:[], maxHp:1e7, hp:1e7, atkV:5, def:0,
@@ -164,6 +164,49 @@ R.bloom = await pg.evaluate(async ()=>{
     riftFromLv3: !r1.arts['u_ruin_rift'] && !!r3.arts['u_ruin_rift'],
     dealtGrows: r1.dealt < r3.dealt && r3.dealt < r5.dealt };
 }
+// 裂天の雷は特定の1体に偏らない（7体・14体でも。k*7 で飛ばすと7体のとき1体に全部落ちていた）
+{
+  const dist={};
+  for(const n of [5,7,14]){ const r=await T('ruin',3,2.6,{n, r:3}); dist[n]=Math.max(...r.per)-Math.min(...r.per); }
+  R.ruin.evenSpread = Object.values(dist).every(d=>d<=2);
+}
+// 縮地：斬る相手がいなければ、1回目の後で止まる（誰もいない所へ何度も飛ばない）
+R.blinkEmpty = await pg.evaluate(async ()=>{
+  const r = await _T('blink',5,1.6,{n:0, before:()=>{ window._x0=P.x; window._y0=P.y; }});
+  const moved = Math.hypot(P.x-_x0, P.y-_y0);
+  return {moved:+moved.toFixed(2), ok: moved <= 4.2+5*0.25+0.05, hops:r.arts['u_blink']||0, oneHop:(r.arts['u_blink']||0)===1};
+});
+// 守護の盾と重騎士の守護陣：守護が切れても守護陣のぶんは残る
+R.wardBulwark = await pg.evaluate(async ()=>{
+  await _T('ward',5,0.05,{n:1,r:8});
+  const before = S.hero.barrier;                         // 守護 Lv.5 の2枚
+  S.hero.barrier = BULWARK_HITS + (S.hero.wardBar||0);   // 守護陣を後からかけた（本編と同じ式）
+  S.run.ward.t = 0.01; await new Promise(r=>setTimeout(r,200));
+  return {before, after:S.hero.barrier, ok: before===2 && S.hero.barrier===BULWARK_HITS};
+});
+// 地脈断：ボスによろめき（＝崩し）が入るのは1発目だけ。最後の1発の押し返し・崩しは Lv.5 だけ
+R.quakeBoss = await pg.evaluate(()=>{
+  const fin3 = ULT_STEP_TEXT.quake[1].includes('押し返') === false;
+  return {fin3, breakSmall: ULT_QUAKE_BREAK <= 4};
+});
+// 鉄壁 Lv.5：効いている間にかけ直しても、溜めた反撃は捨てずに先に出す
+R.aegisRecast = await pg.evaluate(async ()=>{
+  await _T('aegis',5,0.05,{n:3,r:1.5});
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  S.run.aegis.taken = 500;
+  const hp0 = W.enemies.map(e=>e.hp);
+  P.ultCd = 0; fireUlt();
+  const hurt = W.enemies.filter((e,i)=>e.hp<hp0[i]).length;
+  return {hurt, ok: hurt===3 && S.run.aegis.taken===0};
+});
+// 命脈 Lv.5 の盾は命脈が切れたら消える
+R.bloomEnd = await pg.evaluate(async ()=>{
+  await _T('bloom',5,0.0,{n:1,r:8});
+  const had = (S.hero.bshield||0) > 0;
+  S.run.bloom.t = 0.01; S.run.bloom.tick = 0;
+  await new Promise(r=>setTimeout(r,200));
+  return {had, gone: !S.run.bloom && (S.hero.bshield||0)===0, ok: had && !S.run.bloom && (S.hero.bshield||0)===0};
+});
 // 説明文：Lv.3・5 の段の文が付く
 R.desc = await pg.evaluate(()=>{
   const o={};
