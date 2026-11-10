@@ -6179,6 +6179,10 @@ const UNIQUE_BOSSES={
   10: {nm:'空引きのヴェラ', reg:'登録：弓・百四番',   fam:'undead', dt:'pierce',
        // 遠くから射続ける相手。散弾（burst）＝矢を撒く動作にあたる
        moves:['beam','burst','wave'],       rage:['pillars'],
+       /* 仲間1人連れ（_vera --ally 1 --bot dodge SP200 Lv10）で勝率35〜45%に合わせた調整。
+          仲間の有無で勝率が2〜3倍違い（なし46%／あり79%）、5Fで無料の仲間が1人付く（grantStarterAlly）ので
+          「仲間を連れる」前提に寄せ、その分ボス側を硬く・重くしてある。 */
+       hpMul:1.4, atkMul:1.3,
        /* ---------- 第一形態（人型・遠距離だけ） ----------
           倒し切ると、ここに書いてある姿から上の姿（第二形態）へ変わる。
           まだ人の形をしていたころのヴェラ——弓を引く者なので、
@@ -7459,8 +7463,8 @@ function makeBoss(fl, depth, tier){
   const e={
     x:fl.stair.x, y:fl.stair.y,
     arch:a, fam, lv, elite:false, aff:[], boss:true, tier,
-    maxHp: Math.round((26+lv*11)*a.hp*cfg.hp),
-    atkV:  (5+lv*2.6)*a.atk*cfg.atk,
+    maxHp: Math.round((26+lv*11)*a.hp*cfg.hp*(U&&U.hpMul||1)),
+    atkV:  (5+lv*2.6)*a.atk*cfg.atk*(U&&U.atkMul||1),   // hpMul/atkMul：その階の主だけの微調整（ヴェラ）
     def:   lv*1.6*cfg.def,
     res:   fam.res, dt: (U ? U.dt : fam.atk),
     st:{}, bu:{},
@@ -19102,6 +19106,23 @@ function rerollTavern(){
     uniqueAllyName(a);
     S.tavernPool.push(a);
   }
+  grantStarterAlly();
+}
+/* ---------- 5階に着いた人に、無料の仲間を1人 ----------
+   仲間の有無で10Fヴェラの勝率が2〜3倍違う（_vera: 仲間なし→あり）。
+   ところが雇うには金が要るので、金の無い人は仲間0人のまま10Fへ着く。
+   なので 5F に着いたことがあって、連れている者も酒場に預けた者も1人もいないときは、
+   酒場に雇用費0の1人を置く（連れて行くかは選ばせる）。
+   死んで隊を失った直後にも同じ条件で置き直す——「一番人手が要るのは全滅直後」。
+   既に誰かいる人には何もしない。 */
+const STARTER_ALLY_DEPTH = 5;
+function grantStarterAlly(){
+  if(!S.hero || Math.max(S.deepest||1, S.lastDepth||1) < STARTER_ALLY_DEPTH) return;
+  if(party().length || tavernStock().length) return;
+  const a = makeAlly(Math.max(1, S.lastDepth || S.deepest || 1), S.hero);
+  a.returned = true; a.free = true;
+  uniqueAllyName(a);
+  tavernPut(a);
 }
 /* 連れ帰った1人を酒場へ預ける。満員なら**一番弱い1人**が去る。
    古い順に切ると、育てた相手が黙って消える事故が起きる。 */

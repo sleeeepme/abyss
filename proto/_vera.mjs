@@ -29,7 +29,7 @@ import { chromium, devices } from 'playwright';
 import path from 'path';
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const SEEDS = +arg('seeds', 12), SP = +arg('sp', 300), LV = +arg('lv', 14), BOT = arg('bot', 'dodge'), ROLLS = +arg('rolls', 10), CAP = +arg('cap', 360);
-const TIER = +arg('tier', 5), DT = +arg('dt', 1/30), SEE = +arg('see', 0.6), DP = +arg('dp', 0), ALLY = +arg('ally', 0), ATK2 = arg('atk2', null), HP1 = arg('hp1', null), LEGHP = arg('leghp', null);
+const TIER = +arg('tier', 5), DT = +arg('dt', 1/30), SEE = +arg('see', 0.6), DP = +arg('dp', 0), ALLY = +arg('ally', 0), ATK2 = arg('atk2', null), HP1 = arg('hp1', null), LEGHP = arg('leghp', null), HPM = arg('hpmul', null), ATKM = arg('atkmul', null);
 const b = await chromium.launch();
 const ctx = await b.newContext({ ...devices['iPhone 13'], hasTouch: true, isMobile: true });
 const pg = await ctx.newPage();
@@ -37,7 +37,7 @@ const errs = [];
 pg.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
 await pg.goto('file://' + path.resolve(arg('file','proto/index.html')));
 await pg.waitForTimeout(400);
-await pg.evaluate(([a2, h1, lh]) => { const f1 = UNIQUE_BOSSES[10].form1; if (a2 != null) f1.secondAtkMul = +a2; if (lh != null) BOSS_PARTS.legs.hp = +lh; if (h1 != null) f1.hpMul = +h1; }, [ATK2, HP1, LEGHP]);
+await pg.evaluate(([a2, h1, lh, hm, am]) => { if (hm != null) UNIQUE_BOSSES[10].hpMul = +hm; if (am != null) UNIQUE_BOSSES[10].atkMul = +am; const f1 = UNIQUE_BOSSES[10].form1; if (a2 != null) f1.secondAtkMul = +a2; if (lh != null) BOSS_PARTS.legs.hp = +lh; if (h1 != null) f1.hpMul = +h1; }, [ATK2, HP1, LEGHP, HPM, ATKM]);
 await pg.evaluate(() => { if (!S.hero) { S.name = '測定'; startAdventure(); } window.DROP_IN=false; S.tutStone=true; if(window.CAVE) CAVE.halfRate=false; });
 
 const res = [];
