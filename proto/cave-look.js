@@ -364,11 +364,29 @@ function field(f,L,px,py){
   if(bl===0||bl===1) return bl;
   return bl+(L.nz[((py&255)<<8)|(px&255)]-.5)*L.amp;
 }
+/* field() と同じ計算で、マスの壁判定（wallAt）だけを塊の範囲ぶんの表から引く版（2026-11-10 perf）。
+   field() は1ドットごとに wallAt を8回呼ぶ（境界判定・f.g の2段引き・柱の Set 検索つき）。1塊は 44×44 ドットなので約1.5万回。
+   塊が触れるマスはせいぜい 8×8 なので、先に64マスぶんだけ引いておけば同じ値が返る（式の順序・値は field() と同一）。 */
+function fieldTbl(f,L,px,py,T_,tx0,ty0,tw,th){
+  const wl=(x,y)=>{ const i=x-tx0, j=y-ty0; return (i>=0&&j>=0&&i<tw&&j<th)?T_[j*tw+i]:wallAt(f,x,y); };
+  const wi=((py&255)<<8)|(px&255), wj=(((py+97)&255)<<8)|((px+151)&255);
+  const u=(px+.5)/Q-.5+(NZB[wi]-.5)*L.warp, v=(py+.5)/Q-.5+(NZB[wj]-.5)*L.warp, x0=Math.floor(u), y0=Math.floor(v), fx=u-x0, fy=v-y0;
+  const a=wl(x0,y0), b=wl(x0+1,y0), c=wl(x0,y0+1), d=wl(x0+1,y0+1);
+  const bl=(a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy;
+  const u0=(px+.5)/Q-.5, v0=(py+.5)/Q-.5, x1=Math.floor(u0), y1=Math.floor(v0), gx=u0-x1, gy=v0-y1;
+  const b0=(wl(x1,y1)*(1-gx)+wl(x1+1,y1)*gx)*(1-gy)+(wl(x1,y1+1)*(1-gx)+wl(x1+1,y1+1)*gx)*gy;
+  if(b0<=.16) return 0;
+  if(b0>=.84) return 1;
+  if(bl===0||bl===1) return bl;
+  return bl+(L.nz[((py&255)<<8)|(px&255)]-.5)*L.amp;
+}
 function buildChunk(ci,cj){
   G.ver=(G.ver||0)+1;                                          // 壁が増えた＝灯りの影を引き直す
   const {f,L,PW,PH,code,nx,ny}=G, M=6, S=32+M*2;
   const X0=ci*32-M, Y0=cj*32-M, F=new Float32Array(S*S), so=new Uint8Array(S*S);
-  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const v=field(f,L,X0+x,Y0+y);F[y*S+x]=v;so[y*S+x]=v>.5?1:0;}
+  const wr=Math.ceil(L.warp)+1, tx0=Math.floor(X0/Q)-wr-1, ty0=Math.floor(Y0/Q)-wr-1, tw=Math.floor((X0+S)/Q)+wr+2-tx0, th=Math.floor((Y0+S)/Q)+wr+2-ty0;
+  const T_=new Uint8Array(tw*th); for(let j=0;j<th;j++)for(let i=0;i<tw;i++) T_[j*tw+i]=wallAt(f,tx0+i,ty0+j);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const v=fieldTbl(f,L,X0+x,Y0+y,T_,tx0,ty0,tw,th);F[y*S+x]=v;so[y*S+x]=v>.5?1:0;}
   for(let y=M;y<M+32;y++)for(let x=M;x<M+32;x++){
     const wx=X0+x, wy=Y0+y; if(wx>=PW||wy>=PH) continue;
     const i=wy*PW+wx, l=y*S+x;
@@ -931,21 +949,25 @@ let T0=performance.now();
    キャラ・敵・効果は毎フレーム描くので、動きの滑らかさは変わらない。水面と灯りが30分の1秒ごとになる。
    テストは CAVE.halfRate=false にして毎回描く。 */
 CAVE.halfRate=true;
+/* 描き直しの間隔（コマ数）。既定は2（2コマに1回）。index.html の自動調整（PERF）が、
+   低スペック段（直近の平均が20msを超え続けた端末）でだけ3にする。間のコマは前の絵を貼り直すだけなので、
+   落ちるのは水面と灯りの更新が30Hz→20Hzになることだけ（貼り直しの余白を越えて歩いたら、下の条件で描き直す）。 */
+CAVE.terrainEvery=2;
 let lastT=null;
 CAVE.terrain=function(f,Z,camX,camY,blinded){
   try{
     const ps=TS/Q;
-    if(CAVE.halfRate&&lastT&&!lastT.reused&&lastT.f===f&&lastT.Z===Z&&lastT.ps===ps&&lastT.bl===!!blinded&&
+    if(CAVE.halfRate&&lastT&&lastT.reuse<(CAVE.terrainEvery||2)-1&&lastT.f===f&&lastT.Z===Z&&lastT.ps===ps&&lastT.bl===!!blinded&&
        lastT.w===innerWidth&&lastT.h===innerHeight&&
        lastT.bx0*ps<=camX&&(lastT.bx0+bw)*ps>=camX+innerWidth&&lastT.by0*ps<=camY&&(lastT.by0+bh)*ps>=camY+innerHeight){
-      lastT.reused=true; CAVE.nextEmit=[]; CAVE.skipped=(CAVE.skipped||0)+1;
+      lastT.reuse++; CAVE.nextEmit=[]; CAVE.skipped=(CAVE.skipped||0)+1;
       ctx.save(); ctx.imageSmoothingEnabled=false;
       ctx.drawImage(bufC,0,0,bw,bh,lastT.bx0*ps-camX,lastT.by0*ps-camY,bw*ps,bh*ps);
       ctx.restore();
       return true;
     }
     const r=terrain(f,Z,camX,camY,blinded);
-    lastT={f,Z,ps,bl:!!blinded,w:innerWidth,h:innerHeight,bx0:Math.floor(camX/ps)-2,by0:Math.floor(camY/ps)-2,reused:false};
+    lastT={f,Z,ps,bl:!!blinded,w:innerWidth,h:innerHeight,bx0:Math.floor(camX/ps)-2,by0:Math.floor(camY/ps)-2,reuse:0};
     return r;
   }catch(err){ console.error(err); CAVE.on=false; lastT=null; return false; }
 };

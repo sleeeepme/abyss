@@ -15139,12 +15139,13 @@ function tick(now){
   try{
     const live = S.screen==='game' && S.hero && S.run && W.fl;
     window.ABYSS_CRAZYGAMES?.syncGameplay(!!live && !gamePaused());
-    if(live){ if(!gamePaused()) update(dt); draw(); _canvasDirty=true; }
+    if(live){ const _pt0=performance.now(); if(!gamePaused()) update(dt); draw(); _canvasDirty=true; perfFrame(now, performance.now()-_pt0, true); }
+
     else if(_canvasDirty){
       /* ---------- 街やメニューではキャンバスを塗らない ----------
          draw() は「画面全体を一色で塗ってから、game でなければ帰る」形だった。
          つまり**街にいるあいだ、見えないキャンバスを毎フレーム全面塗っていた。**
-         端末の実ピクセルは 390×844 の9倍（DPR 3）＝約296万画素あり、
+         端末の実ピクセルは 390×844 の4倍（DPR は min(2,DPR) で頭打ち）＝約103万画素あり、
          その上を不透明な .screen が完全に覆っている——1枚も見えない塗りに
          毎秒60回ぶんの塗り帯域を使っていたことになる。熱の割に得る物が無い。
 
@@ -15152,6 +15153,7 @@ function tick(now){
          （消さずに放置すると、半透明のモーダル越しに前の盤面が残る）。 */
       draw(); _canvasDirty=false;
     }
+    if(!live) perfFrame(now, 0, false);
   }catch(err){
     console.error('tick error:', err);
     /* 途中で落ちたフレームは canvas の状態を中途半端に残す。
@@ -15978,8 +15980,76 @@ if(window.visualViewport){
   visualViewport.addEventListener('scroll', syncViewportHeight);
 }
 syncViewportHeight();
+/* ---------- 描画の自動調整と計測（2026-11-10 perf） ----------
+   これまで描画解像度は min(2, devicePixelRatio) の固定だった。DPR2の端末は 780×1328 = 約103万画素を毎フレーム塗る。
+   足りない端末でそのまま粘ると、解像度のせいで落ちたコマが「重い」のか「たまたま」のかも分からない。
+     段（tier）0 = DPR 2 / 1 = 1.5 / 2 = 1。直近60コマ（約1秒）の平均が 20ms を超え（かつ、この端末の本来のコマ間隔の
+     1.3倍を超え）たら1段落とす。落とした直後の5秒は判定しない。
+     戻すのは慎重に：45秒以上その段で、平均が本来の間隔の1.1倍以内、かつ1コマの仕事（update+draw）が平均9ms以下の間だけ。
+     戻して30秒以内にまた落ちたら、その段へは二度と戻さない。戻すのは1セッション3回まで。
+     「本来のコマ間隔」は、この画面で見た30コマ平均の最小値（60Hzなら約16.7ms、iOSの低電力モードなら約33ms）。
+     30fps固定の端末を重いと誤認して解像度を落とさないために、絶対値(20ms)だけでは判定しない。
+   段は localStorage に控え、次の起動の初期値にする。自動テスト（navigator.webdriver）では動かさない
+   （重い共有機で測っていると勝手に解像度が変わり、cv.width を見るテストが揺れる）。URL に ?perfauto を付けると動く。
+   ?perf=1 で左上に p95・最大のコマ時間・段・DPR を出す（隠しオーバーレイ。タップは通す）。 */
+const PERF = (()=>{
+  const q=new URLSearchParams(location.search);
+  const auto=(!navigator.webdriver || q.has('perfauto')) && q.get('perf')!=='off';
+  let tier=0; if(auto){ try{ tier=Math.max(0,Math.min(2,parseInt(localStorage.getItem('abyss.perfTier')||'0',10)||0)); }catch(e){} }
+  return {levels:[2,1.5,1], tier, win:[], busyWin:[], cad:[], hist:[], busyHist:[], base:1e9, last:0, cool:0, since:0, upAt:-1e9, ups:0,
+          block:[false,false,false], auto, overlay:q.get('perf')==='1', el:null, n:0, log:[]};
+})();
+function perfDpr(){ return Math.min(PERF.levels[PERF.tier], devicePixelRatio||1); }
+function perfApplyTier(){
+  resize();
+  if(window.CAVE) CAVE.terrainEvery = PERF.tier>=2 ? 3 : 2;      // 低スペック段では地形の描き直しを2コマに1回→3コマに1回
+  try{ localStorage.setItem('abyss.perfTier', String(PERF.tier)); }catch(e){}
+}
+function perfFrame(now, busyMs, live){
+  const P_=PERF, dt=now-P_.last; P_.last=now;
+  if(!(dt>0) || dt>250 || document.hidden){ P_.win.length=0; P_.busyWin.length=0; return; }   // タブを離れていた穴は数えない
+  P_.cad.push(dt); if(P_.cad.length>30) P_.cad.shift();
+  if(P_.cad.length===30){ let a=0; for(const v of P_.cad) a+=v; a/=30; if(a<P_.base) P_.base=Math.max(6,a); }
+  if(!live) return;
+  P_.hist.push(dt); if(P_.hist.length>240) P_.hist.shift();
+  P_.busyHist.push(busyMs); if(P_.busyHist.length>240) P_.busyHist.shift();
+  P_.win.push(dt); P_.busyWin.push(busyMs); if(P_.win.length>60){ P_.win.shift(); P_.busyWin.shift(); }
+  if(P_.overlay && (++P_.n%30)===0) perfOverlay();
+  if(!P_.auto) return;
+  if(P_.cool>0){ P_.cool--; return; }
+  if(P_.win.length<60) return;
+  let avg=0, bavg=0; for(const v of P_.win) avg+=v; for(const v of P_.busyWin) bavg+=v; avg/=60; bavg/=60;
+  if(avg>Math.max(20,P_.base*1.3) && P_.tier<2){
+    if(now-P_.upAt<30000) P_.block[P_.tier]=true;            // 戻した直後にまた落ちた：その段へは戻さない
+    P_.tier++; P_.since=now; P_.cool=300; P_.win.length=0; P_.busyWin.length=0;
+    P_.log.push({t:Math.round(now),dir:'down',tier:P_.tier,avg:+avg.toFixed(1)}); perfApplyTier();
+  }else if(P_.tier>0 && !P_.block[P_.tier-1] && P_.ups<3 && now-P_.since>45000 && avg<=P_.base*1.1+0.5 && bavg<=9){
+    P_.tier--; P_.ups++; P_.upAt=now; P_.since=now; P_.cool=300; P_.win.length=0; P_.busyWin.length=0;
+    P_.log.push({t:Math.round(now),dir:'up',tier:P_.tier,avg:+avg.toFixed(1)}); perfApplyTier();
+  }
+}
+function perfStats(){
+  const h=PERF.hist, n=h.length; if(!n) return null;
+  const s=[...h].sort((a,b)=>a-b), b=[...PERF.busyHist].sort((a,c)=>a-c);
+  const avg=h.reduce((a,c)=>a+c,0)/n;
+  return {frames:n, avgMs:+avg.toFixed(1), p95Ms:+s[Math.min(n-1,Math.floor(n*.95))].toFixed(1), maxMs:+s[n-1].toFixed(1),
+          busyAvgMs:+(b.reduce((a,c)=>a+c,0)/n).toFixed(1), busyP95Ms:+b[Math.min(n-1,Math.floor(n*.95))].toFixed(1), busyMaxMs:+b[n-1].toFixed(1),
+          tier:PERF.tier, dpr:_dpr, baseMs:+PERF.base.toFixed(1), auto:PERF.auto};
+}
+function perfOverlay(){
+  if(!PERF.el){
+    const d=document.createElement('div'); d.id='perf-ov';
+    d.style.cssText='position:fixed;left:4px;top:4px;z-index:99999;font:10px/1.3 monospace;color:#9f9;background:rgba(0,0,0,.65);padding:2px 5px;pointer-events:none;white-space:pre;border-radius:3px';
+    document.body.appendChild(d); PERF.el=d;
+  }
+  const st=perfStats(); if(!st) return;
+  PERF.el.textContent='fps '+(1000/st.avgMs).toFixed(0)+'  avg '+st.avgMs+'  p95 '+st.p95Ms+'  max '+st.maxMs+' ms\n'
+    +'work '+st.busyAvgMs+' / p95 '+st.busyP95Ms+' / max '+st.busyMaxMs+' ms\n'
+    +'tier '+st.tier+'  dpr '+st.dpr+'  base '+st.baseMs+(st.auto?'':'  (auto off)');
+}
+window.ABYSS_PERF={state:PERF, stats:perfStats, setTier(t){ PERF.tier=Math.max(0,Math.min(2,t|0)); perfApplyTier(); }};
 function resize(){
-  const dpr=Math.min(2,devicePixelRatio||1);
+  const dpr=perfDpr();
   syncViewportHeight();
   _dpr=dpr;
   cv.width=innerWidth*dpr; cv.height=innerHeight*dpr;
@@ -15988,6 +16058,18 @@ function resize(){
 }
 addEventListener('resize',resize);
 
+/* 光る敵のリスト。enemyLit は敵1体ごとに「周りに光る敵がいるか」を W.enemies 全体から探していたので、
+   敵が n 体いると1フレームで n×n 回 glowFoe を呼んでいた（49Fの115体前後で約1.3万回×呼び出し元の数）。
+   描画1回（_drawSerial）・同じ配列・同じ長さの間は同じリストを使い回す（光る敵が居ないフロアでは空の配列で終わる）。
+   位置は参照で読むので、敵が動いても古くならない。死亡・生成はフレームをまたぐので _drawSerial が変わる。 */
+let _glowSerial=-1, _glowArr=null, _glowLen=-1, _glowList=[];
+function glowFoes(){
+  const en=W.enemies;
+  if(_glowSerial!==_drawSerial || _glowArr!==en || _glowLen!==en.length){
+    _glowSerial=_drawSerial; _glowArr=en; _glowLen=en.length; _glowList=en.filter(glowFoe);
+  }
+  return _glowList;
+}
 /* 灯りから見た敵の見え方。'lit'＝普通、'shadow'＝黒い影、'hidden'＝見えない。
    灯りの半径は洞窟版が描いた灯り（CAVE.litTiles）。洞窟版が無いときは全部見える。 */
 function enemyLit(e){
@@ -15996,32 +16078,37 @@ function enemyLit(e){
   if(glowFoe(e)) return 'lit';
   if(W.drops.some(d=>d.stone && Math.hypot(d.x-e.x, d.y-e.y) <= STONE_LIGHT_R)) return 'lit';   // 落ちている蛍石の灯りの中
   if(W.shop && Math.hypot(W.shop.x-e.x, W.shop.y-e.y) <= MERCHANT_LIGHT_R) return 'lit';           // 商人の角灯の灯りの中
-  if(W.enemies.some(g=>g!==e && glowFoe(g) && Math.hypot(g.x-e.x, g.y-e.y) <= GLOW_R)) return 'lit';
+  if(glowFoes().some(g=>g!==e && Math.hypot(g.x-e.x, g.y-e.y) <= GLOW_R)) return 'lit';
   const r = (window.CAVE && CAVE.on && Number.isFinite(CAVE.litTiles)) ? CAVE.litTiles : null;
   if(r==null) return 'lit';
   if(Math.hypot(e.x-P.x, e.y-P.y) <= r+0.35) return 'lit';
   return lightLevel() <= LIGHT_BLIND ? 'hidden' : 'shadow';
 }
-/* fn の描いた物を黒い影にして貼る。描画先（ctx）を一時的に裏のキャンバスへ差し替える。 */
+/* fn の描いた物を黒い影にして貼る。描画先（ctx）を一時的に裏のキャンバスへ差し替える。
+   【2026-11-10 perf】裏キャンバスは**画面と同じ大きさ（780×1328 など）**だった。使うのは敵1体ぶんの小さな矩形だけなのに、
+   毎回この巨大な面を相手に描き・source-in で塗り・貼っていたので、影の敵が数体いるだけで1回5〜10msかかった。
+   今は**必要な矩形ぶんだけの大きさ**（大きくなるときだけ作り直す。縮めない）にして、
+   本編の変換行列から矩形の左上ぶんを引いた座標系で描く。貼る位置・黒の色・不透明度は従来と同じ。 */
 let _silCv=null, _silCx=null;
 function drawSilhouette(sx, sy, rad, fn){
-  if(!_silCv || _silCv.width!==cv.width || _silCv.height!==cv.height){
-    _silCv=document.createElement('canvas'); _silCv.width=cv.width; _silCv.height=cv.height; _silCx=_silCv.getContext('2d');
-  }
   const main=ctx, m=main.getTransform(), d=m.a||1;
   const x0=Math.max(0,Math.floor(m.e+(sx-rad)*d)), y0=Math.max(0,Math.floor(m.f+(sy-rad)*d));
   const w=Math.min(cv.width-x0, Math.ceil(rad*2*d)+2), h=Math.min(cv.height-y0, Math.ceil(rad*2*d)+2);
   if(w<=0||h<=0) return;
+  if(!_silCv || _silCv.width<w || _silCv.height<h){
+    if(!_silCv){ _silCv=document.createElement('canvas'); _silCx=_silCv.getContext('2d'); }
+    _silCv.width=Math.max(_silCv.width,w); _silCv.height=Math.max(_silCv.height,h);   // 幅や高さを変えるとコンテキストの状態は初期化される
+  }
   const c=_silCx;
-  c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation='source-over'; c.globalAlpha=1; c.clearRect(x0,y0,w,h);
-  c.setTransform(m); c.imageSmoothingEnabled=false; c.globalAlpha=main.globalAlpha;
+  c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation='source-over'; c.globalAlpha=1; c.clearRect(0,0,w,h);
+  c.setTransform(m.a,m.b,m.c,m.d,m.e-x0,m.f-y0); c.imageSmoothingEnabled=false; c.globalAlpha=main.globalAlpha;
   ctx=c;
   try{ fn(); } finally { ctx=main; }
   c.setTransform(1,0,0,1,0,0); c.globalAlpha=1;
-  c.globalCompositeOperation='source-in'; c.fillStyle='#04050a'; c.fillRect(x0,y0,w,h);
+  c.globalCompositeOperation='source-in'; c.fillStyle='#04050a'; c.fillRect(0,0,w,h);
   c.globalCompositeOperation='source-over';
   main.save(); main.setTransform(1,0,0,1,0,0); main.globalAlpha=0.94;
-  main.drawImage(_silCv, x0,y0,w,h, x0,y0,w,h);
+  main.drawImage(_silCv, 0,0,w,h, x0,y0,w,h);
   main.restore();
 }
 function draw(){
