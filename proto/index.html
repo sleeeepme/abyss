@@ -3399,23 +3399,28 @@ function upgLv(id){ return S.upg[id]||0; }
 
    数が欲しければ深く潜る——ただしそれは**敵が増えるから**であって、
    1体あたりの単価が上がるからではない。 */
+const DP_SP_RATE = 0.15, DP_SP_CAP = 2.5;      // 死の圧の SP 割増し（1+0.15×圧、上限×2.5）
+const DP_ILVL_CAP = 4;                          // 死の圧の ilvl 加算は +floor(圧/2)、上限+4
 const SP_MOB = 1, SP_ELITE = 2, SP_UNIQ = 3;
 const SP_MID = 5, SP_GREAT = 10, SP_FINAL = 20;
 // 死亡強化だけを報酬にも反映。通常の深度・呪いによるLv加算とは分ける。
 function shardDrop(e, depth){
   const bonus=deathPressureLevel(depth);
+  /* 死の圧の報酬は「足す」のではなく「割増す」。足すと圧10で雑魚1SP→11SPになる。
+     SP は base×(1+0.15×圧)、上限×2.5。 */
+  const sp=base=>Math.round(base*Math.min(DP_SP_CAP, 1+DP_SP_RATE*bonus));
 
   /* 侵入者は先に見る。倒した瞬間に入る経路が1本になったので、
      ここで返さないと「基本分＋侵入者分」で二重に入る。
      **この敵が何SPか**を答える場所は、ここ1ヶ所に保つ。 */
-  if(e.intruder) return INTRUDER_SHARDS+bonus;
+  if(e.intruder) return sp(INTRUDER_SHARDS);
   /* 磯虫は1体ずつは出さず、群れを散らした最後の1体で群れの頭数の3割ぶんをまとめて出す */
-  if(e.swarmling) return (typeof packCleared==='function' && packCleared(e)) ? Math.max(SP_MOB, Math.round((SP_MOB+bonus)*(e._packN||10)*SLATER_REWARD)) : 0;
-  if(e.boss) return (e.tier==='final' ? SP_FINAL
-           : e.tier==='great' ? SP_GREAT : SP_MID)+bonus;
-  if(e.uniq)  return SP_UNIQ+bonus;
-  if(e.elite) return SP_ELITE+bonus;
-  return SP_MOB+bonus;
+  if(e.swarmling) return (typeof packCleared==='function' && packCleared(e)) ? Math.max(SP_MOB, Math.round(sp(SP_MOB)*(e._packN||10)*SLATER_REWARD)) : 0;
+  if(e.boss) return sp(e.tier==='final' ? SP_FINAL
+           : e.tier==='great' ? SP_GREAT : SP_MID);
+  if(e.uniq)  return sp(SP_UNIQ);
+  if(e.elite) return sp(SP_ELITE);
+  return sp(SP_MOB);
 }
 /* SPを口座へ入れる。**床には落とさない。**
    経験値・金と同じで、倒した瞬間に入る。
@@ -6290,6 +6295,7 @@ const S={
   stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1,
   // 生きて帰った最深。到達（deepest）とは別に持つ——加護が掛かるのはこちら側
   deepestBack:0, deaths:0, runs:0, abyssCall:false,
+  deathStreak:null,      // 直近の連続死 {d:階, n:回}。3連敗で死の圧を1段戻す
   deathPressure:{},      // 階ごとの死亡蓄積。泉へのSP奉納で全階リセット
   mapOn:false,           // 地図は既定で出さない（🗺 のトグル）
   bossClear:0,           // 倒したボスの最深階。能力強化の段はこれで開く
@@ -7968,9 +7974,20 @@ const ENEMY_STEP_LV = 3;         // 一段ぶんのレベル
 const DEATH_PRESSURE_FROM = 5;
 const DEATH_PRESSURE_STEP = 10;
 const SPRING_OFFER_COST = 100;
+/* 死の圧は「大ボスを一度も倒していない初回帯」では掛けない。
+   避けない人ほど死に、死ぬほど勝てなくなる悪循環（_vera 避けない操縦:
+   SP200 圧0=17% → SP290 圧3=4%）を、入口で断つ。掛かる場合も上限 +2。
+   同じ階で3連敗したら1段戻す（詰んだ人を見捨てない）。 */
+const DEATH_PRESSURE_MIN_CLEAR = 10;   // S.bossClear がこれ未満の間は圧なし
+const DEATH_PRESSURE_CAP = 2;
+const DEATH_PRESSURE_STREAK = 3;
 function deathPressureLevel(depth){
   if(depth<DEATH_PRESSURE_FROM) return 0;
-  return deathPressureLevelFromCount((S.deathPressure||{})[depth]||0);
+  if((S.bossClear||0)<DEATH_PRESSURE_MIN_CLEAR) return 0;
+  let lv=Math.min(DEATH_PRESSURE_CAP, deathPressureLevelFromCount((S.deathPressure||{})[depth]||0));
+  const st=S.deathStreak;
+  if(st && st.n>=DEATH_PRESSURE_STREAK && depth<=st.d) lv=Math.max(0, lv-1);
+  return lv;
 }
 function deathPressureLevelFromCount(n){
   const blocks=Math.floor(n/DEATH_PRESSURE_STEP);
@@ -7982,6 +7999,8 @@ function deathPressureLevelFromCount(n){
 function recordDeathPressure(depth){
   S.deathPressure=S.deathPressure||{};
   for(let d=DEATH_PRESSURE_FROM;d<=depth;d++) S.deathPressure[d]=(S.deathPressure[d]||0)+1;
+  const st=S.deathStreak;
+  S.deathStreak = (st && st.d===depth) ? {d:depth, n:st.n+1} : {d:depth, n:1};
 }
 function enemyLevelAt(depth){
   const base = depth + Math.floor(depth/8) + deathPressureLevel(depth);
@@ -7990,11 +8009,11 @@ function enemyLevelAt(depth){
 }
 // 現在の階もその場で解除。被ダメージ割合・各種倍率・第二形態の控えを保つ。
 function hasDeathPressure(){
-  return Object.entries(S.deathPressure||{}).some(([d,n])=>Number(d)>=DEATH_PRESSURE_FROM && n>0);
+  return Object.entries(S.deathPressure||{}).some(([d,n])=>Number(d)>=DEATH_PRESSURE_FROM && n>0 && deathPressureLevel(Number(d))>0);
 }
 function clearDeathPressure(){
   removeEnemyDeathPressure(S.run ? deathPressureLevel(S.run.depth) : 0);
-  S.deathPressure={};
+  S.deathPressure={}; S.deathStreak=null;
 }
 // 旧セーブの1〜4階の蓄積と、保存済みの現階の敵強化を解除する。
 function normalizeDeathPressure(){
@@ -9045,6 +9064,7 @@ function rememberFloor(){
 }
 function enterFloor(depth, opt){
   opt = opt || {};
+  if(S.deathStreak && depth>S.deathStreak.d) S.deathStreak=null;   // その階を越えたら連敗は切れる
   _linkNow = null;                    // 一斉攻撃の演出は階をまたがない
   _linkCombo = null;
   rememberFloor();                    // 離れる階の記憶を先に控える（上の注記）
@@ -12599,7 +12619,7 @@ function killEnemy(e, byAlly){
      経験値も金も落とし物も、**最初の1回だけ**。 */
   if(e.noXp && e.noDrop) return;
   const st=stats(S.hero);
-  const rewardDepth=S.run.depth+deathPressureLevel(S.run.depth);
+  const rewardDepth=S.run.depth+Math.min(DP_ILVL_CAP, Math.floor(deathPressureLevel(S.run.depth)/2));
   const cfg = e.boss ? BOSS_STATS[e.tier] : null;
   /* ---------- 第50階層の主が呼ぶ雑魚は経験値3倍 ----------
      「削って終わり」ではなく、**戦いながらレベルを上げる**階にしたい。
@@ -14025,7 +14045,7 @@ function die(){
      「どこに何が残ったか」が埋もれていた（報告：文字情報が多すぎる）。
      残すのは**この探索で何が起きたか**だけにする。
      規則は遺体を回収する場面と「遊び方」に書いてある。 */
-  let html=S.run.depth>=DEATH_PRESSURE_FROM
+  let html=(S.run.depth>=DEATH_PRESSURE_FROM && deathPressureLevel(S.run.depth)>0)
     ? '<div style="color:#e0705a;line-height:1.9">第'+DEATH_PRESSURE_FROM+'〜'+S.run.depth+'階層に死の蓄積 — この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</div>'
     : '';
   html += S.grave
@@ -22717,7 +22737,7 @@ bindTap(el('dbg-reset'), ()=>{
   if(window.ABYSS_SAVE && !window.ABYSS_SAVE.clear()) return;
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
-  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.deathStreak=null;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;

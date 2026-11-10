@@ -14,8 +14,9 @@ try{
   const checks=await page.evaluate(()=>{
     const out=[];
     function check(name,ok){if(!ok)throw Error(name);out.push(name);}
-    window.DROP_IN=false; S.tutStone=true;
-    const expected=[[0,0],[1,1],[9,9],[10,10],[11,10],[12,11],[19,14],[20,15],[21,15],[22,15],[23,16],[30,18],[40,20]];
+    window.DROP_IN=false; S.tutStone=true; S.bossClear=10;   // 圧は大ボス撃破後の世界だけ（初回帯は0）
+    const expected=[[0,0],[1,1],[2,2],[9,2],[10,2],[40,2]];   // 上限 +2
+    S.bossClear=9;S.deathPressure={5:12};check('no pressure before first great boss',deathPressureLevel(5)===0&&enemyLevelAt(5)===5);S.bossClear=10;
     for(const [n,lv] of expected){S.deathPressure={5:n};check('curve '+n,deathPressureLevel(5)===lv);}
     S.deathPressure={};startRun(6);S.hero.boons=[];S.hero.party=[];
     function rewardSample(n){
@@ -28,16 +29,24 @@ try{
     }
     const ordinary=rewardSample(0),rewarded=rewardSample(10);
     check('boosted kill increases EXP and gold',rewarded.xp>ordinary.xp&&rewarded.gold>ordinary.gold);
-    check('boosted kill increases SP by Lv bonus',rewarded.sp===ordinary.sp+10);
-    check('equipment item level follows Lv bonus',ordinary.items.length>0&&rewarded.items.length===ordinary.items.length&&rewarded.items.every((lv,i)=>lv===ordinary.items[i]+10));
-    for(const enemy of [{},{elite:true},{uniq:true},{boss:true,tier:'mid'},{boss:true,tier:'great'},{boss:true,tier:'final'},{intruder:true}]){
+    check('boosted kill SP is a 15% markup, not a flat add',rewarded.sp===Math.round(ordinary.sp*1.3));
+    check('equipment item level gains floor(bonus/2)',ordinary.items.length>0&&rewarded.items.length===ordinary.items.length&&rewarded.items.every((lv,i)=>lv===ordinary.items[i]+1));
+    {const lvFn=deathPressureLevel;deathPressureLevel=()=>10;try{
+      const big=rewardSample(10);
+      check('item level bonus capped at +4',big.items.every((lv,i)=>lv===ordinary.items[i]+4));
+      check('SP markup capped at x2.5',shardDrop({boss:true,tier:'great'},6)===Math.round(SP_GREAT*2.5)&&shardDrop({},6)===Math.round(SP_MOB*2.5));
+    }finally{deathPressureLevel=lvFn;}}
+    for(const [enemy,base] of [[{},SP_MOB],[{elite:true},SP_ELITE],[{uniq:true},SP_UNIQ],[{boss:true,tier:'mid'},SP_MID],[{boss:true,tier:'great'},SP_GREAT],[{boss:true,tier:'final'},SP_FINAL],[{intruder:true},INTRUDER_SHARDS]]){
       S.deathPressure={};const sp=shardDrop(enemy,6);S.deathPressure={6:10};
-      check('SP bonus '+JSON.stringify(enemy),shardDrop(enemy,6)===sp+10);
+      check('SP markup '+JSON.stringify(enemy),sp===base&&shardDrop(enemy,6)===Math.round(base*1.3));
     }
+    S.deathPressure={6:10};S.deathStreak={d:6,n:3};
+    check('3 straight losses on a floor ease pressure by one',deathPressureLevel(6)===1&&deathPressureLevel(5)===0);
+    S.deathStreak={d:6,n:2};check('2 losses do not ease',deathPressureLevel(6)===2);S.deathStreak=null;
     const cleared=packCleared;packCleared=()=>false;
     check('unfinished swarm still gives no SP',shardDrop({swarmling:true,_packN:10},6)===0);
     packCleared=()=>true;
-    check('swarm reward keeps group reduction',shardDrop({swarmling:true,_packN:10},6)===Math.round(11*10*SLATER_REWARD));
+    check('swarm reward keeps group reduction',shardDrop({swarmling:true,_packN:10},6)===Math.round(Math.round(1.3)*10*SLATER_REWARD));
     packCleared=cleared;
     clearDeathPressure();const resetReward=rewardSample(0);
     check('reset restores original rewards',JSON.stringify(resetReward)===JSON.stringify(ordinary));
@@ -60,10 +69,10 @@ try{
     S.hero=newHero();S.deathPressure={};startRun(5);S.screen='event';
     RNG=mulberry32(17);const base=makeBoss(W.fl,5,'mid');S.deathPressure={1:12,2:12,3:12,4:12,5:12};S.deaths=12;
     RNG=mulberry32(17);const boosted=makeBoss(W.fl,5,'mid');
-    check('boss stats strengthen',boosted.lv===base.lv+11&&boosted.maxHp>base.maxHp&&boosted.atkV>base.atkV);
+    check('boss stats strengthen',boosted.lv===base.lv+2&&boosted.maxHp>base.maxHp&&boosted.atkV>base.atkV);
     boosted.hp=boosted.maxHp/2;W.enemies=[boosted];W.ev={id:'spring',x:P.x,y:P.y,used:false};
     S.shards=99;openEvent();check('insufficient button disabled',el('ev-offer').disabled);offerAtSpring();
-    check('insufficient no changes',S.shards===99&&!W.ev.used&&deathPressureLevel(5)===11);
+    check('insufficient no changes',S.shards===99&&!W.ev.used&&deathPressureLevel(5)===2);
     S.shards=100;openEvent();check('offer available',!el('ev-offer').disabled&&!el('ev-offer').hidden);
     boosted.form2={maxHp:1000,atkV:200,def:100};
     boosted.parts=[{max:100,hp:50,broken:false},{max:100,hp:0,broken:true}];
@@ -122,13 +131,14 @@ try{
     W.enemies=[e];e.x=P.x+2;e.y=P.y;e.ms=0;e.cd=999;P.target=e;W.seen.forEach(row=>row.fill(1));
     const rows=[],original=label;
     try{
-      for(const [bonus,color] of [[0,'#98a1b2'],[1,'#ffe066'],[4,'#ffe066'],[5,'#ff9a5a'],[9,'#ff9a5a'],[10,'#ff625a']]){
+      for(const [bonus,color] of [[0,'#98a1b2'],[1,'#ffe066'],[2,'#ffe066']]){
         S.deathPressure=bonus?{6:bonus}:{};e.lv=enemyLevelAt(6);
         let seen=false;
         label=function(text,x,y,col,scale){if(text==='Lv.'+e.lv){if(col!==color)throw Error('wrong rendered Lv color');seen=true;}return original(text,x,y,col,scale);};
         draw();if(!seen)throw Error('Lv label not rendered');rows.push(bonus);
       }
     }finally{label=original;}
+    for(const [b,c] of [[4,'#ffe066'],[5,'#ff9a5a'],[9,'#ff9a5a'],[10,'#ff625a']]) if(feelEnemyLevelColor(b)!==c)throw Error('color table '+b);
     clearDeathPressure();if(feelEnemyLevelColor()!=='#98a1b2')throw Error('color did not reset');
     S.deathPressure={6:5};e.lv=enemyLevelAt(6);W.pops=[];W.fx=[];draw();
     return rows;
