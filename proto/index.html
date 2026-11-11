@@ -6578,7 +6578,8 @@ function beaconLevel(depth){ return depth<=1 ? 1 : clamp(Math.round(depth*1.1), 
    同じ強さを渡すために、支給はそちらに合わせる。 */
 function beaconKitDepth(d){ return arrivesByPortal(d) ? d+1 : d; }
 function outfitForBeacon(h, depth){
-  if(!h || (depth<=1 && !dbg('allDepths'))) return null;
+  const debugKit=dbg('on') || dbg('allDepths');
+  if(!h || (depth<=1 && !debugKit)) return null;
   const want=beaconLevel(depth);
   const given={lv:0, gear:[], potentials:0};
   if(h.lv < want){
@@ -6599,8 +6600,12 @@ function outfitForBeacon(h, depth){
     }
   }
   const ilvl = clamp(depth-2, 1, 60);
-  (depth>1 ? [['weapon','sword'], ['armor','chain']] : []).forEach(([slot, base])=>{
+  const gear=[['weapon','sword']];
+  if(depth>1) gear.push(['armor','chain']);
+  gear.forEach(([slot, base])=>{
     if(h.equip[slot]) return;               // 自前の物があれば触らない
+    // 検証では1階から、空の武器枠に全武器種から等確率で1本を支給する。
+    if(debugKit && slot==='weapon') base=pick(BASES.filter(b=>b.slot===SLOT.W)).id;
     const it=genBaseItem(base, ilvl, 1);    // 支給品なので Common 止まり
     it.ident=true;
     h.equip[slot]=it;
