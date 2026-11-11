@@ -7446,8 +7446,18 @@ function tickBossFreeze(dt){
 function frozenNow(){ return !!(S.run && (S.run.frozen||0) > 0); }
 
 /* ボスを 1 体作る。通常敵と同じ枠組みに乗せ、係数と挙動だけを盛る。 */
+function bossStatsAt(depth, tier){
+  const base=BOSS_STATS[tier];
+  /* 段差のならし（_wall --dan 3 SP450 の比: 10F×11.3 15F×2.7 20F×9.0 30F×10.7 40/50F×12.6）。
+     15F・25F の中ボスが壁として軽すぎ、20F 以降の大ボスが重すぎたので寄せる。
+     5F の中ボスと10F（ヴェラ。UNIQUE_BOSSES[10].hpMul で別に調整）は触らない。 */
+  if(tier==='mid'   && depth>=15) return Object.assign({}, base, {hp:BOSS_MID_HP_LATE});
+  if(tier==='great' && depth>=20) return Object.assign({}, base, {hp:BOSS_GREAT_HP_LATE});
+  return base;
+}
+const BOSS_MID_HP_LATE = 20, BOSS_GREAT_HP_LATE = 28;
 function makeBoss(fl, depth, tier){
-  const cfg=BOSS_STATS[tier];
+  const cfg=bossStatsAt(depth, tier);
   const lv = enemyLevelAt(depth) + (tier==='great'?3:1);
   const fams = FAMILY.filter(f=>f.minDepth<=depth);
   /* 名前つきのボスなら、系統・属性・技を丸ごとそちらから引く。
