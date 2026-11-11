@@ -13,9 +13,20 @@ R.lightDecays = await pg.evaluate(()=>{
   const start = lightLevel();
   S.run.elapsed += LIGHT_FIRST - 1;  const stillFull = lightLevel();   // 2分近くはまだ10
   S.run.elapsed += 2;                const after1 = lightLevel();      // 3分で9
-  S.run.elapsed += LIGHT_STEP*2;     const after3 = lightLevel();      // そこから90秒ごと
-  S.run.elapsed += LIGHT_STEP*20;    const floor = lightLevel();
+  S.run.elapsed += lightStep()*2;     const after3 = lightLevel();      // そこから90秒ごと
+  S.run.elapsed += lightStep()*20;    const floor = lightLevel();
   return {start, stillFull, after1, after3, floor, ok: start===10 && stillFull===10 && after1===9 && after3===7 && floor===1};
+});
+
+R.lightStepEarly = await pg.evaluate(()=>{
+  TH.run(8,{seed:3});
+  const r=[1,3,4,9].map(n=>{ S.runs=n; return lightStep(); });
+  return {early: r[0]===LIGHT_STEP_EARLY && r[1]===LIGHT_STEP_EARLY, later: r[2]===LIGHT_STEP && r[3]===LIGHT_STEP, slower: LIGHT_STEP_EARLY>LIGHT_STEP};
+});
+R.guaranteedStone = await pg.evaluate(()=>{
+  startRun(3); const n3=W.drops.filter(d=>d.stone).length;
+  startRun(4); const n4=W.drops.filter(d=>d.stone).length;
+  return {onFloor3: n3>=1, notFloor4: n4===0};
 });
 
 R.alliesAndKinAdd = await pg.evaluate(()=>{

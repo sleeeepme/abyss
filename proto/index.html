@@ -8338,6 +8338,8 @@ function makeUnique(fl, depth, fams){
    潜る時間そのものに配分が要るようにするための仕掛け。 */
 const LIGHT_MAX   = 10;
 const LIGHT_FIRST = 100;    // 新しい蛍石が10から9になるまでの秒数（最初の1段だけ長い。3分→2分 2026-10-01、120→100 2026-10-13）
+const LIGHT_STEP_EARLY = 40;  // 累計の探索が LIGHT_EARLY_RUNS 回までは、灯りの減りをゆるめる（慣れる前に真っ暗にしない）
+const LIGHT_EARLY_RUNS = 3;
 const LIGHT_STEP  = 28;     // そこから1段暗くなるまでの秒数（90→34 2026-10-01、34→28 2026-10-13）
 /* 2026-10-13 ユーザー要望「灯りの減るスピードを2割程度速く」。10→1 が 392秒 → 324秒（約2割速い）。 */
 const LIGHT_BLIND = 3;      // これ以下だと、灯りの外の敵は見えない
@@ -8354,16 +8356,17 @@ function miasmaZone(depth){ return !lightZone(depth); }
 const MIASMA_DOT = {3:0.006, 2:0.012, 1:0.02};
 function glowFoe(e){ return !!(e && !e.dead && e.fam && e.arch && (STONE_DROPPERS[e.fam.id]||[]).includes(e.arch.id)); }
 const GLOW_R = 2.6;   // 光る敵の周りで、ほかの敵も見える半径（マス）
+function lightStep(){ return (S.runs||0) <= LIGHT_EARLY_RUNS ? LIGHT_STEP_EARLY : LIGHT_STEP; }
 function lightFuel(){
   if(!S.run) return LIGHT_MAX;
   if(S.run.noStone) return 1;                                  // 初めての潜り：蛍石を持たずに入る
   if(S.run.stoneAt==null) S.run.stoneAt = S.run.elapsed||0;     // 灯りの無い古いセーブは、今から新しい灯り
   const age = (S.run.elapsed||0) - S.run.stoneAt;
   if(age < LIGHT_FIRST) return LIGHT_MAX;
-  return Math.max(1, LIGHT_MAX - 1 - Math.floor((age - LIGHT_FIRST)/LIGHT_STEP));
+  return Math.max(1, LIGHT_MAX - 1 - Math.floor((age - LIGHT_FIRST)/lightStep()));
 }
 /* 蛍石を替えてから、明るさ L になるまでの秒数（テストや調整用） */
-function lightAgeFor(L){ return L>=LIGHT_MAX ? 0 : LIGHT_FIRST + (LIGHT_MAX-1-L)*LIGHT_STEP; }
+function lightAgeFor(L){ return L>=LIGHT_MAX ? 0 : LIGHT_FIRST + (LIGHT_MAX-1-L)*lightStep(); }
 function lightBonus(){
   if(!S.hero) return 0;
   const allies = livingParty();
@@ -8891,6 +8894,25 @@ const STONE_LIGHT_R = 2.8;   // 落ちている蛍石が照らす半径（マス
 /* 商人の角灯（蛍石が入っている）が照らす半径（マス）と明るさ。2026-10-16「商人の周りをもっと明るく」。
    落ちている蛍石（.85）より明るく広くして、暗い階でも遠くから「あそこに商人がいる」と分かるようにする。 */
 const MERCHANT_LIGHT_R = 3.8, MERCHANT_LIGHT_I = 1.0;
+/* ---------- 3階の蛍石 ----------
+   敵が落とす蛍石は7%で、商人は 3・4 階では必ず出るとは限らない。灯りが尽きかける頃に
+   手に入る蛍石が運だけだと、慣れていない人ほど暗闇で詰む。なので 3 階の入口から
+   歩いて一番遠い部屋に1個、確定で置く。**乱数は引かない**（部屋の並びと距離だけで決める）
+   ので、階の生成や以降の抽選列は動かない。暗い層（石の層・水の層）の階だけ。 */
+const GUARANTEED_STONE_DEPTH = 3;
+function placeGuaranteedStone(fl){
+  if(!lightZone(GUARANTEED_STONE_DEPTH)) return;
+  let best=null, bd=-1;
+  for(const r of fl.rooms){
+    if(r===fl.start) continue;
+    const d=Math.hypot(r.cx-fl.start.cx, r.cy-fl.start.cy);
+    if(d>bd){ bd=d; best=r; }
+  }
+  if(!best) return;
+  let p={x:best.cx+0.5, y:best.cy+0.5};
+  if(!standable(p.x,p.y)) p=snapToFloor(fl, p.x, p.y);
+  W.drops.push({x:p.x, y:p.y, stone:true});
+}
 function placeFirstStone(fl){
   const W_=fl.W, H_=fl.H, dist=new Int32Array(W_*H_).fill(-1), q=[];
   const s0=fl.start.cy*W_+fl.start.cx; dist[s0]=0; q.push(s0);
@@ -9154,6 +9176,7 @@ function enterFloor(depth, opt){
   const remembered = unpackSeen(S.hero && S.hero.mapMem && S.hero.mapMem[depth], W.seen, fl.W, fl.H);
   W.memDepth = depth; W.memSeed = S.hero ? heroMapSeed() : null;
   if(remembered) log('見覚えのある階だ');
+  if(depth===GUARANTEED_STONE_DEPTH) placeGuaranteedStone(fl);   // 3階に蛍石を1個（乱数を使わない決め打ち）
   if(S.run.noStone) placeFirstStone(fl);   // 初めての潜り：入口の次の部屋に蛍石（周りは見えている扱い）
   W.seenKey = null;                 // 階が変わったら塗り直しの記憶も捨てる
 
