@@ -3075,7 +3075,7 @@ const BLOOM_EVERY = 2;     // 大技「命脈」が体を戻す間隔（秒）
 const SKILL_MAX_LV = 5;
 const SK_CD_FLOOR  = 0.6;      // 練気で縮むリキャストの下限（元の 60% まで）
 const SKILL_TECHS = [
-  {id:'wave', nm:'ショック', col:'#8fd8ff', tier:1, shard:70, need:null,
+  {id:'wave', nm:'ショック', col:'#8fd8ff', tier:1, shard:40, need:null,
    desc:'前方の扇をまとめて薙ぐ。下がりながらでも出せる',
    cd:lv=>WAVE_CD-(lv-1)*0.25,
    v:lv=>({mul:WAVE_MUL+(lv-1)*0.5, reach:WAVE_REACH+(lv-1)*0.2, arc:WAVE_ARC}),
@@ -3384,7 +3384,7 @@ function relicToggle(id){
    SPは<b>倒した瞬間に口座へ入る</b>ので、そのあと死んでも残る。
    どんなに酷い死に方をしても、潜った時間そのものは必ず能力強化に変わる。
    逆に金は「生きて帰らないと1Gも手に入らない」ままにしてある（帰還の価値を残すため）。 */
-function upgCost(u,lv){ return Math.round(u.shard*Math.pow(lv+1,1.35)); }
+function upgCost(u,lv){ return Math.round(u.shard*Math.pow(lv+1,1.2)); }
 function upgLv(id){ return S.upg[id]||0; }
 
 /* ---------- 敵1体あたりのSP ----------
