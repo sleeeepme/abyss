@@ -7962,6 +7962,15 @@ function ailForFamily(f){ return (f && FAM_AIL[f.id]) || 'bleed'; }
    （実測：第12階層から出すと、弓と革鎧の引き撃ちが成立しなくなった）。 */
 const ELITE_HARD_FROM = 15;    // 精鋭が出はじめる階＝曲線を吊り上げる階
 const ELITE_CHANCE    = 0.16;
+/* 数で押す代わりに精鋭で重くする: 敵数の上限は ENEMY_COUNT_MAX、精鋭率は第16階層の 0.16 から
+   第50階層の 0.30 まで線形に上がる。 */
+const ENEMY_COUNT_MAX = 65;
+const ELITE_CHANCE_DEEP = 0.30, ELITE_RAMP_FROM = 16, ELITE_RAMP_TO = 50;
+function eliteChanceAt(depth){
+  if(depth<=ELITE_RAMP_FROM) return ELITE_CHANCE;
+  const t=Math.min(1,(depth-ELITE_RAMP_FROM)/(ELITE_RAMP_TO-ELITE_RAMP_FROM));
+  return ELITE_CHANCE+(ELITE_CHANCE_DEEP-ELITE_CHANCE)*t;
+}
 /* 黄の精鋭。**雑魚の延長ではなく、足を止めて戦う相手**にする。
    4.0/1.7/1.4 では、同じ階の規格外（紫 7.5/2.0）と並べたとき
    手応えの差が付かず、金の輪が「少し硬いだけ」の印でしかなかった。
@@ -8092,7 +8101,7 @@ function spawnEnemies(fl, depth){
 
      第20階層から先は増え方そのものを速める。
        第10階層 22体 → 第20階層 37体 → 第30階層 64体 → 第50階層 118体
-     実測で200体までは60fpsを保てるので、上限130はその内側に置いてある。
+     実測で200体までは60fpsを保てるので、上限はその内側に置いてある（のち 65 に下げ、精鋭率で重さを足した）。
 
      ボス階は取り巻きを絞る（攻撃が読めなくなるので）。 */
   const raw = 7 + depth*1.5 + Math.max(0, depth-20)*1.2;
@@ -8101,7 +8110,7 @@ function spawnEnemies(fl, depth){
      50階の主だけは自前で眷属を連れてくる（bossEscort）。 */
   const count = fl.arena ? 0
               : boss ? clamp(Math.round(raw*0.28), 4, 26)
-                     : clamp(Math.round(raw), 8, 130);
+                     : clamp(Math.round(raw), 8, ENEMY_COUNT_MAX);
   /* ---------- 深さの効き ----------
      以前は `depth + depth/8`。第20階層で lv 22、第40階層で lv 45——
      **こちらの伸び（装備・熟練・能力強化・仲間）に追いつかない。**
@@ -8118,7 +8127,7 @@ function spawnEnemies(fl, depth){
     const r = pick(fl.rooms.filter(r=>r!==fl.start)) || fl.rooms[0];
     const a = pick(ARCH);
     const fam = pick(fams.length?fams:[FAMILY[0]]);
-    const elite = depth>=ELITE_HARD_FROM && rnd()<ELITE_CHANCE;
+    const elite = depth>=ELITE_HARD_FROM && rnd()<eliteChanceAt(depth);
     /* ---------- 第20階層から、遠くで崩してくる相手 ----------
        後半の危険が「痛い」と「硬い」の2つしか無かった。
        離れた場所から状態異常を置いてくる相手が混じると、
