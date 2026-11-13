@@ -4743,19 +4743,19 @@ function curseBonus(){
    技レベルはSPで上げる——能力強化がカンストしたあとのSPの行き先でもある。 */
 const ULTS=[
   {id:'quake', nm:'地脈断', icon:'✹', col:'#d6b34a', cd:26,
-   desc:lv=>`周囲 ${(3.2+lv*0.35).toFixed(1)} マスに ATK×${(2.6+lv*0.55).toFixed(1)} の打撃。全員よろめく`,
+   desc:lv=>`周囲 ${(3.2+lv*0.35).toFixed(1)} マスに ATK×${(2.6+lv*0.55).toFixed(1)} の打撃。全員よろめく`+ultStepNote('quake',lv),
    at:1},
   {id:'blink', nm:'縮地', icon:'➤', col:'#7fc8e0', cd:24,
-   desc:lv=>`進行方向へ跳び、通過した敵に ATK×${(1.8+lv*0.4).toFixed(1)}。${(2.0+lv*0.12).toFixed(1)}秒 無敵`,
+   desc:lv=>`近い敵へ ${2+lv} 回跳んで斬り抜け、1回ごとに ATK×${((1.8+lv*0.4)*ULT_BLINK_PASS).toFixed(1)}。抜けたあと ${(2.0+lv*0.12).toFixed(1)}秒 無敵`+ultStepNote('blink',lv),
    at:2},
   {id:'blaze', nm:'灼髄', icon:'✦', col:'#e0705a', cd:30,
-   desc:lv=>`前方へ炎の柱。ATK×${(3.4+lv*0.7).toFixed(1)} と火傷を与える`,
+   desc:lv=>`前方へ炎の柱。ATK×${(3.4+lv*0.7).toFixed(1)} と火傷を与える`+ultStepNote('blaze',lv),
    at:3},
   {id:'ward',  nm:'守護', icon:'✜', col:'#7fe0c0', cd:34,
-   desc:lv=>`${(6+lv*0.8).toFixed(0)}秒 パーティ全員の被ダメージ -${Math.min(70,30+lv*5)}%。状態異常を消す`,
+   desc:lv=>`${(6+lv*0.8).toFixed(0)}秒 パーティ全員の被ダメージ -${Math.min(70,30+lv*5)}%。状態異常を消す`+ultStepNote('ward',lv),
    at:4},
   {id:'ruin',  nm:'裂天', icon:'✧', col:'#c98adf', cd:40,
-   desc:lv=>`画面内の全ての敵に ATK×${(2.2+lv*0.5).toFixed(1)}。ボスには半減`,
+   desc:lv=>`画面内の全ての敵に ATK×${(2.2+lv*0.5).toFixed(1)}。ボスには半減`+ultStepNote('ruin',lv),
    at:5},
 
   /* ---------- 支える側の技 ----------
@@ -4767,16 +4767,145 @@ const ULTS=[
      1つずつ開く。枠は1つのままなので、**開くたびに選び直す**ことになる。
      数を増やすのではなく、迷いを増やすほうの足し方にしてある。 */
   {id:'aegis', nm:'鉄壁', icon:'▣', col:'#8fc7ff', cd:28,
-   desc:lv=>`${(7+lv*0.9).toFixed(0)}秒 パーティ全員の防御力 ×${(1.6+lv*0.22).toFixed(1)}`,
+   desc:lv=>`${(7+lv*0.9+(lv>=3?ULT_AEGIS_EXTRA:0)).toFixed(0)}秒 パーティ全員の防御力 ×${(1.6+lv*0.22).toFixed(1)}`+ultStepNote('aegis',lv),
    at:1},
   {id:'rally', nm:'回帰', icon:'✚', col:'#7fe0c0', cd:32,
-   desc:lv=>`パーティ全員のHPを最大値の ${(22+lv*5)}% 回復`,
+   desc:lv=>`パーティ全員のHPを最大値の ${(22+lv*5)}% 回復`+ultStepNote('rally',lv),
    at:2},
   {id:'bloom', nm:'命脈', icon:'❦', col:'#a9d86a', cd:30,
-   desc:lv=>`${(10+lv*1.5).toFixed(0)}秒 パーティ全員が2秒ごとに最大HPの ${(2+lv*0.5).toFixed(1)}% 回復`,
+   desc:lv=>`${(10+lv*1.5).toFixed(0)}秒 パーティ全員が2秒ごとに最大HPの ${(2+lv*0.5).toFixed(1)}% 回復`+ultStepNote('bloom',lv),
    at:3},
 ];
 const ULT_MAX_LV = 5;
+/* ---------- 大技の段（2026-11-07 ユーザー指定） ----------
+   Lv.1・3・5 で技の形が変わり、Lv.2・4 は数値と演出だけ上がる。
+   演出の派手さは PixelArtFx に o.lv で渡す（Lv.2・4 でも一段ずつ派手になる）。
+     地脈断 … Lv.3 で2発・Lv.5 で3発。1発ごとに半径が広がる。最後の1発は押し返して崩す
+     縮地   … Lv.1 で3回・Lv.5 で7回跳ぶ（1Lvごとに1回）。Lv.5 は最後に斬り跡が一斉に爆ぜる
+     灼髄   … Lv.3 で左右にも火柱の列（3列）・Lv.5 で5列。Lv.5 の火柱は近い敵へ寄る
+     守護   … Lv.3 で効いている間 1発・Lv.5 で2発まで無効。Lv.5 は割れるたびに周りを押し返す
+     鉄壁   … Lv.3 で効く時間 +3秒。Lv.5 は終わるときに受けたダメージの一部を爆発で返す
+     回帰   … Lv.3 で6秒間 仲間の技の待ちが倍の速さで進む。Lv.5 はかけた瞬間に仲間の大技が出る
+     命脈   … Lv.3 でかけた瞬間にも回復。Lv.5 は最大HPを超えた分を盾にする（最大HPの25%まで）
+     裂天   … Lv.3 で裂け目が2秒開いて雷が落ち続ける。Lv.5 は締めにHPが一番高い敵へ太い雷
+   後から来る当たり（2発目以降・跳ぶ2回目以降・雷）は ultLater で積み、発動時の duelCtx を持ち越す
+   ——崩しは「1回の大技につき1度」のまま数える。 */
+function ultTier(lv){ return lv>=5 ? 2 : lv>=3 ? 1 : 0; }
+const ULT_QUAKE_WAVES = [1, 2, 3];        // 段ごとの衝撃波の回数
+const ULT_QUAKE_GROW  = [1, 1.25, 1.5];   // 何発目かで半径に掛ける倍率
+const ULT_QUAKE_GAP   = 0.35;             // 衝撃波の間隔（秒）
+const ULT_QUAKE_AFTER = 0.5;              // 2発目以降の威力（1発目に対する倍率）
+const ULT_QUAKE_PUSH  = 1.2;              // 最後の1発の押し返し（マス）
+const ULT_QUAKE_BREAK = 4;                // 最後の1発の崩し（Lv.5 でも1発で中ボスを崩しきらない値。2026-11-10 レビュー）
+const ULT_BLINK_PASS  = 0.4;              // 1回の斬り抜けの威力（旧 1回ぶんに対する倍率）
+const ULT_BLINK_GAP   = 0.05;             // 跳ぶ合間（秒）
+const ULT_BLINK_ACCEL = 0.82;             // 1回跳ぶごとに走る秒数（と合間）に掛ける倍率。7回でも長くならないように
+const ULT_BLINK_MIN   = 0.06;             // 1回の最短の秒数
+const ULT_BLINK_SPEED = 1.5;              // 大技の縮地は全体を1.5倍の速さで走る（2026-11-07）
+/* i 回目（0始まり）の走る秒数 */
+function ultBlinkSec(i){ return Math.max(ULT_BLINK_MIN, BLINK_SEC/ULT_BLINK_SPEED*Math.pow(ULT_BLINK_ACCEL, i)); }
+function ultBlinkGap(i){ return ULT_BLINK_GAP/ULT_BLINK_SPEED*Math.pow(ULT_BLINK_ACCEL, i); }
+const ULT_BLINK_SEEK  = 5.0;              // 次の相手を探す距離（マス）
+const ULT_BLINK_BURST = 1.5;              // Lv.5 の斬り跡の爆発 ATK×
+const ULT_BLAZE_LANES = [[0], [-0.38, 0, 0.38], [-0.72, -0.38, 0, 0.38, 0.72]];   // 列の向き（ラジアン）
+const ULT_BLAZE_HOME  = 1.0;              // Lv.5 の火柱が敵へ寄る最大距離（マス）
+const ULT_WARD_BLOCK  = [0, 1, 2];        // 効いている間に無効にできる回数
+const ULT_WARD_PUSH   = 1.4;              // Lv.5 の盾が割れたときの押し返し（マス）
+const ULT_AEGIS_EXTRA = 3;                // Lv.3 からの追加の秒数
+const ULT_AEGIS_RET   = 0.6;              // Lv.5 の爆発：受けたダメージの何割を返すか
+const ULT_AEGIS_R     = 3.0;              // 爆発の半径（マス）
+const ULT_RALLY_HASTE = 6;                // Lv.3 の待ちが早く進む秒数
+const ULT_BLOOM_NOW   = 3;                // Lv.3 のかけた瞬間の回復（1回ぶんの何回分か）
+const ULT_BLOOM_SHIELD= 0.25;             // Lv.5 の盾の上限（最大HPに対して）
+const ULT_RUIN_BOLTS  = 8;                // Lv.3 の落ち続ける雷の本数
+const ULT_RUIN_EVERY  = 0.22;             // その間隔（秒）
+const ULT_RUIN_BOLT   = 0.2;              // 1本の威力（本体の倍率に対して）。画面全体・狙い不要なので単体火力は控えめに（2026-11-10 レビュー）
+const ULT_RUIN_FIN    = 1.0;              // Lv.5 の締めの雷（本体の倍率に対して）
+const ULT_STEP_TEXT = {
+  quake:['', '2発目は半径1.25倍に広がる', '3発目は半径1.5倍まで広がり、最後の1発は押し返して崩す'],
+  blink:['', '', '最後に全ての斬り跡が爆ぜる'],
+  blaze:['', '左右にも火柱の列（3列）', '5列に広がり、火柱が近い敵へ寄る'],
+  ward: ['', '効いている間 1発まで無効', '2発まで無効。割れるたびに周りを押し返す'],
+  aegis:['', '効く時間 +3秒', '終わるときに受けたダメージの一部を爆発で返す'],
+  rally:['', '6秒間 仲間の技の待ちが倍の速さで進む', 'かけた瞬間に仲間の大技が出る'],
+  bloom:['', 'かけた瞬間にも回復', '最大HPを超えた分を盾にする'],
+  ruin: ['', '裂け目が2秒開き、雷が落ち続ける', '締めにHPが一番高い敵へ太い雷'],
+};
+const ULT_STEP_KEEP = ['aegis', 'rally', 'bloom', 'ruin'];
+function ultStepNote(id, lv){
+  const tx = ULT_STEP_TEXT[id]; if(!tx) return '';
+  const now = tx[ultTier(lv)];
+  // Lv.5 の文に Lv.3 の効果も残すもの（上書きしないもの）だけ、両方書く
+  const lo  = ultTier(lv)>=2 && tx[1] && ULT_STEP_KEEP.includes(id) ? tx[1]+'。' : '';
+  return now ? '。'+lo+now : '';
+}
+/* 後から来る当たりの列。階をまたがない（startFloor で空にする）。 */
+let ULT_Q = [];
+function ultLater(t, fn){ ULT_Q.push({t, fn, dc:duelCtx}); }
+function tickUltQ(dt){
+  if(!ULT_Q.length) return;
+  const due=[];
+  ULT_Q.forEach(q=>{ q.t-=dt; if(q.t<=0) due.push(q); });
+  if(!due.length) return;
+  ULT_Q = ULT_Q.filter(q=>q.t>0);
+  due.forEach(q=>{
+    if(!S.hero || !S.run) return;
+    const prev=duelCtx; duelCtx=q.dc;
+    try{ q.fn(); } finally{ duelCtx=prev; }
+  });
+}
+/* 大技「回帰」Lv.3〜。仲間の技（Lv.50 の技・武器技）の待ちを、もう1倍ぶん進める。 */
+function tickRallyHaste(dt){
+  if(!S.run || !(S.run.rallyHaste>0)) return;
+  S.run.rallyHaste -= dt;
+  livingParty().forEach(a=>{ if(a.artCd>0) a.artCd -= dt; if(a.wartCd>0) a.wartCd -= dt; });
+}
+/* 命脈の回復。shield なら最大HPを超えた分を盾（h.bshield）にする（最大HPの ULT_BLOOM_SHIELD まで）。 */
+function bloomHeal(ent, pctNow, shield){
+  if(!ent || ent.hpNow<=0) return;
+  const mx = (ent===S.hero) ? stats(ent).maxHp : allyStats(ent).maxHp;
+  const amt = Math.max(1, Math.round(mx*pctNow/100));
+  const room = Math.max(0, mx - ent.hpNow), over = amt - Math.min(room, amt);
+  const ex=(ent===S.hero?P.x:ent.x), ey=(ent===S.hero?P.y:ent.y);
+  if(room>0){ ent.hpNow = Math.min(mx, ent.hpNow + amt); pop(ex, ey-0.5, Math.min(room,amt), '#a9d86a', '+'); }
+  if(shield && over>0){
+    const cap = Math.round(mx*ULT_BLOOM_SHIELD), before = ent.bshield||0;
+    ent.bshield = Math.min(cap, before + over);
+    if(ent.bshield > before) W.pops.push({x:ex, y:ey-0.75, txt:'盾 +'+(ent.bshield-before), c:'#cfe89a', life:0.7});
+  }
+}
+/* 命脈 Lv.5 の盾で受ける。1 は必ず通す（当たった攻撃は1以上、の約束は守る）。 */
+function bloomAbsorb(ent, dm){
+  if(!ent || !(ent.bshield>0) || dm<=1) return dm;
+  const take = Math.min(ent.bshield, dm-1);
+  ent.bshield -= take;
+  return dm - take;
+}
+/* 守護 Lv.5：盾が割れるたびに、その人の周りの敵を押し返す。 */
+function wardBreakPush(h, x, y){
+  if(!S.run || !S.run.ward || !(S.run.ward.lv>=5)) return;
+  if(typeof feelPixelArt==='function') feelPixelArt('u_ward_break', x, y, {o:{lv:S.run.ward.lv}});
+  nearEnemies(x, y, 3).forEach(e=>{
+    if(e.dead || e.boss || Math.hypot(e.x-x, e.y-y) > 2.2) return;
+    knockBack(e, {x, y}, ULT_WARD_PUSH);
+  });
+}
+/* 鉄壁 Lv.5：終わるときに、効いている間に全員が受けたダメージの ULT_AEGIS_RET を周りへ返す。
+   威力は ATK の倍率に直して hitEnemy を通す（防御・耐性・崩しの扱いを他の技とそろえる）。 */
+function ultAegisEnd(ag){
+  if(!ag || !ag.ret || !S.hero) return;
+  const st = stats(S.hero);
+  const mult = Math.min(10, 1.5 + (ag.taken||0)*ULT_AEGIS_RET/Math.max(1, st.atk));
+  if(typeof feelPixelArt==='function') feelPixelArt('u_aegis_burst', P.x, P.y, {ent:P, range:ULT_AEGIS_R, o:{lv:ag.lv}});
+  if(typeof feelKick==='function') feelKick(3.2, 0.28);
+  sayArt(P.x, P.y, '反撃', '#8fc7ff');
+  const prev=duelCtx; duelCtx=ag.dc || {kind:'ult', hit:[]};
+  try{
+    nearEnemies(P.x, P.y, ULT_AEGIS_R+1).forEach(e=>{
+      if(!e.dead && eSurf(e, P.x, P.y) <= ULT_AEGIS_R) hitEnemy(e, st, mult);
+    });
+  } finally{ duelCtx=prev; }
+}
 function ultDef(id){ return ULTS.find(u=>u.id===id); }
 /* 解放済みの大技。大ボスを n 体倒していれば at<=n の技が使える。 */
 function unlockedUlts(){ return ULTS.filter(u=>greatKills() >= u.at); }
@@ -5289,7 +5418,8 @@ function fireAllyArt(a, st, id, tgt, def){
     say();
 
   }else if(id==='bulwark'){
-    [S.hero, ...livingParty()].forEach(h=>{ if(h && !h.dead) h.barrier = BULWARK_HITS; });
+    // 大技「守護」の盾（h.wardBar）は別に数えているので、上書きせず上に積む（守護が切れたときに守護陣のぶんまで消えないように）
+    [S.hero, ...livingParty()].forEach(h=>{ if(h && !h.dead) h.barrier = BULWARK_HITS + (h.wardBar||0); });
     W.fx.push({t:'ultring', artId:'a_bulwark', x:a.x, y:a.y, r:0, max:4.2, life:0.55, maxLife:0.55, col:def.col});
     ultPartyArt('a_bulwark', 2.6, a);
     say('全員に盾');
@@ -6458,7 +6588,8 @@ function beaconLevel(depth){ return depth<=1 ? 1 : clamp(Math.round(depth*1.1), 
    同じ強さを渡すために、支給はそちらに合わせる。 */
 function beaconKitDepth(d){ return arrivesByPortal(d) ? d+1 : d; }
 function outfitForBeacon(h, depth){
-  if(!h || (depth<=1 && !dbg('allDepths'))) return null;
+  const debugKit=dbg('on') || dbg('allDepths');
+  if(!h || (depth<=1 && !debugKit)) return null;
   const want=beaconLevel(depth);
   const given={lv:0, gear:[], potentials:0};
   if(h.lv < want){
@@ -6479,8 +6610,12 @@ function outfitForBeacon(h, depth){
     }
   }
   const ilvl = clamp(depth-2, 1, 60);
-  (depth>1 ? [['weapon','sword'], ['armor','chain']] : []).forEach(([slot, base])=>{
+  const gear=[['weapon','sword']];
+  if(depth>1) gear.push(['armor','chain']);
+  gear.forEach(([slot, base])=>{
     if(h.equip[slot]) return;               // 自前の物があれば触らない
+    // 検証では1階から、空の武器枠に全武器種から等確率で1本を支給する。
+    if(debugKit && slot==='weapon') base=pick(BASES.filter(b=>b.slot===SLOT.W)).id;
     const it=genBaseItem(base, ilvl, 1);    // 支給品なので Common 止まり
     it.ident=true;
     h.equip[slot]=it;
@@ -9227,6 +9362,8 @@ function enterFloor(depth, opt){
   _intrKey = '';
   P.invuln = 0; S.run.ward = null;    // 無敵と守護は階層をまたがない
   S.run.aegis = null; S.run.bloom = null;   // 鉄壁・命脈も同じく持ち越さない
+  S.run.rallyHaste = 0; ULT_Q = [];         // 大技の後から来る当たりも持ち越さない
+  [S.hero, ...party()].forEach(h=>{ if(h){ h.wardBar=0; h.bshield=0; } });
   P.fallAnim = null; P.fallBlink = 0; // 落下演出も同様（跨ぐと違う階で消え続ける）
   S.run.hinted = false;
 
@@ -10721,7 +10858,7 @@ function fireArt(def, src){
     W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:1.8, life:0.45, maxLife:0.45, col:def.col});
 
   }else if(def.k==='barrier'){
-    c.ent.barrier = Math.max(c.ent.barrier||0, 1);
+    c.ent.barrier = Math.max(c.ent.barrier||0, 1 + (c.ent.wardBar||0));   // 守護の盾のぶんは別に残す
     W.fx.push({t:'ultring', artId:def.id, x:c.x, y:c.y, r:0, max:2.2, life:0.5, maxLife:0.5, col:def.col});
 
   }else if(def.k==='orbit'){
@@ -10818,12 +10955,14 @@ function ultReady(){
 function ultPowerMul(){ return 1 + relicSum('ultPow')/100; }
 /* 支える大技・仲間の支える技の絵：本人の足元の陣（本人に付いて動く）＋ 仲間ひとりずつの印を順に灯す。
    id+'_on' が仲間ごとの印。src を省くと主人公が本人。 */
-function ultPartyArt(id, r, src){
+function ultPartyArt(id, r, src, o){
   if(typeof feelPixelArt!=='function') return;
   const me = src || P;
-  feelPixelArt(id, me.x, me.y, {range:r, ent:me});
   const others = [P, ...livingParty()].filter(m=>m!==me);
-  others.forEach((m,i)=>feelPixelArt(id+'_on', m.x, m.y, {ent:m, delay:0.1+i*0.05}));
+  // o.links：本人から仲間へ結ぶ光の筋（回帰 Lv.4〜）。仲間の位置を点で渡す
+  const oo = o ? Object.assign({}, o) : undefined;
+  feelPixelArt(id, me.x, me.y, {range:r, ent:me, o:oo, pts: (o && o.links) ? others.map(m=>[m.x, m.y]) : undefined});
+  others.forEach((m,i)=>feelPixelArt(id+'_on', m.x, m.y, {ent:m, delay:0.1+i*0.05, o:oo}));
 }
 /* 大技の当たりを崩し・妨害に数えるため、中身を包む（どの技でも1回の大技につき1度） */
 /* ---------- 一斉攻撃（連携値） ----------
@@ -11314,72 +11453,170 @@ function fireUltCore(){
   const ang = Math.atan2(P.diry||0, P.dirx||1);
   const near = r => nearEnemies(P.x, P.y, r+1).filter(e=>!e.dead && eSurf(e, P.x, P.y) <= r);
 
+  const tier = ultTier(lv), pix = typeof feelPixelArt==='function';
+  const kick = (a,b) => { if(typeof feelKick==='function') feelKick(a,b); };
+
   if(u.id==='quake'){
-    const r = 3.2 + lv*0.35, mult = 2.6 + lv*0.55;
-    W.fx.push({t:'ultring', artId:'u_quake', x:P.x, y:P.y, r:0, max:r, life:0.42, maxLife:0.42, col:u.col});
-    if(typeof feelPixelArt==='function') feelPixelArt('u_quake', P.x, P.y, {range:r, ent:P});
-    near(r).forEach(e=>{ hitEnemy(e, st, mult); addStatus(e, 'stagger', S.hero.lv); });
+    /* 衝撃波を n 発。2発目以降は半径が広がり、威力は ULT_QUAKE_AFTER 倍。
+       中心はその時の主人公（撃ってから歩いても、自分の足元から広がる）。 */
+    const r0 = 3.2 + lv*0.35, mult = 2.6 + lv*0.55, n = ULT_QUAKE_WAVES[tier];
+    const wave = i => {
+      const r = r0*ULT_QUAKE_GROW[i], fin = tier>=2 && i===n-1;   // 押し返して崩すのは Lv.5 の最後の1発だけ（説明文どおり）
+      const m = mult*(i===0 ? 1 : ULT_QUAKE_AFTER);
+      W.fx.push({t:'ultring', artId:'u_quake', x:P.x, y:P.y, r:0, max:r, life:0.42, maxLife:0.42, col:u.col});
+      if(pix) feelPixelArt('u_quake', P.x, P.y, {range:r, ent:P, o:{lv, wave:i, fin}});
+      if(i>0) kick(2.2+i*0.8, 0.2);
+      near(r).forEach(e=>{
+        hitEnemy(e, st, m);
+        // よろめきはボスには崩しとして入る。発ごとに入れると大技1回で崩しきってしまうので、ボスには1発目だけ
+        if(i===0 || !e.boss) addStatus(e, 'stagger', S.hero.lv);
+        if(fin && !e.dead){
+          if(!e.boss) knockBack(e, P, ULT_QUAKE_PUSH);
+          if(isDuelBoss(e)) addBreak(e, ULT_QUAKE_BREAK);
+        }
+      });
+    };
+    wave(0);
+    for(let i=1;i<n;i++) ultLater(ULT_QUAKE_GAP*i, ()=>wave(i));
 
   }else if(u.id==='blink'){
-    /* ---------- 縮地（旧 瞬歩）は「跳ぶ」のをやめた ----------
-       1フレームで座標を移していたので、**画面上では消えて現れるだけ**。
-       何が起きたのか読めず、そのうえ通り道の敵を巻き込んだ手応えも無かった。
-
-       BLINK_SEC かけて**走り抜ける**形にする。
-       通り道の判定は今までどおり線分で1回だけ取る（走る間に二重に当てない）ので、
-       火力は変わらない。変わるのは**見えるかどうか**だけ。 */
-    const dist = 4.2 + lv*0.25, mult = 1.8 + lv*0.4;
-    const from = {x:P.x, y:P.y};
-    // 行き先を先に決める。壁は抜けないし、体も壁にめり込ませない（dashStop）
-    const stop = dashStop(P.x, P.y, ang, dist, P.r);
-    const gx=stop.x, gy=stop.y;
-    /* 走っている間の操作は奪う（途中で曲げられると線分の判定と食い違う）。
-       update() の頭で P.dash を進めて、終わったら解ける。 */
-    P.dash = {x0:from.x, y0:from.y, x1:gx, y1:gy, t:0, max:BLINK_SEC, col:u.col, art:'u_blink'};
-    if(typeof feelPixelArt==='function') feelPixelArt('u_blink', from.x, from.y, {angle:Math.atan2(gy-from.y, gx-from.x), range:Math.hypot(gx-from.x, gy-from.y)});
-    W.fx.push({t:'ultline', artId:'u_blink', x:from.x, y:from.y, x2:gx, y2:gy, life:0.45, maxLife:0.45, col:u.col});
-    W.enemies.forEach(e=>{
-      if(e.dead) return;
-      // 線分と敵の距離で判定する
+    /* ---------- 縮地：近い敵へ (2+Lv) 回、続けて走り抜ける ----------
+       1回ずつは旧縮地と同じ「BLINK_SEC かけて走り抜け、通り道を線分で1回だけ取る」。
+       次の相手は「まだ斬っていない近い敵」→「斬った敵」→「いなければ前へ」の順で選ぶ。
+       1回の威力は旧1回ぶんの ULT_BLINK_PASS 倍（回数が増えた分を割り戻してある）。 */
+    const hops = 2 + lv, dist = 4.2 + lv*0.25, mult = (1.8 + lv*0.4)*ULT_BLINK_PASS;
+    const slashed = new Set(), skip = new Set(), marks = [];   // skip：狙ったのに届かなかった相手（壁の向こうなど）
+    let lastA = ang;
+    let chain = 0; for(let i=0;i<hops;i++) chain += ultBlinkSec(i) + ultBlinkGap(i);
+    P.invuln = Math.max(P.invuln||0, chain + 2.0 + lv*0.12);   // 抜けきるまで＋抜けた直後
+    const byD = (a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y);
+    const burst = () => {
+      if(pix) marks.forEach((m,k)=>feelPixelArt('u_blink_burst', m.x, m.y, {angle:m.a, delay:k*0.015, o:{lv}}));
+      kick(3.4, 0.26);
+      const done = new Set();
+      marks.forEach(m=>nearEnemies(m.x, m.y, 2.2).forEach(e=>{
+        if(e.dead || done.has(e) || eSurf(e, m.x, m.y) > 1.1) return;
+        done.add(e); hitEnemy(e, st, ULT_BLINK_BURST);
+      }));
+    };
+    const hop = (i, tries=0) => {
+      const cand = nearEnemies(P.x, P.y, ULT_BLINK_SEEK+1).filter(e=>!e.dead && !skip.has(e) && Math.hypot(e.x-P.x, e.y-P.y) <= ULT_BLINK_SEEK);
+      const fresh = cand.filter(e=>!slashed.has(e)).sort(byD);
+      const tgt = fresh[0] || cand.sort(byD)[0] || null;
+      /* 2回目以降で斬る相手がいなければ、そこで止める（誰もいない所へ7回分飛んでいかない）。
+         前へ走り抜けるのは1回目だけ。Lv.5 はそこで斬り跡を爆ぜさせる。 */
+      if(!tgt && i>0){ if(tier>=2) ultLater(0.5/ULT_BLINK_SPEED, burst); return; }
+      const a = tgt ? Math.atan2(tgt.y-P.y, tgt.x-P.x) : lastA;
+      const want = tgt ? Math.min(dist, Math.hypot(tgt.x-P.x, tgt.y-P.y) + 1.2) : dist;   // 相手を抜けた所まで
+      lastA = a;
+      const from = {x:P.x, y:P.y};
+      // 行き先を先に決める。壁は抜けないし、体も壁にめり込ませない（dashStop）
+      const stop = dashStop(P.x, P.y, a, want, P.r);
+      const gx=stop.x, gy=stop.y;
+      // 壁に阻まれてほとんど進めない相手は、狙いから外して次を探す（その場で空振りを重ねない）
+      if(tgt && Math.hypot(gx-from.x, gy-from.y) < 0.3 && tries < 6){
+        skip.add(tgt);
+        return hop(i, tries+1);              // 同じ回のまま次の相手を探す（回数は減らさない）
+      }
+      /* 走っている間の操作は奪う（途中で曲げられると線分の判定と食い違う）。
+         update() の頭で P.dash を進めて、終わったら解ける。 */
+      const sec = ultBlinkSec(i);            // 1回ごとに速くなる
+      P.dash = {x0:from.x, y0:from.y, x1:gx, y1:gy, t:0, max:sec, col:u.col, art:'u_blink'};
+      if(pix) feelPixelArt('u_blink', from.x, from.y, {angle:Math.atan2(gy-from.y, gx-from.x), range:Math.hypot(gx-from.x, gy-from.y), o:{lv, hop:i, dur:sec}});
+      W.fx.push({t:'ultline', artId:'u_blink', x:from.x, y:from.y, x2:gx, y2:gy, life:0.45, maxLife:0.45, col:u.col});
+      if(lv>=4 && i>0) kick(1.4, 0.1);       // Lv.4〜：跳ぶたびに小さく揺れる
       const dx=gx-from.x, dy=gy-from.y, len2=dx*dx+dy*dy||1e-6;
-      let t=((e.x-from.x)*dx+(e.y-from.y)*dy)/len2; t=clamp(t,0,1);
-      const px=from.x+dx*t, py=from.y+dy*t;
-      if(eSurf(e, px, py) <= 0.85) hitEnemy(e, st, mult);
-    });
-    P.invuln = 2.0 + lv*0.12;   // 抜けた直後だけ無敵。逃げにも切り込みにも使える
+      W.enemies.forEach(e=>{
+        if(e.dead) return;
+        // 線分と敵の距離で判定する
+        let t=((e.x-from.x)*dx+(e.y-from.y)*dy)/len2; t=clamp(t,0,1);
+        const px=from.x+dx*t, py=from.y+dy*t;
+        if(eSurf(e, px, py) <= 0.85){
+          hitEnemy(e, st, mult); slashed.add(e);
+          if(marks.length < 24) marks.push({x:e.x, y:e.y, a:Math.atan2(dy,dx)});
+        }
+      });
+      if(tgt && !slashed.has(tgt)) skip.add(tgt);   // 走っても斬れなかった相手は、次から狙わない
+      if(i < hops-1) ultLater(sec + ultBlinkGap(i), ()=>hop(i+1));
+      else if(tier>=2) ultLater(sec + 0.5/ULT_BLINK_SPEED, burst);   // Lv.5：最後に斬り跡が一斉に爆ぜる
+    };
+    hop(0);
 
   }else if(u.id==='blaze'){
-    const len = 6.5, wide = 1.15, mult = 3.4 + lv*0.7;
-    W.fx.push({t:'ultbeam', artId:'u_blaze', x:P.x, y:P.y, a:ang, len, wide, life:0.5, maxLife:0.5, col:u.col});
-    if(typeof feelPixelArt==='function') feelPixelArt('u_blaze', P.x, P.y, {angle:ang, range:len, wide});
-    W.enemies.forEach(e=>{
-      if(e.dead) return;
-      const dx=e.x-P.x, dy=e.y-P.y;
-      const along = dx*Math.cos(ang) + dy*Math.sin(ang);
-      const side  = Math.abs(-dx*Math.sin(ang) + dy*Math.cos(ang));
-      if(along>=-0.4 && along<=len && side<=wide+e.r){
-        hitEnemy(e, st, mult);
-        addStatus(e, 'burn', S.hero.lv);
+    /* Lv.3 から左右にも火柱の列。どの列に入っても1体1回しか当てない。
+       Lv.5 は火柱がそれぞれ近い敵へ ULT_BLAZE_HOME マスまで横に寄る（当たりの帯も一緒に寄る）。 */
+    const len = 6.5, wide = 1.15, mult = 3.4 + lv*0.7, NCOL = 6;
+    const lanes = ULT_BLAZE_LANES[tier], home = tier>=2;
+    const hitOnce = new Set();
+    lanes.forEach((off, li)=>{
+      const a = ang + off, L = len*(1 - Math.abs(off)*0.35);
+      const ca=Math.cos(a), sa=Math.sin(a);
+      // 柱ごとの横ずれ（マス）。Lv.5 だけ近い敵へ寄る
+      const shift = [];
+      for(let k=0;k<NCOL;k++){
+        let sh = 0;
+        if(home){
+          const s0 = L*(k+1)/(NCOL+0.5), cx = P.x+ca*s0, cy = P.y+sa*s0;
+          let best = null, bd = 1e9;
+          nearEnemies(cx, cy, ULT_BLAZE_HOME+1.5).forEach(e=>{
+            if(e.dead) return;
+            const dx=e.x-cx, dy=e.y-cy, side = -dx*sa + dy*ca, along = dx*ca + dy*sa;
+            if(Math.abs(along) > 0.9 || Math.abs(side) > ULT_BLAZE_HOME + wide) return;
+            if(Math.abs(side) < bd){ bd = Math.abs(side); best = side; }
+          });
+          if(best!==null) sh = clamp(best, -ULT_BLAZE_HOME, ULT_BLAZE_HOME);
+        }
+        shift.push(sh);
       }
+      W.fx.push({t:'ultbeam', artId:'u_blaze', x:P.x, y:P.y, a, len:L, wide, life:0.5, maxLife:0.5, col:u.col});
+      // 列を順に灯す（同時だと5列が1つの塊に見える）。左右の列は火柱を低く
+      if(pix) feelPixelArt('u_blaze', P.x, P.y, {angle:a, range:L, wide, delay:Math.round(Math.abs(off)/0.36)*0.2, o:{lv, side:off!==0, off:shift}});
+      W.enemies.forEach(e=>{
+        if(e.dead || hitOnce.has(e)) return;
+        const dx=e.x-P.x, dy=e.y-P.y;
+        const along = dx*ca + dy*sa;
+        let side = Math.abs(-dx*sa + dy*ca);
+        if(home){                                // 寄った柱の帯でも、元の帯でも当てる（寄ったせいで外れる敵を作らない）
+          const k = clamp(Math.round(along/(L/(NCOL+0.5)))-1, 0, NCOL-1);
+          side = Math.min(side, Math.abs((-dx*sa + dy*ca) - shift[k]));
+        }
+        if(along>=-0.4 && along<=L && side<=wide+e.r){
+          hitOnce.add(e);
+          hitEnemy(e, st, mult);
+          addStatus(e, 'burn', S.hero.lv);
+        }
+      });
     });
+    if(lv>=4) kick(2.4, 0.22);
 
   }else if(u.id==='ward'){
-    const dur = 6 + lv*0.8, cut = Math.min(70, 30+lv*5);
-    S.run.ward = {t:dur, cut};
+    const dur = 6 + lv*0.8, cut = Math.min(70, 30+lv*5), blk = ULT_WARD_BLOCK[tier];
+    S.run.ward = {t:dur, cut, lv};
     S.run.pst = {};
     livingParty().forEach(a=>{ a.st={}; });
+    /* Lv.3〜：効いている間だけ、1人 blk 発ぶんの盾（守護陣と同じ h.barrier に積む）。
+       守護のぶんは h.wardBar で数え、守護が切れたら残りを引き取る。 */
+    if(blk) [S.hero, ...livingParty()].forEach(h=>{
+      if(!h) return;
+      const add = Math.max(0, blk - (h.wardBar||0));
+      h.barrier = (h.barrier||0) + add; h.wardBar = (h.wardBar||0) + add;
+    });
     W.fx.push({t:'ultring', artId:'u_ward', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
-    ultPartyArt('u_ward', 2.6);
+    ultPartyArt('u_ward', 2.6, null, {lv});
 
   }else if(u.id==='aegis'){
     /* 防御そのものを掛け算する。守護（被ダメージを削る）とは別枠なので、
-       両方は乗らない——枠が1つしかないので、そもそも同時には持てない。 */
-    const dur = 7 + lv*0.9, mul = 1.6 + lv*0.22;
-    S.run.aegis = {t:dur, mul};
-    W.fx.push({t:'ultring', artId:'u_aegis', x:P.x, y:P.y, r:0, max:2.4, life:0.5, maxLife:0.5, col:u.col});
+       両方は乗らない——枠が1つしかないので、そもそも同時には持てない。
+       Lv.5 は効いている間に全員が受けたダメージを数え、終わりに爆発で返す（ultAegisEnd）。 */
+    const dur = 7 + lv*0.9 + (tier>=1 ? ULT_AEGIS_EXTRA : 0), mul = 1.6 + lv*0.22;
+    // 効いている間にかけ直したら、それまでに受けたぶんの反撃を先に出す（溜めたぶんを捨てない）
+    if(S.run.aegis && S.run.aegis.ret) ultAegisEnd(S.run.aegis);
+    S.run.aegis = {t:dur, mul, lv, taken:0, ret: tier>=2, dc:duelCtx};
+    const R = 2.4*(lv>=2 ? 1.3 : 1);
+    W.fx.push({t:'ultring', artId:'u_aegis', x:P.x, y:P.y, r:0, max:R, life:0.5, maxLife:0.5, col:u.col});
     livingParty().forEach(a=>W.fx.push({t:'ultring', artId:'u_aegis', x:a.x, y:a.y, r:0, max:1.6,
                                         life:0.45, maxLife:0.45, col:u.col}));
-    ultPartyArt('u_aegis', 2.4);
+    ultPartyArt('u_aegis', R, null, {lv});
 
   }else if(u.id==='rally'){
     const pct = (22 + lv*5) / 100;
@@ -11391,31 +11628,59 @@ function fireUltCore(){
       pop(ent.x!==undefined?ent.x:P.x, (ent.y!==undefined?ent.y:P.y)-0.5, amt, '#7fe0c0', '+');
     };
     heal(S.hero); livingParty().forEach(heal);
+    // Lv.3〜：しばらく仲間の技の待ちが倍の速さで進む（update の tickRallyHaste）
+    if(tier>=1) S.run.rallyHaste = ULT_RALLY_HASTE;
+    // Lv.5：かけた瞬間に仲間の大技（Lv.50 の技）が出る。撃つ相手がいなければ、溜まったまま待つ
+    if(tier>=2) livingParty().forEach(a=>{ if(a.artCd!==undefined) a.artCd = 0; });
     W.fx.push({t:'ultring', artId:'u_rally', x:P.x, y:P.y, r:0, max:2.8, life:0.5, maxLife:0.5, col:u.col});
-    ultPartyArt('u_rally', 2.8);
+    ultPartyArt('u_rally', 2.8, null, {lv, links: lv>=4});
 
   }else if(u.id==='bloom'){
     /* 一定時間の自動回復。回帰（その場で戻す）との違いは、
-       **戦い続けているあいだ効く**こと。押す位置が変わる。 */
+       **戦い続けているあいだ効く**こと。押す位置が変わる。
+       Lv.3〜 はかけた瞬間にも ULT_BLOOM_NOW 回分を戻す。Lv.5 は溢れた分を盾にする。 */
     const dur = 10 + lv*1.5, pct = 2 + lv*0.5;
-    S.run.bloom = {t:dur, pct, tick:0};
+    S.run.bloom = {t:dur, pct, tick:0, shield: tier>=2};
+    if(tier>=1){
+      bloomHeal(S.hero, pct*ULT_BLOOM_NOW, tier>=2);
+      livingParty().forEach(a=>bloomHeal(a, pct*ULT_BLOOM_NOW, tier>=2));
+    }
     W.fx.push({t:'ultring', artId:'u_bloom', x:P.x, y:P.y, r:0, max:2.6, life:0.5, maxLife:0.5, col:u.col});
-    ultPartyArt('u_bloom', 2.6);
+    ultPartyArt('u_bloom', 2.6, null, {lv});
 
   }else if(u.id==='ruin'){
     const mult = 2.2 + lv*0.5;
-    const pix = typeof feelPixelArt==='function';
-    W.fx.push({t:'ultflash', artId:pix?'u_ruin':undefined, life:0.45, maxLife:0.45, col:u.col});
-    if(pix) feelPixelArt('u_ruin', P.x, P.y, {ent:P});
+    W.fx.push({t:'ultflash', artId:pix?'u_ruin':undefined, life:lv>=4?0.6:0.45, maxLife:lv>=4?0.6:0.45, col:u.col});
+    if(pix) feelPixelArt('u_ruin', P.x, P.y, {ent:P, o:{lv}});
+    if(lv>=4) kick(3.0, 0.3);
+    const onScreen = () => W.enemies.filter(e=>!e.dead && Math.abs(e.x-P.x)<=18 && Math.abs(e.y-P.y)<=18);
     let nth = 0;
-    W.enemies.forEach(e=>{
-      if(e.dead) return;
-      if(Math.abs(e.x-P.x)>18 || Math.abs(e.y-P.y)>18) return;   // 画面内だけ
+    onScreen().forEach(e=>{
       // 裂天：雷は順に落ちる絵だが、ダメージは今まで通りこの瞬間（絵は 0.1秒＋最大 0.18秒 遅れて着く）
-      if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03, ent:e});
+      if(pix && nth < 24) feelPixelArt('u_ruin_hit', e.x, e.y, {delay:0.1 + Math.min(nth, 6)*0.03, ent:e, o:{lv}});
       nth++;
       hitEnemy(e, st, e.boss ? mult*0.5 : mult);
     });
+    if(tier>=1){
+      /* 裂け目が開いたまま、雷が落ち続ける。相手は乱数を使わずに順に回す
+         （乱数を引くと以降の階の生成がずれる——CLAUDE.md 5.1）。 */
+      if(pix) feelPixelArt('u_ruin_rift', P.x, P.y, {ent:P, o:{lv}});
+      for(let k=0;k<ULT_RUIN_BOLTS;k++) ultLater(0.35 + k*ULT_RUIN_EVERY, ()=>{
+        // 近い順に並べて順に回す（k*7 のような飛ばし方だと、7体のとき1体に全部落ちていた）
+        const list = onScreen().sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)); if(!list.length) return;
+        const e = list[k % list.length];
+        if(pix) feelPixelArt('u_ruin_hit', e.x, e.y, {ent:e, o:{lv}});
+        hitEnemy(e, st, (e.boss ? 0.5 : 1)*mult*ULT_RUIN_BOLT);
+      });
+      if(tier>=2) ultLater(0.35 + ULT_RUIN_BOLTS*ULT_RUIN_EVERY + 0.25, ()=>{
+        const list = onScreen(); if(!list.length) return;
+        const e = list.reduce((a,b)=> b.hp > a.hp ? b : a);
+        if(pix) feelPixelArt('u_ruin_fin', e.x, e.y, {ent:e, o:{lv, big:true}});
+        W.fx.push({t:'ultflash', life:0.35, maxLife:0.35, col:u.col});
+        kick(4.2, 0.32);
+        hitEnemy(e, st, (e.boss ? 0.5 : 1)*mult*ULT_RUIN_FIN);
+      });
+    }
   }
   log('⟡ '+u.nm);
   W.fx.push({t:'hurt', life:0.10});
@@ -12307,6 +12572,8 @@ function hitAlly(a, e, boltDmg, dmgType, boltLv, from){
     if(lc){ e.hp=Math.min(e.maxHp, e.hp + Math.max(1, Math.round(dm*lc)));
             pop(e.x, e.y-0.4, Math.round(dm*lc), '#7fe0c0', '+'); }
   }
+  dm = bloomAbsorb(a, dm);                 // 大技「命脈」Lv.5 の盾
+  if(S.run && S.run.aegis) S.run.aegis.taken += dm;   // 大技「鉄壁」Lv.5 が返すぶん
   a.hpNow -= dm;
   feelImpact(a,e,false,type,null);
   a.hit = 0.12;
@@ -13956,6 +14223,8 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
   }
 
   dm = Math.max(1, dm);                    // 当たった攻撃は必ず 1 以上通す（仲間と同じ規則）
+  dm = bloomAbsorb(S.hero, dm);            // 大技「命脈」Lv.5 の盾
+  if(S.run.aegis) S.run.aegis.taken += dm; // 大技「鉄壁」Lv.5 が返すぶん
   S.hero.hpNow-=dm;
   duelPlayerHurt();                        // 張り付いて崩していた分が削れる
   feelImpact(P,e,false,type,null);
@@ -15538,9 +15807,18 @@ function update(dt){
   tickHazards(dt);
   if(!S.hero || !S.run) return;
   P.invuln = Math.max(0, (P.invuln||0) - dt);
-  if(S.run.ward){ S.run.ward.t -= dt; if(S.run.ward.t<=0) S.run.ward=null; }
+  tickUltQ(dt);                       // 大技の後から来る当たり（2発目・2回目以降・雷）
+  if(S.run.ward){
+    S.run.ward.t -= dt;
+    if(S.run.ward.t<=0){
+      S.run.ward=null;
+      // 守護が積んだ盾は守護と一緒に消える（守護陣のぶんは残す）
+      [S.hero, ...party()].forEach(h=>{ if(h && h.wardBar){ h.barrier=Math.max(0,(h.barrier||0)-h.wardBar); h.wardBar=0; } });
+    }
+  }
   // 大技「鉄壁」。防御を掛け算する（stats の def が見る）
-  if(S.run.aegis){ S.run.aegis.t -= dt; if(S.run.aegis.t<=0) S.run.aegis=null; }
+  if(S.run.aegis){ S.run.aegis.t -= dt; if(S.run.aegis.t<=0){ const ag=S.run.aegis; S.run.aegis=null; ultAegisEnd(ag); } }
+  tickRallyHaste(dt);                 // 大技「回帰」Lv.3〜
   /* 大技「命脈」。2秒ごとに、主人公と仲間の体を戻す。
      毎フレーム少しずつ戻す形にすると数字が読めないので、刻んで出す。 */
   if(S.run.bloom){
@@ -15548,16 +15826,14 @@ function update(dt){
     bl.t -= dt; bl.tick += dt;
     if(bl.tick >= BLOOM_EVERY){
       bl.tick = 0;
-      const heal = ent => {
-        const mx = (ent===S.hero) ? stats(ent).maxHp : allyStats(ent).maxHp;
-        if(ent.hpNow >= mx || ent.hpNow <= 0) return;
-        const amt = Math.max(1, Math.round(mx*bl.pct/100));
-        ent.hpNow = Math.min(mx, ent.hpNow + amt);
-        pop(ent===S.hero?P.x:ent.x, (ent===S.hero?P.y:ent.y)-0.5, amt, '#a9d86a', '+');
-      };
-      heal(S.hero); livingParty().forEach(heal);
+      // Lv.5 は溢れた分が盾になる（bloomHeal）。満タンの人にも回すのはそのため
+      bloomHeal(S.hero, bl.pct, bl.shield); livingParty().forEach(a=>bloomHeal(a, bl.pct, bl.shield));
     }
-    if(bl.t<=0) S.run.bloom=null;
+    if(bl.t<=0){
+      S.run.bloom=null;
+      // 命脈 Lv.5 の盾は命脈と一緒に消える（階をまたぐまで残り続けて、見えない上積みになっていた）
+      [S.hero, ...party()].forEach(h=>{ if(h) h.bshield=0; });
+    }
   }
   if(!S.run.hinted && stairHint()>0){
     S.run.hinted=true;
@@ -16966,6 +17242,14 @@ function draw(){
       ctx.font='bold '+Math.round(TS*0.28)+'px '+FONT;
       ctx.textAlign='center';
       ctx.fillText(String(h.barrier), sx, sy-TS*0.78);
+      ctx.restore();
+    });
+    if(h.bshield>0) uiLater(()=>{             // 大技「命脈」Lv.5 の盾（溢れた回復）
+      const sx=hx*TS-camX, sy=hy*TS-camY;
+      ctx.save();
+      ctx.globalAlpha=0.5+0.15*Math.sin(performance.now()/220);
+      ctx.strokeStyle='#cfe89a'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(sx,sy,TS*0.62,0,7); ctx.stroke();
       ctx.restore();
     });
     if(h!==S.hero && (h.iframe||0)>0){        // 盗賊の幻影
@@ -22843,6 +23127,7 @@ function spendAegis(h, x, y){
 function spendBarrier(h, x, y){
   if(!h || !(h.barrier>0)) return false;
   h.barrier--;
+  if(h.wardBar>0){ h.wardBar--; wardBreakPush(h, x, y); }   // 大技「守護」Lv.3〜 の盾
   W.pops.push({x, y:y-0.4, txt: h.barrier>0 ? '盾 '+h.barrier : '盾が割れた',
                c:'#8e9bb0', life:0.8});
   W.fx.push({t:'parry', x, y, life:0.35, max:0.35});
@@ -23360,7 +23645,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261107-surface-response"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261107-surface-response"></script>
+<script src="cave-look.js?v=20261113-bpx4"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。

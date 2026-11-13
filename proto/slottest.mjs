@@ -207,7 +207,8 @@ R.blink = await pg.evaluate(()=>{
               && Math.hypot(mid[1].x-from.x, mid[1].y-from.y)
                  < Math.hypot(mid[mid.length-1].x-from.x, mid[mid.length-1].y-from.y);
   const ghosts=W.fx.filter(f=>f.t==='dashghost').length;
-  stepSim(BLINK_SEC);
+  /* 2026-11-07：縮地は Lv.1 で3回続けて走り抜ける（Lv ごとに1回増える）。全部走り終えるまで回す */
+  stepSim((2+1)*(BLINK_SEC+ULT_BLINK_GAP));   // 1回ごとに速くなるので、これで足りる
   const arrived=Math.hypot(P.x-from.x, P.y-from.y);
   return {fired, started, sec:BLINK_SEC, ghosts, arrived:+arrived.toFixed(2),
           samples:mid.length,
