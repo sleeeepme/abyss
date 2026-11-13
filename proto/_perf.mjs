@@ -27,9 +27,13 @@ const SECONDS = +arg('seconds', 3);
 
 const b = await chromium.launch();
 /* scaletest と同じ端末指定にする。**deviceScaleFactor を落とすと測定にならない。**
-   iPhone 13 は DPR 3 で、キャンバスの実ピクセルは 390×844 の9倍ある。
-   viewport だけ合わせて DPR を 1 のままにすると、塗りの仕事が 1/9 になり、
-   どの階層でも 60fps に張り付いて「重い所は無い」という誤った結論が出る。 */
+   iPhone 13 の devicePixelRatio は 3 だが、ゲームの描画解像度は resize() が min(2, DPR) で頭打ちにしている
+   （さらに index.html の PERF が、重い端末では 1.5 → 1 へ自動で落とす。自動テスト中は動かない）。
+   なのでキャンバスの実ピクセルは 390×844 の **4倍**（780×1328 ≒ 103万画素）で、9倍ではない
+   （2026-11-10 訂正。以前の「DPR3で9倍」は resize() の頭打ちを見落としていた）。
+   viewport だけ合わせて DPR を 1 のままにすると、塗りの仕事が 1/4 になり、
+   どの階層でも 60fps に張り付いて「重い所は無い」という誤った結論が出る。
+   ?perf=1 を付けて開くと、本編側の隠しオーバーレイに p95・最大のコマ時間と段・DPR が出る。 */
 const ctx = await b.newContext({ ...devices['iPhone 13'], hasTouch:true, isMobile:true });
 const pg = await ctx.newPage();
 const errs = [];

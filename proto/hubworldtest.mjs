@@ -6,7 +6,7 @@ import path from 'node:path';
 const {b,pg,errs}=await boot();const out=path.resolve('output/hub-world-alignment/quality');
 await mkdir(out,{recursive:true});const report={};
 try{
- await install(pg);await pg.waitForFunction(()=>HUB_BG.ready);
+ await install(pg);await pg.waitForFunction(()=>{hubBgWant(0);return HUB_BG.ready});
  await pg.evaluate(()=>{S.hero.party=['knight','mage','priest'].map(j=>TH.ally(8,j,8));el('hub-avatars').dataset.hubKey='';setScreen('town');stopHubWander();});
  report.viewports=[];
  for(const [width,height] of [[390,844],[844,390],[1920,1080],[2560,1080],[390,844]]){

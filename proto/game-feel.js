@@ -1063,17 +1063,31 @@ let feelMainCtx=null;
    （症状は「絵が止まる／キャラが出ない」だけで、例外もログも残らない）
    入口で必ず表のコンテキストへ戻してから控える。 */
 function feelResetCtx(){ if(ctx===feelFxCtx&&feelMainCtx) ctx=feelMainCtx; }
+/* 【2026-11-10 perf（Claude・最小差分）】演出を1つも描かなかったコマは、裏キャンバスを消す・画面へ転写する、の両方を省く。
+   endPixelFx の drawImage は裏キャンバス全面（画面の1/4〜1/9）の転写で、これが周期的に220〜360msの停止として出ていた。
+   戦闘が無いコマ（歩行中など）は演出がまったく無いのが普通なので、空の転写が毎フレーム走っていた。
+   描いたかどうかは、裏の ctx の「描く命令」を包んで印を立てて知る（演出側のコードは1行も触らない）。
+   印が立たなかったコマは裏が空のまま（前のコマが描いていなければ消す必要も無い）で、画面には何も足さない＝見た目は同じ。 */
+let feelFxDirty=false, feelFxHadInk=false;
+for(const m of ['fill','stroke','fillRect','strokeRect','fillText','strokeText','drawImage','putImageData']){
+  if(typeof feelFxCtx[m]!=='function') continue;
+  feelFxCtx[m]=function(){ feelFxDirty=true; return CanvasRenderingContext2D.prototype[m].apply(this,arguments); };   // 実行時に原型を引く（計測用に原型を差し替えるハーネスを妨げない）
+}
 function beginPixelFx(){
   feelResetCtx();
   const q=Math.max(2,Math.round(TS/16));
   const w=Math.ceil(innerWidth/q),h=Math.ceil(innerHeight/q);
-  if(feelFxCanvas.width!==w||feelFxCanvas.height!==h){feelFxCanvas.width=w;feelFxCanvas.height=h;}
-  feelFxCtx.setTransform(1,0,0,1,0,0);feelFxCtx.clearRect(0,0,w,h);
+  if(feelFxCanvas.width!==w||feelFxCanvas.height!==h){feelFxCanvas.width=w;feelFxCanvas.height=h;feelFxHadInk=false;}
+  feelFxCtx.setTransform(1,0,0,1,0,0);
+  if(feelFxHadInk) feelFxCtx.clearRect(0,0,w,h);        // 前のコマに描いた物が残っているときだけ消す
+  feelFxDirty=false;
   feelFxCtx.save();feelFxCtx.scale(1/q,1/q);feelMainCtx=ctx;ctx=feelFxCtx;
 }
 function endPixelFx(){
   const q=Math.max(2,Math.round(TS/16));
   feelFxCtx.restore();ctx=feelMainCtx;
+  feelFxHadInk=feelFxDirty;
+  if(!feelFxDirty) return;                              // 何も描いていないコマは転写しない
   ctx.save();ctx.imageSmoothingEnabled=false;
   ctx.drawImage(feelFxCanvas,0,0,feelFxCanvas.width*q,feelFxCanvas.height*q);ctx.restore();
 }
