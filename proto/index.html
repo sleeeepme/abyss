@@ -14336,6 +14336,106 @@ function returnToTown(){
   loot.forEach(it=>S.stash.push(it));
   finishReturn(0);
 }
+/* ---------- 階ごとの外部テスト用ログ（2026-11-10） ----------
+   遊んだ人から「何階で何回死んだか・どれだけ居たか・どのHPで入ったか」を集めるための記録。
+   **遊びと乱数には一切触れない。** rnd()/rf()/ri() を呼ばず、既存の関数を
+   包んで読むだけ（enterFloor / die / returnToTown）。localStorage の専用キーに積む。
+   取り出し方: URL に ?log=1 を付けると右下に小さな「LOG」ボタンが出る。
+   押すと JSON を クリップボードへコピー（できなければファイルで保存）。
+   コンソールからは PLAYLOG.json() / PLAYLOG.reset()。 */
+const PLAYLOG = window.PLAYLOG = (function(){
+  const KEY = 'abyss_playlog_v1';
+  let data = null, cur = null;
+  const blank = ()=>({v:1, since:Date.now(), runs:0, deaths:0, floors:{}});
+  function load(){
+    if(data) return data;
+    try{ const s = localStorage.getItem(KEY); data = s ? JSON.parse(s) : null; }catch(e){ data = null; }
+    if(!data || data.v!==1 || typeof data.floors!=='object') data = blank();
+    return data;
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} }
+  function fl(d){
+    const f = load().floors;
+    return f[d] || (f[d] = {enter:0, deaths:0, secs:0, hpInSum:0, hpInMin:100});
+  }
+  function hpPct(){
+    try{ const mx = stats(S.hero).maxHp; return mx>0 ? Math.max(0, Math.min(100, Math.round(S.hero.hpNow/mx*100))) : 100; }
+    catch(e){ return 100; }
+  }
+  // いま居る階の滞在秒を締める（探索ごとの経過秒 S.run.elapsed の差）
+  function closeCur(){
+    if(cur && S.run===cur.run){
+      const dt = (S.run.elapsed||0) - cur.t0;
+      if(dt>0) fl(cur.d).secs += dt;
+    }
+    cur = null;
+  }
+  function onEnter(){
+    if(!S.run || !S.hero) return;
+    closeCur();
+    const d = S.run.depth, p = hpPct(), f = fl(d);
+    f.enter++; f.hpInSum += p; if(p<f.hpInMin) f.hpInMin = p;
+    cur = {run:S.run, d, t0:S.run.elapsed||0};
+    save();
+  }
+  function onDeath(d0, deathsBefore){
+    if(S.deaths>deathsBefore){
+      const d = d0.d;
+      if(d0.cur && d0.run) { const dt = d0.el - d0.cur.t0; if(dt>0) fl(d).secs += dt; }
+      fl(d).deaths++; load().deaths++;
+      cur = null; save();
+    }
+  }
+  const _enter = enterFloor, _die = die, _ret = returnToTown;
+  enterFloor = function(){
+    const r = _enter.apply(this, arguments);
+    try{ onEnter(); }catch(e){}
+    return r;
+  };
+  die = function(){
+    let snap = {d:0, cur:null, run:null, el:0};
+    try{ if(S.run){ snap = {d:S.run.depth, cur, run:S.run, el:S.run.elapsed||0}; } }catch(e){}
+    const before = S.deaths|0;
+    const r = _die.apply(this, arguments);
+    try{ if(snap.run) onDeath(snap, before); }catch(e){}
+    return r;
+  };
+  returnToTown = function(){
+    try{ closeCur(); save(); }catch(e){}
+    return _ret.apply(this, arguments);
+  };
+  function json(){
+    const d = load(), out = {v:d.v, since:d.since, exported:Date.now(), deaths:d.deaths, floors:[]};
+    Object.keys(d.floors).map(Number).sort((a,b)=>a-b).forEach(k=>{
+      const f = d.floors[k];
+      out.floors.push({depth:k, enter:f.enter, deaths:f.deaths, secs:Math.round(f.secs),
+                       hpInAvg: f.enter ? Math.round(f.hpInSum/f.enter) : null, hpInMin:f.hpInMin});
+    });
+    return JSON.stringify(out, null, 1);
+  }
+  function reset(){ data = blank(); cur = null; save(); }
+  function exportNow(){
+    const txt = json();
+    const dl = ()=>{
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
+      a.download = 'abyss-playlog.json'; document.body.appendChild(a); a.click(); a.remove();
+    };
+    try{ navigator.clipboard.writeText(txt).catch(dl); }catch(e){ dl(); }
+    return txt;
+  }
+  if(new URLSearchParams(location.search).get('log')==='1'){
+    const mk = ()=>{
+      const b = document.createElement('button');
+      b.id = 'playlogbtn'; b.textContent = 'LOG';
+      b.style.cssText = 'position:fixed;right:4px;bottom:4px;z-index:99999;font-size:10px;padding:3px 6px;opacity:.55;';
+      b.addEventListener('click', e=>{ e.stopPropagation(); exportNow(); b.textContent = 'COPIED'; setTimeout(()=>{ b.textContent='LOG'; }, 1200); });
+      document.body.appendChild(b);
+    };
+    if(document.body) mk(); else document.addEventListener('DOMContentLoaded', mk);
+  }
+  return {json, reset, exportNow, load, KEY};
+})();
 /* ---------- 街での休息 ----------
    主人公と、生き残って連れ帰った仲間を満タンに戻す。
    状態異常も落とす——街まで火傷を持ち帰る理由が無い。
