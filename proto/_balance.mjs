@@ -39,6 +39,8 @@ const FILE     = arg('file', 'proto/index.html');   // 別案を測るとき用
 /* --dash: 予兆の切れ際にダッシュを踏んでジャスト回避を狙う操縦。
    上手い人の側の値を出すために使う。既定は踏まない（下手な人の側）。 */
 const DASH     = process.argv.includes('--dash');
+/* --legacy: B8 以前の操縦（鑑定済みのみ装備・部屋掃討なし・恩寵を選ばない）。前後比較用。 */
+const LEGACY   = process.argv.includes('--legacy');
 /* --tier: 段の解禁具合。**倒したボスの最深階**（S.bossClear）を固定して測る。
    キーストーンは段2以降にあるので、これを 0 のままにすると
    **不屈も衝撃波も持っていない世界**を測ることになる。
@@ -186,14 +188,21 @@ await pg.evaluate(() => {
     /* 拾った物のうち、いま着けている物より良い物を着ける。
        これが無いと素手のまま50階まで歩くことになり、
        装備の寄与がゼロの世界を測ってしまう。
-       鑑定済みしか着けられないのは本編と同じ。 */
+
+       2026-11-10（B8）: 以前は鑑定済みしか着けなかった。Rare 以上は未鑑定で落ちるので、
+       道中で拾った武器がほぼ全部対象外になり、死亡ログの武器欄が全部「なし」＝
+       5F到達時の攻撃が 15〜28 しか無かった（同条件の _wall は 52）。
+       **測定用の操縦だけ**未鑑定品も素の数値で比べて着ける。
+       ゲーム本体の「未鑑定は装備できない」は変えていない。--legacy で旧挙動。 */
     equipBest() {
       if (!S.hero || !S.run) return;
       const score = it => !it ? -1
         : (it.slot === 'weapon' ? (it.atk || 0) * (it.spd || 1)
                                 : (it.def || 0) + (it.maxHp || 0) * 0.05);
       for (const it of S.run.loot) {
-        if (!it || !it.ident || !it.slot) continue;
+        if (!it || !it.slot || it.consum) continue;
+        if (this.legacy && !it.ident) continue;
+        if (it.durMax > 0 && it.dur <= 0) continue;     // 壊れた物は着けない
         const cur = S.hero.equip[it.slot];
         if (score(it) > score(cur)) {
           S.hero.equip[it.slot] = it;
@@ -204,6 +213,23 @@ await pg.evaluate(() => {
           return;                       // 1フレームに1つで十分
         }
       }
+    },
+
+    /* 恩寵の選択画面が開いたら、先頭を選ぶ（選ばないと画面が止まったまま）。
+       付与先の選択は飛ばして主人公に付ける。 */
+    pickBoon() {
+      if (S.screen !== 'boon' || !_boonPending) return false;
+      const b = _boonPending[0];
+      _boonPending = null;
+      applyBoon(S.hero, b);
+      return true;
+    },
+
+    /* 主人公がいる部屋（通路にいるときは null）。 */
+    roomAt(fl, x, y) {
+      for (const r of (fl.rooms || []))
+        if (x >= r.x - 0.5 && x <= r.x + r.w + 0.5 && y >= r.y - 0.5 && y <= r.y + r.h + 0.5) return r;
+      return null;
     },
 
     /* 目標点へ向かう単位ベクトル。 */
@@ -245,6 +271,11 @@ await pg.evaluate(() => {
       let floorT = 0;
       const FLOOR_CAP = cap || 150;   // 1階に留まれる秒数（詰み検出）
       const ENGAGE = 3.0;             // これより近い敵は倒してから進む
+      /* 同じ部屋にいる敵は、遠くても倒してから進む（部屋単位の掃討）。
+         3.0 だけだと部屋の隅の敵を残して階段へ向かい、5F で撃破 13〜19 体・
+         Lv 4 止まりになっていた（B8）。--legacy で従来の挙動。 */
+      const ROOMSWEEP = !opt.legacy;
+      this.legacy = !!opt.legacy;
       const HOLD   = 1.15;            // 寄る下限。これ以上は詰めない
       const DODGE  = 4.5;             // この距離で予兆が出たら離れる
       let dist = null, distDepth = -1, distTgt = null;
@@ -266,7 +297,9 @@ await pg.evaluate(() => {
         cur = { d, hpIn: Math.round(S.hero.hpNow / st.maxHp * 100), hpMin: 100,
                 t: 0, k0: kills, k: 0, lv: S.hero.lv,
                 atk: +st.atk.toFixed(1), maxHp: Math.round(st.maxHp),
-                bossT: 0, bossHp: null };
+                bossT: 0, bossHp: null,
+                wAtk: S.hero.equip.weapon ? (S.hero.equip.weapon.atk || 0) : 0,
+                loot: S.run.loot.length, drops: W.drops ? W.drops.length : 0, dd: (W.drops || []).map(d => [d.x.toFixed(0), d.y.toFixed(0), d.it ? d.it.slot : d.stone ? 'stone' : '?'].join('/')).join(';'), pp: P.x.toFixed(0) + ',' + P.y.toFixed(0) };
         trace.push(cur);
       };
       mark(1);
@@ -274,6 +307,7 @@ await pg.evaluate(() => {
       for (let frame = 0; frame < 60 * 60 * 40; frame++) {
         if (!S.hero || !S.run) { outcome = 'lost'; break; }
         if (S.hero.hpNow <= 0 || S.deaths > 0) { outcome = 'death'; break; }
+        if (!opt.legacy && this.pickBoon()) continue;
 
         const fl = W.fl;
         if (!fl) { outcome = 'lost'; break; }
@@ -283,17 +317,29 @@ await pg.evaluate(() => {
            走り抜けるだけの操縦にすると攻撃力の価値が測れないので、
            **近くに敵がいたら立ち止まって倒す**。実際の遊び方に近く、
            かつ「遠くの敵を延々と追わない」ので1階に留まりすぎない。 */
-        let tgt, engaging = false;
+        let tgt, engaging = false, loot = null;
+        const room = ROOMSWEEP ? this.roomAt(fl, P.x, P.y) : null;
         const foe = noFight > 0 ? null : W.enemies.reduce((best, e) => {
           if (e.dead) return best;
           const d = Math.hypot(e.x - P.x, e.y - P.y);
-          return (d < ENGAGE && (!best || d < best.d)) ? { e, d } : best;
+          const inRoom = room && e.x >= room.x - 0.5 && e.x <= room.x + room.w + 0.5
+                              && e.y >= room.y - 0.5 && e.y <= room.y + room.h + 0.5;
+          return ((d < ENGAGE || inRoom) && (!best || d < best.d)) ? { e, d } : best;
         }, null);
         if (S.run.bossAlive) {
           const bs = W.enemies.find(e => e.boss && !e.dead);
           tgt = bs ? { x: bs.x, y: bs.y } : { x: fl.stair.x, y: fl.stair.y };
         } else if (foe) {
           tgt = { x: foe.e.x, y: foe.e.y }; engaging = true;
+        } else if (!opt.legacy && noFight <= 0 && (loot = (W.drops || []).reduce((best, d) => {
+          /* 落とし物は歩いて触れないと拾えない（autoPickup は 0.7 以内）。
+             これまでの操縦は拾いに行かず、最初に必ず落ちる武器すら置き去りにしていた。
+             近く（8マス）の物だけ拾いに寄る。 */
+          if (!d.it) return best;
+          const dd = Math.hypot(d.x - P.x, d.y - P.y);
+          return (dd < 8 && (!best || dd < best.d)) ? { d: dd, x: d.x, y: d.y } : best;
+        }, null))) {
+          tgt = { x: loot.x, y: loot.y };      // 0.7 以内に入るまで寄る（engaging ではない）
         } else {
           tgt = { x: fl.stair.x, y: fl.stair.y };
         }
@@ -373,7 +419,7 @@ await pg.evaluate(() => {
           stallT = 0; dist = null; distDepth = -1;
           /* 壁の向こうの敵に張り付いていることがある。
              しばらく戦うのをやめて穴へ向かわせ、抜け出させる。 */
-          if (engaging) noFight = 3.0;
+          if (engaging || loot) noFight = 3.0;
         }
         noFight = Math.max(0, noFight - 1 / 60);
 
@@ -457,13 +503,14 @@ for (const sp of SP_LIST) {
   let warned = false;
   for (let s = 0; s < SEEDS; s++) {
     const r = await pg.evaluate(([seed, sp, md, cap, opt]) => BAL.run(seed, sp, md, cap, opt),
-      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, tier: BOSSCLEAR }]);
+      [1000 + s * 7, sp, MAXDEPTH, CAP, { dash: DASH, tier: BOSSCLEAR, legacy: LEGACY }]);
     if (r.missing && r.missing.length && !warned) {
       warned = true;
       console.log('\n  ⚠ 買う順に入っていない項目:', r.missing.join(','),
                   '— _balance.mjs の order に足すこと');
     }
     rows.push(r);
+    if (process.argv.includes('--trace')) console.log('  seed', r.seed, r.trace.map(f => f.d + ':w' + f.wAtk + '/l' + f.loot + '/d[' + f.dd + ']' + f.pp).join(' '));
     if (r.why && !QUIET) console.log('\n  ' + r.outcome + ':', JSON.stringify(r.why));
     if (!QUIET) process.stdout.write('.');
   }
