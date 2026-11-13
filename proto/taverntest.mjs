@@ -275,7 +275,7 @@ R.poolRolls = await pg.evaluate(()=>{
 /* 6-b. **誰も連れ帰らなくても雇える。** 全滅して手ぶらで帰った直後が
        一番人手の要る場面なので、そこで棚が空だと詰む。 */
 R.poolWhenNothingReturned = await pg.evaluate(()=>{
-  S.run=null; S.tavern=[]; S.tavernPool=null;
+  S.run=null; S.tavern=[]; S.tavernPool=null; S.deepest=1; S.lastDepth=1;   // 5Fに着いた人には無料の仲間が付く（下の starterAlly）
   S.hero=newHero(); S.hero.party=[]; S.gold=99999; S.bld={};
   setScreen('tavern');
   const rows=document.querySelectorAll('#tavernpool [data-hire]').length;
@@ -285,6 +285,17 @@ R.poolWhenNothingReturned = await pg.evaluate(()=>{
   return {rows, backEmpty, hired:r.ok, inParty:party().includes(first),
           poolAfter:tavernPool().length,
           ok: rows>=1 && backEmpty && r.ok && party().includes(first)};
+});
+
+// 6-b2. 5Fに着いたのに仲間が0人なら、酒場に雇用費0の1人が置かれる（B3）。誰かいる人には何もしない
+R.starterAlly = await pg.evaluate(()=>{
+  S.run=null; S.hero=newHero(); S.hero.party=[]; S.tavern=[]; S.tavernPool=null; S.gold=0; S.bld={};
+  S.deepest=4; S.lastDepth=4; rerollTavern(); const before=tavernStock().length;
+  S.deepest=5; S.lastDepth=5; rerollTavern(); const st=tavernStock(); const n=st.length;
+  const a=st[0]; const free=!!a && hireCost(a)===0;
+  const hired=a ? hireAlly(a.uidA) : {ok:false};
+  rerollTavern(); const afterHire=tavernStock().length;   // 連れている者がいれば足さない
+  return {notBefore5: before===0, one: n===1, free, hired: hired.ok, noExtraWhenHaveAlly: afterHire===0};
 });
 
 // 6-c. 流れ者は定価（連れ帰った印を持たない）

@@ -21,11 +21,11 @@ R.density = await pg.evaluate(()=>{
   const ns=Object.values(normal);
   const boss={}; [10,30,50].forEach(d=>boss[d]=at(d));
   return {normal, boss,
-          monotone: ns.every((v,i)=>i===0||v>=ns[i-1]),
+          monotone: ns.every((v,i)=>i===0||v>=ns[i-1]-3),   // 上限 ENEMY_COUNT_MAX(65) に張り付いたあとは規格外の混入ぶんだけ揺れる
           // 以前は第22階層で40体に頭打ちだった
-          growsPastOldCap: normal[49]>normal[21]*2,
+          growsPastOldCap: normal[31]>normal[21]*1.5 && normal[49]>40,   // 上限は 130→65 に下げた（B5）。それでも旧上限40は超える
           bossKeepsFewer: boss[50]<normal[49]*0.5,
-          withinBudget: normal[49]<=130};
+          withinBudget: normal[49]<=ENEMY_COUNT_MAX+10};
 });
 R.grid = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(20);
@@ -74,7 +74,7 @@ R.live = await pg.evaluate(async ()=>{
   const out=[];
   for(const d of [11,26,41,49]) out.push(await run(d));
   return {runs:out, holdsUp: out.every(o=>o.fps>45),
-          deepestIsCrowded: out[out.length-1].enemies>100};
+          deepestIsCrowded: out[out.length-1].enemies>=ENEMY_COUNT_MAX-10};
 });
 
 await b.close();
