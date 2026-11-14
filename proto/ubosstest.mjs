@@ -101,19 +101,20 @@ R.familyApplied = await pg.evaluate(depths=>{
   return {bad, ok: bad.length===0};
 }, DEPTHS);
 
-/* 1-e. 階に入ったとき、その階だけの一行が出る。
-       「中ボスの気配」が10回続くのと、10通りの一行があるのとでは、
-       同じ仕掛けでも覚え方が変わる。 */
-R.introLines = await pg.evaluate(depths=>{
-  const lines=depths.map(d=>uniqueBossAt(d).line);
-  const dupes=lines.filter((v,i,a)=>a.indexOf(v)!==i);
+// 1-e. ボスの前触れは出さず、ボス自体は今までどおり出る。
+R.introLines = await pg.evaluate(()=>{
   TH.run(1,{seed:7});
-  logs.length=0;
-  TH.floor(25);
-  const shown=logs.some(l=>l.includes(uniqueBossAt(25).line));
-  return {lines:lines.length, dupes, shownInLog:shown,
-          ok: dupes.length===0 && lines.length===10 && shown};
-}, DEPTHS);
+  const captured=[], realLog=log;
+  log=(t)=>{ captured.push(t); realLog(t); };
+  try {
+    TH.floor(25);
+  } finally {
+    log=realLog;
+  }
+  const shown=captured.includes(uniqueBossAt(25).line);
+  const bossPresent=W.enemies.some(e=>e.boss && !e.dead);
+  return {notShownInLog:!shown, bossPresent, ok:!shown && bossPresent};   // true = 期待どおり（CLAUDE.md 3章）
+});
 
 // 1-f. 周回した先（61階以降）は今までどおり動く（表に無くても落ちない）
 R.beyondTable = await pg.evaluate(()=>{

@@ -8676,7 +8676,7 @@ function makeUnique(fl, depth, fams){
      商人が売っているほか、灯りを帯びた敵が稀に落とす。
    ・味方1人・眷属1体につき +1（上限 10）。仲間は灯りを持っている——連れているほど暗くなるのが遅い。
    ・潜るたびに新しい灯り（10）から始まる。
-   ・ゲージは出さない。画面の暗さで分かる。
+   ・ゲージは出さない。画面の暗さで分かる。（段数を出すのは、灯りで払う場面＝商人の画面と大技の「灯2」の札だけ）
    暗くなると、灯りの外の闇が迫り（cave-look の視界の輪）、灯りの外の敵は黒い影になり、
    3 以下では見えなくなる。明るさ 1 のまま一定時間いると、巡回者が来る。
    潜る時間そのものに配分が要るようにするための仕掛け。 */
@@ -8731,7 +8731,7 @@ function newStone(why){
   S.run.lightSaid = LIGHT_MAX;
   if(S.run.noStone){                       // 初めての蛍石。仕組みをここで一度だけ言う
     S.run.noStone = false; S.tutStone = true; S.run.darkT = 0;
-    log('<i class="pi pi-bulb"></i> 蛍石を拾った — 灯りが灯った');
+    log('<i class="pi pi-bulb"></i> ランタンを手に入れた — 蛍石の灯りが灯った');
     log('蛍石の灯りは時間とともに弱まる。新しい蛍石を拾えば灯り直せる');
     return;
   }
@@ -9625,35 +9625,8 @@ function enterFloor(depth, opt){
   livingParty().forEach(a=>damageAllyGear(a, 'accessory', DUR.accessoryPerFloor));
   P.guard=false; P.parryFx=0;
 
-  /* 層が切り替わったときだけ名前を大きく出す（10階層ごと）。
-     地名を持つ階（51階＝アビスの口）は、層ではなくその1階の名前を出す——
-     ここは層の続きではなく、たどり着いた場所だから。 */
-  /* 層が変わったことは**ログの1行だけ**で伝える。
-     以前は画面中央に大きく層名と一文を出していたが、降りるたびに
-     操作を止めて読ませる文章が挟まるのは、道中のテンポをそのぶん削る。
-     地名を持つ階（51階＝アビスの口）だけは、たどり着いた事実そのものが
-     区切りなので、そこだけバナーを残してある。 */
-  const pl = floorPlace(depth);
-  const z = fl.zone;
-  if(pl){
-    S.run.zoneId = z ? z.id : S.run.zoneId;
-    showBanner(pl.nm, '', pl.accent, 2.6);
-    log('── '+pl.nm+' ──');
-  }else if(z && z.id !== S.run.zoneId){
-    S.run.zoneId = z.id;
-    log('── '+z.nm+' ──');
-  }
-
+  // 層名はHUDに表示し、入場時は層の見出しやボスの前触れを流さない。
   log('第'+depth+'階層');
-  if(S.run.bossTier){
-    /* 名前つきのボスなら、その階だけの一行を出す。
-       正体（名前）はまだ伏せる——一撃入れて初めて名乗る仕掛けは残したい。
-       ここで渡すのは「何かがいる」ではなく「**何がいそうか**」の手触りだけ。 */
-    const U=uniqueBossAt(S.run.depth);
-    log(U ? U.line
-          : S.run.bossTier==='final' ? '初めの供物の気配'
-          : S.run.bossTier==='great' ? '大ボスの気配' : '中ボスの気配');
-  }
   if(W.enemies.some(e=>e.uniq && !e.dead)) log('見慣れぬ気配がひとつ');
   if(W.ev) log(eventDef(W.ev.id).icon+' '+eventDef(W.ev.id).nm+'がある');
   if(W.ores.length) log('<i class="pi pi-pick"></i> 鉱脈 '+W.ores.length+'ヶ所');
@@ -15318,7 +15291,7 @@ function autoPickup(){
       W.drops.splice(i,1);
       /* 床に落ちたSP。いまは誰も置かない（倒した瞬間に口座へ入る）が、
          古いセーブに残っている分を拾えなくすると詰むので、受け口は残す。 */
-      if(d.stone){ newStone('蛍石を拾った'); continue; }
+      if(d.stone){ if(d.first) lanternGetStart(d.x, d.y); else lanternEatStart(d.x, d.y); newStone('蛍石を拾った'); continue; }
       if(d.shard){
         const n=gainShards(d.shard);
         if(n>0) W.pops.push({x:d.x, y:d.y-0.85, txt:'+'+n+' SP', c:'#8fd8ff',
@@ -15402,7 +15375,7 @@ function buyFromMerchant(uid){
   if(S.run.gold < it.price) return {ok:false, why:'金が足りない'};
   S.run.gold -= it.price;
   W.shop.stock.splice(W.shop.stock.indexOf(it),1);
-  if(it.stone){ newStone('蛍石を買った'); return {ok:true, item:it, stone:true}; }
+  if(it.stone){ lanternEatStart(W.shop.x, W.shop.y); newStone('蛍石を買った'); return {ok:true, item:it, stone:true}; }
   delete it.price;
   S.run.loot.push(it);            // 持ち物へ。持ち帰るまでは自分の物にならない
   return {ok:true, item:it};
@@ -17008,6 +16981,13 @@ function draw(){
     if(d.stone){
       /* 蛍石。淡い緑に光る結晶（闇の外でも見える）。2026-10-16：まわりに円いにじみの光、
          芯を光が下から上へ走るゆらめき、まわりで瞬くきらめきを足した（結晶の絵は前のまま） */
+      /* 初めての潜りで入口の先に落ちているのは、蛍石の入った**ランタン**（2026-11-11）。
+         拾うと相棒として付いてくる。それ以外の蛍石は今まで通り結晶の絵。 */
+      if(d.first){
+        drawLanternOnGround(sx, sy, d);
+        if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('ランタン', sx, sy-TS*0.62, '#6fe8b8', 0.95);
+        return;
+      }
       drawFluorite(sx, sy, d);
       if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.55, '#6fe8b8', 0.95);
       return;
@@ -18018,6 +17998,7 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   occOne(P);                          // 主人公のぶんの立ち物の描き戻し
+  if(!heroBlinkOff && !(heroDrop&&heroDrop.hide) && !P.fallAnim) drawLantern(camX, camY, _drawDt);   // 灯りの相棒
   drawFeelKins(camX,camY);             // 主人公より前面、照明・HUDより下
   drawPlayerLight(camX,camY);
   // ランタンの網（?lantern=net のときだけ）の暗がりはキャラまで描いた所で重ねる
@@ -18853,6 +18834,268 @@ function drawUpgradeMark(sx, sy){
      3) ゆらめき：結晶の芯を、明るい1段が下から上へ走る
      4) きらめき：まわりの3か所で、十字の小さな星が順に瞬く
    を重ねる。動きはドットの格子に合わせて刻む（なめらかに動かしすぎない）。 */
+/* ---------- ランタン（灯りの相棒） 2026-11-11 ----------
+   蛍石の入った角灯。初めての潜りで拾い、以後ずっと主人公に付いてくる。
+   眷属・周回刃は「回る物」なので、ランタンは**回らない**ことで見分ける：
+   肩の後ろ（眷属の輪 1.05 マスの内側）に遅れて付いてきて、振り子で揺れる。
+   絵は 5×8 ドット（主人公と同じ TS/16 の格子）。見た目だけの物で、当たりも乱数も持たない。 */
+const LANTERN_PX = ["..O..",".OBO.","OIiIO","OgGgO","OGWGO","OgGgO","OIiIO",".ObO."];
+const LANTERN_PAL = {O:'#141a2c', I:'#3a4258', i:'#5d6884', B:'#c8a050', b:'#8a6a34', g:'#3fb08a', G:'#6fe8b8', W:'#e4fff4'};
+const LANTERN_GET_SEC = 1.7;       // 手に入れた演出の長さ
+const LANTERN_EAT_SEC = 1.0;       // 蛍石を食べるアニメの長さ
+const LAN = {x:null, y:null, sway:0, face:1, get:null, eat:null, t:0,
+             alert:null, scanT:0, floorRef:null, told:null, toldKeys:null, prevD:null};
+/* ---------- 顔つきと気配の知らせ（2026-11-12） ----------
+   顔つき：蛍石の段で4つ。10〜7 元気／6〜4 普通（芯の白がときどき消える）／
+   3〜2 眠い（まぶたが1段下がる）／1 消えかけ（細目・明滅・主人公に寄り添う）。
+   瘴気の層では暗さの代わりにガラスが曇る（緑が灰に寄る）。
+   気配：灯りの外にある物だけ、色と動きで知らせる。一度に1つ、優先は 危険＞亡骸＞宝＞穴。
+     危険＝灯りの外から近づく敵・踏むと痛い床・起き上がり待ちの亡者。**色は変えず**震えと明滅、反対側へ身を引く
+     亡骸＝前に倒れた場所。**その階にいるときだけ**（W.grave はその階でしか立たない）。白く2回まばたき
+     宝＝落ちている品・鉱脈・道中の出来事（商人は目立つので入れない 2026-11-12）。金色に脈打ち、その方へ身を乗り出す
+     穴＝下り口。暗く沈み、その方へ滴が落ちる
+   感知距離は灯りの段で縮む：距離 ×（0.5＋0.5×段/10）。灯りを払うほど気配に鈍くなる（多少鈍くなって良い、で確定 2026-11-12）。
+   見た目だけ。乱数は使わない。 */
+const LANTERN_ALERT = {
+  dangerR: 5, hazR: 2, treasureR: 6, holeR: 8, graveNearR: 8,
+  sec: 1.2,            // 危険以外の知らせ1回の長さ
+  scanSec: 0.2,        // 調べる間隔
+};
+function lanternFace(F){ return F>=7 ? 0 : F>=4 ? 1 : F>=2 ? 2 : 3; }
+function lanternSenseMul(){ return 0.5 + 0.5*clamp(lightFuel(),0,LIGHT_MAX)/LIGHT_MAX; }
+/* 灯りの届く半径（マス）。洞窟版の描いた灯りに合わせる。瘴気の層（明るい）は画面の半分ほど */
+function lanternLitR(){
+  if(lightZone() && window.CAVE && CAVE.on && Number.isFinite(CAVE.litTiles)) return CAVE.litTiles + 0.35;
+  return 6;
+}
+function lanternMix(a, b, k){
+  const pa=parseInt(a.slice(1),16), pb=parseInt(b.slice(1),16);
+  const r=Math.round(((pa>>16)&255)*(1-k)+((pb>>16)&255)*k), g=Math.round(((pa>>8)&255)*(1-k)+((pb>>8)&255)*k), bl=Math.round((pa&255)*(1-k)+(pb&255)*k);
+  return '#'+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1);
+}
+/* 気配を調べる。見つけた知らせを LAN.alert に入れる */
+function lanternScan(){
+  const fl=W.fl; if(!fl) return;
+  if(LAN.floorRef!==fl){ LAN.floorRef=fl; LAN.told=new WeakSet(); LAN.toldKeys=new Set(); LAN.prevD=new WeakMap(); LAN.alert=null; }
+  const m=lanternSenseMul(), litR=lanternLitR();
+  const out=(x,y,R)=>{ const d=Math.hypot(x-P.x, y-P.y); return d>litR && d<=R ? d : -1; };
+  // 危険：近づいてくる敵（前回より近い）、起き上がり待ち、足もと近くの踏むと痛い床
+  let dng=null, dd=1e9;
+  for(const e of W.enemies){
+    if(e.dead) continue;
+    const d=Math.hypot(e.x-P.x, e.y-P.y), prev=LAN.prevD.get(e); LAN.prevD.set(e, d);
+    if(d<=litR || d>LANTERN_ALERT.dangerR*m) continue;
+    if(prev!=null && d<prev-0.01 && d<dd){ dd=d; dng={x:e.x,y:e.y}; }
+  }
+  for(const r of (W.risen||[])){ const e=r.e; if(!e) continue; const d=out(e.x,e.y,LANTERN_ALERT.dangerR*m); if(d>=0 && d<dd){ dd=d; dng={x:e.x,y:e.y}; } }
+  if(W.haz && W.haz.g){
+    const R=LANTERN_ALERT.hazR*m, x0=Math.floor(P.x-R), x1=Math.ceil(P.x+R), y0=Math.floor(P.y-R), y1=Math.ceil(P.y+R);
+    for(let y=Math.max(0,y0); y<=Math.min(fl.H-1,y1); y++){ const row=W.haz.g[y]; if(!row) continue;
+      for(let x=Math.max(0,x0); x<=Math.min(fl.W-1,x1); x++) if(row[x]){ const d=out(x+0.5,y+0.5,R); if(d>=0 && d<dd){ dd=d; dng={x:x+0.5,y:y+0.5}; } } }
+  }
+  if(dng){ LAN.alert={kind:'danger', x:dng.x, y:dng.y, t:0}; return; }
+  if(LAN.alert && LAN.alert.kind==='danger') LAN.alert=null;
+  if(LAN.alert) return;                                  // 知らせの途中は次を出さない
+  const say=(kind,x,y,key)=>{ LAN.alert={kind, x, y, t:0}; if(typeof key==='string') LAN.toldKeys.add(key); else LAN.told.add(key); return true; };
+  // 亡骸：階に入ったとき1回、近づいたときにもう1回
+  if(W.grave){
+    if(!LAN.toldKeys.has('grave-in')) return say('grave', W.grave.x, W.grave.y, 'grave-in');
+    if(!LAN.toldKeys.has('grave-near') && Math.hypot(W.grave.x-P.x, W.grave.y-P.y)<=LANTERN_ALERT.graveNearR)
+      return say('grave', W.grave.x, W.grave.y, 'grave-near');
+  }
+  // 宝：一番近い物から。灯りの中に入った物は知らせ済みにする（見えた物は言わない）
+  const R=LANTERN_ALERT.treasureR*m; let best=null, bd=1e9;
+  const cand=[];
+  for(const d of W.drops) if(!d.stone) cand.push(d);
+  for(const o of (W.ores||[])) if(!o.mined) cand.push(o);
+  if(W.ev && !W.ev.used) cand.push(W.ev);
+  for(const o of cand){
+    if(LAN.told.has(o)) continue;
+    const d=Math.hypot(o.x-P.x, o.y-P.y);
+    if(d<=litR){ LAN.told.add(o); continue; }
+    if(d<=R && d<bd){ bd=d; best=o; }
+  }
+  if(best) return say('treasure', best.x, best.y, best);
+  // 穴：その階で1回
+  if(fl.stair && !LAN.toldKeys.has('hole')){
+    const sx=fl.stair.x+0.5, sy=fl.stair.y+0.5, d=Math.hypot(sx-P.x, sy-P.y);
+    if(d<=litR) LAN.toldKeys.add('hole');
+    else if(d<=LANTERN_ALERT.holeR*m) return say('hole', sx, sy, 'hole');
+  }
+}
+/* 蛍石を手に入れた瞬間。石が (x,y) からランタンへ飛び、蓋を開けて食べる（2026-11-11）。
+   蓋が口：開いて待つ → 石が入る → ぱくっと閉じる → もぐもぐ → 飲み込んで光る */
+function lanternEatStart(x, y){
+  if(!S.run || S.run.noStone) return;          // まだランタンを持っていない
+  LAN.eat = {t:0, x0:x, y0:y};
+}
+/* 拾った瞬間。拾った場所から頭上へ掲げ、光の輪を広げてから肩の後ろへ収まる */
+function lanternGetStart(x, y){
+  LAN.get = {t:0, x0:x, y0:y};
+  LAN.x = x; LAN.y = y;
+  W.pops.push({x:P.x, y:P.y-1.75, txt:'ランタンを手に入れた', c:'#bff8dc', life:LANTERN_GET_SEC, max:LANTERN_GET_SEC, bold:true});
+  if(typeof feelKick==='function') feelKick(1.2, 0.18);
+}
+/* 絵そのもの。cx,cy は絵の中心。sway は下端が横へ流れるドット数（吊り手は動かない） */
+function drawLanternSprite(cx, cy, sway, bright, lid, shut, pal){
+  pal = pal || LANTERN_PAL; shut = shut|0;
+  const u=Math.max(1,Math.round(TS/16)), w=5, h=LANTERN_PX.length;
+  const x0=Math.round(cx)-Math.floor(w/2)*u-(u>>1), y0=Math.round(cy)-(h>>1)*u;
+  lid = lid|0;
+  if(lid>0){                                   // 開いた口：蓋と胴のあいだが暗く開く
+    ctx.fillStyle=LANTERN_PAL.O; ctx.fillRect(x0, y0+(3-lid)*u, u, lid*u); ctx.fillRect(x0+4*u, y0+(3-lid)*u, u, lid*u);
+    ctx.fillStyle='#0a0d16'; ctx.fillRect(x0+u, y0+(3-lid)*u, 3*u, lid*u);       // 口の中は暗い
+    ctx.fillStyle=pal.W; ctx.fillRect(x0+u, y0+2*u, 3*u, u);              // 下あごの縁だけ光る
+  }
+  for(let y=0;y<h;y++){
+    const off = y<1 ? 0 : Math.round(sway*(y)/(h-1));
+    const row=LANTERN_PX[y];
+    for(let x=0;x<w;x++){
+      const ch=row[x]; if(ch==='.') continue;
+      // 灯りが弱いと、芯の白が消えて緑だけになる
+      let c=ch;
+      // まぶた：窓の上の段（shut≥1）と下の段（shut≥2）を鉄で塞ぐ。真ん中の芯だけ残る
+      if((c==='g'||c==='G'||c==='W') && ((shut>=1 && y===3) || (shut>=2 && y===5))) c='I';
+      ctx.fillStyle = pal[c];
+      ctx.fillRect(x0+(x+off)*u, y0+(y-(y<3?lid:0))*u, u, u);   // 上3段（吊り手・蓋・枠）が蓋として持ち上がる
+    }
+  }
+}
+function lanternGlow(cx, cy, r, a){
+  const g=ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, 'rgba(111,232,184,'+a+')'); g.addColorStop(0.4, 'rgba(111,232,184,'+(a*0.34)+')'); g.addColorStop(1, 'rgba(111,232,184,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+}
+/* 床に置かれているランタン（拾う前）。蛍石と同じく闇の外でも見える */
+function drawLanternOnGround(sx, sy, d){
+  const now=performance.now()/1000, pulse=0.8+0.2*Math.sin(now*2.4);
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(sx, sy+TS*0.2, TS*0.2, TS*0.07, 0, 0, 7); ctx.fill();
+  ctx.globalCompositeOperation='lighter';
+  lanternGlow(sx, sy-TS*0.05, TS*1.35, 0.42*pulse);
+  ctx.globalCompositeOperation='source-over';
+  drawLanternSprite(sx, sy-TS*0.06, 0, 1);
+  const tw=(now*1.1)%1;
+  if(tw<0.16){ const u=Math.max(1,Math.round(TS/16)), qx=Math.round(sx)-(u>>1), qy=Math.round(sy-TS*0.06);
+    ctx.globalAlpha=1-tw/0.16; ctx.fillStyle='#e4fff4'; ctx.fillRect(qx-u*2,qy,u*5,u); ctx.fillRect(qx,qy-u*2,u,u*5); }
+  ctx.restore();
+}
+/* 付いてくるランタン。主人公を描いたすぐ後に呼ぶ */
+function drawLantern(camX, camY, dt){
+  if(!S.run || S.run.noStone || !S.hero || S.screen!=='game') { LAN.x=null; LAN.get=null; LAN.eat=null; LAN.alert=null; return; }   // 街では見せない
+  dt = Math.min(0.1, dt||0.016); LAN.t += dt;
+  if(Math.abs(P.dirx||0)>0.3) LAN.face = P.dirx>0 ? 1 : -1;
+  const F=lightFuel(), face=lanternFace(F);
+  // 気配
+  LAN.scanT -= dt;
+  if(LAN.scanT<=0 && !LAN.get){ LAN.scanT=LANTERN_ALERT.scanSec; lanternScan(); }
+  const A=LAN.alert;
+  if(A){ A.t += dt; if(A.kind!=='danger' && A.t>=LANTERN_ALERT.sec) LAN.alert=null; }
+  const ak = A ? A.kind : null, ah = A ? Math.atan2(A.y-P.y, A.x-P.x) : 0;
+  let ax=P.x-0.40*LAN.face, ay=P.y-0.52, k=1-Math.exp(-dt*9);
+  if(face===3){ ax += 0.15*LAN.face; ay += 0.1; }                       // 消えかけ：寄り添う
+  if(ak==='treasure'){ ax += Math.cos(ah)*0.25; ay += Math.sin(ah)*0.25; }   // 身を乗り出す
+  if(ak==='danger'){ ax -= Math.cos(ah)*0.18; ay -= Math.sin(ah)*0.18; }     // 身を引く
+  if(ak==='hole'){ ay += 0.12; }                                          // 沈む
+  const G=LAN.get; let gk=-1;
+  if(G){
+    G.t += dt; gk = G.t/LANTERN_GET_SEC;
+    if(gk>=1) LAN.get=null;
+    else if(gk<0.72){ ax=P.x; ay=P.y-1.15; k=1-Math.exp(-dt*14); }   // 頭上に掲げる
+  }
+  if(LAN.x==null || Math.hypot(LAN.x-ax, LAN.y-ay)>4){ LAN.x=ax; LAN.y=ay; LAN.sway=0; }   // 階をまたいだら追い直す
+  const nx=LAN.x+(ax-LAN.x)*k, ny=LAN.y+(ay-LAN.y)*k, vx=(nx-LAN.x)/dt;
+  LAN.x=nx; LAN.y=ny;
+  LAN.sway += (clamp(-vx*0.9,-2,2) - LAN.sway)*Math.min(1,dt*10);
+  const u=Math.max(1,Math.round(TS/16)), now=LAN.t;
+  const bright = clamp(F/LIGHT_MAX, 0.1, 1);
+  let fl = 0.86+0.08*Math.sin(now*7.3)+0.06*Math.sin(now*13.1);
+  if(face===3) fl *= (Math.sin(now*9)>-0.2 ? 1 : 0.35) * ((now%2.6)<0.12 ? 0.15 : 1);   // 明滅と咳
+  if(ak==='danger') fl *= (Math.floor(now*14)%2) ? 1 : 0.45;
+  if(ak==='hole') fl *= 0.55;
+  if(ak==='treasure') fl *= 0.85+0.35*Math.max(0, Math.sin(A.t*9));
+  // 色：顔つき・知らせ・瘴気の曇り
+  const pal=Object.assign({}, LANTERN_PAL);
+  if(face>=1 && !(face===1 && Math.sin(now*1.7)>0)) pal.W=pal.G;          // 芯の白が消える
+  if(face>=3) pal.G=lanternMix(pal.G, pal.g, 0.5);
+  if(ak==='treasure'){ const kk=0.6+0.4*Math.max(0,Math.sin(A.t*9)); pal.g=lanternMix(pal.g,'#b08a30',kk); pal.G=lanternMix(pal.G,'#ffd06a',kk); pal.W=lanternMix(pal.W,'#fff6d0',kk); }
+  if(ak==='hole'){ pal.g='#1e4a4a'; pal.G='#2f7a72'; pal.W='#5aa0a0'; }
+  let shut = face===2 ? 1 : face===3 ? 2 : 0;
+  if(ak==='grave'){                                     // 白く2回まばたき
+    const ph=Math.floor(A.t/0.15);
+    if(ph<4){ if(ph%2===0) shut=2; else { pal.g=pal.G=pal.W='#ffffff'; shut=0; } }
+  }
+  if(miasmaZone()){ const fog=(1-F/LIGHT_MAX)*0.75; ['g','G','W'].forEach(c=>pal[c]=lanternMix(pal[c],'#7d8a88',fog)); }
+  const bob = G ? 0 : Math.round(Math.sin(now*2.2)*0.8)*u;
+  let cx=LAN.x*TS-camX, cy=LAN.y*TS-camY+bob;
+  if(ak==='danger') cx += ((Math.floor(now*20)%2)?1:-1)*u;           // 小刻みに震える
+  /* 蛍石を食べる。e：0〜0.42 口を開けて石を待つ／〜0.5 ぱくっ／〜0.8 もぐもぐ／〜1 飲み込んで光る */
+  const E=LAN.eat; let e=-1, lid=0;
+  if(E){
+    E.t += dt; e = E.t/LANTERN_EAT_SEC;
+    if(e>=1){ LAN.eat=null; e=-1; }
+    else if(e<0.42){ lid = e<0.08 ? 1 : 2; cy -= u; }                      // 伸び上がって口を開ける
+    else if(e<0.5){ cy += u; }                                            // 閉じて沈む
+    else if(e<0.8){ const c=Math.floor((e-0.5)/0.075); lid = c%2 ? 0 : 1; cx += (c%2 ? -u : u); }   // もぐもぐ
+  }
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  { const gc = ak==='treasure' ? '255,208,106' : ak==='grave' && shut===0 ? '230,240,255' : null;
+    if(gc){ const g2=ctx.createRadialGradient(cx,cy,0,cx,cy,TS*0.9); g2.addColorStop(0,'rgba('+gc+','+(0.6*fl)+')'); g2.addColorStop(1,'rgba('+gc+',0)'); ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(cx,cy,TS*0.9,0,7); ctx.fill(); }
+    else lanternGlow(cx, cy, TS*0.9, (0.25+0.45*bright)*fl*(miasmaZone()?1-(1-F/LIGHT_MAX)*0.6:1)); }
+  ctx.globalCompositeOperation='source-over';
+  drawLanternSprite(cx, cy, E ? 0 : Math.round(LAN.sway), bright, lid, E ? 0 : shut, pal);
+  if(ak==='hole'){                                      // 穴の方へ落ちる滴
+    const dk=(A.t*1.6)%1, dx=Math.round(Math.cos(ah)*dk*3), qx=Math.round(cx)-(u>>1)+dx*u, qy=Math.round(cy)+Math.round((4+dk*6))*u;
+    ctx.globalAlpha=1-dk; ctx.fillStyle=pal.G; ctx.fillRect(qx, qy, u, u); ctx.globalAlpha=1;
+  }
+  if(E && e>=0 && e<0.42){
+    /* 飛んでくる蛍石。山なりに口へ。暗い外枠＋明るい芯（落ちている蛍石と同じ色） */
+    const k=e/0.42, kk=k*k*(3-2*k);
+    const ox=E.x0*TS-camX, oy=E.y0*TS-camY-TS*0.2, mx=cx, my=cy-3*u;
+    const sx=ox+(mx-ox)*kk, sy=oy+(my-oy)*kk - Math.sin(k*Math.PI)*TS*0.7, q=u;
+    ctx.globalCompositeOperation='lighter'; lanternGlow(sx, sy, TS*0.45, 0.5); ctx.globalCompositeOperation='source-over';
+    const bx=Math.round(sx)-q-(q>>1), by=Math.round(sy)-2*q;
+    ctx.fillStyle='#1d4a3c'; ctx.fillRect(bx, by, 3*q, 5*q);           // 外枠は上下左右とも1ドット
+    ctx.fillStyle='#6fe8b8'; ctx.fillRect(bx+q, by+q, q, 3*q);
+    ctx.fillStyle='#d8fff0'; ctx.fillRect(bx+q, by+2*q, q, q);
+  }
+  if(E && e>=0.8){
+    /* 飲み込んだ：ひと息光って、きらめきが3つ昇る */
+    const k=(e-0.8)/0.2;
+    ctx.globalCompositeOperation='lighter'; lanternGlow(cx, cy, TS*(0.9+k*1.3), 0.6*(1-k)); ctx.globalCompositeOperation='source-over';
+    ctx.fillStyle='#e4fff4'; ctx.globalAlpha=1-k;
+    [[-3,0],[0,-2],[3,-1]].forEach(([dx,dy],i)=>{ const qx=Math.round(cx)+dx*u-(u>>1), qy=Math.round(cy)+(dy-4-Math.round(k*(3+i)))*u;
+      ctx.fillRect(qx-u,qy,3*u,u); ctx.fillRect(qx,qy-u,u,3*u); });
+    ctx.globalAlpha=1;
+  }
+  // 芯のきらめき（ときどき十字に光る。灯りが弱いと出ない）
+  const tw=(now*1.3)%1;
+  if(!G && !E && !ak && face===0 && tw<0.14){
+    const qx=Math.round(cx)-(u>>1), qy=Math.round(cy);
+    ctx.globalAlpha=1-tw/0.14; ctx.fillStyle='#e4fff4';
+    ctx.fillRect(qx-u*2,qy,u*5,u); ctx.fillRect(qx,qy-u*2,u,u*5); ctx.globalAlpha=1;
+  }
+  if(G && gk>=0.14 && gk<0.8){
+    /* 掲げた所で灯る：白い十字が大きく瞬き、緑の輪が2つ広がる */
+    const e=(gk-0.14)/0.66, q=u;
+    ctx.globalCompositeOperation='lighter';
+    lanternGlow(cx, cy, TS*(1.2+e*2.2), 0.55*(1-e));
+    ctx.globalCompositeOperation='source-over';
+    for(let i=0;i<2;i++){
+      const r=e*1.25-i*0.28; if(r<=0||r>=1) continue;
+      ctx.globalAlpha=(1-r)*0.9; ctx.strokeStyle= i ? '#6fe8b8' : '#e4fff4'; ctx.lineWidth=Math.max(2,q*1.5);
+      ctx.beginPath(); ctx.arc(cx, cy, TS*(0.4+r*3.4), 0, 7); ctx.stroke();
+    }
+    if(e<0.5){
+      const arm=Math.round(2+6*Math.sin(e/0.5*Math.PI)), qx=Math.round(cx)-(q>>1), qy=Math.round(cy);
+      ctx.globalAlpha=1-e; ctx.fillStyle='#ffffff';
+      ctx.fillRect(qx-arm*q, qy, (arm*2+1)*q, q); ctx.fillRect(qx, qy-arm*q, q, (arm*2+1)*q);
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
 function drawFluorite(sx, sy, d){
   const q=Math.max(1,Math.round(TS/16)), side=16*q;
   const left=Math.round(sx-side/2), top=Math.round(sy-side*0.62);
@@ -18874,11 +19117,11 @@ function drawFluorite(sx, sy, d){
   const Q=Math.max(2,Math.round(TS/16)), gl=0.55+0.45*Math.sin(performance.now()/260);
   const bx=Math.round(sx-Q*2), by=Math.round(sy-Q*3);
   ctx.fillStyle='#1d4a3c'; ctx.fillRect(bx, by, Q*4, Q*6);
-  ctx.fillStyle='#6fe8b8'; ctx.fillRect(Math.round(sx-Q), by, Q*2, Q*5);
+  ctx.fillStyle='#6fe8b8'; ctx.fillRect(Math.round(sx-Q), by+Q, Q*2, Q*4);    // 上辺にも暗い外枠を1ドット残す（2026-11-12）
   ctx.globalAlpha=gl; ctx.fillStyle='#d8fff0'; ctx.fillRect(Math.round(sx-Q), Math.round(sy-Q*2), Q, Q*2); ctx.globalAlpha=1;
   // 3) ゆらめき：芯の中を、明るい1段が下から上へ（12コマ/秒で刻む）
-  const band = 4 - (((now*12)|0) % 9);                    // 4→0 と動き、あとは休む
-  if(band>=0){ ctx.globalAlpha=0.85; ctx.fillStyle='#e6fff4'; ctx.fillRect(Math.round(sx-Q), by+band*Q, Q*2, Q); ctx.globalAlpha=1; }
+  const band = 3 - (((now*12)|0) % 8);                    // 3→0 と動き、あとは休む（芯は外枠の1段下から）
+  if(band>=0){ ctx.globalAlpha=0.85; ctx.fillStyle='#e6fff4'; ctx.fillRect(Math.round(sx-Q), by+(band+1)*Q, Q*2, Q); ctx.globalAlpha=1; }
   // 4) きらめき：3か所が順番に瞬く（十字の星。大きい時は腕が2ドット）
   const SP=[[-4,-3],[4,-4],[3,2],[-4,1],[1,-6]];   // 結晶の真ん中（sx,sy）からのずれ（ドット）
   for(let i=0;i<3;i++){

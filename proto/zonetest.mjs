@@ -162,42 +162,26 @@ R.noEarlyUnlock = await pg.evaluate(()=>{
 
 /* ============ 4. 見せ方 ============ */
 
-// 4-a. 層が変わった階でだけバナーが出る
-/* 層が変わったことは**ログの1行**で伝える。
-   以前は画面中央のバナーで層名と一文を出していたが、降りるたびに
-   読ませる文章が挟まってテンポを削るのでやめた（バナー自体は
-   装備の破損など「止めて伝えるべき事」のために残っている）。 */
+// 4-a. 層が変わっても入場時の見出しは出さない。階数のログは残す。
 R.banner = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(1);
-  const zoneLine=()=>logs.filter(l=>/^── /.test(l)).length;
-  /* ログは直近5行しか持たない環状バッファ（log() 参照）。同じ階でも
-     商人・鍛冶場・鉱脈などの手がかりが何行も続くと、探したい層バナーの行
-     そのものが押し出されて消えてしまう——**出たかどうか**を見たいだけなので、
-     ここだけは log() を差し替えて、押し出される前の生の呼び出しを直接拾う。 */
-  const captured=[];
-  const realLog=log;
+  const captured=[], banners=[];
+  const realLog=log, realBanner=showBanner;
+  // 直近5行のログから押し出される前、バナーが順番待ちに入る前に記録する。
   log=(t)=>{ captured.push(t); realLog(t); };
-  logs.length=0;
-  enterFloor(2);
-  const sameZone=zoneLine();              // 同じ層なので増えない
-  captured.length=0;
-  enterFloor(11);
-  const newZone=captured.filter(l=>/^── /.test(l)).length;   // 層が変わったので1行増える
-  const line=captured.filter(l=>/^── /.test(l)).pop() || '';
-  logs.length=0;
-  enterFloor(12);
-  const stillSame=zoneLine();
-  _banner=null;
-  enterFloor(21);
-  const noBanner=_banner;
-  log=realLog;
-  return {sameZone, newZone, line, stillSame,
-          quietWithinZone:  sameZone===0,
-          announcesNewZone: newZone===1,
-          namesTheZone:     line.includes(zoneAt(11).nm),
-          quietAgainAfter:  stillSame===0,
-          noBannerAnyMore:  noBanner===null,
-          onlyOnZoneChange: sameZone===0 && newZone===1 && stillSame===0};
+  showBanner=(...args)=>{ banners.push(args[0]); realBanner(...args); };
+  try {
+    enterFloor(11);
+    enterFloor(51);
+  } finally {
+    log=realLog;
+    showBanner=realBanner;
+  }
+  const noZoneHeading=!captured.some(l=>/^── /.test(l));
+  const noPlaceBanner=![zoneAt(11).nm, floorPlaceName(51)].some(n=>banners.includes(n));
+  const keepsFloorNumbers=[11,51].every(d=>captured.includes('第'+d+'階層'));
+  return {noZoneHeading, noPlaceBanner, keepsFloorNumbers,
+          ok:noZoneHeading && noPlaceBanner && keepsFloorNumbers};
 });
 
 // 4-b. HUD と階段ダイアログに層の名前が出る
