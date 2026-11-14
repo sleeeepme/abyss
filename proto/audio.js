@@ -24,7 +24,11 @@
     parry:{name:'パリイ／ジャスト回避',bus:'feedback',gain:.6,priority:95,cooldown:350,length:.30,pulse:2,noise:1,texture:'刃を弾く鋭い接触と細い残響'},
     dash:{name:'ダッシュ',bus:'combat',gain:.28,priority:50,cooldown:300,length:.09,pulse:0,noise:1,shape:'dash',texture:'低い所から上がる短い風'},
     skill:{name:'武器技／大技',bus:'feedback',gain:.54,priority:75,cooldown:650,length:.36,pulse:1,noise:1,shape:'skill',texture:'低くうねって上がる溜めと、はじける衝撃'},
-    defeat:{name:'敵の消滅',bus:'combat',gain:.27,priority:24,cooldown:350,length:.27,pulse:1,noise:1,texture:'崩れて、3段で下がる小さな音'},
+    /* 雑魚の撃破（2026-11-14）。前の「敵の消滅」（defeat）は、同じ瞬間の命中の音に間隔と発音枠を取られて、ほとんど鳴っていなかった。
+       命中とは別の間隔（family）・発音枠の外（free）にして、倒した手応えが必ず聞こえるようにする。続けて倒すと続けて鳴る */
+    kill:{name:'雑魚敵の撃破',bus:'combat',family:'kill',free:true,gain:.5,priority:47,cooldown:110,length:.46,pulse:0,noise:0,c:true,texture:'低い「ドッ」と弾ける音のあと、灰が散るような細かい音が上へ抜ける'},
+    /* 技の閃き（2026-11-14）。電球が出る「ポッ」→ 灯る瞬間に「ピコーン」。variant：hero は時間が緩むぶん灯るのが遅い */
+    flash:{name:'技の閃き',bus:'feedback',gain:.62,priority:96,cooldown:800,length:1.5,pulse:1,noise:0,music:true,c:true,texture:'小さな「ポッ」のあと、灯る瞬間に高い2音の「ピコーン」が細く残る'},
     boss:{name:'ボス撃破',bus:'feedback',gain:.6,priority:99,cooldown:2000,length:.82,pulse:1,noise:1,texture:'重い崩落、二度の瓦解、静まる余韻'},
     death:{name:'戦闘不能',bus:'feedback',gain:.58,priority:100,cooldown:2000,length:.52,pulse:1,noise:1,texture:'身体が落ちる衝撃と装備の擦れ'},
     pickup:{name:'アイテム取得',bus:'world',gain:.34,priority:55,cooldown:300,length:.13,pulse:1,noise:0,texture:'上がる2音の「ピコッ」'},
@@ -48,14 +52,14 @@
     buy:{name:'購入・支払い',bus:'ui',gain:.32,priority:63,cooldown:200,length:0.25,pulse:0,noise:0,c:true,texture:'G5とD6の2つの短い音'},
     notify:{name:'通知',bus:'ui',gain:.30,priority:57,cooldown:1200,length:0.6,pulse:0,noise:0,c:true,texture:'E4とB4の5度の響き'}
   };
-  const defaults={version:1,enabled:true,master:.35,music:.6,maxEvents:2,maxStarts:8,ally:.25,distance:8,duck:.3,tail:1,
+  const defaults={version:1,enabled:true,master:.35,music:.6,maxEvents:2,maxStarts:8,ally:.25,distance:8,duck:.3,tail:1,space:.2,
     buses:{combat:.70,feedback:.90,world:.65,ui:.6},sounds:Object.fromEntries(Object.entries(defs).map(([k,d])=>[k,{enabled:true,gain:d.gain,cooldown:d.cooldown}]))};
   const copy=x=>JSON.parse(JSON.stringify(x));
   const clamp=(x,a,b,f)=>Number.isFinite(Number(x))?Math.max(a,Math.min(b,Number(x))):f;
   function sanitize(v={}){
     if(!v||typeof v!=='object'||Array.isArray(v))v={};
     const n=copy(defaults);n.enabled=typeof v.enabled==='boolean'?v.enabled:n.enabled;
-    for(const [k,a,b] of [['master',0,.8],['music',0,1],['maxEvents',1,3],['maxStarts',3,12],['ally',0,.5],['distance',3,12],['duck',.1,.65],['tail',.5,1]])n[k]=clamp(v[k],a,b,n[k]);
+    for(const [k,a,b] of [['master',0,.8],['music',0,1],['maxEvents',1,3],['maxStarts',3,12],['ally',0,.5],['distance',3,12],['duck',.1,.65],['tail',.5,1],['space',0,.5]])n[k]=clamp(v[k],a,b,n[k]);
     n.maxEvents=Math.round(n.maxEvents);n.maxStarts=Math.round(n.maxStarts);
     for(const k in n.buses)n.buses[k]=clamp(v.buses?.[k],0,1,n.buses[k]);
     for(const k in n.sounds){const s=v.sounds?.[k];if(!s)continue;n.sounds[k]={enabled:typeof s.enabled==='boolean'?s.enabled:true,gain:clamp(s.gain,0,1,n.sounds[k].gain),cooldown:clamp(s.cooldown,60,3000,n.sounds[k].cooldown)};}
@@ -69,7 +73,7 @@
     musicSync();
     if(master){master.gain.cancelScheduledValues(ctx.currentTime);master.gain.setValueAtTime(settings.enabled&&!externalMutes.size?settings.master:0,ctx.currentTime);}
   }
-  let ctx,master,duck,compressor,queue=[],timer=0,active=[],last={},lastFamily={},starts=[],cache=new Map(),duckUntil=0;
+  let ctx,master,duck,compressor,reverb=null,queue=[],timer=0,active=[],last={},lastFamily={},starts=[],cache=new Map(),duckUntil=0;
   let counters={requested:0,played:0,dropped:0,stolen:0,peakEvents:0,peakPulse:0,peakNoise:0},history=[],listeners=new Set(),fault='';
   function report(id,result,why){history.unshift({id,result,why,time:Date.now()});history.length=Math.min(history.length,32);}
   function notify(){for(const f of listeners){try{f();}catch{}}}
@@ -84,11 +88,24 @@
         const low=ctx.createBiquadFilter();low.type='lowpass';low.frequency.value=6200;low.Q.value=.5;
         compressor=ctx.createDynamicsCompressor();compressor.threshold.value=-16;compressor.knee.value=10;compressor.ratio.value=8;compressor.attack.value=.003;compressor.release.value=.12;
         duck=ctx.createGain();duck.connect(low);low.connect(compressor);compressor.connect(master);master.connect(ctx.destination);
+        /* 洞窟の響き（2026-11-14）。効果音を少しだけ送る短い残響。乾いた音がその場に置かれて聞こえるように。
+           響きは合成で作る（録音なし）：はじめに左右で違う反射が3つ、そのあと 0.3 秒ほどで消える、だんだんこもる雑音 */
+        try{reverb=ctx.createConvolver();reverb.normalize=false;reverb.buffer=caveIR(ctx);const wet=ctx.createGain();wet.gain.value=1;reverb.connect(wet);wet.connect(low);}catch{reverb=null;}
         // Important sounds bypass only ducking, not output filtering/limiting.
         ctx._sfxInput=low;
       }
       if(ctx.state!=='running')await ctx.resume();musicSync();notify();return ctx.state==='running';
     }catch{fault='音声を開始できません。もう一度「音を有効にする」を押してください';notify();return false;}
+  }
+  function caveIR(ctx){
+    const sr=ctx.sampleRate,n=Math.ceil(sr*1.1),b=ctx.createBuffer(2,n,sr);let seed=0x1234567;
+    const rnd=()=>{seed=(Math.imul(seed^(seed>>>15),0x2c1b3c6d)+0x6d2b79f5)|0;return ((seed>>>0)%100000)/50000-1;};
+    for(let c=0;c<2;c++){const d=b.getChannelData(c);let lp=0,e=0;
+      for(const [t,g] of (c?[[.019,.5],[.043,-.36],[.071,.26]]:[[.023,.5],[.037,.36],[.064,-.26]]))d[Math.round(t*sr)]+=g;
+      for(let i=Math.round(.012*sr);i<n;i++){const t=i/sr,k=1-Math.exp(-TAU*(900+5200*Math.exp(-t/.16))/sr);lp+=k*(rnd()-lp);d[i]+=lp*Math.exp(-t/.26)*Math.min(1,(t-.012)/.02);}
+      for(let i=0;i<n;i++){d[i]*=Math.min(1,(n-1-i)/(sr*.05));e+=d[i]*d[i];}
+      const g=1/Math.sqrt(e||1);for(let i=0;i<n;i++)d[i]*=g;}
+    return b;
   }
   // Each list is one physical GB channel. Segments on a list never overlap.
   // Pulse: [start, length, Hz, level 0..15, envelope pace, duty, settleHz].
@@ -114,7 +131,6 @@
     parry:{p:[[[0,.19,1640,9,1,.125]],[[0,.105,2533,6,1,.125]]],n:[[0,.018,1,1,0,15,1],[.018,.05,3,1,1,8,1]]},
     dash:{n:[[0,.085,3,4,0,9,1,{shiftTo:1}]]},
     skill:{p:[[[0,.33,147,10,3,.5,0,{to:392,vib:.02,vibHz:10}]]],n:[[0,.04,1,2,0,14,1],[.04,.28,3,4,0,9,2]]},
-    defeat:{p:[[[0,.05,196,8,1,.5,0,{to:131}],[.07,.05,147,6,1,.5],[.14,.07,110,5,1,.5]]],n:[[0,.04,3,3,0,12,1],[.04,.20,4,5,0,8,2]]},
     boss:{p:[[[0,.18,83,12,1,.5,66],[.20,.11,69,6,1,.5]]],n:[[0,.10,5,4,0,15,1],[.10,.10,3,5,0,10,1],[.20,.13,5,4,0,10,1],[.33,.18,7,5,0,8,2],[.51,.25,3,6,0,4,3]]},
     death:{p:[[[0,.115,92,10,1,.5,66]]],n:[[0,.05,4,3,0,14,1],[.05,.11,6,4,0,8,1],[.16,.16,3,3,1,5,1],[.32,.15,4,5,0,3,2]]},
     pickup:{p:[[[0,.04,1047,10,1,.25],[.045,.08,1568,10,1,.25]]]},
@@ -223,12 +239,32 @@
         swell(o,.55,.95,{gain:.24,type:'bp',f0:900,f1:300,sweep:.8,q:2,a:.03,r:.6,trem:.5,tremHz:9});
         swell(o,0,1.5,{gain:.14,f0:200,a:.2,r:.7});},
     };
-    const LEN={ui:.32,confirm:.75,back:.4,open:.55,close:.45,tab:.3,toggle:.35,deny:.45,equip:.6,buy:.5,notify:1.6,level:1.4,fall:1.0,land:1.4,roar:1.75};
+    /* 雑魚の撃破：命中の音（0.02秒ほど）のすぐ後ろに、低い「ドッ」と下がる破裂、そのあと灰が散る細かい音が上へ抜ける。
+       鳴るたびの高さの揺れは他より大きく（±7%）——続けて倒したときに同じ音が並ばないように */
+    R.kill=(o,v)=>{const u=1+(v-1)*7,pan=(rand()*2-1)*.25;
+      voice(o,.012,.15,{gain:.5,w:'tri',f0:175*u,f1:52*u,glide:.09,a:.002,r:.08});
+      tk(o,.012,104*u,{duty:.5,d:.028,g:.13});
+      noise(o,.012,.17,{gain:.5,f0:2600*u,f1:420,sweep:.1,q:1.1,d:.034});
+      swell(o,.07,.34,{gain:.27,pan,type:'bp',f0:1100*u,f1:3600,sweep:.3,q:1.6,a:.02,r:.26,trem:.7,tremHz:27});
+      swell(o,.1,.3,{gain:.15,pan:-pan,type:'hp',f0:3000,a:.03,r:.24,trem:.8,tremHz:19});};
+    /* 技の閃き：電球が出る「ポッ」、灯るまで細く上がる息、灯る瞬間（T）に A6→D7 の「ピコーン」。
+       D7 に1オクターブ下の三角波と薄い5度を重ねて、こだまで細く残す。きらめきを2つ左右に置く */
+    R.flash=(o,v,who)=>{const T=who==='hero'?.45:.22;
+      tk(o,0,587.3*v,{w:'tri',d:.03,g:.3});noise(o,0,.02,{gain:.1,type:'hp',f0:3000,d:.004});
+      swell(o,.03,T-.03,{gain:.06,type:'bp',f0:700,f1:2600,sweep:T,q:2.5,a:T*.75,r:.02});
+      tk(o,T,1760*v,{duty:.125,d:.022,g:.3});
+      blip(o,T+.055,.9,{gain:.44,w:'tri',f:2349.3*v,a:.002,d:.3});
+      blip(o,T+.055,.5,{gain:.15,duty:.125,f:2349.3*v,a:.002,d:.1});
+      blip(o,T+.055,.8,{gain:.22,w:'tri',f:1174.7*v,a:.004,d:.26});
+      blip(o,T+.06,.6,{gain:.09,w:'tri',f:3520*v,a:.004,d:.18});
+      tk(o,T+.19,3136*v,{w:'tri',d:.03,g:.09,pan:-.6});tk(o,T+.29,3520*v,{w:'tri',d:.035,g:.07,pan:.6});};
+    const LP={kill:5200,flash:5600};   // この2つは「低い響き」より明るく（弾ける音・灯る音）
+    const LEN={kill:.5,flash:1.2,ui:.32,confirm:.75,back:.4,open:.55,close:.45,tab:.3,toggle:.35,deny:.45,equip:.6,buy:.5,notify:1.6,level:1.4,fall:1.0,land:1.4,roar:1.75};
     const PEAK=.2,cache=new Map();   // 効果音（GB）と同じくらいの大きさに
     function make(ctx,id,variant){
-      const v=1+(rand()*2-1)*.01,o=Out(ctx.sampleRate,LEN[id]+(id==='land'?.13*Math.max(0,(+variant||1)-1):0));
+      const v=1+(rand()*2-1)*.01,o=Out(ctx.sampleRate,LEN[id]+(id==='land'?.13*Math.max(0,(+variant||1)-1):0)+(id==='flash'&&variant==='hero'?.23:0));
       R[id](o,v,variant);
-      onepole(o,80,'hp');onepole(o,2600,'lp');echo(o,.12,.18);
+      onepole(o,80,'hp');onepole(o,LP[id]||2600,'lp');echo(o,.12,id==='kill'?.1:.18);
       let pk=0,dl=0,dr=0;
       for(let i=0;i<o.n;i++){const e=Math.min(1,i/(o.sr*.0005),(o.n-1-i)/(o.sr*.02));dl+=.002*(o.L[i]-dl);dr+=.002*(o.R[i]-dr);o.L[i]=(o.L[i]-dl)*e;o.R[i]=(o.R[i]-dr)*e;pk=Math.max(pk,Math.abs(o.L[i]),Math.abs(o.R[i]));}
       const k=pk>0?PEAK*(1+(rand()*2-1)*.05)/pk:1,b=ctx.createBuffer(2,o.n,o.sr);
@@ -275,19 +311,22 @@
     if(externalMutes.size||!settings.enabled||!s.enabled||!settings.master||!s.gain||!settings.buses[d.bus]||document.hidden)return drop(id,'消音設定');
     const key=id+(o.ally?':ally':':self'),cd=s.cooldown/1000;
     if(now-(last[key]??-Infinity)<cd)return drop(id,'同じ音の間隔');
-    const family=o.ally?'ally':d.bus==='combat'?'combat':d.bus;
-    const interval=o.ally?.35:d.bus==='combat'?.075:.035;
+    const family=o.ally?'ally':d.family||(d.bus==='combat'?'combat':d.bus);
+    const interval=o.ally?.35:d.family?.06:d.bus==='combat'?.075:.035;
     if(now-(lastFamily[family]??-Infinity)<interval)return drop(id,'カテゴリ連打制限');
     starts=starts.filter(t=>now-t<1);
     if(starts.length>=settings.maxStarts+(rank>=80?3:0))return drop(id,'1秒の発音上限');
     const distance=Number.isFinite(o.distance)?Math.max(0,o.distance):0;
     if(distance>settings.distance)return drop(id,'遠距離');
-    const volume=s.gain*settings.buses[d.bus]*(o.ally?settings.ally:1)/(1+(distance/3.5)**2);
+    /* GBの音は、鳴るたびに高さ±3.5%・音量±6%だけ揺らす（2026-11-14）。同じ斬撃・命中が機械のように並ばないように。
+       ゲームの乱数は使わない（Math.random）。UI・場面の音は合成の側で揺らしてある */
+    const vary=!d.c&&!d.music,rate=vary?1+(Math.random()*2-1)*.035:1;
+    const volume=s.gain*settings.buses[d.bus]*(o.ally?settings.ally:1)/(1+(distance/3.5)**2)*(vary?1+(Math.random()*2-1)*.06:1);
     if(volume<.015)return drop(id,'小音量');
     prune();let survivors=active.slice(),victims=[];
     /* UIの「低い響き」は発音枠の外で鳴らす（2026-10-25）。三角波の小さな音で、矩形波とノイズの枠も使わない。
        着地・咆哮・レベルアップのような長い音が枠を埋めているときに、押した音が消えないように */
-    const free=!!(d.c&&d.bus==='ui');
+    const free=!!(d.free||d.c&&d.bus==='ui');
     const fits=()=>free||survivors.filter(a=>!a.free).length<settings.maxEvents&&survivors.reduce((n,a)=>n+a.pulse,0)+d.pulse<=2&&survivors.reduce((n,a)=>n+a.noise,0)+d.noise<=1;
     // Remove the quietest low-priority competitor only when it helps free a slot.
     const candidates=survivors.filter(a=>a.rank<rank&&!a.free).sort((a,b)=>a.rank-b.rank||a.volume-b.volume);
@@ -295,14 +334,19 @@
     if(!fits())return drop(id,'重要音／発音枠を保護');
     let start=now+.003;
     if(victims.length){start=now+.015;for(const a of victims){a.gain.gain.cancelScheduledValues(now);a.gain.gain.setTargetAtTime(0,now,.003);try{a.source.stop(now+.012);}catch{}counters.stolen++;}active=survivors;}
-    const b=synth(id,o.variant),source=ctx.createBufferSource(),gain=ctx.createGain();source.buffer=b;source.connect(gain);gain.connect(rank>=80?ctx._sfxInput:duck);
+    const b=synth(id,o.variant),source=ctx.createBufferSource(),gain=ctx.createGain();source.buffer=b;source.playbackRate.value=rate;source.connect(gain);
+    /* 左右の位置（o.pan：-1〜1）と、洞窟の響きへの送り。遠い音ほど響きが多い。UI と、こだまが入っている音は控えめに送る */
+    const dest=rank>=80?ctx._sfxInput:duck,pan=Number.isFinite(o.pan)?Math.max(-1,Math.min(1,o.pan)):0;
+    let panner=null,send=null;
+    if(pan&&ctx.createStereoPanner){panner=ctx.createStereoPanner();panner.pan.value=pan;gain.connect(panner);panner.connect(dest);}else gain.connect(dest);
+    if(reverb&&settings.space>0){send=ctx.createGain();send.gain.value=settings.space*(d.bus==='ui'?.3:d.c?.6:1)*(1+Math.min(1.5,distance/5));(panner||gain).connect(send);send.connect(reverb);}
     // Preserve the fanfare's cadence even when combat tails are shortened.
     const span=Math.min(b.duration,d.length*(d.music?1:settings.tail)),end=start+span;
     gain.gain.setValueAtTime(volume,start);
     if(d.music){gain.gain.setValueAtTime(volume,end-.10);gain.gain.linearRampToValueAtTime(0,end);}
     else {gain.gain.setTargetAtTime(.0001,start+span*.38,Math.max(.012,span*.23));gain.gain.setValueAtTime(volume*Math.exp(-Math.max(0,span*.62-.01)/Math.max(.012,span*.23)),end-.01);gain.gain.linearRampToValueAtTime(0,end);}
     const a={source,gain,id,end,rank,volume,pulse:d.pulse,noise:d.noise,free};active.push(a);
-    source.onended=()=>{source.disconnect();gain.disconnect();active=active.filter(x=>x!==a);};source.start(start);source.stop(end+.001);
+    source.onended=()=>{source.disconnect();gain.disconnect();if(panner)panner.disconnect();if(send)send.disconnect();active=active.filter(x=>x!==a);};source.start(start);source.stop(end+.001);
     if(rank>=80){duckUntil=Math.max(duckUntil,end+.08);duck.gain.cancelScheduledValues(now);duck.gain.setTargetAtTime(settings.duck,now,.008);duck.gain.setTargetAtTime(1,duckUntil,.07);}
     last[key]=now;lastFamily[family]=now;starts.push(now);counters.played++;
     counters.peakEvents=Math.max(counters.peakEvents,active.filter(a=>!a.free).length);counters.peakPulse=Math.max(counters.peakPulse,active.reduce((n,a)=>n+a.pulse,0));counters.peakNoise=Math.max(counters.peakNoise,active.reduce((n,a)=>n+a.noise,0));report(id,'play',o.ally?'仲間・距離減衰':'再生');return true;
@@ -312,10 +356,10 @@
   function emit(id,options={}){
     if(!defs[id])return false;counters.requested++;
     if(externalMutes.size||!ctx||ctx.state!=='running'||document.hidden||!settings.enabled)return drop(id,'未開始／休止');
-    const event={id,options:{ally:!!options.ally,distance:options.distance,variant:options.variant},rank:defs[id].priority-(options.ally?25:0)};
+    const event={id,options:{ally:!!options.ally,distance:options.distance,variant:options.variant,pan:options.pan},rank:defs[id].priority-(options.ally?25:0)};
     // 16 ms aggregation, one candidate per sound+origin, fixed memory and no backlog.
     const duplicate=queue.find(e=>e.id===id&&e.options.ally===event.options.ally);
-    if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0))duplicate.options.distance=event.options.distance;return drop(id,'同時ヒットを統合');}
+    if(duplicate){if((event.options.distance||0)<(duplicate.options.distance||0)){duplicate.options.distance=event.options.distance;duplicate.options.pan=event.options.pan;}return drop(id,'同時ヒットを統合');}
     if(queue.length>=32)return drop(id,'フレーム上限');queue.push(event);if(!timer)timer=setTimeout(flush,16);return true;
   }
   /* ---------- BGM（2026-10-22：拠点の曲、同日 石の層の曲・中ボス戦の曲、10-23 ヴェラ第二形態の曲） ----------
@@ -416,7 +460,7 @@
   /* 先に取ってきて解いておく（ヴェラの階に入った時点で。第二形態に変わった瞬間に鳴らしたい） */
   function musicPrefetch(id){const t=TRACKS[id];if(!t||!ctx||ctx.state!=='running')return;const p=player(id);if(p&&p.kind==='buf')bufLoad(p);}
   function musicKick(){if(musicCanPlay()&&(!players[mWant]||!isPlaying(players[mWant])))musicSync();}
-  function inspect(){prune();return {state:ctx?.state||'locked',music:(()=>{const p=players[mWant];return {want:mWant,id:p?p.id:null,kind:p?p.kind:null,playing:!!p&&isPlaying(p),volume:p?(p.gain?p.gain.gain.value:p.el?p.el.volume:0):0,routed:!!(p&&p.gain),time:p?(p.kind==='el'?p.el.currentTime:bufPos(p)):0,loaded:!!(p&&(p.kind==='el'||p.buf)),others:Object.values(players).filter(q=>q!==p&&isPlaying(q)).map(q=>q.id),fault:mFault};})(),externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
+  function inspect(){prune();return {state:ctx?.state||'locked',space:!!reverb,music:(()=>{const p=players[mWant];return {want:mWant,id:p?p.id:null,kind:p?p.kind:null,playing:!!p&&isPlaying(p),volume:p?(p.gain?p.gain.gain.value:p.el?p.el.volume:0):0,routed:!!(p&&p.gain),time:p?(p.kind==='el'?p.el.currentTime:bufPos(p)):0,loaded:!!(p&&(p.kind==='el'||p.buf)),others:Object.values(players).filter(q=>q!==p&&isPlaying(q)).map(q=>q.id),fault:mFault};})(),externallyMuted:externalMutes.size>0,active:active.map(a=>({id:a.id,pulse:a.pulse,noise:a.noise})),queued:queue.length,counters:{...counters},history:history.slice(),fault};}
   window.ABYSS_AUDIO={defs:Object.freeze(defs),defaults:()=>copy(defaults),settings:()=>copy(settings),configure,unlock,emit,stop,inspect,setExternalMute,music,musicPrefetch,tracks:Object.freeze(Object.keys(TRACKS)),
     subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},resetStats(){counters={requested:0,played:0,dropped:0,stolen:0,peakEvents:0,peakPulse:0,peakNoise:0};history=[];},
     async audition(id){if(await unlock()){stop();return emit(id);}return false;}};

@@ -3,7 +3,7 @@
   const A=ABYSS_AUDIO,$=s=>document.querySelector(s),busNames={combat:'攻撃・通常命中',feedback:'被弾・重要な結果',world:'取得・探索',ui:'UI操作'};
   if(new URLSearchParams(location.search).has('embedded'))document.body.classList.add('embedded');
   let config=A.settings(),filter='all',timers=[],runId=0;
-  const globals=[['master','全体音量',0,.8,.01,'percent'],['music','BGM',0,1,.01,'percent'],['maxEvents','同時に鳴る効果音',1,3,1,'件'],['maxStarts','1秒あたりの通常音',3,12,1,'件'],['tail','余韻の長さ',.5,1,.05,'ratio'],['ally','仲間の音量',0,.5,.01,'percent'],['distance','聞こえる距離',3,12,1,'マス'],['duck','重要音中の通常音量',.1,.65,.05,'percent']];
+  const globals=[['master','全体音量',0,.8,.01,'percent'],['music','BGM',0,1,.01,'percent'],['maxEvents','同時に鳴る効果音',1,3,1,'件'],['maxStarts','1秒あたりの通常音',3,12,1,'件'],['tail','余韻の長さ',.5,1,.05,'ratio'],['ally','仲間の音量',0,.5,.01,'percent'],['distance','聞こえる距離',3,12,1,'マス'],['duck','重要音中の通常音量',.1,.65,.05,'percent'],['space','洞窟の響き',0,.5,.01,'percent']];
   const fmt=(n,unit)=>unit==='percent'?Math.round(n*100)+'%':unit==='ratio'?Math.round(n*100)+'%':n+' '+unit;
   function status(message){$('#status').textContent=message;}
   async function audition(id){stop();const d=A.defs[id],s=config.sounds[id];if(!config.enabled||!s.enabled||!s.gain||!config.master||!config.buses[d.bus]){status('この音は消音設定です。音量またはON/OFFを変更してください。');return;}await A.audition(id);status(d.name+'を試聴');}
@@ -44,7 +44,7 @@
     const schedule=(ms,id,options={})=>timers.push(setTimeout(()=>{if(run===runId)A.emit(id,options);},ms));
     const type=b.dataset.demo;
     if(type==='duel')for(let t=0;t<4000;t+=480){schedule(t,'slash');schedule(t+100,'hit');if(t===960)schedule(t+180,'hurt');}
-    if(type==='crowd')for(let t=0;t<5000;t+=80){schedule(t,t%240===0?'magic':'slash');schedule(t,'hit');schedule(t,'magic',{ally:true,distance:3});schedule(t+12,'defeat',{ally:true,distance:6});if(t%800===0)schedule(t,'critical');if(t===1600)schedule(t,'hurt');if(t===3200)schedule(t,'parry');}
+    if(type==='crowd')for(let t=0;t<5000;t+=80){schedule(t,t%240===0?'magic':'slash');schedule(t,'hit');schedule(t,'magic',{ally:true,distance:3});schedule(t+12,'kill',{ally:true,distance:6});if(t%800===0)schedule(t,'critical');if(t===1600)schedule(t,'hurt');if(t===3200)schedule(t,'parry');}
     if(type==='danger'){schedule(0,'magic');schedule(30,'slash',{ally:true,distance:2});schedule(65,'hurt');schedule(600,'guard');schedule(1000,'slash');schedule(1040,'parry');schedule(1700,'skill');schedule(2200,'level');}
     status('重なりを確認中。下に再生・省略の理由が表示されます。');
   });

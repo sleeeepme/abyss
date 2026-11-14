@@ -2,7 +2,8 @@
 (() => {
   'use strict';
   const A=window.ABYSS_AUDIO;if(!A)return;
-  const where=(e,ally=false)=>({ally,distance:e&&Number.isFinite(e.x)&&Number.isFinite(e.y)?Math.hypot(e.x-P.x,e.y-P.y):0});
+  /* 音の出どころ：主人公からの距離と、左右の位置（pan。7マス横で ±0.7 まで。2026-11-14） */
+  const where=(e,ally=false)=>{const ok=e&&e!==P&&Number.isFinite(e.x)&&Number.isFinite(e.y);return {ally,distance:ok?Math.hypot(e.x-P.x,e.y-P.y):0,pan:ok?Math.max(-.7,Math.min(.7,(e.x-P.x)/10)):0};};
   const emit=(id,o)=>{try{A.emit(id,o);}catch{}};
   const wrap=(name,after,before)=>{const f=window[name];if(typeof f!=='function')return;window[name]=function(...args){let old;try{old=before?.(...args);}catch{}const result=f.apply(this,args);try{after(args,result,old);}catch{}return result;};};
   /* 意味のある音は、ボタンの処理が終わってから（画面の切替の A.stop に消されないように）鳴らす */
@@ -27,7 +28,10 @@
   wrap('feelWeaponArtStart',([ent])=>emit('skill',where(ent,ent!==P)));
   wrap('feelUltimate',([ent])=>emit('skill',where(ent,ent!==P)));
   // Ordinary enemy deaths only after dead changes; phase transitions are not kills.
-  wrap('killEnemy',([e,ally],r,was)=>{if(!was&&e.dead)emit(e.boss?'boss':'defeat',where(e,e.boss?false:!!ally));},e=>e.dead);
+  wrap('killEnemy',([e,ally],r,was)=>{if(!was&&e.dead)emit(e.boss?'boss':'kill',where(e,e.boss?false:!!ally));},e=>e.dead);
+  /* 技の閃き（2026-11-14）。電球が出た瞬間に鳴らす（音の中で、灯る瞬間に「ピコーン」が来る）。
+     主人公は時間が緩む（feelSlow 0.35秒・0.35倍）ぶん、灯るのが 0.45 秒後。仲間は 0.22 秒後 */
+  wrap('artFlashFx',([x,y,def,ent])=>{const o=where(ent);o.variant=(!ent||ent===P)?'hero':'ally';emit('flash',o);});
   wrap('die',(_,r,count)=>{if(S.deaths>count)emit('death');},()=>S.deaths);
   wrap('autoPickup',(_,r,n)=>{if(W.drops.length<n)emit('pickup');},()=>W.drops.length);
   wrap('useConsum',(_,ok)=>{if(ok)emit('heal');});
