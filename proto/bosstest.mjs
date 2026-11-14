@@ -137,7 +137,7 @@ R.persistence = await pg.evaluate(()=>{
 // 放射弾は固定タイマーではなく「散弾（burst）」という技になったので、
 // 技として撃たれることを見る（詳細は bossaoe.mjs）
 R.phases = await pg.evaluate(async ()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={hp:8}; S.hero=newHero(); startRun(10);
   const boss=W.enemies.find(e=>e.boss);
   W.enemies=[boss];
@@ -162,7 +162,7 @@ R.phases = await pg.evaluate(async ()=>{
    過ごすことになり、それが「攻撃してこない」に見えていた（報告：第10階層）。
    遠くに立たせたまま様子を見て、動き出す（chase に入る）ことを確かめる。 */
 R.arenaAware = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(10); S.hero.party=[];
   const boss=W.enemies.find(e=>e.boss);
   // 広間の対角ぐらい離す。通常の索敵距離（10前後）よりずっと遠い。
@@ -179,7 +179,7 @@ R.arenaAware = await pg.evaluate(()=>{
    代わりに残った方が合体して第3形態になる（teleMul低下・ms上昇。2026-11-06 ブレヒトの三つの形）。
    両方倒して初めて、通常のボス撃破処理が1回だけ流れる。 */
 R.twinSequential = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={}; S.hero=newHero(); startRun(20); S.hero.party=[];
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
   const twins=W.enemies.filter(e=>e.boss&&e.twin);
@@ -241,7 +241,7 @@ R.poisonSafeZones = await pg.evaluate(()=>{
    他の「招来」持ちボス（第30階層以外）は跳ばないことも見ておく
    ——1体だけの専用挙動であって、技そのものの仕様変更ではない。 */
 R.bossWarpsOnSummon = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(30); S.hero.party=[];
   const boss=W.enemies.find(e=>e.boss);
   const isMallet = boss.uniqueBoss===POISON_BOSS_DEPTH;
@@ -267,7 +267,7 @@ R.otherSummonBossDoesNotWarp = await pg.evaluate(()=>{
 
 // --- 10. ボス撃破の確定ドロップ
 R.drops = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); startRun(10);
   const boss=W.enemies.find(e=>e.boss);
   W.drops=[];
@@ -313,7 +313,7 @@ R.finalSpawn = await pg.evaluate(()=>{
 
 // --- 17. 51階の主を倒したときだけ「踏破」になる。50階の主を倒しても踏破にならない。
 R.finalClearGate = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.upg={}; S.hero=newHero(); startRun(50); S.hero.party=[];
   const boss50=W.enemies.find(e=>e.boss);
   boss50.hp=1; killEnemy(boss50);
@@ -410,7 +410,7 @@ R.finalCloneMove = await pg.evaluate(()=>{
    「戦いながらレベルを上げる」ための倍率なので、対象は escort / summoned だけ
    ——同じ階の自然湧きの雑魚は変わらない。 */
 R.offeringTrashXp3x = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
   const mk=(extra)=>Object.assign({x:P.x,y:P.y,arch:ARCH[0],fam:FAMILY[0],lv:20,elite:false,aff:[],
     maxHp:999,hp:999,atkV:0,def:0,res:{},dt:'blunt',st:{},bu:{},state:'chase',t:0,cd:99,
@@ -433,7 +433,7 @@ R.offeringTrashXp3x = await pg.evaluate(()=>{
 
 /* --- 24. 主を倒すと：残っていた眷属は消え、パーティは全回復する */
 R.offeringDefeatCleanup = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];
   const ally=makeAlly(50, S.hero);
   ally.x=P.x+0.5; ally.y=P.y;
@@ -524,7 +524,7 @@ R.finalBossBaneClearsOnVictory = await pg.evaluate(()=>{
 /* 25-e. 「主」なら誰でもではなく、本物のアビスの口（51階・uniqueBoss===FINAL_DEPTH）
    だけが対象。50階の主（初めの供物）は見つかった状態でも切り替わらない。 */
 R.onlyRealFinalBossCycles = await pg.evaluate(()=>{
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[]; P.invuln=1e9;
   const boss50=W.enemies.find(e=>e.boss);
   boss50.revealed=true;
@@ -603,7 +603,7 @@ R.bottomStopsDescent = await pg.evaluate(()=>{
   const stayed = S.run.depth===d0;
   el('m-stairs').classList.remove('on'); setScreen('game');
   // 50階では今まで通り降りられる
-  S.greatDown={};   // 大ボスは一度倒すと出なくなる。各検証は未撃破から始める
+  S.greatDown={}; S.midDown={};   // ボスは一度倒すと出なくなる。各検証は未撃破から始める
   startRun(50); P.invuln=1e9;
   openStairs();
   const at50={downShown: el('st-down').style.display!=='none'};
@@ -835,6 +835,31 @@ R.portalApartFromHole = await pg.evaluate(()=>{
           portalOnlyReturns: portal.title==='帰還ポータル' && portal.noDown && portal.ret && portal.noHeal,
           ok: closedFirst && besideHole && standOn && opensOnKill && wentHome && noneOff
               && hole.down && hole.noReturn && portal.ret && portal.noDown};
+});
+
+/* --- 中ボスは一度倒したら二度と出ない（2026-11-14）。倒した階は中継地点になり、
+       街からその階の帰還ポータルの前へ戻れる。 */
+R.midOnce = await pg.evaluate(()=>{
+  S.hero=newHero(); S.upg={}; S.greatDown={}; S.midDown={}; S.beacons=[]; S.bossBoon={};
+  startRun(5); S.hero.party=[]; P.invuln=1e9;
+  const hadBoss = !!W.enemies.find(e=>e.boss);
+  const boss=W.enemies.find(e=>e.boss);
+  while(!boss.dead){ boss.hp=0; killEnemy(boss); }
+  document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on')); setScreen('game');
+  const recorded = midDowned(5);
+  const beacon = unlockedDepths().includes(5);
+  returnToTown(); document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on'));
+  S.startDepth=5; startRun(5);
+  const noBoss = !W.enemies.some(e=>e.boss && !e.dead);
+  const portalOpen = !!W.portal && W.portal.open;
+  const atPortal = !!W.portal && Math.hypot(P.x-W.portal.x, P.y-W.portal.y) < 3;
+  const fifteenStill = bossTierAt(15)==='mid';
+  // 古いセーブ：恩寵の記録（bossBoon）から倒した中ボスを読み直す
+  S.midDown=undefined; S.bossBoon={5:1, 10:1}; migrateMidDown();
+  const migrated = midDowned(5) && !midDowned(15) && !S.midDown[10];
+  S.midDown={}; S.bossBoon={}; S.beacons=[];
+  return {hadBoss, recorded, beacon, noBoss, portalOpen, atPortal, fifteenStill, migrated,
+          ok: hadBoss && recorded && beacon && noBoss && portalOpen && atPortal && fifteenStill && migrated};
 });
 
 await b.close();

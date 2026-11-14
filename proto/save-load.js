@@ -228,6 +228,7 @@
     for(const [i,target] of [S,P,W].entries()){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,roots[i]);}
     if(keepDebug)S.debug=keepDebug;
     normalizeDeathPressure(); // 旧セーブの1〜4階の死亡強化も解除
+    migrateMidDown();         // 旧セーブ：倒した中ボスの記録（S.midDown）を恩寵の記録から作る
     W.pops=[];RNG=mulberry32(d.rng);genItem._n=d.itemId;
     _intrF=null;_intrKey='';_fallen=null;_fallenQueue=d.ui.fallenQueue||[];
     _deathPool=d.ui.deathPool;_deathBase=d.ui.deathBase;_deathCap=d.ui.deathCap;

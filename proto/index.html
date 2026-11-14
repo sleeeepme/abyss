@@ -6273,10 +6273,23 @@ function markBossBoon(depth){ S.bossBoon = S.bossBoon || {}; S.bossBoon[depth]=1
    同じ大ボスを何度も出すと、中継地点も大技も繰り返し取れてしまうし、
    何より「倒した」という出来事が記録に残らない。 */
 function greatDowned(depth){ return !!(S.greatDown && S.greatDown[depth]); }
+/* 倒した中ボスの階（5・15・25…）。**一度倒したら二度と出さない**（2026-11-14 作者判断）。
+   大ボスと同じく、倒した階はただの階に戻り、帰還ポータルは入った時点で開いていて、
+   街からその階のポータルへ戻れる（中継地点）。
+   この記録ができる前のセーブは、読み込み時に migrateMidDown が
+   恩寵を受け取った記録（bossBoon）＝初めて倒した記録から作る。 */
+function midDowned(depth){
+  return depth%10===5 && !!(S.midDown && S.midDown[depth]);
+}
+function migrateMidDown(){
+  if(S.midDown) return;
+  S.midDown={};
+  for(const d of Object.keys(S.bossBoon||{})) if(+d%10===5) S.midDown[d]=1;
+}
 function bossTierAt(depth){
   if(depth===FINAL_DEPTH) return 'final';
   if(depth<=0 || depth%5!==0) return null;
-  if(depth%10!==0) return 'mid';
+  if(depth%10!==0) return midDowned(depth) ? null : 'mid';
   /* 倒した大ボスの階は、次からただの階に戻す。
      ここで null を返すだけで、大広間も取り巻き無しも帰還ポータルの封鎖も
      まとめて解ける——判定が1ヶ所に集まっているのはそのためにしてある。 */
@@ -6657,6 +6670,7 @@ const S={
   tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
   bossBoon:{},           // 恩寵を受け取ったボス階（二度は出さない）
   greatDown:{},          // 倒した大ボスの階。次からはただの階に戻す（口座側）
+  midDown:{},            // 倒した中ボスの階。同じく次からはただの階（中継地点にもなる）
   cleared2:{},           // 一度抜けた階。穴の位置を伏せない（口座側）
   moss:{},               // 苔玉を層ごとに何匹倒したか（口座側）
   duranGiven:false,      // ドゥラントリーを渡したか（一度だけ）
@@ -6750,7 +6764,12 @@ function stashCap(){ return 20 + bldLv('stash')*6; }
    10・20・30・40 の大ボスが、そのまま 11・21・31・41 の入口になる。
    「あの門番を倒したから、ここまでは歩かなくてよくなった」——
    踏破が地図に残る形になり、ボスを倒す意味が1つ増える。 */
-function beacons(){ return (S.beacons||[]).slice().sort((a,b)=>a-b); }
+function beacons(){
+  /* 中ボスを倒した階も中継地点。古いセーブ（midDown が無い頃に倒した分）も midDowned で拾う */
+  const out=new Set(S.beacons||[]);
+  for(let d=5; d<FINAL_DEPTH; d+=10) if(midDowned(d)) out.add(d);
+  return [...out].sort((a,b)=>a-b);
+}
 function unlockedDepths(){
   /* デバッグではボス階とその次の階を選べる（1・5・6・10・11…）。
      最終階より先は出さず、ラストボスの階も必ず含める。 */
@@ -10368,7 +10387,8 @@ function playerAttack(){
 /* 中継地点を作る。**大ボス撃破の瞬間**だけから呼ばれる入口。同じ階を二重に足さない。
    以前は通常の帰還（5階ごとの帰還ポータル）でも中継地点や一度きりの再開切符
    （S.resumeDepth）が付いていたが、歩き直しの手応え自体を無くしてしまうため撤廃した。
-   恒久の中継地点は、いまは大ボス（10階ごと）撃破だけが発生源になる。 */
+   恒久の中継地点は、ボス（5階ごとの中ボス・10階ごとの大ボス）の撃破だけが発生源になる
+   （中ボスは 2026-11-14 から。一度倒した中ボスは二度と出ない）。 */
 function grantBeacon(depth, opt){
   opt = opt || {};
   if(depth<=0 || (S.beacons||[]).includes(depth)) return false;
@@ -13176,6 +13196,11 @@ function killEnemy(e, byAlly){
        口座側の記録（S.hero ではなく S）なので、死んでも消えない。 */
     S.bossClear = Math.max(S.bossClear||0, S.run.depth);
     log(e.name+'を撃破');
+    /* 中ボスは一度倒したら二度と出さない。倒した階は中継地点になる（midDowned）。 */
+    if(e.tier==='mid'){
+      S.midDown = S.midDown || {}; S.midDown[S.run.depth] = 1;
+      grantBeacon(S.run.depth);
+    }
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.9,max:0.9});
     /* ---------- 第50階層の主を倒した褒賞 ----------
        経験値稼ぎの相手だった眷属は、主が消えれば残っていても意味を失う
@@ -14980,7 +15005,7 @@ function finishReturn(overflow){
      連れ帰った印だけは付ける。次に雇い直すときに半額になる。 */
   livingParty().forEach(a=>{ a.returned = true; });
   /* 帰還による自動再開（次から+1階／同じ階へ一度だけ）は撤廃。
-     恒久の中継地点は大ボス撃破（onGreatBossDown）だけが発生源になる——
+     恒久の中継地点はボス撃破（中ボスと onGreatBossDown）だけが発生源になる——
      帰還そのものは次の開始階に一切影響しない。 */
   S.run=null;
   rerollShop();                                     // 帰還のたびに品揃えが変わる
@@ -23808,7 +23833,7 @@ bindTap(el('dbg-reset'), ()=>{
   S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
   S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   S.moss={}; S.duranGiven=false;                  // 苔玉の記録も消す
-  S.bossBoon={}; S.cleared2={}; S.greatDown={};   // ボスの恩寵・踏破・大ボス撃破の記録も消す
+  S.bossBoon={}; S.cleared2={}; S.greatDown={}; S.midDown={};   // ボスの恩寵・踏破・大ボス撃破の記録も消す
   setScreen('title');
 });
 
