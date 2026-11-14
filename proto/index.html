@@ -4432,11 +4432,106 @@ function graveHoursLeft(g){
 }
 /* 風化しきった遺体は消す。街に戻ったときと階層に入るときに呼ぶ。 */
 function pruneGrave(){
+  if(typeof pruneRevenant==='function') pruneRevenant();
   if(S.grave && graveDecay(S.grave) <= 0){
     S.grave = null;
     return true;
   }
   return false;
+}
+
+/* ==================== 還り損ない（前の代が立つ）2026-11-14 ====================
+   仕様：プロジェクト文書「abyss-還り損ない-前の代が立つ-仕様案」（第1段）。
+   死んだ代は自我を失って還りになり、死んだ階に立ち続ける。倒すと遺体の中身と、
+   死んだ時に装備していた物（レジェンド以外）のうち**ランダムに1つ**が戻る。
+   ・ボス階で死んだら、ボス階ではない1つ上の階の下り口のそばに立つ。
+   ・遺体と同じく1つだけ、72時間で消える（graveDecay を共用）。
+   ・強さはその階の普通の敵が物差し。HP×6・攻撃×1.5（仕様の「精鋭×4・×1.2」は
+     精鋭＝普通×1.5・×1.25 として書いた数字。本編の精鋭は×5.6・×2.1 なので、
+     ユーザーが見て決めた数字のほうに合わせて普通の敵から掛ける）。
+     そこに「出来」（前の代の毎秒火力 ÷ 白の剣+0 で同じ代が出す毎秒火力）を 0.8〜1.6 で掛ける。
+   ・乱数は本編の RNG を使わない（落とす装備の抽選・置き場所）。 */
+/* 実行時スイッチ。遺体だけの仕組みを確かめるテスト（gravetest）が切る */
+let REVENANT_ON = true;
+const REV_HP_MUL  = 6;
+const REV_ATK_MUL = 1.5;
+const REV_Q = [0.8, 1.6];
+const REV_DUR_KEEP = 0.5;     // 戻る装備の耐久（残りの半分）
+/* 同じ代が、その階の白の剣+0（素の攻撃力の真ん中）だけを持ったときの毎秒火力との比 */
+function revQuality(h, depth){
+  const st=stats(h), now=st.atk*st.aspd;
+  const keep=h.equip, sw=BASES.find(b=>b.id==='sword');
+  const ref={uid:0, base:'sword', nm:sw.nm, slot:SLOT.W, ilvl:depth, rar:0, ident:true, aff:[],
+             atk:Math.round((sw.atk[0]+sw.atk[1])/2*scaleOf(depth)), spd:sw.spd, durMax:sw.dur, dur:sw.dur};
+  h.equip={weapon:ref, shield:null, armor:null, accessory:null};
+  let base;
+  try{ const s2=stats(h); base=s2.atk*s2.aspd; } finally { h.equip=keep; }
+  return clamp(base>0 ? now/base : 1, REV_Q[0], REV_Q[1]);
+}
+/* 死んだ階から、前の代が立つ階を決める。ボス階なら上へ（大ボスを倒した階はボス階ではない） */
+function revenantDepth(depth){
+  let d=depth;
+  while(d>1 && bossTierAt(d)) d--;
+  return bossTierAt(d) ? 0 : d;
+}
+/* die() から。装備していた物（レジェンドは既に外してある）を受け取り、写しを作る */
+function makeRevenantRecord(equipped){
+  if(!REVENANT_ON || !S.hero || !S.run) return null;
+  const depth=S.run.depth;
+  if(depth>=FINAL_DEPTH) return null;               // アビスの口では作らない
+  const d=revenantDepth(depth);
+  if(!d) return null;
+  const R=mulberry32(((S.deaths||0)*2654435761 ^ (depth*40503) ^ (nowMs()&0xffffffff))>>>0);
+  const gear=(equipped||[]).filter(it=>it && !isLegend(it));
+  const drop=gear.length ? gear[Math.floor(R()*gear.length)] : null;
+  const st=stats(S.hero);
+  return {depth:d, onStair: d!==depth, x:P.x, y:P.y, t:nowMs(),
+          name:heroBaseName(), lv:S.hero.lv, artKey:S.hero.artKey||null,
+          q:+revQuality(S.hero, depth).toFixed(3), proj:!!st.proj, dt:st.dmgType||'slash',
+          def:Math.round(st.def), res:Object.assign({}, st.res), drop};
+}
+function pruneRevenant(){
+  if(S.revenant && graveDecay(S.revenant)<=0){ S.revenant=null; return true; }
+  return false;
+}
+/* 階に入ったとき。その階の前の代を敵として作る */
+function makeRevenant(fl, depth){
+  const rec=S.revenant;
+  if(!rec || rec.depth!==depth) return null;
+  const lv=enemyLevelAt(depth), q=rec.q||1;
+  const a=ARCH.find(x=>x.id===(rec.proj?'range':'rush')) || ARCH[0];
+  const fam=FAMILY.find(f=>f.id==='undead') || FAMILY[0];
+  const p = rec.onStair && fl.stair
+    ? snapToFloor(fl, fl.stair.x+1.6, fl.stair.y+0.6)
+    : snapToFloor(fl, rec.x, rec.y);
+  const e={
+    x:p.x, y:p.y, arch:a, fam, lv, elite:true, aff:[], revenant:true, artKey:rec.artKey,
+    maxHp: Math.max(1, Math.round((26+lv*11)*REV_HP_MUL*q)),
+    atkV:  (5+lv*2.6)*REV_ATK_MUL*q,
+    def:   Math.max(rec.def||0, lv*1.6),
+    res:   Object.assign({}, rec.res||{}), dt: rec.dt||'slash',
+    st:{}, bu:{},
+    state:'idle', t:0, cd:1, vx:0, vy:0, hit:0, tele:0, dead:false, r:0.40,
+    ms:a.ms, teleMul:1, col:'#8a90a8',
+    reg:'還り', name:rec.name
+  };
+  e.hp=e.maxHp;
+  return e;
+}
+/* killEnemy から。装備1つと遺体の中身を返す */
+function revenantDefeated(e){
+  const rec=S.revenant;
+  log(`<span style="color:#9fd0c8">${e.name}は還った</span>`);
+  if(rec && rec.drop){
+    const it=rec.drop;
+    if(it.durMax) it.dur=Math.max(1, Math.round((it.dur||0)*REV_DUR_KEEP));
+    W.drops.push({x:e.x, y:e.y, it});
+    log('　前の代の装備が落ちた — '+itemName(it));
+  }
+  // 遺体の中身（風化ぶんは collectGrave が減らす）
+  if(S.grave){ W.grave={x:e.x, y:e.y}; collectGrave(); }
+  S.revenant=null;
+  W.revenantE=null;
 }
 
 /* ---------- 護符（ガチャの「スキル」枠） ----------
@@ -6649,6 +6744,7 @@ const S={
   salt:0,
   upg:{}, shop:[], shopSeed:1, startDepth:1,
   grave:null,            // {depth,x,y,items:[],gold,heroName,lv}
+  revenant:null,         // 前の代（還り損ない）。makeRevenantRecord の形
   carry:[], gachaLeft:GACHA_PER_DAY, gachaFree:GACHA_FREE_PER_DAY, gachaDay:'',   // 持ち込み枠（死ぬと失う）
   lastDepth:1,           // 直近の探索の到達最深度。ガチャの排出帯を決める
   cleared:0,             // 第51階層の主（アビスの門番、アズレイア）を倒した回数
@@ -9529,7 +9625,10 @@ function enterFloor(depth, opt){
   // 死んだのは前のキャラ＝別の間取り。死んだ座標に一番近い床タイルへ
   // スナップして「だいたい同じあたり」に置く。
   pruneGrave();
-  W.grave = (S.grave && S.grave.depth===depth) ? snapToFloor(fl, S.grave.x, S.grave.y) : null;
+  /* 前の代が立つ階では、遺体はその者が抱えている（倒すまで拾えない） */
+  W.revenantE = makeRevenant(fl, depth);
+  if(W.revenantE){ W.enemies.push(W.revenantE); log('<span style="color:#9fd0c8">この階層に、前の代が立っている</span>'); }
+  W.grave = (S.grave && S.grave.depth===depth && !W.revenantE) ? snapToFloor(fl, S.grave.x, S.grave.y) : null;
 
   // 仲間候補。ボス階には出さない（ボス部屋の直前で加入判断をさせない）
   /* 大広間はボス戦だけの階。鉱脈も商人も候補も置かない——
@@ -13106,6 +13205,7 @@ function killEnemy(e, byAlly){
     }
   }
   e.dead=true; S.run.kills++;
+  if(e.revenant) revenantDefeated(e);   // 前の代：装備1つと遺体の中身
   traitOnKill(byAlly || S.hero);      // 特性「血の糧」「勢い」（倒した本人の装備だけ）
   skillOnKill(e);                     // 呪印：倒れた所で爆ぜて、周りへ印を移す
   linkGain(e.boss ? LINK.killBoss : e.elite ? LINK.killElite : LINK.kill);
@@ -14538,6 +14638,9 @@ function die(){
     ? {depth:S.run.depth, x:P.x, y:P.y, items:kept, gold:keptGold, ore:keptOre, xp:keptXp,
        heroName:S.hero.name, lv:S.hero.lv, t:nowMs()}
     : null;
+  /* 前の代（還り損ない）。遺体の中身はこの者が抱えて立つので、遺体の階もそこへ揃える */
+  S.revenant = makeRevenantRecord(equipped);
+  if(S.revenant && S.grave){ S.grave.depth=S.revenant.depth; S.grave.t=S.revenant.t; }
 
   el('d-body').textContent = S.hero.name+'（Lv.'+S.hero.lv+'）は第'+S.run.depth+'階層で力尽きた。';
 
@@ -14553,7 +14656,10 @@ function die(){
   let html=(S.run.depth>=DEATH_PRESSURE_FROM && deathPressureLevel(S.run.depth)>0)
     ? '<div style="color:#e0705a;line-height:1.9">第'+DEATH_PRESSURE_FROM+'〜'+S.run.depth+'階層に死の蓄積 — この階の敵Lv +'+deathPressureLevel(S.run.depth)+'</div>'
     : '';
-  html += S.grave
+  html += S.revenant
+    ? '<div style="color:#9fd0c8;line-height:1.9">'
+      + `第${S.revenant.depth}階層に、<b>${S.revenant.name}</b>が残った</div>`
+    : S.grave
     ? '<div style="color:#7fe0c0;line-height:1.9">'
       + `遺体が<b>第${S.grave.depth}階層</b>に残った</div>`
     : '<div style="color:var(--dim);line-height:1.9">遺体には何も残らなかった。</div>';
@@ -16569,6 +16675,7 @@ const CharacterArt = (function(){
   }
   function enemyKey(e){
     if(!e || e.moss) return null;
+    if(e.revenant) return (e.artKey && ready(e.artKey)) ? e.artKey : HERO_ART_DEFAULT;   // 前の代は主人公の絵
     if(e.uniqueBoss===5) return 'great-ash-frog';
     if(!e.fam || e.fam.id!=='beast') return null;
     return {rush:'ash-hound',range:'dust-spider',turret:'ash-toad',swarm:'stone-boar'}[e.arch.id]||null;
@@ -16723,7 +16830,7 @@ function enemyLit(e){
    今は**必要な矩形ぶんだけの大きさ**（大きくなるときだけ作り直す。縮めない）にして、
    本編の変換行列から矩形の左上ぶんを引いた座標系で描く。貼る位置・黒の色・不透明度は従来と同じ。 */
 let _silCv=null, _silCx=null;
-function drawSilhouette(sx, sy, rad, fn){
+function drawSilhouette(sx, sy, rad, fn, alpha, col){
   const main=ctx, m=main.getTransform(), d=m.a||1;
   const x0=Math.max(0,Math.floor(m.e+(sx-rad)*d)), y0=Math.max(0,Math.floor(m.f+(sy-rad)*d));
   const w=Math.min(cv.width-x0, Math.ceil(rad*2*d)+2), h=Math.min(cv.height-y0, Math.ceil(rad*2*d)+2);
@@ -16738,9 +16845,9 @@ function drawSilhouette(sx, sy, rad, fn){
   ctx=c;
   try{ fn(); } finally { ctx=main; }
   c.setTransform(1,0,0,1,0,0); c.globalAlpha=1;
-  c.globalCompositeOperation='source-in'; c.fillStyle='#04050a'; c.fillRect(0,0,w,h);
+  c.globalCompositeOperation='source-in'; c.fillStyle=col||'#04050a'; c.fillRect(0,0,w,h);
   c.globalCompositeOperation='source-over';
-  main.save(); main.setTransform(1,0,0,1,0,0); main.globalAlpha=0.94;
+  main.save(); main.setTransform(1,0,0,1,0,0); main.globalAlpha=alpha==null?0.94:alpha;
   main.drawImage(_silCv, 0,0,w,h, x0,y0,w,h);
   main.restore();
 }
@@ -17179,6 +17286,8 @@ function draw(){
     /* 灯りの外は黒い影だけ。名前・HP帯・印も出さない（何がいるかは近づくまで分からない） */
     if(litSt==='shadow'){ drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody); ctx.globalAlpha=1; return; }
     drawBody();
+    /* 前の代は、主人公の絵を暗く色を抜いて描く（同じ絵を影の色で半分重ねる） */
+    if(e.revenant && !e.dead) drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody, 0.55, '#0b0d1c');
     if(engulfed){ ctx.globalAlpha=1; return; }       // 一斉攻撃の煙の中：体だけ（名前・HP帯・印は出さない）
     /* 部位を持つヴェラは、当たった部位だけを cave-look.js が光らせる。体ごとの白い被せは出さない */
     if(!e.dead && !(e.parts && window.CAVE && CAVE.on)) drawFeelFlash(e,sx,sy,spr?R*2.6:e.uniqueBoss===5?R*2.25:TS*(e.elite?1.12:1));
@@ -17190,7 +17299,7 @@ function draw(){
       ctx.fill();
       ctx.globalAlpha=1;
     }
-    if(e.elite && !e.intruder){ ctx.strokeStyle='#d6b34a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(sx,sy,R+4,0,7); ctx.stroke(); }
+    if(e.elite && !e.intruder && !e.revenant){ ctx.strokeStyle='#d6b34a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(sx,sy,R+4,0,7); ctx.stroke(); }
     // 侵入者は赤い脈。金（エリート）や紫（ユニーク）と混ざらない色にして、
     // 画面の端に映った一瞬で「あれは戦う相手ではない」と分かるようにする。
     if(e.intruder && !e.dead){
@@ -17245,12 +17354,14 @@ function draw(){
          名前と Lv がどちらも読めない二重の文字列になる。 */
       const nameTag=(y,col,sc)=>{
         label(e.name, sx, y, col, sc);
-        label('Lv.'+e.lv, sx, y+Math.max(9,TS*0.36*sc)*1.05, feelEnemyLevelColor(), sc*0.82);
+        label('Lv.'+e.lv+(e.revenant?'　還り':''), sx, y+Math.max(9,TS*0.36*sc)*1.05, feelEnemyLevelColor(), sc*0.82);
       };
       if(e.intruder)
         nameTag(sy+visBot+TS*0.42, '#ff6a5a', 1);
       else if(e.uniq)
         nameTag(sy+visBot+TS*0.40, '#c07fe0', 1);
+      else if(e.revenant)
+        nameTag(sy+visBot+TS*0.40, '#9fd0c8', 1);
       /* 名前を全部出すと、乱戦で足元が文字の山になって**逆に何も読めない**。
          精鋭は「見分けが付くこと」自体が情報なので出す。
          ただの雑魚は今狙っている1体だけ——それ以外は名前を知る必要がない。 */
@@ -19305,6 +19416,7 @@ function drawMinimap(){
     }
   }
   if(W.grave) dot(W.grave.x, W.grave.y, '#7fe0c0');
+  if(W.revenantE && !W.revenantE.dead) dot(W.revenantE.x, W.revenantE.y, '#e0505a');   // 前の代
   // 帰還ポータル。穴（水色）より白に寄せて、隣り合っても見分けが付くようにする
   if(W.portal && W.portal.open && (stairRevealed() || tileSeen(W.portal.x, W.portal.y)))
     dot(W.portal.x, W.portal.y, '#e8fbff');
@@ -19578,8 +19690,14 @@ function updateHUD(){
   // 引き撃ちの倍率の表記（#foottag）は常に非表示固定なので initHudOnce() で一度だけ消す。
 
   const gh=el('gravehint');
-  hset('gravehint.disp', S.grave?'block':'none', v=>gh.style.display=v);
-  if(S.grave){
+  hset('gravehint.disp', (S.grave||S.revenant)?'block':'none', v=>gh.style.display=v);
+  if(S.revenant){
+    /* 前の代（還り損ない）。遺体の中身もこの者が抱えている */
+    const R=S.revenant, here=W.revenantE && !W.revenantE.dead;
+    hset('gravehint.t', here ? R.name+'はこの階層に立っている（ミニマップの赤）'
+                             : '第'+R.depth+'階層　'+R.name+'（Lv.'+R.lv+'）／あと'+Math.ceil(graveHoursLeft(R))+'時間',
+      v=>gh.textContent=v);
+  }else if(S.grave){
     hset('gravehint.t', W.grave ? '遺体はこの階層にある（ミニマップの緑）'
                              : '遺体：第'+S.grave.depth+'階層'
                                + (graveDecay(S.grave)<1 ? '（'+Math.round(graveDecay(S.grave)*100)+'%）' : ''),

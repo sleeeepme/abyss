@@ -9,7 +9,10 @@ await pg.goto('file://'+path.resolve('proto/index.html'));
 await pg.waitForTimeout(350);
 /* タイトル画面を1枚跨いでから拠点に入るようになった。
    このスイートが見たいのは拠点から先なので、ここで済ませておく。 */
-await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); } });
+await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); }
+  /* 死んだ画面と遺体の回収（8・9）は、遺体だけの仕組みを見ている。
+     前の代（還り損ない）が立つと遺体はその者が抱えるので、ここでは切る（revenanttest が見る） */
+  REVENANT_ON = false; });
 /* 慰霊碑・鍛冶屋・倉庫・酒場は街開発で建ててから使う形になった。
    このスイートが見たいのは「ハブから各画面へ行き来できるか」なので、
    施設は建った状態にそろえておく（建てる前の挙動は towntest が見る）。 */

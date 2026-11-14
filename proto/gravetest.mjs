@@ -9,7 +9,11 @@ await pg.goto('file://'+path.resolve('proto/index.html'));
 await pg.waitForTimeout(350);
 /* タイトル画面を1枚跨いでから拠点に入るようになった。
    このスイートが見たいのは拠点から先なので、ここで済ませておく。 */
-await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); } });
+await pg.evaluate(()=>{ if(!S.hero){ S.name='テスト'; startAdventure(); }
+  /* 前の代（還り損ない）が立つと、遺体はその者が抱えて触れなくなる。
+     このスイートは遺体だけの仕組み（アビスの口など前の代が立たない所の形）を見るので、切っておく。
+     前の代のほうは revenanttest.mjs が見る。 */
+  REVENANT_ON = false; });
 const R={};
 
 // --- 1. 死亡すると遺体ができ、装備品は含まれず、金は半分（遺体に）／半分（即座に口座へ）

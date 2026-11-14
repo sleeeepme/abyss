@@ -569,7 +569,8 @@ R.deathScreenIsShort = await pg.evaluate(()=>{
     '永遠に失われた','取りに戻れば回収できる','SPは死んでも失われない',
     '能力強化に使える','倉庫の装備と所持金は無事',
   ].filter(w=>txt.indexOf(w)>=0);
-  const kept=['遺体が','持ち帰った'].filter(w=>txt.indexOf(w)>=0);
+  // 遺体の行は、前の代（還り損ない）が立つときは「第N階層に、名前が残った」になる
+  const kept=[(txt.indexOf('遺体が')>=0||txt.indexOf('が残った')>=0)?'遺体の行':'','持ち帰った'].filter(w=>w && (w==='遺体の行'||txt.indexOf(w)>=0));
   document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on'));
   S.abyssCall=false; S.grave=null;
   return {lines:txt.split('\n').filter(x=>x.trim()).length,
