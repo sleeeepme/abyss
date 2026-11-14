@@ -12,8 +12,12 @@ const setup = async (d, rage)=> pg.evaluate(async ([d,rage])=>{ TH.run(d,{seed:4
 for(const d of [5,10,15,25]){
   const off=await setup(d,false), on=await setup(d,true);
   R['d'+d]={off:off.fx, on:on.fx, visOff:off.vis, visOn:on.vis,
-    // ヴェラ第一形態・蜘蛛は待機のコマで形が変わるので、大きさは比べない（錨点で置いている）
-    ok: off.fx===null && !!on.fx && (d===10 || d===25 || JSON.stringify(off.vis)===JSON.stringify(on.vis))};
+    // 灰の大蛙（コマ送りの絵・跳ぶと幅が変わる）・ヴェラ第一形態・蜘蛛は待機のコマで形が変わるので、大きさは比べない（錨点で置いている）
+    ok: off.fx===null && !!on.fx && (d===5 || d===10 || d===25 || JSON.stringify(off.vis)===JSON.stringify(on.vis))};
 }
-R.toadEye = {eyes: R.d5.on && R.d5.on.eyes, ok: !!(R.d5.on && R.d5.on.eyes>0)};
+// 灰の大蛙はコマ送りの絵。目が琥珀に光るコマは待機の一部だけなので、1コマの瞬間ではなく2秒のあいだに1度でも検出されるかを見る
+R.toadEye = await pg.evaluate(async()=>{ TH.run(5,{seed:44}); W.enemies.filter(x=>!x.boss).forEach(x=>x.dead=true); TH.immortal();
+  const e=W.enemies.find(x=>x.boss); e.revealed=true; e.rage=true; e.ms=0; e.moveCd=999; e.cd=999; e.cast=null; e.tele=0; P.x=e.x-3; P.y=e.y+.3;
+  let mx=0; for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,80)); mx=Math.max(mx,(CAVE.rageLast&&CAVE.rageLast.eyes)||0); }
+  return {eyes:mx, ok:mx>0}; });
 await done(b, errs, R);
