@@ -4167,6 +4167,7 @@ function rageFx(N,u,t,x0,y0,x1,y1,seed){
 }
 CAVE.rageFx=true;
 function enemy(e,sx,sy,R){
+  if(e.revenant) return false;   // 前の代は本編が主人公の絵で描く
   const r=renderFoe(e); if(!r) return false;
   const {N,face,mid,k,fam,arch}=r, ps=TS/Q*(r.px||1);   // r.px：ヴェラは主人公と同じ細かさ（半分のドット）
   // 見えている形の中心を (sx,sy) に合わせる。本編の絵は中心で置くので、当たりの絵もそこに出る
