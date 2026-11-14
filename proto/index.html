@@ -6429,6 +6429,7 @@ const S={
   stash:[], legendStash:[], legendEverOwned:[], gold:0, deepest:1,
   // 生きて帰った最深。到達（deepest）とは別に持つ——加護が掛かるのはこちら側
   deepestBack:0, deaths:0, runs:0, abyssCall:false,
+  starterAllyGiven:false, // 5Fの無料の仲間を置いたか（1回だけ）
   deathStreak:null,      // 直近の連続死 {d:階, n:回}。3連敗で死の圧を1段戻す
   deathPressure:{},      // 階ごとの死亡蓄積。泉へのSP奉納で全階リセット
   mapOn:false,           // 地図は既定で出さない（🗺 のトグル）
@@ -19673,12 +19674,14 @@ function rerollTavern(){
    ところが雇うには金が要るので、金の無い人は仲間0人のまま10Fへ着く。
    なので 5F に着いたことがあって、連れている者も酒場に預けた者も1人もいないときは、
    酒場に雇用費0の1人を置く（連れて行くかは選ばせる）。
-   死んで隊を失った直後にも同じ条件で置き直す——「一番人手が要るのは全滅直後」。
+   置くのは**1回だけ**（S.starterAllyGiven）。全滅のたびに置き直すと
+   慰霊碑の復活に SP を払う意味が薄れる（2026-11-14 作者判断）。
    既に誰かいる人には何もしない。 */
 const STARTER_ALLY_DEPTH = 5;
 function grantStarterAlly(){
   if(!S.hero || Math.max(S.deepest||1, S.lastDepth||1) < STARTER_ALLY_DEPTH) return;
-  if(party().length || tavernStock().length) return;
+  if(S.starterAllyGiven || party().length || tavernStock().length) return;
+  S.starterAllyGiven = true;
   const a = makeAlly(Math.max(1, S.lastDepth || S.deepest || 1), S.hero);
   a.returned = true; a.free = true;
   uniqueAllyName(a);
@@ -23319,7 +23322,7 @@ bindTap(el('dbg-reset'), ()=>{
   if(window.ABYSS_SAVE && !window.ABYSS_SAVE.clear()) return;
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
-  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.deathStreak=null;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
+  S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.deathStreak=null;S.starterAllyGiven=false;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
   S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;

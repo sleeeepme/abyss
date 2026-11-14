@@ -289,13 +289,14 @@ R.poolWhenNothingReturned = await pg.evaluate(()=>{
 
 // 6-b2. 5Fに着いたのに仲間が0人なら、酒場に雇用費0の1人が置かれる（B3）。誰かいる人には何もしない
 R.starterAlly = await pg.evaluate(()=>{
-  S.run=null; S.hero=newHero(); S.hero.party=[]; S.tavern=[]; S.tavernPool=null; S.gold=0; S.bld={};
+  S.run=null; S.hero=newHero(); S.hero.party=[]; S.tavern=[]; S.tavernPool=null; S.gold=0; S.bld={}; S.starterAllyGiven=false;
   S.deepest=4; S.lastDepth=4; rerollTavern(); const before=tavernStock().length;
   S.deepest=5; S.lastDepth=5; rerollTavern(); const st=tavernStock(); const n=st.length;
   const a=st[0]; const free=!!a && hireCost(a)===0;
   const hired=a ? hireAlly(a.uidA) : {ok:false};
   rerollTavern(); const afterHire=tavernStock().length;   // 連れている者がいれば足さない
-  return {notBefore5: before===0, one: n===1, free, hired: hired.ok, noExtraWhenHaveAlly: afterHire===0};
+  S.hero.party=[]; S.tavern=[]; rerollTavern(); const afterWipe=tavernStock().length;   // 全滅しても2人目は出ない
+  return {notBefore5: before===0, one: n===1, free, hired: hired.ok, noExtraWhenHaveAlly: afterHire===0, onlyOnce: afterWipe===0};
 });
 
 // 6-c. 流れ者は定価（連れ帰った印を持たない）
