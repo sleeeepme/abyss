@@ -84,6 +84,31 @@ await check('ordinary exploration autosaves on interval, not every frame',async(
   await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>ABYSS_SAVE.info().revision),revision);
   await page.waitForFunction(revision=>ABYSS_SAVE.info().revision>revision,revision,{timeout:7000});
 });
+await check('only newly acquired gear shows NEW on the first bag visit across reloads',async()=>{
+  const {uid,oldUid}=await page.evaluate(()=>{
+    const old=genBaseItem('sword',1,0);
+    const fresh=genBaseItem('axe',1,0);
+    fresh.rar=2;fresh.ident=false;
+    S.run.loot=[old];
+    W.drops=[{x:P.x,y:P.y,it:fresh},{x:P.x,y:P.y,it:makeConsum('salve')}];
+    autoPickup();
+    openStat();closeStat();
+    return {uid:fresh.uid,oldUid:old.uid};
+  });
+  await flush();await reload();await resume();await page.click('#save-action');
+  const badge=`#bag-loot [data-uid="${uid}"] .item-new`;
+  await page.click('#bagbtn');
+  assert.equal(await page.locator(badge).textContent(),'NEW');
+  assert.equal(await page.locator('#bag-loot .item-new').count(),1);
+  await page.click(`#bag-loot [data-uid="${oldUid}"]`);
+  assert.equal(await page.locator(badge).isVisible(),true);
+  await page.click('#bag-ok');await page.click('#bagbtn');
+  assert.equal(await page.locator('#m-bag .item-new').count(),0);
+  await page.click('#bag-ok');await flush();await reload();await resume();await page.click('#save-action');
+  await page.click('#bagbtn');
+  assert.equal(await page.locator('#m-bag .item-new').count(),0);
+  await page.click('#bag-ok');
+});
 await check('boon choices resume without reroll',async()=>{
   await page.evaluate(()=>{openBoonPick('mid','テスト');});await flush();
   const choices=await page.evaluate(()=>JSON.stringify(_boonPending));await reload();await resume();

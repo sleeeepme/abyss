@@ -356,7 +356,7 @@ const ITEM_ART = (()=>{
     const imported=decodeImported(entry);sprites[name]=imported;runtimeSprites[name]=imported;
   }
   function key(it){
-    if(it?.consum)return ({draught:'vial',antidote:'leaf'})[it.consum]||'potion';
+    if(it?.consum)return ({draught:'vial',antidote:'leaf',herb:'leaf'})[it.consum]||'potion';
     if(!it?.ident)return 'bag';
     const name=({leather:'armor',round:'buckler'})[it.base]||it.base;
     return sprites[name]?name:'bag';

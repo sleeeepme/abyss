@@ -337,12 +337,17 @@
   button.ghost{background:transparent}
   .btnrow{display:flex;gap:8px;margin-top:8px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .item-sort{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;color:var(--dim);font-size:12px}
+  .item-sort select{min-height:40px;padding:6px 8px;border:2px solid var(--line);
+    background:#232a38;color:var(--txt);font:inherit;color-scheme:dark}
   /* 2026-10-13：札（.item／.boon）は左の縦の帯をやめ、4隅とも同じ1段の角丸の枠にそろえた（ユーザー要望）。
      色で見分けていた物は、レア度（.rc）・セット中（.set）のように枠と地そのものの色で出す。 */
   .item{background:var(--panel);border:2px solid var(--line);
     padding:9px 10px 9px 10px;font-size:12px;cursor:pointer;line-height:1.5}
   .item:active{background:#1e2432}
   .item .nm{font-weight:700;font-size:12px}
+  .item .item-new{display:inline-block;margin-left:6px;padding:0 4px;vertical-align:1px;
+    border:1px solid #92743e;color:#ffe197;background:#302619;font-size:10px;line-height:14px}
   .item .af{color:var(--dim);font-size:12px}
   .item.eq{outline:1px solid #3d7a5c}
   /* レア度の札：左の帯ではなく、札そのもの（縁と地）をレア度の色にする（2026-10-12 ユーザー要望） */
@@ -985,6 +990,7 @@
   <h2>装備中 <span style="color:var(--dim);font-weight:400;font-size:12px">タップで外す</span></h2>
   <div class="grid" id="stash-equip"></div>
   <h2>保管 <span style="color:var(--dim);font-weight:400" id="stashcount"></span></h2>
+  <div class="item-sort" id="stash-sort"></div>
   <div class="grid" id="stash"></div>
   <div style="height:8px"></div>
   <button class="ghost" id="btn-sellall">白装備を一括売却</button>
@@ -1163,6 +1169,7 @@
   <div class="grid" id="bag-equip"></div>
 
   <h2>拾った物 <span style="color:var(--dim);font-weight:400;font-size:12px" id="bag-loothint"></span></h2>
+  <div class="item-sort" id="bag-sort"></div>
   <div class="grid" id="bag-loot"></div>
 
   <div style="height:14px"></div>
@@ -2037,28 +2044,59 @@ const CONSUMABLES=[
    use:h=>{ [S.hero, ...livingParty()].forEach(m=>{ if(!m) return;
               const mx=entMaxHp(m); m.hpNow=Math.min(mx, m.hpNow+mx*0.35); });
             return 'パーティが回復した'; }},
+  {id:'herb', nm:'薬草', col:'#96d36c', rar:0,
+   desc:'1人のHPを 10% 回復する',
+   use:h=>{ const mx=entMaxHp(h); h.hpNow=Math.min(mx, h.hpNow+mx*0.10); return 'HPが回復した'; }},
 ];
 const CONSUM_DROP_RATE = 0.04;    // 敵1体あたりの出現率
 const CONSUM_SHOP_MUL  = 2.6;     // 店の売値（装備の2.0倍より高い）
 function consumDef(id){ return CONSUMABLES.find(c=>c.id===id); }
 function isConsum(it){ return !!(it && it.consum); }
+function acquireItem(items, it){
+  recordItemAcquisition(it);
+  items.push(it);
+}
+function recordItemAcquisition(it){
+  S.itemAcquisitions=(S.itemAcquisitions||0)+1;
+  it.acquiredOrder=S.itemAcquisitions;
+  if(!isConsum(it)) it.newToBag=true;
+}
+function byRarity(a,b){ return (b.rar??-1)-(a.rar??-1); }
+function itemStacks(items, compare=byRarity){
+  const stacks=[], consumables=new Map();
+  for(const it of items.slice().sort(compare)){
+    const key=isConsum(it) ? `${it.consum}:${it.rar}:${it.price??''}` : null;
+    const existing=consumables.get(key);
+    if(existing){ existing.count++; continue; }
+    const row={it,count:1};
+    if(key!==null) consumables.set(key,row);
+    stacks.push(row);
+  }
+  return stacks;
+}
+function stackCountHTML(count){
+  return count>1 ? ' <span style="color:var(--dim)">×'+count+'</span>' : '';
+}
 function makeConsum(id){
   const c = id ? consumDef(id) : (()=>{
-    const tot=CONSUMABLES.reduce((a,x)=>a+x.w,0);
+    const pool=CONSUMABLES.filter(k=>k.w>0);
+    const tot=pool.reduce((a,x)=>a+x.w,0);
     let x=rnd()*tot;
-    for(const k of CONSUMABLES){ x-=k.w; if(x<=0) return k; }
-    return CONSUMABLES[0];
+    for(const k of pool){ x-=k.w; if(x<=0) return k; }
+    return pool[0];
   })();
   return {uid:(genItem._n=(genItem._n||0)+1), consum:c.id, nm:c.nm, slot:'consum',
-          ident:true, rar:1, ilvl:1, aff:[]};
+          ident:true, rar:c.rar??1, ilvl:1, aff:[]};
 }
 /* 使う。持ち物から消える。相手を渡さなければ主人公に使う。 */
 function useConsum(it, target){
   if(!isConsum(it) || !S.hero || !S.run) return false;
+  const index=S.run.loot.indexOf(it);
+  if(index<0) return false;
   const c=consumDef(it.consum); if(!c) return false;
   const h = target || S.hero;
   const msg=c.use(h);
-  S.run.loot = S.run.loot.filter(x=>x!==it);
+  S.run.loot.splice(index,1);
   log(c.nm+'を'+(h===S.hero?'':h.name+'に')+'使った — '+msg);
   const fx = h===S.hero ? {x:P.x, y:P.y} : {x:h.x, y:h.y};
   W.fx.push({t:'grave', x:fx.x, y:fx.y, life:0.5, max:0.5});
@@ -2919,7 +2957,7 @@ const BASE_ART = {
   ring:'ring', amulet:'amulet',
 };
 const SLOT_ART   = {weapon:'sword', shield:'buckler', armor:'armor', accessory:'ring'};
-const CONSUM_ART = {salve:'potion', draught:'vial', antidote:'leaf', tonic:'potion'};
+const CONSUM_ART = {salve:'potion', draught:'vial', antidote:'leaf', tonic:'potion', herb:'leaf'};
 const ic_ = n => (window.UI_ICONS ? UI_ICONS.itemHtml(n) : '');
 /* 旧来の名前のまま引けるようにしておく（呼び出し側を一斉に書き換えない）。 */
 const BASE_IC   = new Proxy({}, {get:(_,k)=> ic_(BASE_ART[k]||'bag')});
@@ -9303,6 +9341,7 @@ function startRun(depth){
   S.carry.forEach(c=>{
     if(c.kind==='charm') S.run.charms.push(Object.assign({}, c.charm, {owner:null}));  // 既定の持ち主は自分
     else if(c.kind==='potential') (S.hero.charPot ||= []).push({...c.potential, source:'gacha'});
+    else if(c.item.acquiredOrder==null) acquireItem(S.run.loot,c.item);
     else S.run.loot.push(c.item);
   });
   if(S.carry.length) log('持ち込み：'+S.carry.map(carryName).join('、'));
@@ -9535,6 +9574,27 @@ function heroMapSeed(){
   return h.mapSeed;
 }
 function layoutSeed(depth){ return (((S.salt|0) + heroMapSeed()*7919 + depth*104729)>>>0); }
+function placeHerbs(fl, seed){
+  // 床配置だけの乱数列。既存の敵・宝箱・戦闘の乱数をずらさない。
+  const random=mulberry32((seed ^ Math.imul(S.runs, 0x5f356495))>>>0);
+  const count=1+Math.floor(random()*2);
+  const occupied=new Set([
+    ...W.drops, ...W.enemies, ...W.ores, W.portal, W.grave, W.npc, W.ev,
+    W.forge, W.shop, W.trial, P,
+  ].filter(Boolean).map(({x,y})=>Math.floor(y)*fl.W+Math.floor(x)));
+  const spots=[];
+  for(let y=0;y<fl.H;y++){
+    for(let x=0;x<fl.W;x++){
+      if(fl.g[y][x]!==T.FLOOR || occupied.has(y*fl.W+x)) continue;
+      const px=x+0.5, py=y+0.5;
+      if(clearOfStair(fl,px,py) && standable(px,py) && !hazardAt(px,py)) spots.push({x:px,y:py});
+    }
+  }
+  for(let i=0;i<count && spots.length;i++){
+    const [spot]=spots.splice(Math.floor(random()*spots.length),1);
+    W.drops.push({...spot,it:makeConsum('herb')});
+  }
+}
 /* ---------- 踏破の記憶 ----------
    間取りが変わらないなら、**一度見た所は次も見えていてよい。**
    階を離れるとき（降りる・帰る）に W.seen をキャラに控え、
@@ -9665,6 +9725,7 @@ function enterFloor(depth, opt){
   W.shop  = arena ? null : spawnMerchant(fl, depth, [W.forge, ...(W.ores||[])]);
   W.trial = arena ? null : spawnTrial(fl, depth, [W.forge, W.shop, W.ev, ...(W.ores||[])]);
   clearAbyss(fl);                     // 水の層：淵に置かれた物・敵（浮いていないもの）を立てる床へ
+  placeHerbs(fl,lseed);
   W.mine = null;
   W.arts = [];                        // 置き型の効果は階をまたがない
   /* 試練は階をまたげない。持ち越せると「湧いた敵から逃げて穴へ」が正解になり、
@@ -14792,7 +14853,7 @@ function collectGrave(){
   const items=S.grave.items.slice(0, Math.floor(S.grave.items.length*k));
   const lostItems=S.grave.items.length - items.length;
   const g=Math.floor(S.grave.gold*k);
-  S.run.loot.push(...items);
+  items.forEach(it=>acquireItem(S.run.loot,it));
   S.run.gold += g;
   // 経験値も風化する。放置した時間ぶんは戻ってこない。
   const xp=Math.floor((S.grave.xp||0)*k);
@@ -14840,7 +14901,7 @@ function renderKeep(){
     + `いま <b style="color:${n>_keepFree?'#e0705a':'#7fe0c0'}">${n}</b> 点を選んでいる<br>`
     + `<span style="font-size:12px">選ばなかった ${sell.length} 点は <b style="color:#d6b34a">${gold} G</b> で売る</span>`;
   el('keep-list').innerHTML = _keepPool
-    .slice().sort((a,b)=>itemValue(b)-itemValue(a))
+    .slice().sort((a,b)=>byRarity(a,b) || itemValue(b)-itemValue(a))
     .map(it=>{
       const on=_keepSel.has(it.uid);
       return `<div class="item rc" data-keep="${it.uid}"
@@ -14914,8 +14975,8 @@ function returnToTown(){
      「持ち帰る物を選ぶ」画面にも並ばない——選ばせる余地が無い物だから。 */
   bankLegends(S.run.loot);
   const loot=S.run.loot.filter(it=>!isConsum(it) && !isLegend(it))
-    .sort((a,b)=> (b.rar-a.rar) || (itemValue(b)-itemValue(a)));
-  const free=Math.max(0, stashCap()-S.stash.length);
+    .sort((a,b)=>byRarity(a,b) || itemValue(b)-itemValue(a));
+  const free=Math.max(0, stashCap()-itemStacks(S.stash).length);
   let overflow=0;
   if(loot.length > free && loot.length){
     /* 入りきらない。**選ばせてから**続きへ進む。
@@ -15097,7 +15158,7 @@ function finishReturn(overflow){
      呼び出し側のローカル変数はもうここまで届かない。 */
   const shown = S.run.loot.filter(it=>!isConsum(it));
   el('r-loot').innerHTML = shown.length
-    ? shown.map(it=>itemHTML(it,false)).join('')
+    ? shown.sort(byRarity).map(it=>itemHTML(it,false)).join('')
     : '<div class="empty">戦利品なし</div>';
   /* ---------- 連れて帰った仲間は、そのまま隊に残る ----------
      一度は「街に着いたら全員酒場へ」にしていた。**毎回雇い直すのは税でしかない。**
@@ -15223,7 +15284,7 @@ addEventListener('keydown',e=>{
      強制的に中断されたように見える不具合があった（報告：
      「技の名前変更の文字入力中に強制的に入力を終了させられる事がある」）。 */
   const ae=document.activeElement;
-  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')) return;
+  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')) return;
   keys[e.key.toLowerCase()]=1;
   if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
   const k=e.key.toLowerCase();
@@ -15429,7 +15490,7 @@ function autoPickup(){
                              life:1.1, max:1.1, reward:true});
         continue;
       }
-      S.run.loot.push(d.it);
+      acquireItem(S.run.loot,d.it);
       log('拾った：'+itemName(d.it));
     }
   }
@@ -15508,7 +15569,7 @@ function buyFromMerchant(uid){
   W.shop.stock.splice(W.shop.stock.indexOf(it),1);
   if(it.stone){ lanternEatStart(W.shop.x, W.shop.y); newStone('蛍石を買った'); return {ok:true, item:it, stone:true}; }
   delete it.price;
-  S.run.loot.push(it);            // 持ち物へ。持ち帰るまでは自分の物にならない
+  acquireItem(S.run.loot,it);    // 持ち物へ。持ち帰るまでは自分の物にならない
   return {ok:true, item:it};
 }
 function openMerchant(){
@@ -15530,7 +15591,7 @@ function renderMerchant(){
   const st=(W.shop&&W.shop.stock)||[];
   el('ms-list').innerHTML = !st.length
     ? '<div class="empty">売り切れだ</div>'
-    : st.map(it=>{
+    : itemStacks(st).map(({it,count})=>{
         if(it.stone){
           const afford=g>=it.price;
           return `<div class="item" data-mbuy="${it.uid}" style="border-left-color:#6fe8b8;opacity:${afford?1:0.5}">
@@ -15542,7 +15603,7 @@ function renderMerchant(){
         const col=isConsum(it) ? ((consumDef(it.consum)||{}).col||'#7fe0c0') : RARCOL[it.rar];
         const afford=g>=it.price;
         return `<div class="item rc" data-mbuy="${it.uid}" style="--rc:${col};opacity:${afford?1:0.5}">
-          <div class="nm" style="color:${col}">${itemName(it)}</div>
+          <div class="nm" style="color:${col}">${itemName(it)}${stackCountHTML(count)}</div>
           <div class="af">${itemSubLine(it)}</div>
           <div class="af">${affLines(it).join('<br>')}</div>
           <div class="af" style="color:${afford?'#d6b34a':'#e0705a'}">${it.price} G</div>
@@ -18922,6 +18983,16 @@ function gearScore(st){
   return {off: Math.max(0.01, (st.atk + el*0.8) * st.aspd * (1 + st.crit/100*(CRIT_MUL-1))),
           tank: Math.max(1, st.maxHp * (1 + Math.max(0, st.def)/60))};
 }
+function scoreWithGear(it){
+  const equip=S.hero.equip, slot=it.slot;
+  const hadSlot=Object.hasOwn(equip,slot), prev=equip[slot];
+  equip[slot]=it;
+  try{ return gearScore(stats(S.hero)); }
+  finally{
+    if(hadSlot) equip[slot]=prev;
+    else delete equip[slot];
+  }
+}
 function isGearUpgrade(it){
   if(!it || !S.hero || !it.ident || !it.slot || isConsum(it) || isBroken(it)) return false;
   const now = performance.now(), c = _upMark.get(it);
@@ -18932,8 +19003,7 @@ function isGearUpgrade(it){
     if(!cur) v = true;                                  // 空いているスロットなら、着ければ必ず強くなる
     else {
       const before = gearScore(stats(S.hero));
-      S.hero.equip[slot] = it;
-      let after; try{ after = gearScore(stats(S.hero)); } finally { S.hero.equip[slot] = cur; }
+      const after = scoreWithGear(it);
       v = (after.off/before.off) * (after.tank/before.tank) > UPGRADE_MARK_MIN;
     }
   }
@@ -20014,10 +20084,66 @@ function itemHTML(it, showEq, opt){
   const locked = opt.lockUnident && !it.ident;
   return '<div class="item rc'+(eqd?' eq':'')+(locked?' locked':'')+'" data-uid="'+it.uid+'" '+
     'style="--rc:'+col+'">'+
-    '<div class="nm" style="color:'+col+'">'+itemName(it)+'</div>'+
-    '<div class="af">'+itemSubLine(it)+(locked?' ・装備不可':'')+'</div>'+
+    '<div class="nm" style="color:'+col+'">'+itemName(it)
+    +(opt.showNew?'<span class="item-new">NEW</span>':'')+stackCountHTML(opt.count)+'</div>'+
+    '<div class="af">'+(opt.subLine || itemSubLine(it))+(locked?' ・装備不可':'')+'</div>'+
     '<div class="af">'+affLines(it).join('<br>')+'</div>'+
     (opt.compare ? compareHTML(it) : '')+'</div>';
+}
+const ITEM_SORT_FIELDS={acquired:'入手順',performance:'性能',rarity:'レアリティ',type:'種別'};
+const ITEM_SORT_TYPES=['weapon','shield','armor','accessory','consum'];
+function itemSortSettings(view){
+  return S.itemSort?.[view] || {field:'rarity',direction:'desc'};
+}
+function sortedItemStacks(items, view){
+  const {field,direction}=itemSortSettings(view);
+  const sign=direction==='asc'?1:-1;
+  const scores=new Map();
+  if(field==='performance'){
+    for(const it of items){
+      if(!S.hero || !it.ident || isConsum(it)) continue;
+      const {off,tank}=scoreWithGear(it);
+      scores.set(it,off*tank);
+    }
+  }
+  return itemStacks(items,(a,b)=>{
+    if(field==='performance'){
+      if(scores.has(a)!==scores.has(b)) return scores.has(a)?-1:1;
+      return ((scores.get(a)??0)-(scores.get(b)??0))*sign;
+    }
+    if(field==='acquired'){
+      if(a.acquiredOrder!=null || b.acquiredOrder!=null){
+        const diff=(a.acquiredOrder??0)-(b.acquiredOrder??0);
+        if(diff) return diff*sign;
+      }
+      return (a.uid-b.uid)*sign;
+    }
+    if(field==='type'){
+      return (ITEM_SORT_TYPES.indexOf(a.slot)-ITEM_SORT_TYPES.indexOf(b.slot))*sign;
+    }
+    return byRarity(a,b)*-sign;
+  });
+}
+function syncItemSortControls(view){
+  const {field,direction}=itemSortSettings(view);
+  el(view+'-sort-field').value=field;
+  el(view+'-sort-direction').value=direction;
+}
+function bindItemSort(view, render){
+  const controls=el(view+'-sort');
+  controls.innerHTML='<label for="'+view+'-sort-field">並べ替え</label>'
+    +'<select id="'+view+'-sort-field">'
+    +Object.entries(ITEM_SORT_FIELDS).map(([id,name])=>'<option value="'+id+'">'+name+'</option>').join('')
+    +'</select><select id="'+view+'-sort-direction" aria-label="並び順">'
+    +'<option value="asc">昇順 ↑</option><option value="desc">降順 ↓</option></select>';
+  controls.addEventListener('change',savedAction(()=>{
+    (S.itemSort ||= {})[view]={
+      field:el(view+'-sort-field').value,
+      direction:el(view+'-sort-direction').value,
+    };
+    render();
+  }));
+  syncItemSortControls(view);
 }
 /* 装備中と比べてどう変わるかを 1 行で出す。数値を並べるだけでは判断できない */
 function compareHTML(it){
@@ -20505,10 +20631,10 @@ bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   else toast('呼び戻せない — '+(r.why||''), '#e0705a');
   renderKeepScroll('scr-mem', ()=>{ renderMem(); renderTown(); });
 });
-function shopHTML(it){
+function shopHTML(it,count){
   const col=RARCOL[it.rar], afford=S.gold>=it.price;
   return `<div class="item rc" data-buy="${it.uid}" style="--rc:${col};opacity:${afford?1:0.5}">
-    <div class="nm" style="color:${col}">${itemName(it)}</div>
+    <div class="nm" style="color:${col}">${itemName(it)}${stackCountHTML(count)}</div>
     <div class="af">${itemSubLine(it)}</div>
     <div class="af">${affLines(it).join('<br>')}</div>
     <div class="af" style="color:${afford?'#d6b34a':'#5c6479'};font-weight:700">${it.price} G</div>
@@ -20612,7 +20738,7 @@ const uds=unlockedDepths();
   const shopSub=el('m-shop-sub');
   shopSub.textContent = need ? `<i class="pi pi-warn"></i> 要修理 ${need}点` : `${S.shop.length}点 入荷中`;
   shopSub.style.color = need ? '#ffb08a' : '';
-  el('m-stash-sub').textContent = `${S.stash.length} / ${stashCap()}`;
+  el('m-stash-sub').textContent = `${itemStacks(S.stash).length} / ${stashCap()}`;
   const buyable = UPGRADES.filter(u=>upgLv(u.id)<u.max && (S.shards||0)>=upgCost(u,upgLv(u.id))).length
                 + unlockedUlts().filter(u=>ultCanUp(u.id)).length;
   el('m-upg-sub').textContent   = buyable ? `${buyable}件 習得可能` : `◆ ${S.shards||0} SP`;
@@ -21335,7 +21461,7 @@ function renderAllyEquip(){
                  : `<span style="color:#e0705a">${nm} ${s}</span>`;
     }).join('　');
   };
-  const src=aeSource().filter(it=>allyCanEquip(a,it));
+  const src=aeSource().filter(it=>allyCanEquip(a,it)).sort(byRarity);
   el('ae-srchead').textContent = S.run ? '渡せる物（持ち物から）' : '渡せる物（倉庫から）';
   el('ae-note').innerHTML = `武器は<b>${(BASES.find(b=>b.id===j.weapon)||{}).nm}</b>のみ。防具と装飾品は自由。`
     + '<span style="color:var(--dim)">　未鑑定・破損した物は渡せない</span>';
@@ -21655,7 +21781,9 @@ function renderShop(){
   if(!S.shop.length) rerollShop();
   goldLabel('shop-gold');
   el('oreshop').innerHTML = ORES.filter(o=>ORE_PRICE[o.id]).map(oreShopHTML).join('');
-  el('shop').innerHTML = S.shop.length? S.shop.map(shopHTML).join('') : '<div class="empty">売り切れ</div>';
+  el('shop').innerHTML = S.shop.length
+    ? itemStacks(S.shop).map(({it,count})=>shopHTML(it,count)).join('')
+    : '<div class="empty">売り切れ</div>';
   el('btn-reroll').textContent = `品揃えを入れ替える（${Math.max(20, Math.round(S.deepest*6))} G）`;
 
   const fix=repairables();
@@ -21672,18 +21800,20 @@ function renderStash(){
   const eq=Object.values(S.hero.equip).filter(Boolean);
   el('stash-equip').innerHTML = eq.length? eq.map(it=>itemHTML(it,true)).join('')
     : '<div class="empty">何も装備していない</div>';
-  el('stashcount').textContent='（'+S.stash.length+' / '+stashCap()+'）';
-  /* レジェンドは別の棚。枠を数えないので件数表示にも混ぜず、
-     先頭にまとめて出す（探すたびに倉庫を掘らせない）。 */
+  syncItemSortControls('stash');
+  el('stashcount').textContent='（'+itemStacks(S.stash).length+' / '+stashCap()+'）';
+  // レジェンドは保存上は専用の棚に置き、表示では保管品と同じ条件で並べる。
   const shelf=legendShelf();
+  const stacks=sortedItemStacks([...shelf,...S.stash],'stash');
   const head = shelf.length
     ? `<div class="empty" style="color:${RARCOL[LEGEND_RAR]};text-align:left">`
       + `★ レジェンド（${shelf.length} / ${LEGENDS.length}）　倉庫の枠を使わない・死んでも残る</div>`
-      + shelf.map(it=>itemHTML(it,true,{compare:true})).join('')
     : '';
-  el('stash').innerHTML = (head + (S.stash.length
-      ? S.stash.map(it=>itemHTML(it,true,{compare:true})).join('')
-      : (shelf.length ? '' : '<div class="empty">空</div>')));
+  el('stash').innerHTML = (head + (stacks.length
+      ? stacks.map(({it,count})=>itemHTML(it,true,{
+          count, compare:!isConsum(it), subLine:isConsum(it)?'消耗品 / タップで1個持ち込む':null,
+        })).join('')
+      : '<div class="empty">空</div>'));
 }
 /* ==================== スキルツリー画面（旧 能力強化） ====================
    2026-10-13 ユーザー要望：「スキルツリーにバリエーションを持たせたいので、
@@ -22268,7 +22398,10 @@ function renderGacha(){
                   : '広告を見て引く';
   btn.className = S.gachaLeft>0 ? 'primary' : 'ghost';
   syncCrazyAdAvailability();
-  el('carry').innerHTML = S.carry.length? S.carry.map(carryHTML).join('')
+  el('carry').innerHTML = S.carry.length
+    ? S.carry.filter(c=>c.kind!=='item').map(carryHTML).join('')
+      + itemStacks(S.carry.filter(c=>c.kind==='item').map(c=>c.item))
+        .map(({it,count})=>itemHTML(it,false,{count})).join('')
     : '<div class="empty">まだ何もない</div>';
 }
 
@@ -22535,11 +22668,12 @@ function townTap(e){
   if(bb){
     const it=S.shop.find(i=>i.uid===+bb.dataset.buy);
     if(!it || S.gold<it.price) return;
-    if(S.stash.length>=stashCap()) return;
+    const stacks=itemStacks(S.stash);
+    if(stacks.length>=stashCap() && !stacks.some(row=>isConsum(it) && row.it.consum===it.consum && row.it.rar===it.rar)) return;
     S.gold-=it.price;
     S.shop.splice(S.shop.indexOf(it),1);
     delete it.price;
-    S.stash.push(it);
+    acquireItem(S.stash,it);
     redraw(); return;
   }
 
@@ -22549,6 +22683,11 @@ function townTap(e){
   const uid=+n.dataset.uid;
   const inStash=findOwnedItem(uid);      // 倉庫とレジェンドの棚の両方
   if(inStash){
+    if(isConsum(inStash)){
+      unshelveItem(inStash);
+      S.carry.push({kind:'item',item:inStash});
+      redraw(); return;
+    }
     /* 仲間がいるなら、誰に着せるかを聞く。
        仲間に装備を渡す道は仲間の画面にしか無かったので、
        倉庫で良い物を見つけても、そこからは自分にしか着せられなかった。
@@ -22975,6 +23114,7 @@ function charPotListHTML(h){
     </div>`;
   }).join('');
 }
+let bagNewItems=new Set();
 function renderBag(){
   if(!S.run || !S.hero) return;
   const st=stats(S.hero);
@@ -23036,7 +23176,7 @@ function renderBag(){
           <div class="af" style="color:var(--dim);font-size:12px">仲間の画面から渡し先を変えられる</div>
           </div>`; }).join('')
       : '')
-    + (eq.length ? eq.map(it=>itemHTML(it,true)).join('')
+    + (eq.length ? eq.map(it=>itemHTML(it,true,{showNew:bagNewItems.has(it)})).join('')
                  : (S.run.charms.length?'':'<div class="empty">何も装備していない</div>'));
 
   const unid=S.run.loot.filter(i=>!i.ident).length;
@@ -23044,18 +23184,28 @@ function renderBag(){
   el('bag-loothint').textContent =
     (cons?`消耗品 ${cons} 点はタップで使用。`:'') +
     (unid ? `タップで装備（未鑑定 ${unid} 点は不可）` : 'タップで装備');
+  syncItemSortControls('bag');
   el('bag-loot').innerHTML = S.run.loot.length
-    ? S.run.loot.map(it=>itemHTML(it,false,{lockUnident:true,compare:true})).join('')
+    ? sortedItemStacks(S.run.loot,'bag').map(({it,count})=>itemHTML(it,false,{
+        count, lockUnident:true, compare:!isConsum(it), showNew:bagNewItems.has(it),
+      })).join('')
     : '<div class="empty">まだ何も拾っていない</div>';
 }
 function openBag(){
-  if(!S.run || !S.hero) return;
+  if(!S.run || !S.hero || S.screen==='bag') return;
+  // 初回の表示は再描画しても保ち、セーブには既読の状態を残す。
+  bagNewItems=new Set([...S.run.loot,...Object.values(S.hero.equip)].filter(it=>it?.newToBag));
+  bagNewItems.forEach(it=>{ delete it.newToBag; });
+  if(bagNewItems.size) window.ABYSS_SAVE?.request();
   S.screen='bag';
   el('hud').classList.remove('on');
   renderBag();
   el('m-bag').classList.add('on');
 }
-function closeBag(){ el('m-bag').classList.remove('on'); setScreen('game'); last=performance.now(); }
+function closeBag(){
+  bagNewItems.clear();
+  el('m-bag').classList.remove('on'); setScreen('game'); last=performance.now();
+}
 
 /* 探索中のステータス。持ち物と分けたのは、用が違うから——
    装備を替えたいときに能力値の壁を毎回スクロールさせない。 */
@@ -23868,6 +24018,8 @@ function closeHelp(){ el('m-help').classList.remove('on'); setScreen(_prevScreen
 bindTap(el('help-ok'), closeHelp);
 bindTap(el('bagbtn'), openBag);
 bindTap(el('bag-ok'), closeBag);
+bindItemSort('bag',renderBag);
+bindItemSort('stash',renderStash);
 bindTap(el('statbtn'), openStat);
 /* 地図の出し入れ。**押した瞬間に描き直さない**——次のフレームで
    drawMinimap() が S.mapOn を見るので、ここで触るのは状態だけでいい。 */
@@ -23976,7 +24128,10 @@ function doGachaPull(){
 }
 bindTap(el('gres-ok'), ()=>{
   el('m-gres').classList.remove('on');
-  if(_pending){ S.carry.push(_pending); _pending=null; }
+  if(_pending){
+    if(_pending.kind==='item') recordItemAcquisition(_pending.item);
+    S.carry.push(_pending); _pending=null;
+  }
   renderGacha();
 });
 bindTap(el('st-down'), ()=>{
@@ -24256,7 +24411,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="ally-effect-study.js"></script>
 <script src="weapon-art-effect-study.js?v=20260915b"></script>
 <script src="item-icons-imported-data.js?v=20260915a"></script>
-<script src="item-icons.js?v=20260915a"></script>
+<script src="item-icons.js?v=20261115a"></script>
 <!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->

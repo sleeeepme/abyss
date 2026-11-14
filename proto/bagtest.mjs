@@ -1,5 +1,6 @@
 // 未鑑定ルール / 探索中インベントリ / 移動速度 の検証（タッチのみ）
 import { chromium, devices } from 'playwright'; import path from 'path';
+import assert from 'node:assert/strict';
 const b=await chromium.launch();
 const ctx=await b.newContext({ ...devices['iPhone 13'], hasTouch:true, isMobile:true });
 const pg=await ctx.newPage();
@@ -124,6 +125,96 @@ R.resumedAfterClose = await pg.evaluate(x=>Math.abs(P.x-x)>0.3, px);
 await pg.evaluate(()=>{ S.run.depth=5; returnToTown(); });
 await pg.waitForTimeout(200);
 R.identifiedOnReturn = await pg.evaluate(()=>S.stash.length>0 && S.stash.every(i=>i.ident));
+
+// 薬草は全階の歩ける床に1〜2個。ボス階・淵がある階・周回先も含む。
+R.herbFloor = await pg.evaluate(()=>{
+  S.hero=newHero(); startRun(1);
+  const counts=[];
+  for(let depth=1;depth<=65;depth++){
+    if(depth>1) enterFloor(depth);
+    const herbs=W.drops.filter(d=>d.it?.consum==='herb');
+    if(!herbs.every(d=>standable(d.x,d.y) && clearOfStair(W.fl,d.x,d.y) && !hazardAt(d.x,d.y))) return false;
+    if(new Set(herbs.map(d=>d.x+':'+d.y)).size!==herbs.length) return false;
+    counts.push(herbs.length);
+  }
+  return counts.every(n=>n===1 || n===2) && counts.includes(1) && counts.includes(2);
+});
+assert.equal(R.herbFloor,true);
+
+// 同種のスタックを選び、生きている仲間だけに薬草を1個使う。
+const herb = await pg.evaluate(()=>{
+  const common=genBaseItem('sword',1,0), rare=genBaseItem('axe',1,0);
+  rare.rar=2; rare.ident=true;
+  const first=makeConsum('herb'), second=makeConsum('herb'), salve=makeConsum('salve');
+  S.run.loot=[common,first,rare,second,salve];
+  const ally=makeAlly(1,S.hero);S.hero.party=[ally];
+  const max=entMaxHp(ally);
+  ally.hpNow=max/2;
+  openBag();
+  return {uid:first.uid, nextUid:second.uid, order:[rare.uid,salve.uid,common.uid,first.uid], max, heroHp:S.hero.hpNow};
+});
+assert.deepEqual(await pg.locator('#bag-loot [data-uid]').evaluateAll(rows=>rows.map(row=>+row.dataset.uid)),herb.order);
+assert.match(await pg.locator(`#bag-loot [data-uid="${herb.uid}"] .nm`).textContent(),/薬草 ×2/);
+await pg.locator(`#bag-loot [data-uid="${herb.uid}"]`).tap();
+await pg.locator('[data-ut="1"]').tap();
+assert.deepEqual(await pg.evaluate(()=>({
+  remaining:S.run.loot.filter(it=>it.consum==='herb').map(it=>it.uid),
+  allyHp:S.hero.party[0].hpNow,heroHp:S.hero.hpNow,
+})),{remaining:[herb.nextUid],allyHp:herb.max/2+herb.max*0.1,heroHp:herb.heroHp});
+assert.match(await pg.locator(`#bag-loot [data-uid="${herb.nextUid}"] .nm`).textContent(),/^薬草$/);
+
+// 倉庫が満杯でも既存のスタックに追加でき、タップで1個ずつ持ち込める。
+const stocked = await pg.evaluate(()=>{
+  const first=makeConsum('salve'), second=makeConsum('salve');
+  S.run=null; S.carry=[]; S.gold=1000;
+  S.stash=[first,...Array.from({length:stashCap()-1},()=>genBaseItem('sword',1,0))];
+  S.shop=[{...second,price:50}];
+  setScreen('shop');
+  return {first:first.uid,second:second.uid,capacity:stashCap()};
+});
+await pg.locator(`[data-buy="${stocked.second}"]`).tap();
+await pg.evaluate(()=>setScreen('stash'));
+assert.match(await pg.locator('#stashcount').textContent(),new RegExp(`${stocked.capacity} / ${stocked.capacity}`));
+assert.match(await pg.locator(`#stash [data-uid="${stocked.first}"] .nm`).textContent(),/癒しの軟膏 ×2/);
+await pg.locator(`#stash [data-uid="${stocked.first}"]`).tap();
+assert.match(await pg.locator(`#stash [data-uid="${stocked.second}"] .nm`).textContent(),/^癒しの軟膏$/);
+assert.deepEqual(await pg.evaluate(()=>{startRun(1);return S.run.loot.filter(isConsum).map(it=>it.uid);}),[stocked.first]);
+
+// 実際の選択欄で4種類と両方向を確認。床に生成された順と拾った順は逆にする。
+const sortItems = await pg.evaluate(()=>{
+  const sword=genBaseItem('sword',1,0), armor=genBaseItem('leather',1,0);
+  armor.rar=2;armor.def=10000;
+  S.run.loot=[];
+  acquireItem(S.run.loot,armor);
+  acquireItem(S.run.loot,sword);
+  acquireItem(S.run.loot,makeConsum('herb'));
+  acquireItem(S.run.loot,makeConsum('herb'));
+  openBag();
+  return {sword:sword.uid,armor:armor.uid};
+});
+const field=pg.locator('#bag-sort-field'), direction=pg.locator('#bag-sort-direction');
+const gearOrder=()=>pg.locator('#bag-loot [data-uid]').evaluateAll((rows,ids)=>rows
+  .map(row=>+row.dataset.uid).filter(uid=>uid===ids.sword || uid===ids.armor),sortItems);
+const {sword,armor}=sortItems;
+for(const [sort,ascending] of Object.entries({
+  acquired:[armor,sword],performance:[sword,armor],rarity:[sword,armor],type:[sword,armor],
+})){
+  await field.selectOption(sort);
+  await direction.selectOption('asc');
+  assert.deepEqual(await gearOrder(),ascending,sort+' asc');
+  await direction.selectOption('desc');
+  assert.deepEqual(await gearOrder(),ascending.slice().reverse(),sort+' desc');
+  assert.equal(await pg.locator('#bag-loot .item').count(),3);
+}
+assert.equal(await pg.locator('#bag-loot .item-new').count(),2);
+await pg.evaluate(()=>{closeBag();S.stash=S.run.loot.slice();S.run=null;setScreen('stash');});
+await pg.locator('#stash-sort-field').selectOption('acquired');
+await pg.locator('#stash-sort-direction').selectOption('asc');
+assert.equal(await pg.locator('#stash [data-uid]').first().getAttribute('data-uid'),String(armor));
+await pg.evaluate(()=>setScreen('town'));
+await pg.evaluate(()=>setScreen('stash'));
+assert.equal(await pg.locator('#stash-sort-field').inputValue(),'acquired');
+assert.equal(await pg.locator('#stash-sort-direction').inputValue(),'asc');
 
 await b.close();
 console.log(JSON.stringify({errs,R},null,2));
