@@ -22161,8 +22161,9 @@ function renderGacha(){
 /* ---------- ガチャ ---------- */
 let _adNoticeTimer=null;
 let _adTimer=null, _adDone=null, _adUnder=[], _adSession=null, _demoComplete=null;
-// ローカルの試遊だけ従来のダミーを使う。公開URLでは未接続扱いとし、偽の報酬を出さない。
-const _adDemo = location.protocol==='file:' || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+// ローカル試遊と、公開先でテスト広告を明示したセッションで使う。
+const _adDemo = new URLSearchParams(location.search).get('ads')==='demo'
+  || location.protocol==='file:' || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
 if(_adDemo && !window.ABYSS_CRAZYGAMES?.enabled) ABYSS_ADS.setProvider({
   name:'demo',
   requestRewarded({signal}){
