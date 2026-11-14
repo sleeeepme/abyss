@@ -91,6 +91,9 @@ R.draw = await run(`
   const e=W.enemies.find(x=>x.revenant);
   P.x=e.x+1.2; P.y=e.y;
   let ok=true; try{ for(let i=0;i<3;i++) draw(); }catch(err){ ok=String(err); }
-  return {drawsWithoutError: ok===true};
+  TH.step(0.3);
+  // 左上の知らせ（#gravehint）は、前の代が立っている間は出さない（ユーザー指定）
+  const noHint=getComputedStyle(document.getElementById('gravehint')).display==='none';
+  return {drawsWithoutError: ok===true, noHint};
 `);
 await done(b, errs, R);

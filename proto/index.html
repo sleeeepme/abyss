@@ -19690,14 +19690,10 @@ function updateHUD(){
   // 引き撃ちの倍率の表記（#foottag）は常に非表示固定なので initHudOnce() で一度だけ消す。
 
   const gh=el('gravehint');
-  hset('gravehint.disp', (S.grave||S.revenant)?'block':'none', v=>gh.style.display=v);
-  if(S.revenant){
-    /* 前の代（還り損ない）。遺体の中身もこの者が抱えている */
-    const R=S.revenant, here=W.revenantE && !W.revenantE.dead;
-    hset('gravehint.t', here ? R.name+'はこの階層に立っている（ミニマップの赤）'
-                             : '第'+R.depth+'階層　'+R.name+'（Lv.'+R.lv+'）／あと'+Math.ceil(graveHoursLeft(R))+'時間',
-      v=>gh.textContent=v);
-  }else if(S.grave){
+  /* 前の代（還り損ない）が立っている間は、左上に何も出さない（2026-11-14 ユーザー指定）。
+     居場所は地図の赤い点と、階に入ったときのログで分かる。 */
+  hset('gravehint.disp', (S.grave && !S.revenant)?'block':'none', v=>gh.style.display=v);
+  if(S.grave && !S.revenant){
     hset('gravehint.t', W.grave ? '遺体はこの階層にある（ミニマップの緑）'
                              : '遺体：第'+S.grave.depth+'階層'
                                + (graveDecay(S.grave)<1 ? '（'+Math.round(graveDecay(S.grave)*100)+'%）' : ''),
