@@ -2186,6 +2186,9 @@ function gearDurMul(it){
 /* 傷みを与えて、実際に落ちた整数ぶんを返す（0 なら今回は減っていない）。 */
 function wearGear(it, amount, extraMul){
   const mul = gearDurMul(it) * (extraMul||1);
+  const trt = traitOf(it);                        // 特性「頑丈」「脆い刃」
+  if(trt && trt.id==='ganjo') amount *= 1 - trt.v/100;
+  if(trt && trt.id==='moroi') amount *= 2;
   it._wear = (it._wear||0) + amount/mul;
   const step = Math.floor(it._wear);
   if(step<=0) return 0;
@@ -2375,6 +2378,190 @@ function potentialLine(a){
   return `<span style="color:#6cc24a">${STATNM[a.stat].replace('%v',a.v)}</span>`;
 }
 
+/* ==================== 装備の特性（2026-11-14） ====================
+   数値の付帯（接頭辞・接尾辞・潜在）とは別枠の、名前つきの「いつ・何をすると・何が起きる」。
+   仕様：プロジェクト文書「abyss-装備の特性-案出しと仕様案」（ユーザーが「一旦これで進めて」）。
+   - 1つの装備に1つまで。レジェンドには付けない（makeLegend は buildItem を通らない）。
+   - 付くかどうかは装備のレア度で決まる（白25%〜赤100%）。強さ（並・良・★）は別に引く。
+   - 乱数は**本編の RNG を使わない**。装備の uid から作る専用の列で引く——
+     buildItem の乱数消費をこれ以上ずらさない（CLAUDE.md 5.1）。
+   - 第1弾：武器共通の「軽」12種、盾3種、防具5種、癖10種。
+     武器種ごとの特性・「中」「重」の物は第2弾以降。 */
+const TRAIT_ATTACH_P = [0.25, 0.40, 0.60, 0.80, 1.00];        // 白/緑/青/紫/赤
+const TRAIT_Q_W = [[75,22,3],[65,29,6],[50,38,12],[35,43,22],[20,45,35]];   // 並/良/★
+const TRAIT_QUIRK_P = [0.40, 0.30, 0.20, 0.10, 0.05];          // 癖（得と損）を引く割合。白・緑で多い
+const TRAIT_QNM = ['','',' ★'];
+/* sl：付く装備の枠。q:1 は癖。r は数値の幅、sc:1 は ilvl で伸ばす固定値。
+   d(v) が説明文（v は色付けした数値の文字列）。 */
+const TRAITS=[
+  // ---- 武器共通 ----
+  {id:'oiuchi',  nm:'追い打ち',   sl:'weapon', r:[8,20],  d:v=>`状態異常の敵へのダメージ +${v}%`},
+  {id:'uitachi', nm:'初太刀',     sl:'weapon', r:[15,40], d:v=>`HPが満タンの敵へのダメージ +${v}%`},
+  {id:'todome',  nm:'止め',       sl:'weapon', r:[12,30], d:v=>`HPが3割以下の敵へのダメージ +${v}%`},
+  {id:'haisui',  nm:'背水',       sl:'weapon', r:[10,25], d:v=>`自分のHPが半分以下のとき、ダメージ +${v}%`},
+  {id:'ikioi',   nm:'勢い',       sl:'weapon', r:[8,20],  d:v=>`敵を倒すと4秒、攻撃速度 +${v}%`},
+  {id:'kate',    nm:'血の糧',     sl:'weapon', r:[2,6], sc:1, d:v=>`敵を倒すとHPが ${v} 回復`},
+  {id:'kudaki',  nm:'砕き',       sl:'weapon', r:[15,40], d:v=>`ボスの崩しゲージの溜まり +${v}%`},
+  {id:'koou',    nm:'呼応',       sl:'weapon', r:[10,25], d:v=>`連携値の溜まり +${v}%`},
+  {id:'mikiri',  nm:'見切りの刃', sl:'weapon', r:[30,80], d:v=>`見切りの後の一撃のダメージ +${v}%`, solo:1},
+  {id:'yamiuchi',nm:'闇討ち',     sl:'weapon', r:[15,35], d:v=>`灯りが3以下のとき、ダメージ +${v}%`},
+  {id:'ganjo',   nm:'頑丈',       sl:'weapon', r:[20,50], d:v=>`耐久の減り -${v}%`},
+  {id:'keitou',  nm:'系統狩り',   sl:'weapon', r:[15,35], fam:1, d:(v,a)=>`${traitFamNm(a)}へのダメージ +${v}%`},
+  // ---- 盾 ----
+  {id:'fudou',   nm:'不動',       sl:'shield', r:[3,8],   d:v=>`ガード中は押し戻されない。ガード軽減 +${v}`},
+  {id:'togetate',nm:'棘の盾',     sl:'shield', r:[20,50], d:v=>`ガードで受けたダメージの ${v}% を返す`},
+  {id:'kamae',   nm:'構え直し',   sl:'shield', r:[2,6], sc:1, d:v=>`パリイが決まると、HPが ${v} 回復`, solo:1},
+  // ---- 防具 ----
+  {id:'gyakkyo', nm:'逆境',       sl:'armor',  r:[10,25], d:v=>`HPが3割以下のとき、移動速度 +${v}%`},
+  {id:'ukenaga', nm:'受け流し',   sl:'armor',  r:[8,20],  d:v=>`攻撃を受けた後3秒、回避率 +${v}%`},
+  {id:'shizume', nm:'鎮め',       sl:'armor',  r:[20,50], d:v=>`自分にかかる状態異常の時間 -${v}%`},
+  {id:'ikitsugi',nm:'息継ぎ',     sl:'armor',  r:[5,15], sc:1, div:10, d:v=>`5秒攻撃を受けないと、毎秒HPが ${v} 回復`},
+  {id:'tomori',  nm:'灯守り',     sl:'armor',  r:[15,35], d:v=>`瘴気で削られるHP -${v}%`},
+  // ---- 癖（得と損。損の数値は固定） ----
+  {id:'omoi',    nm:'重い',       sl:'weapon', q:1, r:[15,30], d:v=>`攻撃力 +${v}%、攻撃速度 -10%`},
+  {id:'karui',   nm:'軽い',       sl:'weapon', q:1, r:[10,20], d:v=>`攻撃速度 +${v}%、攻撃力 -8%`},
+  {id:'oofuri',  nm:'大振り',     sl:'weapon', q:1, r:[20,40], d:v=>`振りの範囲 +${v}°、攻撃速度 -8%`},
+  {id:'moroi',   nm:'脆い刃',     sl:'weapon', q:1, r:[30,70], d:v=>`会心のダメージ +${v}%、耐久の減りが2倍`},
+  {id:'chiwaki', nm:'血の渇き',   sl:'weapon', q:1, r:[15,30], d:v=>`ダメージ +${v}%、攻撃を当てるたびにHP -1`},
+  {id:'ikabachi',nm:'一か八か',   sl:'weapon', q:1, r:[10,20], d:v=>`会心率 +${v}%、会心でない攻撃のダメージ -10%`},
+  {id:'juusou',  nm:'重装',       sl:'armor',  q:1, r:[20,40], d:v=>`防御 +${v}%、移動速度 -6%`},
+  {id:'usude',   nm:'薄手',       sl:'armor',  q:1, r:[6,14],  d:v=>`回避率 +${v}%、防御 -15%`},
+  {id:'donjuu',  nm:'鈍重',       sl:'shield', q:1, r:[5,10],  d:v=>`ガード軽減 +${v}、パリイ受付 -0.04秒`},
+  {id:'keimyou', nm:'軽妙',       sl:'shield', q:1, r:[4,8], div:100, d:v=>`パリイ受付 +${v}秒、ガード軽減 -5`},
+];
+const TRAIT_BY = Object.fromEntries(TRAITS.map(t=>[t.id,t]));
+function traitDef(id){ return TRAIT_BY[id] || null; }
+function traitOf(it){ return ((it&&it.aff)||[]).find(a=>a.t==='tr') || null; }
+/* 数合わせ（接頭辞・接尾辞の本数）から外す付帯：潜在と特性 */
+function isExtraAff(a){ return !!a && (a.t==='pt' || a.t==='tr'); }
+function traitFamNm(a){ const f=(typeof FAMILY!=='undefined') && FAMILY.find(x=>x.id===(a&&a.fam)); return f ? f.nm+'系' : '特定の系統'; }
+/* 装備の uid から作る専用の乱数列。本編の RNG を1つも引かない。 */
+function traitRng(it){
+  const seed = (Math.imul((it.uid||1)>>>0, 2654435761) ^ (((S.hero&&S.hero.mapSeed)||0)>>>0)
+               ^ Math.imul((S.runs||0)+1, 40503) ^ 0x7a17) >>> 0;
+  return mulberry32(seed);
+}
+function rollTrait(it, rarId){
+  const R = traitRng(it);
+  if(R() >= (TRAIT_ATTACH_P[rarId]||0)) return null;
+  const quirk = R() < (TRAIT_QUIRK_P[rarId]||0);
+  let pool = TRAITS.filter(t=>t.sl===it.slot && !!t.q===quirk);
+  if(!pool.length) pool = TRAITS.filter(t=>t.sl===it.slot);
+  if(!pool.length) return null;
+  const def = pool[Math.floor(R()*pool.length)];
+  const w = TRAIT_Q_W[rarId] || TRAIT_Q_W[0];
+  let x = R()*(w[0]+w[1]+w[2]), q = 0;
+  if(x >= w[0]) q = (x >= w[0]+w[1]) ? 2 : 1;
+  // 幅を3つに切った q 番目の帯から引く
+  const lo = def.r[0] + (def.r[1]-def.r[0])*q/3, hi = def.r[0] + (def.r[1]-def.r[0])*(q+1)/3;
+  let v = lo + R()*(hi-lo);
+  if(def.sc) v *= scaleOf(it.ilvl||1);
+  v = Math.max(1, Math.round(v));
+  const af = {t:'tr', id:def.id, nm:def.nm, v, q};
+  if(def.fam){
+    const fams = (typeof FAMILY!=='undefined' ? FAMILY : []).filter(f=>(f.minDepth||1) <= Math.max(1, it.ilvl||1)+6);
+    const fs = fams.length ? fams : FAMILY;
+    af.fam = fs[Math.floor(R()*fs.length)].id;
+  }
+  return af;
+}
+/* 表示用の数値（div があれば割る） */
+function traitVal(a){ const d=traitDef(a.id); return d && d.div ? +(a.v/d.div).toFixed(2) : a.v; }
+function traitText(a){
+  const d=traitDef(a.id); if(!d) return '';
+  const star = a.q===2 ? '★' : '';
+  return d.d(`<b style="color:${a.q===2?'#ff8ad8':'#ffd27a'}">${star}${traitVal(a)}</b>`, a);
+}
+function traitLine(a){
+  const d=traitDef(a.id); if(!d) return '';
+  const quirk = d.q ? '<span style="color:var(--dim);font-size:12px"> 癖</span>' : '';
+  const solo  = d.solo ? '<span style="color:var(--dim);font-size:12px"> 主人公のみ</span>' : '';
+  return `<span style="color:#ff9a5a">［${d.nm}${TRAIT_QNM[a.q||0]}］</span>${quirk}${solo}<br><span style="color:#d8cfc0;font-size:12px">${traitText(a)}</span>`;
+}
+/* その者が着けている（壊れていない）装備の特性 id の値。同じ特性が2つあっても大きい方だけ。 */
+function trV(h, id){
+  if(!h || !h.equip) return 0;
+  let v=0;
+  for(const it of Object.values(h.equip)){
+    if(!it || isBroken(it)) continue;
+    const a=traitOf(it);
+    if(a && a.id===id && a.v>v) v=a.v;
+  }
+  return v;
+}
+function trAff(h, id){
+  if(!h || !h.equip) return null;
+  for(const it of Object.values(h.equip)){
+    if(!it || isBroken(it)) continue;
+    const a=traitOf(it); if(a && a.id===id) return a;
+  }
+  return null;
+}
+/* stats() の蓄積器へ：数字だけで片が付く物（癖・不動のガード軽減） */
+function traitAp(it, a){
+  const t=traitOf(it); if(!t) return;
+  const v=t.v;
+  switch(t.id){
+    case 'omoi':    a.dmgPct+=v; a.aspdPct-=10; break;
+    case 'karui':   a.aspdPct+=v; a.dmgPct-=8; break;
+    case 'oofuri':  a.arcAdd+=v; a.aspdPct-=8; break;
+    case 'chiwaki': a.dmgPct+=v; break;
+    case 'ikabachi':a.critPct+=v; break;
+    case 'juusou':  a.defPct+=v; a.msPct-=6; break;
+    case 'usude':   a.evade+=v; a.defPct-=15; break;
+    case 'donjuu':  a.blockAdd+=v; a.parryAdd-=0.04; break;
+    case 'keimyou': a.parryAdd+=v/100; a.blockAdd-=5; break;
+    case 'fudou':   a.blockAdd+=v; break;
+  }
+}
+/* stats() の最後：割合の防御・盾・時限の効果 */
+function traitPost(h, o, a){
+  o.def *= Math.max(0.1, 1 + (a.defPct||0)/100);
+  if(o.hasShield){
+    o.block   = clamp(o.block + (a.blockAdd||0), 0, 80);
+    o.parryWin= Math.max(0.05, o.parryWin + (a.parryAdd||0));
+  }
+  const ik=trV(h,'ikioi');
+  if(ik && (h.trIkT||0)>0) o.aspd *= 1 + ik/100;
+  const uk=trV(h,'ukenaga');
+  if(uk && (h.trUkT||0)>0) o.evade = clamp(o.evade + uk, 0, EVADE_CAP);
+  const gk=trV(h,'gyakkyo');
+  if(gk && h.hpNow!=null && h.hpNow <= o.maxHp*0.3) o.ms *= 1 + gk/100;
+  return o;
+}
+/* 一撃の倍率（hitEnemy から）。src は殴った者（主人公か仲間）。 */
+function traitHitMul(src, st, e, crit, mk){
+  if(!src || !src.equip) return 1;
+  let m=1, v;
+  if((v=trV(src,'oiuchi'))  && e.st && Object.values(e.st).some(s=>s && s.t>0)) m*=1+v/100;
+  if((v=trV(src,'uitachi')) && e.hp >= e.maxHp) m*=1+v/100;
+  if((v=trV(src,'todome'))  && e.hp <= e.maxHp*0.3) m*=1+v/100;
+  if((v=trV(src,'haisui'))  && src.hpNow!=null && st.maxHp && src.hpNow <= st.maxHp*0.5) m*=1+v/100;
+  if((v=trV(src,'yamiuchi'))&& S.run && !S.run.noStone && lightLevel() <= 3) m*=1+v/100;
+  if(mk && (v=trV(src,'mikiri'))) m*=1+v/100;
+  const kt=trAff(src,'keitou');
+  if(kt && e.fam && e.fam.id===kt.fam) m*=1+kt.v/100;
+  if(crit && (v=trV(src,'moroi'))) m*=1+v/100;
+  if(!crit && trV(src,'ikabachi')) m*=0.9;
+  return m;
+}
+/* 倒したとき（killEnemy から）。who は倒した者。 */
+function traitOnKill(who){
+  if(!who) return;
+  const kv=trV(who,'kate');
+  if(kv) healEnt(who, kv);
+  if(trV(who,'ikioi')) who.trIkT = 4;
+}
+/* 毎フレーム（主人公の tick から）。仲間の時限は持たない（勢い・受け流しは主人公の分だけ数える）。 */
+function traitTick(h, dt){
+  if(!h) return;
+  if(h.trIkT>0) h.trIkT=Math.max(0,h.trIkT-dt);
+  if(h.trUkT>0) h.trUkT=Math.max(0,h.trUkT-dt);
+  h.trCalm=(h.trCalm||0)+dt;
+  const a=trAff(h,'ikitsugi');
+  if(a && h.trCalm>=5 && h.hpNow>0) healEnt(h, a.v/10*dt);
+}
+
 /* これ以下のレア度は鑑定済みで落ちる。Rare(2) 以上が未鑑定＝現地では装備できない。 */
 const RAR_IDENT_MAX = 1;
 /* 基礎移動速度（マス/秒）。旧 3.3 の 1.25 倍 */
@@ -2515,6 +2702,9 @@ function buildItem(base, rar, ilvl){
      ここには来ない＝自動的に付帯しない。 */
   const pot = rollPotential(ilvl, rar.id);
   if(pot) it.aff.push(pot);
+  /* 特性。専用の乱数列で引くので、ここで本編の RNG は進まない。 */
+  const tr = rollTrait(it, rar.id);
+  if(tr) it.aff.push(tr);
   return it;
 }
 function genItem(ilvl, mf=0, depth){
@@ -2797,9 +2987,12 @@ function itemRollQ(it){
      既に「何本付くか」を織り込んでいる）。 */
   const ra = RARITY[it.rar] && RARITY[it.rar].aff;
   const affMid = ra ? (ra[0]+ra[1])/2 : 0;
-  const affQ = 1 + (((it.aff||[]).length) - affMid)*0.08;
+  const affQ = 1 + (((it.aff||[]).filter(a=>a.t!=='tr').length) - affMid)*0.08;
   const rollQ = mid>0 ? now/mid : 1;
-  return clamp(rollQ*affQ, 0.6, 1.8);
+  // 特性：並 +5%／良 +12%／★ +25%
+  const trt = traitOf(it);
+  const trQ = trt ? [1.05,1.12,1.25][trt.q||0] : 1;
+  return clamp(rollQ*affQ*trQ, 0.6, 1.8);
 }
 function itemValue(it){
   if(isConsum(it)) return consumDef(it.consum) ? consumDef(it.consum).price : 20;
@@ -2992,6 +3185,7 @@ function affLines(it){
     if(a.t==='c'){ L.push(charmAffLine(a)); return; }
     // 潜在は耐久の下にまとめて出す（下記）ので、ここではスキップする
     if(a.t==='pt'){ return; }
+    if(a.t==='tr'){ return; }      // 特性は一番下にまとめて出す
     L.push(cardStat(a.stat, a.v));
     // 2つめの効果を持つ接頭辞（疾き）。書かないと、付いていることが伝わらない。
     if(a.stat2 && STATNM[a.stat2]) L.push(cardStat(a.stat2, a.v2));
@@ -3006,6 +3200,8 @@ function affLines(it){
   // 潜在は耐久のすぐ下（レジェンドは付帯しないのでここには来ない）
   const pot=potentialOf(it);
   if(pot) L.push(`<span style="color:#6cc24a">${cardStat(pot.stat, pot.v)}</span>`);   // 色は potentialLine と同じ緑
+  const trt=traitOf(it);
+  if(trt) L.push(traitLine(trt));
   return L;
 }
 function itemSubLine(it){
@@ -6725,7 +6921,9 @@ function stats(h){
          fire:0,shock:0,frost:0,mf:0,thorns:0,lowDR:0,def:0,
          resFire:0,resShock:0,resFrost:0,resArcane:0,ultCdr:0,evade:0,
          // 打ち直しで付く技の受け皿
-         rangePct:0, multi:0, arcAdd:0, pierceAdd:0, durSave:0};
+         rangePct:0, multi:0, arcAdd:0, pierceAdd:0, durSave:0,
+         // 特性（traitAp）の受け皿
+         defPct:0, blockAdd:0, parryAdd:0};
   let wAtk=FIST.atk, wSpd=FIST.spd, bDef=0;
   let wReach=FIST.reach, wArc=FIST.arc, wHands=FIST.hands, wProj=FIST.proj, wDt=FIST.dt;
   let wUp=0, wItem=null, wBase=null;
@@ -6753,6 +6951,7 @@ function stats(h){
     it.aff.forEach(f=>{ if(!f.stat) return;
                         a[f.stat]=(a[f.stat]||0)+f.v;
                         if(f.stat2) a[f.stat2]=(a[f.stat2]||0)+(f.v2||0); });
+    traitAp(it, a);                // 特性のうち数字で片が付くぶん
   });
   /* プレイヤーキャラの潜在（レベルアップで1つずつ増える）。装備の潜在と
      まったく同じ形（{stat, v}）で持たせてあるので、同じ加算1行で乗る。
@@ -6796,7 +6995,7 @@ function stats(h){
   const DN = (S.run && h!==null && !isDurantree(h))
              ? duranNear(h===S.hero ? P.x : (h.x||0), h===S.hero ? P.y : (h.y||0))
              : {range:0, aspd:0, hp:0, def:0};
-  return {
+  const __o = {
     str,dex,vit,int,
     // hpDebt = 祭壇に捧げた分。そのキャラが死ぬまで戻らない。
     maxHp: Math.round(maxHp * (1 + DN.hp/100)),
@@ -6858,6 +7057,7 @@ function stats(h){
     // 大技のリキャスト短縮（装備＋恩寵）。仲間ぶんは ultCooldown 側で足す。
     ultCdr: a.ultCdr + B('ultcdr')
   };
+  return traitPost(h, __o, a);
 }
 
 /* ---------- 耐久 ---------- */
@@ -6995,7 +7195,10 @@ function addStatus(target, id, srcLevel){
   let dps = ours ? (3 + srcLevel*1.1) : (6 + srcLevel*2.2);
   // 高熱（炉の層の溶岩専用）。部屋の熱でじわじわ効くだけなので、火傷より遅く削る。
   if(id==='heat') dps *= HEAT_DPS_MUL;
-  target.st[id] = {t:def.dur, dps: ours ? dotCap(target, dps) : dps};
+  /* 特性「鎮め」。主人公は S.hero の装備、仲間は本人の装備を見る */
+  const trOwner = target.isPlayer ? S.hero : (target.ally ? target : null);
+  const shz = ours && trOwner ? trV(trOwner,'shizume') : 0;
+  target.st[id] = {t:def.dur*(1-shz/100), dps: ours ? dotCap(target, dps) : dps};
   if(target.isPlayer) log(def.nm+'！');
 }
 function hasStatus(target, id){ return !!(target.st && target.st[id] && target.st[id].t>0); }
@@ -8565,11 +8768,11 @@ function tickMiasma(dt){
   S.run.miaT -= 1;
   const col='#c04a9a';
   if(!godMode()){
-    const d=Math.max(1, Math.round(stats(S.hero).maxHp*pct));
+    const d=Math.max(1, Math.round(stats(S.hero).maxHp*pct*(1-trV(S.hero,'tomori')/100)));   // 特性「灯守り」
     S.hero.hpNow-=d; popPlayerDamage(d,col,true);
   }
   livingParty().forEach(a=>{
-    const d=Math.max(1, Math.round(allyStats(a).maxHp*pct));
+    const d=Math.max(1, Math.round(allyStats(a).maxHp*pct*(1-trV(a,'tomori')/100)));
     a.hpNow-=d; pop(a.x,a.y-0.4,d,col);
     if(a.hpNow<=0) downAlly(a);
   });
@@ -9950,7 +10153,8 @@ function hitEnemy(e, st, mult, opt){
      （0.17 × 0.5）、同じ段の「剛力 +28%」の3割の価値しかなかった。
      表示された率が、そのまま強さとして読めない状態になっていた。
      1.8 にすると +17% → 実効 +13.6%。上限の 75% まで積んだときで +60%。 */
-  const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm*duelVuln(e)), src.lv,
+  const tm = traitHitMul(src, st, e, crit, mk);   // 装備の特性
+  const r = resolveDamage(e, playerParts(st,(crit?CRIT_MUL:1.0)*(mult||1)*back*lm*duelVuln(e)*tm), src.lv,
                           {ailMul: playerAilMul(st)});
   /* 部位（ヴェラ第二形態の脚）に当たった一撃は、脚のHPだけを削る。当たった所は弾の位置か、殴った者の位置 */
   const at = opt.at||(src===S.hero?P:src);
@@ -9958,7 +10162,7 @@ function hitEnemy(e, st, mult, opt){
   if(hitPart) partHit(e, r.total, at.x, at.y, hitPart);
   else e.hp-=r.total;
   e.hit=0.12; e._hitWho = hitPart ? hitPart.id : 'body';   // 赤く光らせる所（cave-look.js の vera2Draw：当たった部位だけ）
-  linkGain(src===S.hero ? LINK.hitHero : LINK.hitAlly);   // 連携値（一斉攻撃そのものの当たりでは溜まらない——linkGain が弾く）
+  linkGain((src===S.hero ? LINK.hitHero : LINK.hitAlly) * (1 + trV(src,'koou')/100));   // 連携値（特性「呼応」）（一斉攻撃そのものの当たりでは溜まらない——linkGain が弾く）
   feelImpact(e,src===S.hero?P:src,!!crit,st.dmgType,elemOf(st));
   if(e.boss && !e.revealed){ e.revealed=true; log(e.name+'——'); }
   /* 崩し。武器技・大技は1回の技につき1度だけ（duelCtx が数える）、それ以外は手数で溜まる */
@@ -9969,6 +10173,7 @@ function hitEnemy(e, st, mult, opt){
       let pt = DUEL.pt.hit + (crit?DUEL.pt.crit:0) + (back>1?DUEL.pt.back:0);
       if(st.dmgType==='blunt') pt*=DUEL.pt.bluntMul;
       if(src!==S.hero) pt*=DUEL.pt.allyMul;
+      pt *= 1 + trV(src,'kudaki')/100;            // 特性「砕き」
       addBreak(e, pt);
     }
   }
@@ -9982,6 +10187,8 @@ function hitEnemy(e, st, mult, opt){
   pop(hitPart?e.x+hitPart.ox:e.x, hitPart?e.y+hitPart.oy:e.y, r.total, col, r.weak?'▲':(r.resisted?'▼':(weak?'↓':'')), crit || r.weak);
   r.procs.forEach(sid=>W.pops.push({x:e.x,y:e.y-0.5,txt:STATUS[sid].nm,c:STATUS[sid].col,life:0.8}));
   if(st.leech) healEnt(src, r.total*st.leech/100);
+  /* 特性「血の渇き」：当てるたびに1削れる。これで倒れはしない（1で止める） */
+  if(trV(src,'chiwaki') && src.hpNow>1) src.hpNow = Math.max(1, src.hpNow-1);
   /* 命中したときだけ起きるぶん。血河・ノコギリ鉈の出血、トールハンマーの感電と
      弾き飛ばし。**倒した相手には掛けない**——死体をノックバックさせない。 */
   if(LG && !e.dead && e.hp>0){
@@ -12926,6 +13133,7 @@ function killEnemy(e, byAlly){
     }
   }
   e.dead=true; S.run.kills++;
+  traitOnKill(byAlly || S.hero);      // 特性「血の糧」「勢い」（倒した本人の装備だけ）
   skillOnKill(e);                     // 呪印：倒れた所で爆ぜて、周りへ印を移す
   linkGain(e.boss ? LINK.killBoss : e.elite ? LINK.killElite : LINK.kill);
   burstEnemyPixels(e);
@@ -14153,6 +14361,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
     const since = nowSec() - P.guardStart;
     if(since <= st.parryWin){
       P.parryFx = 0.35;
+      { const kv=trV(S.hero,'kamae'); if(kv) healEnt(S.hero, kv); }   // 特性「構え直し」
       feelPerfect('PARRY','#ffe5a0');
       log('パリイ！');
       W.fx.push({t:'parry',x:P.x,y:P.y,life:0.35,max:0.35});
@@ -14213,6 +14422,7 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
     guarded=true;
     damageGear('shield', DUR.shieldPerBlock);
   }
+  const trTg = guarded ? trV(S.hero,'togetate') : 0;   // 特性「棘の盾」（返すのは減らした後のぶん）
 
   // 戦士の「庇う」: そばにいる戦士が被ダメージの一部を肩代わりする。
   // 前に出て殴るだけでなく、立ち位置そのものが仕事になる役割を1つ作りたかった。
@@ -14234,7 +14444,10 @@ function hitPlayer(e, boltDmg, dmgType, boltLv){
   feelImpact(P,e,false,type,null);
   /* 押し出しは**ダメージが通ったときだけ**。回避やパリイで消えた攻撃は
      ここまで来ない——避けたのに押される、が起きると盾を構える理由が濁る。 */
-  if(e && !boltDmg) knockBack(P, e, e.push);
+  if(e && !boltDmg && !(guarded && trV(S.hero,'fudou'))) knockBack(P, e, e.push);   // 特性「不動」はガード中に押されない
+  S.hero.trCalm = 0;                                  // 特性「息継ぎ」の時計
+  if(trV(S.hero,'ukenaga')) S.hero.trUkT = 3;         // 特性「受け流し」
+  if(trTg && e && !e.dead){ e.hp-=dm*trTg/100; if(e.boss) e.revealed=true; if(e.hp<=0) killEnemy(e); }
   cancelMine('殴られて手が止まった');      // 掘っている最中に殴られたら中断
   popPlayerDamage(dm,guarded?'#8fc7ff':'#ffaaa0');
   W.fx.push({t:'hurt',life:guarded?0.12:0.2});
@@ -15808,6 +16021,7 @@ function update(dt){
   P.waveCd = Math.max(0, (P.waveCd||0) - dt);   // スキル技（枠2）のリキャスト
   P.artCd  = Math.max(0, (P.artCd||0) - dt);    // 武器技（枠ごとに1つ）
   P.mikiri = Math.max(0, (P.mikiri||0) - dt);   // 見切りのあとの確定会心
+  if(S.hero) traitTick(S.hero, dt);               // 特性の時限（勢い・受け流し・息継ぎ）
   tickHazards(dt);
   if(!S.hero || !S.run) return;
   P.invuln = Math.max(0, (P.invuln||0) - dt);
@@ -21808,11 +22022,11 @@ function rollGacha(){
   const need = ri(RARITY[targetRar].aff[0], RARITY[targetRar].aff[1]);
   // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠。ここで切り詰め/補充する対象から
   // 外しておかないと、末尾に積んである潜在が真っ先に切り落とされてしまう。
-  const potAff = it.aff.filter(a=>a.t==='pt');
-  let baseAff  = it.aff.filter(a=>a.t!=='pt');
+  const potAff = it.aff.filter(isExtraAff);      // 潜在と特性
+  let baseAff  = it.aff.filter(a=>!isExtraAff(a));
   if(baseAff.length > need) baseAff.length = need;
   for(let g=0; baseAff.length<need && g<40; g++){
-    const cand = genItem(ilvl,60).aff.find(a=>a.t!=='pt' && !baseAff.some(b=>b.id===a.id));
+    const cand = genItem(ilvl,60).aff.find(a=>!isExtraAff(a) && a.t!=='c' && !baseAff.some(b=>b.id===a.id));
     if(cand) baseAff.push(cand);
   }
   it.aff = [...baseAff, ...potAff];    // 潜在は数合わせの結果に関わらず必ず残す
@@ -22935,9 +23149,9 @@ function resolveEvent(){
       it.rar = Math.min(RARITY.length-1, it.rar+1);
       const need=ri(RARITY[it.rar].aff[0], RARITY[it.rar].aff[1]);
       // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠に数える（gachaの付け替えと同じ理由）
-      const baseCount=()=>it.aff.filter(a=>a.t!=='pt').length;
+      const baseCount=()=>it.aff.filter(a=>!isExtraAff(a)).length;
       for(let g=0; baseCount()<need && g<40; g++){
-        const cand=genItem(it.ilvl,40).aff.find(a=>a.t!=='pt' && !it.aff.some(b=>b.id===a.id));
+        const cand=genItem(it.ilvl,40).aff.find(a=>!isExtraAff(a) && a.t!=='c' && !it.aff.some(b=>b.id===a.id));
         if(cand) it.aff.push(cand);
       }
       S.run.loot.push(it);

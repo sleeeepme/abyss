@@ -100,8 +100,10 @@ R.shape = await pg.evaluate(()=>{
     const r=RARITY[g.item.rar];
     // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠なので、
     // レア度上限／Commonゼロ接辞のチェックからは除外する
-    const baseAff=g.item.aff.filter(a=>a.t!=='pt');
+    // 特性（t:'tr'）も潜在と同じく別枠。1つの装備に1つまで
+    const baseAff=g.item.aff.filter(a=>a.t!=='pt' && a.t!=='tr');
     const potAff=g.item.aff.filter(a=>a.t==='pt');
+    if(g.item.aff.filter(a=>a.t==='tr').length>1) potOk=false;
     if(baseAff.length>r.aff[1]) affixOk=false;              // 上限は必ず守る
     if(g.item.rar===0 && baseAff.length!==0) affixOk=false;  // Common は接頭辞・接尾辞なし
     if(potAff.length>1) potOk=false;                         // 潜在は0個か1個のどちらかで、2個以上は付かない（付帯は確率制、必ず1つではない）
