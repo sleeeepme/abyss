@@ -943,7 +943,7 @@
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">死ぬまで有効</span></h2>
   <div class="grid" id="town-boons"></div>
 
-  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップで1つずつ手に入る</span></h2>
+  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップやガチャで手に入る</span></h2>
   <div class="grid" id="town-charpot"></div>
 
   <h2>仲間 <span style="color:var(--dim);font-weight:400;font-size:12px">タップで装備と技</span></h2>
@@ -1056,8 +1056,8 @@
 <div class="screen" id="scr-gacha">
   <div class="subhead"><button class="back" data-back="1">‹ 戻る</button>
     <h1>ガチャ</h1><span class="gold" id="gacha-gold"></span></div>
-  <p class="sub">広告を見ると1回引ける。<b>1回の探索につき2回まで</b>。<br>
-    出た物はそのまま次の探索に持ち込める。<b style="color:var(--c-relic)">死ぬと失う。</b></p>
+  <p class="sub">武器・護符・潜在が出る。潜在は次の探索から主人公の資質に加わる。<br>
+    報酬は次の探索に持ち込める。<b style="color:var(--c-relic)">死ぬと失う。</b></p>
 
   <div class="card" id="gacha-status"></div>
   <button class="primary" id="btn-gacha">広告を見て引く</button>
@@ -1144,7 +1144,7 @@
   <h2>恩寵 <span style="color:var(--dim);font-weight:400;font-size:12px">ボス撃破で得た・死ぬまで有効</span></h2>
   <div class="grid" id="bag-boons"></div>
 
-  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップで1つずつ手に入る</span></h2>
+  <h2>資質 <span style="color:var(--dim);font-weight:400;font-size:12px">レベルアップやガチャで手に入る</span></h2>
   <div class="grid" id="bag-charpot"></div>
 
   <h2>仲間 <span style="color:var(--dim);font-weight:400;font-size:12px">最大3名・あなたが死ぬと一緒に失われる</span></h2>
@@ -2358,9 +2358,11 @@ const POTENTIALS=[
    rarId は装備本体のレア度（rar.id、0=Common〜4=Relic）。付帯確率の抽選に外れたら null を返す。 */
 function rollPotential(ilvl, rarId){
   if(rnd() >= (POTENTIAL_ATTACH_P[rarId] || 0)) return null;
-  const tier=rollPotentialTier();
+  return makePotential(ilvl, rollPotentialTier());
+}
+function makePotential(level, tier){
   const def=pick(POTENTIALS);
-  const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(ilvl)));
+  const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(level)));
   return {t:'pt', id:def.id, stat:def.stat, v, tier};
 }
 function potentialOf(it){ return ((it&&it.aff)||[]).find(a=>a.t==='pt') || null; }
@@ -4321,6 +4323,7 @@ const GACHA_FREE_PER_DAY = 1;
 const GACHA_RARE_MUL  = 0.45; // Rare 以上
 const GACHA_UNCOMMON_MUL = 0.60; // Uncommon（緑）
 const GACHA_CHARM_MUL = 0.80; // 護符（紫）が出る比率
+const GACHA_POTENTIAL_P = 0.20; // 1回の抽選で潜在が出る確率
 
 /* 削るのは主に Uncommon（緑）のほうにしてある。
    レア以上まで一緒に削ると、最深の帯まで白ばかりになって
@@ -6605,8 +6608,10 @@ function outfitForBeacon(h, depth){
   // 個数で不足分だけ埋めるので、以前の引き上げ済みキャラにも効き、再入場で増殖しない。
   if(dbg('allDepths')){
     h.charPot=h.charPot||[];
-    while(h.charPot.length < h.lv-1){
-      h.charPot.push(rollCharPotential({lv:h.charPot.length+2}));
+    let levelPots=h.charPot.filter(p=>p.source!=='gacha').length;
+    while(levelPots < h.lv-1){
+      h.charPot.push(rollCharPotential({lv:levelPots+2}));
+      levelPots++;
       given.potentials++;
     }
   }
@@ -8976,9 +8981,10 @@ function startRun(depth){
            startBack:(S.deepestBack||0)};
   S.shardsRun=0;
 
-  // ガチャの持ち込み枠をここで渡す。武器は持ち物へ、護符はその探索の常時効果へ。
+  // 武器は持ち物、護符は探索中の効果、潜在は主人公の資質に加える。
   S.carry.forEach(c=>{
     if(c.kind==='charm') S.run.charms.push(Object.assign({}, c.charm, {owner:null}));  // 既定の持ち主は自分
+    else if(c.kind==='potential') (S.hero.charPot ||= []).push({...c.potential, source:'gacha'});
     else S.run.loot.push(c.item);
   });
   if(S.carry.length) log('持ち込み：'+S.carry.map(carryName).join('、'));
@@ -12815,10 +12821,7 @@ let _lvFlash=0;
    「そのレベルアップで到達したレベル」——潜り続けて装備が強くなるのとは
    別に、レベルそのものが上がるほど1枚あたりの価値も上がるようにする。 */
 function rollCharPotential(h){
-  const tier=rollPotentialTier();
-  const def=pick(POTENTIALS);
-  const v=Math.max(1, Math.round(rf(def.r[0],def.r[1]) * POTENTIAL_SCALE[tier] * scaleOf(h.lv)));
-  return {t:'pt', id:def.id, stat:def.stat, v, tier};
+  return makePotential(h.lv, rollPotentialTier());
 }
 /* 一度に複数レベル上がる（大きな経験値を一気に得た）と、この関数が
    同期的に連続で呼ばれる。そのぶんを溜めておいて、addXp のループが
@@ -21625,8 +21628,19 @@ bindTap(el('an-ok'),    ()=>commitArtRename(false));
 bindTap(el('an-reset'), ()=>commitArtRename(true));
 bindTap(el('an-close'), closeArtRename);
 function charmName(c){ return '<i class="pi pi-orb"></i> '+c.nm; }   // 護符も行頭でそれと分かるように
-function carryName(c){ return c.kind==='charm' ? charmName(c.charm) : itemName(c.item); }
+function carryName(c){
+  if(c.kind==='charm') return charmName(c.charm);
+  if(c.kind==='potential') return RARITY[c.potential.tier].nm+'の潜在';
+  return itemName(c.item);
+}
 function carryHTML(c){
+  if(c.kind==='potential'){
+    const p=c.potential, col=RARCOL[p.tier];
+    return `<div class="item" style="border-left-color:${col}">
+      <div class="nm" style="color:${col}">${carryName(c)}</div>
+      <div class="af">${STATNM[p.stat].replace('%v',p.v)}</div>
+    </div>`;
+  }
   if(c.kind==='charm'){
     return `<div class="item" style="border-left-color:#a97fe0">
       <div class="nm" style="color:#a97fe0">${charmName(c.charm)}</div>
@@ -21639,18 +21653,18 @@ function renderGacha(){
   refreshGacha();
   goldLabel('gacha-gold');
   const band=gachaBand(), next=gachaNextBand();
-  const rarePct = Math.round((band.w[2]+band.w[3]+band.w[4])
-                  / band.w.reduce((a,b)=>a+b,0) * 100);
+  const weights=gachaWeights(band);
+  const rarePct=(weights.slice(2).reduce((a,b)=>a+b,0)/weights.reduce((a,b)=>a+b,0)*100).toFixed(1);
   el('gacha-status').innerHTML =
     '<div class="row"><span class="k">今日の残り</span><span><b>'+S.gachaLeft+'</b> / '+GACHA_PER_DAY+
       ((S.gachaFree||0)>0 ? ' <span style="color:#7fe0c0;font-size:12px">（うち'+S.gachaFree+'回は広告なし）</span>' : '')+'</span></div>'+
     '<div class="row"><span class="k">直近の到達</span><span>第 <b>'+(S.lastDepth||1)+'</b> 階層</span></div>'+
     '<div class="row"><span class="k">排出帯</span><span style="color:'+RARCOL[2]+'"><b>'+band.nm+'</b></span></div>'+
-    '<div class="row"><span class="k">Rare 以上</span><span><b>'+rarePct+'%</b></span></div>'+
+    '<div class="row"><span class="k">武器・潜在の Rare 以上</span><span><b>'+rarePct+'%</b></span></div>'+
     (next
       ? '<div class="row"><span class="k">次の帯</span><span>第 '+next.min+' 階層まで潜れば「'+next.nm+'」</span></div>'
       : '<div class="row"><span class="k">次の帯</span><span>最高帯に到達している</span></div>')+
-    '<div class="row"><span class="k">補充</span><span>アビスに潜るとリセット</span></div>';
+    '<div class="row"><span class="k">補充</span><span>日付が変わるとリセット</span></div>';
   const btn=el('btn-gacha');
   const free=(S.gachaFree||0)>0;
   btn.textContent = S.gachaLeft<=0 ? '今日はもう引けない（明日また5回）'
@@ -21771,15 +21785,18 @@ function rollGacha(){
   if(S.gachaLeft<=0) return null;
   S.gachaLeft--;
   const band=gachaBand();
-  // 護符か武器か。浅い帯ほど護符寄り（武器を配るより探索補助のほうが腐らない）。
-  if(rnd() < band.charm*GACHA_CHARM_MUL){
+  const kindRoll = rnd();
+  const charmChance = band.charm*GACHA_CHARM_MUL;
+  if(kindRoll < charmChance){
     const c=pick(CHARMS);
     return {kind:'charm', charm:c};
   }
-  // 武器のレア度は「直近どこまで潜れたか」だけで決まる。
-  // 以前は Rare 以上を引くまで回し直していたので、初回から強武器が出ていた。
+  // 武器と潜在は直近の到達階層で決まる同じレア度抽選を通す。
   const targetRar = rollGachaRarity(band);
   const ilvl=clamp(Math.round((S.lastDepth||1)+4), 4, 60);
+  if(kindRoll < charmChance+GACHA_POTENTIAL_P){
+    return {kind:'potential', potential:makePotential(ilvl, targetRar)};
+  }
   let it=null;
   for(let i=0;i<200;i++){
     const g=genItem(ilvl, 60);
@@ -21803,7 +21820,8 @@ function rollGacha(){
   return {kind:'item', item:it};
 }
 function showGachaResult(c){
-  el('gres-title').textContent = c.kind==='charm' ? '護符を獲得' : '武器を獲得';
+  const names={charm:'護符', potential:'潜在', item:'武器'};
+  el('gres-title').textContent = names[c.kind]+'を獲得';
   el('gres-item').innerHTML = carryHTML(c);
   el('m-gres').classList.add('on');
 }
@@ -22346,7 +22364,7 @@ function boonListHTML(h){
    「今起きたこと」を伝える役、この一覧は「今の合計」を伝える役、で分担する）。
    boonListHTML と同じ形：同じ効果が複数あれば合算し、色は一番強い物で塗る。 */
 function charPotListHTML(h){
-  if(!h || !h.charPot || !h.charPot.length) return '<div class="empty">まだ無い（レベルアップで手に入る）</div>';
+  if(!h || !h.charPot || !h.charPot.length) return '<div class="empty">まだ無い</div>';
   const statKeys=[...new Set(h.charPot.map(x=>x.stat))];
   return statKeys.map(stat=>{
     const list=h.charPot.filter(x=>x.stat===stat);
@@ -23340,7 +23358,7 @@ bindTap(el('dbg-reset'), ()=>{
 /* ガチャ（ダミー広告 → 抽選 → 持ち込み枠へ） */
 let _pending=null;
 bindTap(el('btn-gacha'), ()=>{
-  if(refreshGacha()<=0) return;
+  if(_pending || refreshGacha()<=0) return;
   /* 無料枠が残っていれば広告を挟まない。
      「引く」を押した結果がすぐ返るほうが、1回目の手触りは良い。 */
   if((S.gachaFree||0) > 0){ S.gachaFree--; doGachaPull(); return; }
@@ -23351,8 +23369,12 @@ bindTap(el('ad-ok'), ()=>{ if(!el('ad-ok').disabled) _demoComplete?.(); });
 /* 1回引いて結果を出す。**広告あり／無料枠のどちらからも同じ道を通す**——
    引く処理が2ヶ所にあると、片方だけ直した日に排出が食い違う。 */
 function doGachaPull(){
+  if(_pending) return;
   _pending = rollGacha();
-  if(_pending) showGachaResult(_pending);
+  if(_pending){
+    showGachaResult(_pending);
+    window.ABYSS_SAVE?.request();
+  }
   renderGacha();
 }
 bindTap(el('gres-ok'), ()=>{

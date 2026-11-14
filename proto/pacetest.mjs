@@ -1,5 +1,6 @@
 // 進行度連動のガチャ／深度による敵系統の解禁／ボスの被弾で正体が割れる、の検証
 import { chromium, devices } from 'playwright'; import path from 'path';
+import assert from 'node:assert/strict';
 const b=await chromium.launch();
 const ctx=await b.newContext({...devices['iPhone 13'],hasTouch:true,isMobile:true});
 const pg=await ctx.newPage();
@@ -38,9 +39,10 @@ R.rates = await pg.evaluate(()=>{
     for(let i=0;i<n;i++){
       S.gachaLeft=1;
       const g=rollGacha();
-      if(g.kind==='charm') c.charm++; else c.rar[g.item.rar]++;
+      if(g.kind==='charm') c.charm++;
+      if(g.kind==='item') c.rar[g.item.rar]++;
     }
-    const weapons=n-c.charm;
+    const weapons=c.rar.reduce((a,b)=>a+b,0);
     return {
       charmPct: +(c.charm/n*100).toFixed(1),
       rarePlusPct: +((c.rar[2]+c.rar[3]+c.rar[4])/Math.max(1,weapons)*100).toFixed(1),
@@ -60,6 +62,30 @@ R.rates = await pg.evaluate(()=>{
     deepestIsRarest: e.rarePlusPct > a.rarePlusPct*4};
 });
 
+// 同じ帯・同じレア度の乱数で、武器と潜在は全5段階で一致する。
+R.sharedRarity = await pg.evaluate(()=>{
+  return GACHA_BANDS.every(band=>{
+    S.lastDepth=band.min;
+    const weights=gachaWeights(band), total=weights.reduce((a,b)=>a+b,0);
+    let lower=0;
+    return weights.every((weight,tier)=>{
+      const rarityRoll=(lower+weight/2)/total;
+      lower+=weight;
+      const pull=kindRoll=>{
+        S.gachaLeft=1;
+        const next=mulberry32(42);
+        const rolls=[kindRoll,rarityRoll];
+        RNG=()=>rolls.shift() ?? next();
+        try{ return rollGacha(); } finally{ RNG=next; }
+      };
+      const weapon=pull(0.99), potential=pull(band.charm*GACHA_CHARM_MUL+0.01);
+      return weapon.kind==='item' && potential.kind==='potential'
+        && weapon.item.rar===tier && potential.potential.tier===tier;
+    });
+  });
+});
+assert.equal(R.sharedRarity,true);
+
 // 1-c. ガチャ産は必ず武器で、必ず鑑定済み。接辞の本数がレア度と整合している
 R.shape = await pg.evaluate(()=>{
   RNG=mulberry32(4242); S.lastDepth=25;
@@ -67,12 +93,12 @@ R.shape = await pg.evaluate(()=>{
   for(let i=0;i<800;i++){
     S.gachaLeft=1;
     const g=rollGacha();
-    if(g.kind==='charm') continue;
+    if(g.kind!=='item') continue;
     n++;
     if(g.item.slot!=='weapon') allWeapon=false;
     if(!g.item.ident) allIdent=false;
     const r=RARITY[g.item.rar];
-    // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠で必ず1つ付くおまけなので、
+    // 潜在（t:'pt'）は接頭辞・接尾辞の数合わせとは別枠なので、
     // レア度上限／Commonゼロ接辞のチェックからは除外する
     const baseAff=g.item.aff.filter(a=>a.t!=='pt');
     const potAff=g.item.aff.filter(a=>a.t==='pt');

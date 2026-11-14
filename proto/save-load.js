@@ -94,6 +94,10 @@
     if(typeof e.payload!=='string'||hash(e.payload)!==e.checksum)throw Error('保存データが破損しています');
     const d=unpack(JSON.parse(e.payload));validate(d);e.data=d;return e;
   }
+  function validGachaPotential(p){
+    return p?.t==='pt' && Number.isInteger(p.tier) && p.tier>=0 && p.tier<POTENTIAL_SCALE.length
+      && Number.isSafeInteger(p.v) && p.v>0 && POTENTIALS.some(def=>def.id===p.id&&def.stat===p.stat);
+  }
   function validate(d){
     if(!d||!d.s||!d.p||!d.w||!d.ui||!d.feel)throw Error('保存項目が足りません');
     if(typeof d.s.name!=='string'||d.s.name.length>100||!Number.isSafeInteger(d.rng)||!Number.isSafeInteger(d.itemId))throw Error('進行情報が不正です');
@@ -104,6 +108,7 @@
         || Object.entries(pressure).some(([k,n])=>!/^([1-9][0-9]*)$/.test(k) || Number(k)>100 || !Number.isSafeInteger(n) || n<0 || n>d.s.deaths))throw Error('死の蓄積が不正です');
     }
     for(const k of ['stash','legendStash','carry','tavern','fallen'])if(!Array.isArray(d.s[k]))throw Error('持ち物が不正です');
+    if(d.s.carry.some(c=>c?.kind==='potential'&&!validGachaPotential(c.potential)))throw Error('持ち込みの潜在が不正です');
     if(d.s.hero&&(!Number.isFinite(d.s.hero.hpNow)||!d.s.hero.equip||!Array.isArray(d.s.hero.party)||!Array.isArray(d.s.hero.boons)))throw Error('主人公の状態が不正です');
     if(d.s.run){
       if(!Number.isInteger(d.s.run.depth)||d.s.run.depth<1||d.s.run.depth>100||!Array.isArray(d.s.run.loot))throw Error('探索情報が不正です');
@@ -113,7 +118,11 @@
       if(!Array.isArray(d.w.enemies)||!Array.isArray(d.w.drops)||!Array.isArray(d.w.seen)||d.w.seen.length!==f.H||f.g.some(r=>!r||r.length!==f.W)||d.w.seen.some(r=>!(r instanceof Uint8Array)||r.length!==f.W))throw Error('階層情報が不正です');
     }else if(!d.s.hero&&d.ui.phase!=='death')throw Error('主人公情報がありません');
     if(!['town','game','death','keep','boon','btarget','use','fallen','clear','gacha'].includes(d.ui.phase))throw Error('進行画面が不正です');
-    if(d.ui.phase==='gacha'&&(!d.ui.gachaPending||!['item','charm'].includes(d.ui.gachaPending.kind)))throw Error('抽選結果が不正です');
+    if(d.ui.phase==='gacha'){
+      const reward=d.ui.gachaPending;
+      if(!reward || !['item','charm','potential'].includes(reward.kind)
+        || (reward.kind==='potential'&&!validGachaPotential(reward.potential)))throw Error('抽選結果が不正です');
+    }
     if(d.ui.phase==='use'&&(!d.ui.ut||!consumDef(d.ui.ut.consum)||!d.s.run.loot.includes(d.ui.ut)))throw Error('使用するアイテムが不正です');
     if(d.ui.phase==='keep'&&(!Array.isArray(d.ui.keepPool)||!(d.ui.keepSel instanceof Set)))throw Error('帰還選択が不正です');
     if(d.ui.phase==='boon'&&(!Array.isArray(d.ui.boon)||!d.ui.boon.length))throw Error('恩寵選択が不正です');

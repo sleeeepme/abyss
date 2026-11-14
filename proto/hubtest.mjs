@@ -68,16 +68,14 @@ await tap('#gres-ok');
 await tap('#btn-gacha');
 R.adOpened = await vis('#m-ad');
 R.okDisabledBeforeWatch = await pg.evaluate(()=>document.getElementById('ad-ok').disabled);
-await pg.evaluate(()=>{ // 視聴完了を即座にシミュレート
-  const ok=document.getElementById('ad-ok'); ok.disabled=false; ok.style.opacity='1';
-});
+await pg.waitForFunction(()=>!el('ad-ok').disabled);
 await tap('#ad-ok');
 R.resultShown = await vis('#m-gres');
 await tap('#gres-ok');
 R.afterFirst = await pg.evaluate(()=>({left:S.gachaLeft, carry:S.carry.length}));
 // 2回目
 await tap('#btn-gacha');
-await pg.evaluate(()=>{ const ok=document.getElementById('ad-ok'); ok.disabled=false; });
+await pg.waitForFunction(()=>!el('ad-ok').disabled);
 await tap('#ad-ok'); await tap('#gres-ok');
 R.afterSecond = await pg.evaluate(()=>({left:S.gachaLeft, carry:S.carry.length}));
 // 残りを使い切ってから、次の1回がブロックされることを確認する
@@ -93,16 +91,17 @@ R.blockedWhenSpent.ok = R.blockedWhenSpent.adStayedClosed && R.blockedWhenSpent.
 
 // --- 4. 排出物の中身
 R.pool = await pg.evaluate(()=>{
-  S.deepest=25; let charm=0,weapon=0,badRar=0,unident=0;
+  S.deepest=25; let charm=0,weapon=0,potential=0,badRar=0,unident=0;
   for(let i=0;i<600;i++){
     S.gachaLeft=1;
     const c=rollGacha();
     if(c.kind==='charm'){ charm++; if(!CHARMS.some(x=>x.id===c.charm.id)) badRar++; }
-    else { weapon++; if(c.item.rar<2) badRar++; if(!c.item.ident) unident++;
+    else if(c.kind==='potential'){ potential++; if(!RARITY[c.potential.tier]) badRar++; }
+    else { weapon++; if(!RARITY[c.item.rar]) badRar++; if(!c.item.ident) unident++;
            if(c.item.slot!=='weapon') badRar++; }
   }
   S.gachaLeft=0;
-  return {charm, weapon, invalid:badRar, unidentified:unident};
+  return {charm, weapon, potential, invalid:badRar, unidentified:unident};
 });
 
 // --- 5. 持ち込みが探索開始時に渡され、護符がステータスに乗る

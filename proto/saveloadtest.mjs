@@ -41,12 +41,28 @@ await check('debug switches set on the title survive resume',async()=>{
   await reload();await resume();                         // 検証の汚れを持ち越さない
   assert.equal(await page.evaluate(()=>!!(S.debug&&S.debug.allDepths)),false);
 });
-await check('unclaimed gacha result resumes without reroll or lost reward',async()=>{
-  await page.evaluate(()=>{setScreen('gacha');doGachaPull();});await flush();
+await check('gacha potential survives reload before and after claiming and applies once',async()=>{
+  await page.evaluate(()=>{
+    setScreen('gacha');
+    const lower=gachaBand().charm*GACHA_CHARM_MUL;
+    for(let seed=0;;seed++){
+      const roll=mulberry32(seed)();
+      if(roll>=lower && roll<lower+GACHA_POTENTIAL_P){ RNG=mulberry32(seed); break; }
+    }
+    el('btn-gacha').click();
+  });
+  assert.equal(await page.locator('#gres-title').textContent(),'潜在を獲得');
+  await flush();
+  const potential=await page.evaluate(()=>_pending.potential);
   const before=await page.evaluate(()=>JSON.stringify([_pending,S.gachaLeft,S.carry]));await reload();await resume();
   assert.equal(await page.evaluate(()=>JSON.stringify([_pending,S.gachaLeft,S.carry])),before);
+  assert.equal(await page.locator('#gres-title').textContent(),'潜在を獲得');
   const carry=await page.evaluate(()=>S.carry.length);await page.click('#gres-ok');await reload();await resume();
   assert.equal(await page.evaluate(()=>S.carry.length),carry+1);assert.equal(await page.evaluate(()=>_pending),null);
+  assert.deepEqual(await page.evaluate(()=>S.carry.at(-1).potential),potential);
+  await page.evaluate(()=>{startRun(1);startRun(1);});
+  assert.deepEqual(await page.evaluate(()=>S.hero.charPot.filter(p=>p.source==='gacha')),[{...potential,source:'gacha'}]);
+  assert.equal(await page.evaluate(()=>S.carry.length),0);
 });
 await check('world, references, RNG, typed arrays and item IDs survive reload',async()=>{
   await page.evaluate(()=>{
