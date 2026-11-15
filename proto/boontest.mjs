@@ -544,7 +544,7 @@ R.nanSafe = await pg.evaluate(()=>{
    .modal は全部同じ z-index なので、DOM の後ろにある m-event が
    m-boon の上に完全に乗っていて、選択画面は on なのに一切触れなかった。
    なので elementFromPoint で「その座標に実際に何が居るか」まで見る。 */
-R.altarPick = await pg.evaluate(()=>{
+R.altarPick = await pg.evaluate(async ()=>{
   TH.run(1,{seed:3}); TH.floor(6);
   const hp0 = stats(S.hero).maxHp;
   W.ev={id:'altar', x:P.x, y:P.y, used:false};
@@ -554,6 +554,9 @@ R.altarPick = await pg.evaluate(()=>{
   const boonOpen = el('m-boon').classList.contains('on');
   const evClosed = !el('m-event').classList.contains('on');
   const nodes    = document.querySelectorAll('#boon-choices [data-boon]');
+  /* 札は左から1枚ずつ出る（windowFx、2026-11-15）。出切るまでは、まだの札が隠れていて当たらないのが正しいので、
+     出切ってから「覆われていないか」を見る */
+  await new Promise(r=>setTimeout(r, WFX.cardGap*3+150));
   // 3つとも、その座標をタップしたら自分に当たること
   const covered=[];
   nodes.forEach(n=>{

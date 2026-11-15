@@ -517,6 +517,12 @@
      通知なので、居場所を分ける。
      枠と薄い背景を持たせるのは、流れる戦闘ログと「格が違う」と分かるように。
      色は得た資質のいちばん高い色（RARCOL）を JS が --pn-col に入れる。 */
+  /* 窓が開くときの光（windowFx）。角は窓の clip-path と ::before の角のドットを写す */
+  .wfx{position:fixed;box-sizing:border-box;pointer-events:none;z-index:95}
+  .wfx-r::before{content:"";position:absolute;inset:0;border:inherit;pointer-events:none;
+    -webkit-mask-image:var(--wbi);mask-image:var(--wbi);-webkit-mask-size:var(--wbs);mask-size:var(--wbs);
+    -webkit-mask-position:var(--wbp);mask-position:var(--wbp);-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+  .boon.wfx-wait{visibility:hidden}
   #potnote{position:absolute;left:50%;
     bottom:calc(env(safe-area-inset-bottom) + 186px);
     transform:translateX(-50%);
@@ -13213,6 +13219,83 @@ function flushCharPotNotice(){
   if(_feelHold){ _feelHold.pot=true; return; }       // ボスの撃破演出のあいだは溜めておく
   notify(()=>flushCharPotNow(), NOTIF_SEC.pot, 'pot');   // 帯と同じ列に並ぶ（Lv の帯のあとに出る）
 }
+/* ==================== 窓が開くときの光（2026-11-15） ====================
+   ユーザー指定：資質の通知・閃きの窓・恩寵の3択が開く瞬間に、
+   フラッシュ（窓と同じ形で白く光って引く＋縁の光）と、外へ広がる波紋2本。
+   ・角は**窓とまったく同じ作り**：窓の clip-path と ::before の角のドットを写す
+     （輪を自前の計算で描くと、窓と段の取り方がずれた）。
+   ・広がっても角の丸みは窓のまま。大きさと位置は2pxの格子で段に進む。
+   ・恩寵の3択は、左の札から WFX.cardGap 秒ずつずらして1枚ずつ出す。出切るまで札は押せない。
+   ・動きを減らす設定（prefers-reduced-motion）では何もしない。 */
+const WFX = {
+  flashHold:60, flashFade:180,      // 白い光：60ms そのまま、180ms で3段に引く
+  glow:420,                         // 縁の光：5段で引く
+  ring:620, ringSteps:7,            // 波紋1本の長さと段の数
+  rings:[[140,24],[280,34]],        // [遅れ(ms), 広がり(px)]
+  cardGap:240,                      // 恩寵の札を出す間(ms)
+};
+function wfxReduced(){ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+const wfxQ = v => Math.round(v/2)*2;
+/* n の、アニメが終わった後の画面上の矩形。出のアニメが掛かっている最中でも、
+   最後に落ち着く位置で光らせたい。 */
+function wfxRect(n){
+  const keepA=n.style.animation;
+  n.style.animation='none';          // CSS の出のアニメ（拡大・ずらし）を外して、落ち着く位置を測る
+  const r=n.getBoundingClientRect();
+  n.style.animation=keepA;
+  return {x:r.left, y:r.top, w:r.width, h:r.height};
+}
+/* 窓の角の作りを写す。clip-path と、::before の角のドット（mask） */
+function wfxLook(n){
+  const cs=getComputedStyle(n), bs=getComputedStyle(n,'::before');
+  const clip=(cs.clipPath && cs.clipPath!=='none') ? cs.clipPath : 'var(--pxr2)';
+  const mi=bs.webkitMaskImage || bs.maskImage;
+  const bm=(mi && mi!=='none')
+    ? {i:mi, s:bs.webkitMaskSize||bs.maskSize, p:bs.webkitMaskPosition||bs.maskPosition}
+    : {i:'linear-gradient(#000 0 0),linear-gradient(#000 0 0),linear-gradient(#000 0 0),linear-gradient(#000 0 0)',
+       s:'2px 2px,2px 2px,2px 2px,2px 2px', p:'left top,right top,left bottom,right bottom'};
+  return {clip, bm};
+}
+function wfxEl(R, look, css, ring){
+  const d=document.createElement('div');
+  d.className='wfx'+(ring?' wfx-r':'');
+  Object.assign(d.style,{left:wfxQ(R.x)+'px',top:wfxQ(R.y)+'px',width:wfxQ(R.w)+'px',height:wfxQ(R.h)+'px',
+                         clipPath:look.clip}, css||{});
+  if(ring){ d.style.setProperty('--wbi',look.bm.i); d.style.setProperty('--wbs',look.bm.s); d.style.setProperty('--wbp',look.bm.p); }
+  document.body.appendChild(d);
+  return d;
+}
+/* 段で進むキーフレーム（各段のあいだは動かない） */
+function wfxSteps(n, f){ const k=[]; for(let i=0;i<=n;i++){ const o=f(i/n); o.offset=i/n; o.easing='steps(1,end)'; k.push(o); } return k; }
+function wfxPlay(d, keys, dur, delay){
+  const a=d.animate(keys,{duration:dur, delay:delay||0, fill:'both'});
+  a.onfinish=()=>d.remove();
+  return a;
+}
+/* 窓 n を、色 col で光らせる。delay(ms) 後に始まる */
+function windowFx(n, col, delay){
+  if(!n || wfxReduced() || typeof n.animate!=='function') return;
+  const R=wfxRect(n), look=wfxLook(n), dl=delay||0, W=WFX;
+  if(!(R.w>0 && R.h>0)) return;
+  // フラッシュ：窓と同じ形で白く
+  const fl=wfxEl(R, look, {background:'#fff'});
+  const fk=[{opacity:.9,offset:0,easing:'steps(1,end)'},{opacity:.9,offset:W.flashHold/(W.flashHold+W.flashFade),easing:'steps(1,end)'},
+            {opacity:.6,offset:(W.flashHold+W.flashFade/3)/(W.flashHold+W.flashFade),easing:'steps(1,end)'},
+            {opacity:.3,offset:(W.flashHold+W.flashFade*2/3)/(W.flashHold+W.flashFade),easing:'steps(1,end)'},{opacity:0,offset:1}];
+  wfxPlay(fl, fk, W.flashHold+W.flashFade, dl);
+  // 縁の光：白い縁と、外へ1・2ドットの色の縁
+  [[0,'#fff',1],[2,col,.8],[4,col,.35]].forEach(([o,c,a])=>{
+    const g=wfxEl({x:R.x-o,y:R.y-o,w:R.w+o*2,h:R.h+o*2}, look, {border:'2px solid '+c}, true);
+    wfxPlay(g, wfxSteps(5, p=>({opacity:a*(1-p)})), W.glow, dl);
+  });
+  // 波紋：窓と同じ角のまま、外へ広がって消える
+  W.rings.forEach(([rd,o])=>{
+    const r=wfxEl(R, look, {border:'2px solid '+col}, true);
+    wfxPlay(r, wfxSteps(W.ringSteps, p=>{ const off=wfxQ(o*p);
+      return {left:wfxQ(R.x)-off+'px', top:wfxQ(R.y)-off+'px', width:wfxQ(R.w)+off*2+'px', height:wfxQ(R.h)+off*2+'px', opacity:1-p}; }),
+      W.ring, dl+rd);
+  });
+}
 function flushCharPotNow(){
   if(!_charPotPend.length) return;
   const pots=_charPotPend; _charPotPend=[];
@@ -13231,6 +13314,7 @@ function flushCharPotNow(){
   void nd.offsetWidth;                 // 連続で出す時にアニメを再生し直すため
   nd.classList.add('pot-note-anim');
   nd.classList.add('on');
+  windowFx(nd, RARCOL[top.tier]);      // 開く瞬間の光と波紋（色は一番高い資質の色）
   _potNoteT=POTNOTE_SEC;
 }
 function tickPotNote(dt){
@@ -22320,6 +22404,7 @@ function openArtRename(id, flashed){
   el('an-sub').textContent = d.desc || d.nm;
   el('an-input').value = artName(d);
   el('m-artname').classList.add('on');
+  if(flashed) windowFx(document.querySelector('#m-artname .box'), '#ffd06a');   // 閃いた時だけ光る（名前を付け直すときは光らない）
   /* 戦っている最中に開くので、開いているあいだは時間を止める。
      **止めるのは update だけで、draw は回し続ける**——
      画面まで消すと、何の上に窓が出ているのか分からなくなる。 */
@@ -23347,6 +23432,21 @@ function openBoonPick(tier, srcName, savedChoices){
     </div>`;
   }).join('');
   el('m-boon').classList.add('on');
+  /* 左の札から1枚ずつ、光と波紋つきで出す（2026-11-15 ユーザー指定）。
+     まだ出ていない札は visibility:hidden なので、押しても当たらない。 */
+  if(!wfxReduced()){
+    const picks=_boonPending.slice();
+    const cards=[...el('boon-choices').querySelectorAll('.boon')];
+    cards.forEach(c=>c.classList.add('wfx-wait'));
+    cards.forEach((c,i)=>setTimeout(()=>{
+      c.classList.remove('wfx-wait');
+      if(!el('m-boon').classList.contains('on') || !c.isConnected) return;
+      windowFx(c, boonRarDef(picks[i].rar).col);
+      if(c.animate) c.animate([{transform:'translateY(6px)',offset:0,easing:'steps(1,end)'},
+                               {transform:'translateY(2px)',offset:.5,easing:'steps(1,end)'},
+                               {transform:'translateY(0)',offset:1}],{duration:70});
+    }, i*WFX.cardGap));
+  }
 }
 let _boonTier='mid';
 function boonTap(e){
