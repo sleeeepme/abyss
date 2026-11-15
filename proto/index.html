@@ -17593,16 +17593,18 @@ function draw(){
   /* 盗賊の短剣の技（ダンシングソード）と同じドット絵の短剣で描く。
      刃の位置は当たり判定（bl.x, bl.y＝主人公から BLADE_R の円）そのもの。後ろに残像と弧を引く。 */
   const bladeAngs=(P.blades||[]).filter(bl=>bl.x!==undefined).map((bl,i,a)=>(P.bladeAng||0)+i*Math.PI*2/(P.blades.length||1));
-  const bladePix = bladeAngs.length && window.PixelArtFx && PixelArtFx.defs && PixelArtFx.defs.dgblade;
+  /* 穴から落ちてくる間は、刃も主人公と一緒に落ちてくる（まだ画面の上なら出さない） */
+  const bladeDrop = dropInPose(P), bladeDy = bladeDrop ? (bladeDrop.y||0) : 0;
+  const bladePix = bladeAngs.length && !(bladeDrop&&bladeDrop.hide) && window.PixelArtFx && PixelArtFx.defs && PixelArtFx.defs.dgblade;
   if(bladePix){
     try{
-      PixelArtFx.renderEffect(ctx,{id:'dgblade', age:(S.run&&S.run.elapsed)||0, x:P.x*TS-camX, y:P.y*TS-camY,
+      PixelArtFx.renderEffect(ctx,{id:'dgblade', age:(S.run&&S.run.elapsed)||0, x:P.x*TS-camX, y:P.y*TS-camY+bladeDy,
         range:BLADE_R, angles:bladeAngs, scale:TS/48, layer:'air'});
     }catch(err){ /* 絵で失敗したら下の図形で出す */ }
   }
   if(!bladePix) (P.blades||[]).forEach((bl,i)=>{
-    if(bl.x===undefined) return;
-    const bx=bl.x*TS-camX, by=bl.y*TS-camY;
+    if(bl.x===undefined || (bladeDrop&&bladeDrop.hide)) return;
+    const bx=bl.x*TS-camX, by=bl.y*TS-camY+bladeDy;
     const n=(P.blades.length||1);
     const ang=(P.bladeAng||0) + (i*Math.PI*2/n) + Math.PI/2;   // 接線
     ctx.save();
@@ -18195,7 +18197,8 @@ function draw(){
   ctx.restore();
   ctx.globalAlpha=1;
   occOne(P);                          // 主人公のぶんの立ち物の描き戻し
-  if(!heroBlinkOff && !(heroDrop&&heroDrop.hide) && !P.fallAnim) drawLantern(camX, camY, _drawDt);   // 灯りの相棒
+  /* 穴から落ちてくる間は、ランタンも主人公と一緒に上から落ちてくる（heroDrop.y を足す） */
+  if(!heroBlinkOff && !(heroDrop&&heroDrop.hide) && !P.fallAnim) drawLantern(camX, camY, _drawDt, heroDrop ? heroDrop.y : 0);   // 灯りの相棒
   drawFeelKins(camX,camY);             // 主人公より前面、照明・HUDより下
   drawPlayerLight(camX,camY);
   // ランタンの網（?lantern=net のときだけ）の暗がりはキャラまで描いた所で重ねる
@@ -19187,7 +19190,7 @@ function drawLanternOnGround(sx, sy, d){
   ctx.restore();
 }
 /* 付いてくるランタン。主人公を描いたすぐ後に呼ぶ */
-function drawLantern(camX, camY, dt){
+function drawLantern(camX, camY, dt, dropY){
   if(!S.run || S.run.noStone || !S.hero || S.screen!=='game') { LAN.x=null; LAN.get=null; LAN.eat=null; LAN.alert=null; return; }   // 街では見せない
   dt = Math.min(0.1, dt||0.016); LAN.t += dt;
   if(Math.abs(P.dirx||0)>0.3) LAN.face = P.dirx>0 ? 1 : -1;
@@ -19209,6 +19212,7 @@ function drawLantern(camX, camY, dt){
     if(gk>=1) LAN.get=null;
     else if(gk<0.72){ ax=P.x; ay=P.y-1.15; k=1-Math.exp(-dt*14); }   // 頭上に掲げる
   }
+  if(dropY){ ay += dropY/TS; LAN.x=ax; LAN.y=ay; LAN.sway=0; }      // 落下中は主人公にぴたりと付いて一緒に落ちる
   if(LAN.x==null || Math.hypot(LAN.x-ax, LAN.y-ay)>4){ LAN.x=ax; LAN.y=ay; LAN.sway=0; }   // 階をまたいだら追い直す
   const nx=LAN.x+(ax-LAN.x)*k, ny=LAN.y+(ay-LAN.y)*k, vx=(nx-LAN.x)/dt;
   LAN.x=nx; LAN.y=ny;
@@ -19248,7 +19252,8 @@ function drawLantern(camX, camY, dt){
   ctx.globalCompositeOperation='lighter';
   { const gc = ak==='treasure' ? '255,208,106' : ak==='grave' && shut===0 ? '230,240,255' : null;
     if(gc){ const g2=ctx.createRadialGradient(cx,cy,0,cx,cy,TS*0.9); g2.addColorStop(0,'rgba('+gc+','+(0.6*fl)+')'); g2.addColorStop(1,'rgba('+gc+',0)'); ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(cx,cy,TS*0.9,0,7); ctx.fill(); }
-    else lanternGlow(cx, cy, TS*0.9, (0.25+0.45*bright)*fl*(miasmaZone()?1-(1-F/LIGHT_MAX)*0.6:1)); }
+    /* ふだんのランタンは光の暈を出さない（2026-11-14 作者判断。灯りは周りの明るさで伝わる）。
+       宝・墓の知らせの光だけ残す。 */ }
   ctx.globalCompositeOperation='source-over';
   drawLanternSprite(cx, cy, E ? 0 : Math.round(LAN.sway), bright, lid, E ? 0 : shut, pal);
   if(ak==='hole'){                                      // 穴の方へ落ちる滴
@@ -24419,7 +24424,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20261021a"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
-<script src="game-feel.js?v=20261107-surface-response"></script>
+<script src="game-feel.js?v=20261115-dropin-kin"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
 <script src="cave-look.js?v=20261114-toad1"></script>

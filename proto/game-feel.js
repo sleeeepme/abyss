@@ -40,9 +40,13 @@ function feelEntityOffset(e){
 function drawFeelKins(camX,camY){
   [S.hero, ...livingParty()].forEach(h=>{
     if(!h || h.dead) return;
+    /* 穴から落ちてくる間は、眷属も主人と一緒に上から落ちてくる（まだ画面の上なら出さない） */
+    const dp=typeof dropInPose==='function' ? dropInPose(h===S.hero?P:h) : null;
+    if(dp && dp.hide) return;
+    const dropY=dp ? (dp.y||0) : 0;
     (h.kins||[]).forEach(k=>{                // 眷属（最大3体）
       if(k.x===undefined) return;
-      const sx=k.x*TS-camX, sy=k.y*TS-camY;
+      const sx=k.x*TS-camX, sy=k.y*TS-camY+dropY;
       const pl=0.6+0.4*Math.sin(performance.now()/170+k.ang);
       ctx.save();
       ctx.globalAlpha=0.20*pl; ctx.fillStyle='#8fd8ff';     // 足もとの淡い光は残す（撃つ線と同じ色）

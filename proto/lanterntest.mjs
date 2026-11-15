@@ -25,6 +25,12 @@ const R = await pg.evaluate(()=>{ try{
   R.second = S.run.noStone===false && !W.drops.some(x=>x.first);
   for(let i=0;i<3;i++){ _drawDt=1/60; draw(); }
   R.followsFromStart = LAN.x!=null && !LAN.get;
+  // 穴から落ちてくる間は、ランタンも主人公と一緒に上にいる（地面に置き去りにしない）
+  window.DROP_IN=true; startDropIn(); W.dropIn.t=0.2; _drawDt=1/60; draw();
+  const fallY=LAN.y;
+  W.dropIn.t=W.dropIn.end-0.01; draw(); for(let i=0;i<5;i++){ _drawDt=1/60; draw(); }
+  R.fallsWithHero = fallY < P.y-2.5 && Math.abs(LAN.y-(P.y-0.52))<0.2;
+  W.dropIn=null; window.DROP_IN=undefined;
   // 普通の蛍石は演出なし
   W.drops.push({x:P.x,y:P.y,stone:true}); stepSim(0.1,{draw:true});
   R.plainStone = !LAN.get && !!LAN.eat;
