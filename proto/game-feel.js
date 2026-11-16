@@ -264,6 +264,7 @@ function feelBossArt(e){
   if(!PIXEL_ART_FX||!e||!e.boss)return null;
   if(e.uniqueBoss===5)return{pre:'bt',kind:'ash'};
   if(e.uniqueBoss===10)return{pre:'bv',kind:e.form2?'ghost':'stone'};
+  if(e.uniqueBoss===15)return{pre:'bl',kind:'leech'};
   return null;
 }
 /* 灰の大蛙の口の位置（マス）。絵（great-ash-frog、32×32、右向き）の口は中心から右へ 0.30、下へ 0.14（絵の大きさ比）。
@@ -278,6 +279,14 @@ function feelDrawBossCasts(layer,camX,camY){
     if(e.dead||!e.cast)continue;
     const B=feelBossArt(e);if(!B)continue;
     const age=e.cast.max-e.cast.t,life=e.cast.max,sx=e.x*TS-camX,sy=e.y*TS-camY;
+    if(B.pre==='bl'){   // 遺構のヒル：溜めは口元（cast.ox,oy）。礫と卵は溜めの終わりに口から着弾点へ飛ぶ
+      const c=e.cast,mx=c.ox*TS-camX,my=c.oy*TS-camY,M=typeof BOSS_MOVES!=='undefined'?BOSS_MOVES[c.id]:null;
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bl_charge',age,life,x:mx,y:my,angle:c.dir||0,scale:sc,layer,
+        range:c.id==='gulp'&&M?M.len:1.5,arc:c.id==='gulp'&&M?M.arc*Math.PI/180:undefined,o:{mv:c.id}});
+      if(c.id==='gravel'||c.id==='spawn')(c.spots||[]).forEach((sp,i)=>PIXEL_ART_FX.renderEffect(ctx,{
+        id:'bl_spit',age:age+i*.035,life:life+i*.035,x:sp.x*TS-camX,y:sp.y*TS-camY,casterX:mx,casterY:my,scale:sc,layer,seed:i,o:{egg:c.id==='spawn'}}));
+      continue;
+    }
     PIXEL_ART_FX.renderEffect(ctx,{id:B.pre+'_charge',age,life,x:sx,y:sy,angle:e.cast.dir||0,kind:B.kind,scale:sc,layer});
     if(e.cast.id==='pillars')(e.cast.spots||[]).forEach((sp,i)=>PIXEL_ART_FX.renderEffect(ctx,{
       id:B.pre==='bt'?'bt_spit':'bv_rock',age:age+i*.03,life:life+i*.03,x:sp.x*TS-camX,y:sp.y*TS-camY,
@@ -287,6 +296,30 @@ function feelDrawBossCasts(layer,camX,camY){
 /* 形を持つ弾・輪（ヴェラの矢と礫の波動）。W.fx の記録はそのまま、絵だけ差し替える */
 function feelDrawBossFx(layer,camX,camY){
   const sc=feelArtScale();
+  /* 遺構のヒル：残る物（毒の溜り・瓦礫）は床の層、転がる大岩と砕けた礫は手前 */
+  if(layer==='ground'){
+    for(const q of (W.pools||[]))PIXEL_ART_FX.renderEffect(ctx,{id:'bl_pool',age:FEEL.time,x:q.x*TS-camX,y:q.y*TS-camY,range:q.r,scale:sc,layer,seed:q.seed,
+      o:{age:q.max-q.life,left:q.life}});
+    for(const b of (W.rubble||[]))PIXEL_ART_FX.renderEffect(ctx,{id:'bl_rubble',age:FEEL.time,x:b.x*TS-camX,y:b.y*TS-camY,scale:sc,layer,seed:b.seed,
+      o:{born:b.born,left:b.life}});
+  }
+  /* 打ち直しのブレヒト：溜めの粒、巻き転がりの触手、飛んでいる間の影と風切り */
+  for(const e of (W.enemies||[])){
+    if(!e.brecht||e.dead)continue;
+    const b=e.brecht,sx=e.x*TS-camX,sy=e.y*TS-camY;
+    if(e.cast&&layer==='air')PIXEL_ART_FX.renderEffect(ctx,{id:'bb_charge',age:e.cast.max-e.cast.t,life:e.cast.max,x:sx,y:sy,scale:sc,layer,
+      o:{form:b.merged?'merge':b.purged?b.inner:'armor'}});
+    if(e.roll&&e.roll.wide&&layer==='air')PIXEL_ART_FX.renderEffect(ctx,{id:'bb_spin',age:FEEL.time,x:sx,y:sy,range:e.roll.wide,scale:sc,layer});
+    const c=e.cast,F=c&&c.fly;
+    if(F&&F.who&&c.t<=F.T&&F.T>0){const w=F.who,k=1-c.t/F.T;
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bb_fly',age:FEEL.time,x:w.x*TS-camX,y:w.y*TS-camY,angle:Math.atan2(F.y1-F.y0,F.x1-F.x0),scale:sc,layer,
+        o:{k,z:w.flyZ||0,split:c.id==='splitslam'}});}
+  }
+  for(const f of (W.fx||[])){
+    if(f.t==='boulder'&&!f.done)PIXEL_ART_FX.renderEffect(ctx,{id:'bl_boulder',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,angle:f.dir,scale:sc,layer,o:{age:f.age}});
+    else if(f.t==='bolt'&&f.artId==='bl_shard'&&layer==='air')
+      PIXEL_ART_FX.renderEffect(ctx,{id:'bl_shard',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,angle:Math.atan2(f.vy,f.vx),scale:sc,layer,seed:(f.vx*7+f.vy*13)|0});
+  }
   for(const f of (W.fx||[])){
     if(f.artId==='bv_arrow'&&f.t==='bolt'&&layer==='air')
       PIXEL_ART_FX.renderEffect(ctx,{id:'bv_arrow',age:FEEL.time,x:f.x*TS-camX,y:f.y*TS-camY,angle:Math.atan2(f.vy,f.vx),kind:f.artKind,scale:sc,layer});
@@ -352,13 +385,18 @@ killEnemy=function(e,byAlly){
   /* 撃破の報酬の数字（+EXP/+G/+SP）も、撃破演出のあとに出す（演出の上に数字が重ならないように） */
   if(held&&_feelHold){ const fresh=W.pops.splice(pops0).filter(p=>{ if(p.reward){ _feelHold.pops.push(p); return false; } return true; }); W.pops.push(...fresh); }
   for(const d of W.drops)if(!drops.has(d))d.feelDrop={age:0,x:e.x,y:e.y};
-  if(e.boss){
+  /* ブレヒトの片方が相方に合わさったとき（撃破ではない）：世界を止める撃破の間（寄り・金の飛沫）は入れない。
+     合体の絵（bb_merge）→ 咆哮、の順をふつうの時間で見せる（2026-11-16） */
+  const absorbed=!!(e.boss&&e.brecht&&!e.brecht.merged&&W.enemies.some(x=>x!==e&&x.brecht&&x.brecht.merged&&!x.dead));
+  if(absorbed){ if(held&&typeof feelReleaseHold==='function') feelReleaseHold(); }
+  else if(e.boss){
     const screen=S.screen,modals=[...document.querySelectorAll('.modal.on')];
     const pending=screen!=='game'?()=>{setScreen(screen);modals.forEach(n=>n.classList.add('on'));}:null;
     if(pending){modals.forEach(n=>n.classList.remove('on'));setScreen('game');}
     /* ヴェラ第二形態は撃破演出（cave-look.js の vera2DeathDraw、約7.5秒）を流す。
        そのあいだ世界を止めておき、汎用の金の飛沫と輪は出さない（演出の中で爆散する）。 */
-    const dLen=(window.CAVE&&CAVE.vera2&&CAVE.vera2.deathLen)?CAVE.vera2.deathLen(e):0;
+    const dLen=((window.CAVE&&CAVE.vera2&&CAVE.vera2.deathLen)?CAVE.vera2.deathLen(e):0)
+      ||((window.CAVE&&CAVE.brechtDeathLen)?CAVE.brechtDeathLen(e):0);   // 合体したブレヒト：泡になって消える（約3.2秒）
     if(dLen>0){ FEEL.boss={x:e.x,y:e.y,age:0,pending,screen,dur:dLen+0.25};feelKick(4,.3); }
     else{
     FEEL.boss={x:e.x,y:e.y,age:0,pending,screen};feelSlow(.32,.2);feelKick(7,.4);

@@ -21,6 +21,7 @@ await pg.evaluate(()=>{
     const bs=W.enemies.filter(e=>e.boss); bs.forEach(e=>{ e.revealed=true; });
     if(purge){ bs.forEach(e=>{ e.hp=Math.round(e.maxHp*0.49); bossRage(e); }); }
     bs.forEach(e=>{ e.moveCd=99; e.cd=99; e.cast=null; e.recover=0; });
+    P.pull=null;                 // 前の検証の引き寄せ（掛け合い「引いて挟む」は 0.35 秒）を持ち越さない
     return bs;
   };
   // 開けた所（主人公の出る所）にボスを置き、主人公をその右へ。向きは右（0）
@@ -120,7 +121,7 @@ R.merge = await pg.evaluate(()=>{
   o.hp=1; killEnemy(o);
   const r={merged:c.brecht.merged, hpPct:+(c.hp/c.maxHp).toFixed(2), moves:c.moves.slice().sort().join('/'), name:c.name,
            def:+(c.def/c.brecht.def0).toFixed(2), drops:W.drops.length, alive:S.run.bossAlive};
-  r.ok = r.merged && r.hpPct>=0.4 && r.moves==='bubble/grab/ink/pinch/roll/tentacle' && r.name===BRECHT.merge.nm && r.def===0.75 && r.drops===0 && r.alive;
+  r.ok = r.merged && r.hpPct>=0.4 && r.moves==='bubble/grab/ink/inkbubble/inout/pinch/roll/spinroll/tentacle' && r.name===BRECHT.merge.nm && r.def===0.75 && r.drops===0 && r.alive;
   return r;
 });
 R.noWarp = await pg.evaluate(()=>{

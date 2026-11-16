@@ -203,12 +203,16 @@
   .skn{position:absolute;width:106px;height:52px;display:flex;align-items:center;gap:6px;padding:0 6px 0 7px;
     background:var(--panel);border:2px solid var(--line);clip-path:var(--pxr2);cursor:pointer;box-sizing:border-box}
   .skn>i{flex:none;width:30px;height:30px;background:center/100% 100% no-repeat;image-rendering:pixelated}
-  .skn-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .skn-t{display:flex;flex-direction:column;gap:2px;min-width:0}
   .skn-nm{font-size:10.5px;font-weight:700;color:#e6e9f0;line-height:1.15;word-break:break-all;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .skn-nm .pi{margin-right:2px}
   .skn-pp{display:flex;gap:2px}
   .skn-pp b{width:6px;height:4px;background:#2a3040}
   .skn-pp b.on{background:var(--ic)}
+  .skn-cost{font-size:10px;line-height:11px;color:#8fd8ff;white-space:nowrap}
+  .skn.poor .skn-cost{color:#e07a6a}
+  .skn.locked .skn-cost,.skn.noreq .skn-cost{color:#a3acc0}
+  .skn-limit{font-size:10px;line-height:11px;color:#7fe0c0}
   .skn.own{border-color:#3d4a66}
   .skn.maxed{border-color:#3f7d5c}
   .skn.maxed .skn-pp b.on{background:#7fe0c0}
@@ -6610,6 +6614,30 @@ const BOSS_MOVES={
   bubble:  {nm:'泡',     tele:0.55, n:9, fan:70, speed:2.8, mult:0.55, cd:[4.5,6.0], min:0, max:99},
   // 転がり（宿借り）。殻に籠って直線を転がる。予兆の帯の上を本当に通る
   roll:    {nm:'転がり', tele:0.80, len:8.0, wide:0.95, mult:1.20, cd:[4.4,6.0], min:2.0, max:99},
+  /* ---- 打ち直しのブレヒト（20F）：2体の掛け合いと、合体後だけの技。BRECHT_PAIR 参照（2026-11-16） ---- */
+  // 打ち合わせ（鎧2体）。2体を結ぶ帯に、両側から鎚を打ち出す。離れているほど溜めが長い
+  anvil:    {nm:'打ち合わせ', tele:0.90, wide:0.8, mult:1.25, cd:[5.0,7.0], min:0, max:99},
+  // 投げる（蛸が宿借りを）。着弾の円。宿借りは本当に飛んで来て、着地のあとひっくり返る
+  throw:    {nm:'投げる',     tele:1.00, rad:2.2, mult:1.30, cd:[7.0,9.0], min:3.0, max:9.0},
+  // 内と外（合体）。近くの鋏の扇と、遠くの触手3本を同時に。扇の外・帯のあいだが空く
+  inout:    {nm:'内と外',     tele:0.90, rad:2.4, arc:55, len:6.5, wide:0.45, fan:30, mult:0.90, cd:[4.0,5.5], min:0, max:7.0},
+  // 墨の泡（合体）。泡が消えた所に小さな墨溜まりが残る
+  inkbubble:{nm:'墨の泡',     tele:0.60, n:7, fan:80, speed:2.6, mult:0.55, cd:[5.0,7.0], min:0, max:99},
+  // 巻き転がり（合体）。転がりながら触手を左右に伸ばす＝帯が太い
+  spinroll: {nm:'巻き転がり', tele:0.85, len:8.0, wide:1.7, mult:1.20, cd:[5.0,7.0], min:2.0, max:99},
+  // 分かれ打ち（合体・HP3割以下）。二つに分かれて跳び、狙った円でぶつかって合体し直す。本体は本当にそこまで動く
+  splitslam:{nm:'分かれ打ち', tele:1.10, rad:2.6, mult:1.60, cd:[6.0,8.0], min:2.5, max:9.0},
+  /* ---- 遺構のヒル（15F）：呑んで、吐く。LEECH 参照（2026-11-16） ---- */
+  // 礫吐き。石を山なりに吐く。落ちる所は溜めの時点で決める（落石と同じ）。落ちた石は瓦礫として残る
+  gravel:  {nm:'礫吐き',   tele:0.90, rad:1.1, n:4, spread:3.4, mult:0.90, cd:[3.6,5.0], min:0, max:99},
+  // 毒吐き。口から帯を掃く。通った跡が毒の溜りとして残る。毒を呑んでいると3筋の扇になる
+  venom:   {nm:'毒吐き',   tele:0.80, len:7.0, wide:0.6, fan:24, mult:0.90, cd:[4.0,5.6], min:0, max:8.5},
+  // 吸い込み。広い扇の中の者・瓦礫・毒の溜りを口へ引く（溜めの間ずっと）。最後に口元を噛む
+  gulp:    {nm:'吸い込み', tele:1.60, len:8.0, arc:40, rad:1.7, mult:1.30, cd:[7.0,9.5], min:0, max:9.5},
+  // 仔を吐く。卵を吐く。孵る前に割れば湧かない
+  spawn:   {nm:'仔を吐く', tele:0.80, n:2, rad:0.6, spread:3.0, cd:[10.0,13.0], min:0, max:99},
+  // 大岩（激昂）。口から太い帯を大岩が本当に転がる。壁で砕けて礫が散る
+  boulder: {nm:'大岩',     tele:1.00, len:9.0, wide:1.1, mult:1.50, cd:[5.0,6.8], min:0, max:99},
   // 分身。本体そっくりの幻を数体だす。幻はHPが無いに等しく、削っても本体は減らない
   // ——「本体を見失わない」ことそのものを体で覚えさせる、門番だけの技。
   clone: {nm:'分身',     tele:0.60, n:2, dur:4.5, cd:[10.0,14.0], min:0, max:99},
@@ -6688,8 +6716,9 @@ const UNIQUE_BOSSES={
        parts:'legs',
        line:'矢はとうに尽きている。それでも引く動作をやめない。'},
 
+  /* 2026-11-16：呑んで、吐く。前は波動・散弾・招来、激昂で叩きつけ（どのボスにもある形だった） */
   15: {nm:'沼の大蛭',      reg:'現象体・二号／滞',   fam:'slime',  dt:'blunt',
-       moves:['wave','burst','summon'],     rage:['slam'],
+       moves:['gravel','venom','gulp','spawn'],     rage:['boulder'],
        line:'二百年、吸い続けている。吸うとき、水位が下がる。'},
 
   /* 2026-11-06：鎧の中に蛸と宿借り。三つの形で技が入れ替わる（BRECHT）。
@@ -8183,6 +8212,15 @@ function bossFormShatter(e){
 }
 /* 咆哮。衝撃波が抜けたあとに吠える：口元から画面が放射状に歪む（drawRoarFx）、揺れ、塵。
    音（roar）は audio-game.js が包んで鳴らす。名前の帯は出さない */
+/* 最期の咆哮。倒れた直後、泡になる前に吠える（2026-11-16 ユーザー指定「泡になる直前にも咆哮を入れて」）。
+   bossFormRoar は倒れた相手には出さないので、撃破演出用に分けてある。歪み・揺れ・音は同じ */
+function bossDeathRoar(e){
+  if(!e) return;
+  const L=BOSS_FORM_FX.roarLen;
+  W.fx.push({t:'roar', x:e.x, y:e.y-0.75, life:L, max:L});
+  if(typeof feelKick==='function') feelKick(5.5, 0.3);
+  if(typeof feelSpray==='function') feelSpray(e.x, e.y+1.6, '#9a907c', 30, 3.0, 'dust');
+}
 function bossFormRoar(e){
   if(!e || e.dead) return;
   const L=BOSS_FORM_FX.roarLen;
@@ -9674,6 +9712,7 @@ function enterFloor(depth, opt){
                  // 入った直後に瞬歩を撃った場合に P.dash が消される（syncFeel の
                  // 階変化検知がここより後に走り、直前に発生させた瞬歩を巻き戻してしまう）。
   W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
+  W.rubble=[]; W.pools=[];   // ヒルの瓦礫と毒の溜り
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
   W.enemies.push(...spawnSlaters(fl, depth));   // 水の層：磯虫の群れ
@@ -13418,6 +13457,7 @@ function killEnemy(e, byAlly){
        通常のボス撃破処理（ドロップ・撃破ログ・恩寵）を1回だけ流す。 */
     const twinLeft = e.twin ? W.enemies.find(x=>x!==e && x.twin && !x.dead) : null;
     if(twinLeft && twinLeft.brecht && e.brecht){ brechtMerge(twinLeft, e); return; }   // 打ち直しのブレヒト：合体する
+    if(e.brecht && brechtArtOn()){ feelPixelArt('bb_death', e.x, e.y, {}); e.fade=0.3; bossDeathRoar(e); }   // 合体したブレヒトの最期：泡になって消える（体の絵は cave-look.js が溶かす。fade は演出の間は減らない）
     if(twinLeft){
       twinLeft.teleMul = Math.min(twinLeft.teleMul, TWIN_ENRAGE_TELE_MUL);
       twinLeft.ms *= TWIN_ENRAGE_MS_MUL;
@@ -13623,6 +13663,7 @@ function enemyUpdate(e,dt){
     if(e.hp<=0 && !e.dead) killEnemy(e);
   });
   if(e.dead) return;
+  if(e.egg){ leechEggTick(e, dt); return; }   // ヒルの卵：孵るまで動かない・攻撃しない
   /* フロストノヴァの凍結。動きも、溜めている技の時計も止まる（溶けたら続きから） */
   if(e.frz>0){ e.frz-=dt; if(e.frz<=0){ e.frz=0; e.frzMax=0; } return; }
   if(hasStatus(e,'stagger')){ e.hit=Math.max(e.hit,0.05); return; }   // 打撃で止まる
@@ -13887,6 +13928,7 @@ function brechtPurge(e){
     feelSpray(e.x, e.y-0.3, '#5c5c66', 18, 2.6);
     feelSpray(e.x, e.y+0.8, '#9a907c', 16, 1.8, 'dust');
   }
+  if(brechtArtOn()) feelPixelArt('bb_purge', e.x, e.y, {o:{inner:b.inner}});   // 光のひび → 板が飛んで床に残る
   W.pops.push({x:e.x, y:e.y-1.2, txt:'鎧を脱いだ', c:'#ffd8a0', life:1.2, max:1.2});
   if(e.revealed) log(e.name+'——鎧を脱ぎ捨てた。脆いが、速い');
 }
@@ -13896,11 +13938,21 @@ function brechtMerge(s, d){
   const was=s.name;
   b.merged = true; b.purged = true;
   brechtSetForm(s, BRECHT.merge);
+  /* どちらを先に倒したかで合体後が変わる：残った方（s）の技は強い版、倒した方（d）の技は弱い版 */
+  b.strong = BRECHT[b.inner].moves.slice();
+  b.weak   = (d.brecht ? BRECHT[d.brecht.inner].moves : []).slice();
+  s.moves.push('inout','inkbubble','spinroll');      // 合体後だけの技
   s.hp = Math.max(s.hp, Math.round(s.maxHp*BRECHT.merge.heal));
   W.fx.push({t:'ultline', x:d.x, y:d.y, x2:s.x, y2:s.y, life:0.5, maxLife:0.5, col:'#e0b0d0'});
   W.fx.push({t:'shock', x:s.x, y:s.y, r:3.2, life:0.5, max:0.5, col:BRECHT.merge.col});
   if(typeof feelSpray==='function'){ feelSpray(d.x, d.y, '#e0b0d0', 24, 2.4); feelSpray(s.x, s.y, '#e0b0d0', 30, 3.2); }
-  if(typeof bossFormRoar==='function') bossFormRoar(s);          // 揺れ・咆哮の歪み・咆哮の音
+  if(brechtArtOn()) feelPixelArt('bb_merge', s.x, s.y, {range:Math.hypot(d.x-s.x, d.y-s.y)+2,   // ほどけて流れ込み、巻きつき、縫われる
+    o:{dx:(d.x-s.x)*16, dy:(d.y-s.y)*16, inner:d.brecht?d.brecht.inner:'octo'}});
+  /* 咆哮は合体の絵が弾けた後に（ヴェラの変身と同じ順：形ができあがってから吠える）。2026-11-16 ユーザー指定。
+     前は合体と同じ瞬間に吠えていて、流れ込む粒が画面の歪みに埋もれていた。吠え終わるまで技は出さない */
+  const roarAt=BRECHT_PAIR.mergeRoarAt;
+  if(typeof bossFormRoar==='function'){ if(typeof ultLater==='function') ultLater(roarAt, ()=>bossFormRoar(s)); else bossFormRoar(s); }
+  s.moveCd=Math.max(s.moveCd||0, roarAt+BOSS_FORM_FX.roarLen+0.3); s.cd=Math.max(s.cd||0, roarAt+BOSS_FORM_FX.roarLen); s.cast=null; s.combo=null;
   W.pops.push({x:s.x, y:s.y-1.4, txt:'合体', c:'#ffb0d8', life:1.3, max:1.3});
   if(s.revealed || d.revealed) log(d.name+'が'+was+'と合わさった——'+BRECHT.merge.nm+'、最後の形');
 }
@@ -13958,16 +14010,21 @@ const DUEL={
   recDmg:1.2,                            // 隙・怯みの間に受けるダメージ
   mikiriWin:0.25, mikiriCrit:2.0,        // 着弾の何秒前までに抜ければ見切りか／確定会心の持ち時間
   rec:{slam:0.9, cleave:0.6, burst:0.4, wave:1.0, charge:1.2, pillars:0.5, beam:0.8, summon:0, clone:0,
-       tentacle:0.7, ink:0.5, grab:0.6, pinch:0.5, bubble:0.4, roll:1.2},
+       tentacle:0.7, ink:0.5, grab:0.6, pinch:0.5, bubble:0.4, roll:1.2,
+       gravel:0.5, venom:0.8, gulp:1.0, spawn:0, boulder:0.9,
+       anvil:0.8, throw:0.6, inout:0.8, inkbubble:0.4, spinroll:1.2, splitslam:1.0},
   recRage:0.7, recCombo:1.5,
   /* 連携（1発目 → 2発目）。両方の技を持っているボスでだけ出る。2発目からは繋がない。 */
   combo:{cleave:'slam', charge:'cleave', beam:'burst', pillars:'slam', slam:'wave',
-         grab:'tentacle', roll:'pinch', ink:'bubble'},   // ブレヒト：引き寄せて触手、転がって鋏、墨のあと泡
+         grab:'tentacle', roll:'pinch', ink:'bubble',    // ブレヒト：引き寄せて触手、転がって鋏、墨のあと泡
+         gulp:'gravel', venom:'gulp', gravel:'boulder'}, // ヒル：呑んで礫、毒のあと呑む、礫のあと大岩（激昂後）
   comboGap:0.3, comboCh:[0, 0.35, 0.60], // 段階ごとの連携の確率
   phase3:0.20, phase3BrkMul:0.8, roar:0.6,
 };
 /* 体で溜める大技。妨害も見切り（歩いて抜ける）も、この5つが対象 */
-const DUEL_BODY={slam:1, cleave:1, charge:1, beam:1, pillars:1, tentacle:1, grab:1, pinch:1, roll:1, ink:1};
+const DUEL_BODY={slam:1, cleave:1, charge:1, beam:1, pillars:1, tentacle:1, grab:1, pinch:1, roll:1, ink:1,
+                 gravel:1, venom:1, gulp:1, boulder:1,
+                 anvil:1, throw:1, inout:1, spinroll:1, splitslam:1};
 let duelCtx=null;        // いま当たっているのが武器技／大技か（artHit・fireUlt が立てる）
 let duelBoltSrc=null;    // ボスの弾が主人公に届いたとき、撃ったボス（見切りの持ち主）
 
@@ -14053,6 +14110,7 @@ function bossInterrupt(e){
   e.moveCd=Math.max(e.moveCd||0, m.cd[0]*(e.rage?0.65:1));
   if(e.revealed) log(e.name+'の'+m.nm+'を潰した');
   W.pops.push({x:e.x, y:e.y-1.0, txt:'妨害', c:'#ffe08a', life:1.0, max:1.0});
+  if(id==='gulp') leechChoke(e);       // ヒル：吸い込みを潰すと、むせて呑んだ物を吐き戻す（隙が長い）
   if(typeof feelKick==='function') feelKick(2.6, 0.18);
   W.fx.push({t:'parry', x:e.x, y:e.y, life:0.4, max:0.4});
 }
@@ -14078,10 +14136,12 @@ function duelPlayerHurt(){
 }
 /* 技の溜めを始める（普段の技も、連携の2発目も） */
 function bossBeginCast(e, id, tg, combo){
-  const m=BOSS_MOVES[id];
+  const sm=brechtMoveDef(e, id), m=sm||BOSS_MOVES[id];
   e.lastMove = id;
   e.cast = {id, t:m.tele*(e.teleMul||1), max:m.tele*(e.teleMul||1),
             dir:Math.atan2(tg.y-e.y, tg.x-e.x), combo:!!combo};
+  if(sm) e.cast.m=sm;                              // 合体後：残った方の技は強い版、倒した方の技は弱い版
+  if(BRECHT_NEW[id]) brechtBeginCast(e, id, tg, m);
   /* 潰せるのは体で溜める大技だけ。激昂で開いた技と、直前に潰された技は潰せない */
   e.cast.intr = !!DUEL_BODY[id] && !(e.rageMoves && e.rageMoves.includes(id)) && e.noIntr!==id;
   if(e.noIntr===id) e.noIntr=null;
@@ -14105,6 +14165,7 @@ function bossBeginCast(e, id, tg, combo){
     }
     e.cast.spots=spots;
   }
+  if(LEECH_MOVES[id]) leechBeginCast(e, id, tg);
   e.tele = 0;                        // 通常攻撃の予兆は打ち消す（二重に出さない）
   if(e.revealed) log(e.name+'の'+m.nm);
 }
@@ -14124,7 +14185,10 @@ function bossCast(e, dt, slow, tg){
   if(e.cast){
     /* 見切りの記録：体で溜める大技の範囲に主人公が最後にいた時刻（残り秒で持つ） */
     if(DUEL_BODY[e.cast.id] && S.hero && S.run && bossMoveHits(e, e.cast, P.x, P.y, P.r)) e.cast.inT = e.cast.t;
+    if(e.cast.id==='gulp') leechGulpTick(e, dt*slow);
+    if(e.cast.follow && (e.cast.follow.dead || !e.cast.follow.cast || e.cast.follow.cast.id!==e.cast.id)){ e.cast=null; e.moveCd=Math.max(e.moveCd||0, 1.0); return true; }   // 相方の技が消えた
     e.cast.t -= dt*slow;
+    if(e.cast && e.cast.fly) brechtFlyTick(e.cast);
     if(e.cast.t<=0){
       const c=e.cast;
       const mk = c.inT!=null && c.inT<=DUEL.mikiriWin && S.hero && S.run && !bossMoveHits(e, c, P.x, P.y, P.r);
@@ -14143,6 +14207,7 @@ function bossCast(e, dt, slow, tg){
   }
 
   /* 連携の2発目。間を置いて溜め始める（その間も動かない）。間合いが外れていたら出さない */
+  if(e.combo && e.brecht){ const mt=brechtMate(e); if(mt && (mt.cast || mt.roll)) e.combo=null; }   // 相方が掛け合いで続いたら、自分の連携は出さない（予兆を重ねない）
   if(e.combo){
     e.combo.t -= dt*slow;
     if(e.combo.t>0) return true;
@@ -14151,10 +14216,28 @@ function bossCast(e, dt, slow, tg){
     if(d>=m.min && d<=m.max + e.r){ bossBeginCast(e, id, tg, true); return true; }
   }
 
+  if(e.flyZ) e.flyZ=0;                               // 飛ぶ技が終わった（潰された）あとに浮いたままにしない
+  if(e.uniqueBoss===15 && Math.abs(tg.x-e.x)>0.6) e.face = tg.x>e.x ? 1 : -1;   // ヒルは標的の側を向く（溜めの間は変えない）
   e.moveCd -= dt*slow;
   if(e.moveCd>0) return false;
 
   const d = Math.hypot(tg.x-e.x, tg.y-e.y);
+  if(e.brecht){
+    const b=e.brecht, mt=brechtMate(e);
+    /* 2体いる間は交互に溜める：相方が溜めている・転がっている間は、こちらは歩くだけ（予兆が2つ重ならない） */
+    if(mt && (mt.cast || mt.roll || mt.combo)){ e.moveCd=0.3; return false; }
+    /* 掛け合い：相方の手が空いていれば、2体でひとつの技 */
+    if(mt && brechtFree(mt) && rnd()<BRECHT_PAIR.ch){
+      if(!b.purged && !mt.brecht.purged){ bossBeginCast(e, 'anvil', tg, false); return true; }
+      if(b.purged && mt.brecht.purged && b.inner==='octo' && d>=BOSS_MOVES.throw.min && d<=BOSS_MOVES.throw.max
+         && Math.hypot(mt.x-e.x, mt.y-e.y)<BRECHT_PAIR.throwNear){ bossBeginCast(e, 'throw', tg, false); return true; }
+    }
+    /* 合体後、HP3割で分かれ打ちが開く */
+    if(b.merged && !b.split && e.hp<=e.maxHp*BRECHT_PAIR.splitAt){
+      b.split=true; e.moves.push('splitslam');
+      W.pops.push({x:e.x, y:e.y-1.4, txt:'継ぎ目が緩んだ', c:'#ffb0d8', life:1.2, max:1.2});
+    }
+  }
   // 今の間合いで意味のある技だけを候補にする
   let usable = e.moves.filter(id=>{
     const m=BOSS_MOVES[id];
@@ -14191,13 +14274,14 @@ function bossRollTick(e, dt){
   R.left -= step; e.vx=0; e.vy=0;
   aoeTargets().forEach(t=>{
     const key=t.ent||'P'; if(R.hit.includes(key)) return;
-    if(Math.hypot(t.x-e.x, t.y-e.y) - t.r < e.r + ROLL.hitR){
-      R.hit.push(key); aoeHit(e, t, m.mult);
+    if(Math.hypot(t.x-e.x, t.y-e.y) - t.r < (R.wide || e.r + ROLL.hitR)){
+      R.hit.push(key); aoeHit(e, t, R.mult||m.mult);
       // 轢かれた者は進む向きの横へ弾かれる（真後ろへ押すと、同じ帯の上で何度も当たって見える）
       const side=((t.x-e.x)*-cy+(t.y-e.y)*cx)>=0 ? 1 : -1;
       moveEnt(t.ent||P, -cy*side*0.9, cx*side*0.9);
     }
   });
+  brechtRollExtras(e, R, step);
   R.dust -= dt;
   if(R.dust<=0 && typeof feelSpray==='function'){ R.dust=0.06; feelSpray(e.x, e.y+e.r*0.6, '#9a907c', 3, 0.5, 'dust'); }
   if(R.left<=0.01 || moved < step*0.4){                // 使い切った・壁で止まった
@@ -14205,6 +14289,440 @@ function bossRollTick(e, dt){
       W.fx.push({t:'shock', x:e.x+cx*e.r, y:e.y+cy*e.r, r:1.4, life:0.3, max:0.3, col:'#c8c4bc'}); }
     e.recover=R.rec!=null ? R.rec : (DUEL.rec.roll||0)*(e.rage?DUEL.recRage:1);
     e.roll=null;
+  }
+}
+/* ============================================================
+   遺構のヒル（15F）：呑んで、吐く（2026-11-16 ユーザー指定「石や毒を吐き出すような形」）
+   ・技はすべて**口**から出る。口の位置は leechMouth（絵は標的の側を向く：e.face）
+   ・礫吐きの石は瓦礫（W.rubble）として残る：歩けない・弾を遮る・毒吐きの帯を止める
+   ・毒吐きの跡は毒の溜り（W.pools）として残る：踏むと毒沼と同じ削れ
+   ・吸い込みは瓦礫と毒の溜りも呑む。呑んだ物（e.belly）で次の吐きが変わる：
+       瓦礫 → 次の礫吐きが2倍の数／毒 → 次の毒吐きが3筋の扇
+   ・吸い込みを武器技で潰すと、むせて吐き戻す（belly が空になり、隙が長い）
+   予兆の図形＝当たり判定（bossMoveHits）は他の技と同じ約束。
+   ============================================================ */
+const LEECH_MOVES={gravel:1, venom:1, gulp:1, spawn:1, boulder:1};
+const LEECH={
+  mouthX:1.0, mouthY:-1.0,            // 口の位置（体の中心から、マス。x は向きで反転。絵の口の所を実画面で測った）
+  rubbleR:0.55, rubbleLife:8.0, rubbleMax:10,
+  poolR:0.8, poolLife:6.0, poolStep:1.4, poolMax:16, poolTick:0.5,
+  gulpPull:2.3,                       // 吸い込みが人を引く速さ（マス/秒。歩きは 4.1）
+  gulpObj:5.0,                        // 瓦礫・毒の溜りが滑る速さ
+  gulpEat:0.7,                        // 口からこの距離まで来たら呑む
+  gravelBig:2, gravelCap:8,           // 瓦礫を呑んでいたときの礫の倍率と上限
+  chokeStun:1.5,                      // むせる時間
+  eggHatch:1.8, eggHp:0.35,           // 孵るまでの秒数／卵のHP（孵る仔の何割）
+  boulderSpeed:11, boulderR:0.9, shards:5, shardCap:9, shardSpeed:6.0, shardMult:0.6,
+};
+function leechMouth(e){ return {x:e.x+(e.face||-1)*LEECH.mouthX, y:e.y+LEECH.mouthY}; }
+/* 瓦礫。(x,y) 半径 r が掛かっている瓦礫を返す */
+function rubbleAt(x, y, r){
+  const L=W.rubble; if(!L||!L.length) return null;
+  for(const b of L) if(Math.hypot(x-b.x, y-b.y) < b.r+(r||0)) return b;
+  return null;
+}
+function leechChip(x, y){ if(typeof feelSpray==='function') feelSpray(x, y, '#aba38a', 4, 0.8, 'dust'); }
+function leechAddRubble(x, y){
+  if(solid(x,y)) return null;
+  const L=(W.rubble=W.rubble||[]);
+  const b={x, y, r:LEECH.rubbleR, life:LEECH.rubbleLife, max:LEECH.rubbleLife, seed:(L.length*37+Math.round(x*13+y*7))&255, born:0};
+  L.push(b); if(L.length>LEECH.rubbleMax) L.shift();
+  return b;
+}
+function leechAddPool(x, y){
+  if(solid(x,y)) return null;
+  const L=(W.pools=W.pools||[]);
+  const q={x, y, r:LEECH.poolR, life:LEECH.poolLife, max:LEECH.poolLife, seed:(L.length*53+Math.round(x*11+y*17))&255};
+  L.push(q); if(L.length>LEECH.poolMax) L.shift();
+  return q;
+}
+function poolAt(x, y){
+  const L=W.pools; if(!L||!L.length) return null;
+  for(const q of L) if(Math.hypot(x-q.x, (y-q.y)*1.15) < q.r) return q;
+  return null;
+}
+/* 帯が瓦礫で止まる長さ（毒吐き）。予兆も判定も同じこれを使う */
+function leechBandLen(x0, y0, a, len, wide){
+  const L=W.rubble; if(!L||!L.length) return len;
+  const cx=Math.cos(a), cy=Math.sin(a); let out=len;
+  for(const b of L){
+    const dx=b.x-x0, dy=b.y-y0, along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
+    if(along>0.3 && along<out && side<wide+b.r*0.6) out=along;
+  }
+  return out;
+}
+function leechVenomDirs(cast, m){
+  if(!cast.fan3) return [cast.dir];
+  const f=m.fan*Math.PI/180; return [cast.dir-f, cast.dir, cast.dir+f];
+}
+/* 溜め始め。口の位置と向きを決め、呑んだ物を使う */
+function leechBeginCast(e, id, tg){
+  const m=BOSS_MOVES[id], c=e.cast;
+  e.face = tg.x>=e.x ? 1 : -1;
+  const mo=leechMouth(e); c.ox=mo.x; c.oy=mo.y;
+  c.dir=Math.atan2(tg.y-mo.y, tg.x-mo.x);
+  const B=(e.belly=e.belly||{stone:0, venom:0});
+  if(id==='gravel'){
+    const big=B.stone>0; B.stone=0; c.big=big;
+    const n=Math.min(LEECH.gravelCap, (m.n+(e.rage?1:0))*(big?LEECH.gravelBig:1));
+    const spots=[{x:tg.x, y:tg.y}];
+    for(let i=1;i<n;i++){
+      const ang=rnd()*Math.PI*2, r=rf(m.rad*1.5, m.spread*(big?1.35:1));
+      spots.push({x:tg.x+Math.cos(ang)*r, y:tg.y+Math.sin(ang)*r});
+    }
+    c.spots=spots;
+  }else if(id==='venom'){
+    c.fan3=B.venom>0; B.venom=0;
+  }else if(id==='spawn'){
+    const n=m.n+(e.rage?1:0), spots=[];
+    for(let i=0;i<n;i++){
+      const ang=c.dir+(i-(n-1)/2)*0.7+(rnd()-0.5)*0.3, r=rf(2.0, m.spread);
+      spots.push({x:mo.x+Math.cos(ang)*r, y:mo.y+Math.sin(ang)*r});
+    }
+    c.spots=spots;
+  }else if(id==='gulp'){
+    c.ate={stone:0, venom:0};
+  }
+}
+/* 吸い込みの扇（引く範囲）に入っているか */
+function leechInGulp(c, x, y, r){
+  const m=BOSS_MOVES.gulp, dx=x-c.ox, dy=y-c.oy, d=Math.hypot(dx,dy);
+  if(d - (r||0) > m.len) return false;
+  if(d < 0.5) return true;
+  return Math.abs(((Math.atan2(dy,dx)-c.dir+Math.PI*3)%(Math.PI*2))-Math.PI) <= m.arc*Math.PI/180;
+}
+/* 吸い込みの溜めの間、毎フレーム。人は歩けば抜けられる速さで、物は速く、口へ引く */
+function leechGulpTick(e, dt){
+  const c=e.cast, B=(e.belly=e.belly||{stone:0, venom:0});
+  const pull=(o, sp, stop)=>{
+    const dx=c.ox-o.x, dy=c.oy-o.y, d=Math.hypot(dx,dy); if(d<=stop) return d;
+    const st=Math.min(d-stop, sp*dt);
+    if(o.isEnt) moveEnt(o.ent, dx/d*st, dy/d*st); else { o.x+=dx/d*st; o.y+=dy/d*st; }
+    return d-st;
+  };
+  for(const a of [P, ...livingParty()]){
+    if(!a || (a===P && (!S.hero||!S.run))) continue;
+    if(leechInGulp(c, a.x, a.y, a.r||0.3)) pull({isEnt:true, ent:a, x:a.x, y:a.y}, LEECH.gulpPull, 0.6);
+  }
+  if(W.rubble) W.rubble=W.rubble.filter(b=>{
+    if(!leechInGulp(c, b.x, b.y, b.r)) return true;
+    if(pull(b, LEECH.gulpObj, 0) <= LEECH.gulpEat){ B.stone++; c.ate.stone++; leechChip(b.x, b.y); return false; }
+    return true;
+  });
+  if(W.pools) W.pools=W.pools.filter(q=>{
+    if(!leechInGulp(c, q.x, q.y, q.r)) return true;
+    if(pull(q, LEECH.gulpObj, 0) <= LEECH.gulpEat){ B.venom++; c.ate.venom++; return false; }
+    return true;
+  });
+}
+/* 吸い込みを潰された：むせて、呑んだ物を吐き戻す。腹は空になり、隙が長い */
+function leechChoke(e){
+  const B=e.belly||{stone:0, venom:0}, mo=leechMouth(e);
+  const n=Math.min(3, B.stone);
+  for(let i=0;i<n;i++){ const a=(e.face>0?0:Math.PI)+(i-(n-1)/2)*0.6; leechAddRubble(mo.x+Math.cos(a)*1.6, mo.y+0.5+Math.sin(a)*1.6); }
+  if(B.venom>0) leechAddPool(mo.x+(e.face||-1)*1.2, mo.y+0.6);
+  e.belly={stone:0, venom:0};
+  e.recover=LEECH.chokeStun;
+  W.pops.push({x:e.x, y:e.y-1.6, txt:'むせた', c:'#cfe8a0', life:1.0, max:1.0});
+  if(typeof feelPixelArt==='function') feelPixelArt('bl_choke', mo.x, mo.y, {angle:e.face>0?0:Math.PI});
+}
+function leechResolve(e, m){
+  const c=e.cast, id=c.id, dir=c.dir;
+  const art=(aid, x, y, o)=>{ if(typeof feelPixelArt==='function') feelPixelArt(aid, x, y, o||{}); };
+  if(id==='gravel'){
+    (c.spots||[]).forEach((sp,i)=>{
+      art('bl_stonehit', sp.x, sp.y, {range:m.rad});
+      W.fx.push({t:'shock', artId:'bl_stonehit', x:sp.x, y:sp.y, r:m.rad, life:0.3, max:0.3, col:'#aba38a'});
+      aoeTargets().forEach(t=>{ if(pillarHits(sp, m, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+      leechAddRubble(sp.x, sp.y);
+    });
+    if(typeof feelKick==='function') feelKick(2.2, 0.16);
+  }else if(id==='venom'){
+    leechVenomDirs(c, m).forEach(a=>{
+      const len=leechBandLen(c.ox, c.oy, a, m.len, m.wide);
+      art('bl_venom', c.ox, c.oy, {angle:a, range:len, wide:m.wide});
+      for(let d=LEECH.poolStep; d<=len+0.01; d+=LEECH.poolStep) leechAddPool(c.ox+Math.cos(a)*d, c.oy+Math.sin(a)*d);
+    });
+    aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+  }else if(id==='gulp'){
+    art('bl_bite', c.ox, c.oy, {angle:dir, range:m.rad});
+    if(typeof feelKick==='function') feelKick(2.6, 0.18);
+    aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+    if(e.revealed && (c.ate.stone||c.ate.venom))
+      log(e.name+'が'+(c.ate.stone?'瓦礫':'')+(c.ate.stone&&c.ate.venom?'と':'')+(c.ate.venom?'毒':'')+'を呑んだ');
+  }else if(id==='spawn'){
+    const lv=Math.max(1, e.lv-2), fams=floorFamilies(S.run?S.run.depth:1);
+    (c.spots||[]).forEach(sp=>{
+      if(!standable(sp.x, sp.y)) return;
+      const a2=pick(ARCH), fam2=pick(fams.length?fams:[FAMILY[0]]);
+      const k={x:sp.x, y:sp.y, arch:a2, fam:fam2, lv, elite:false, aff:[],
+        maxHp:Math.round((26+lv*11)*a2.hp*0.7), atkV:(5+lv*2.6)*a2.atk*0.8, def:lv*1.6,
+        res:fam2.res, dt:fam2.atk, st:{}, bu:{},
+        state:'chase', t:0, cd:rf(0,0.6), vx:0, vy:0, hit:0, tele:0, dead:false, r:0.34,
+        ms:a2.ms, teleMul:1, col:fam2.col, name:fam2.nm+'の'+a2.nm, summoned:true};
+      k.egg={t:LEECH.eggHatch, max:LEECH.eggHatch, hp0:k.maxHp, name0:k.name, def0:k.def};
+      k.maxHp=Math.max(1, Math.round(k.maxHp*LEECH.eggHp)); k.hp=k.maxHp; k.def=0; k.name='ヒルの卵';
+      W.enemies.push(k);
+      art('bl_eggland', sp.x, sp.y);
+    });
+  }else if(id==='boulder'){
+    W.fx.push({t:'boulder', x:c.ox, y:c.oy, dir, left:m.len, hit:[], src:e, eat:0, life:99, age:0, mult:m.mult});
+    if(typeof feelKick==='function') feelKick(2.4, 0.14);
+  }
+}
+/* 卵の絵（PixelArtFx の bl_egg）。描けなければ false（今までの敵の絵で出す） */
+function leechEggDraw(e, sx, sy){
+  if(typeof PIXEL_ART_FX==='undefined' || !PIXEL_ART_FX || typeof feelArtScale!=='function') return false;
+  const g=e.egg;
+  PIXEL_ART_FX.renderEffect(ctx, {id:'bl_egg', age:g.max-g.t, life:g.max, x:sx, y:sy, scale:feelArtScale(), seed:(e.x*7+e.y*13)|0,
+                                  o:{hurt:e.hit>0}});
+  return true;
+}
+/* 卵。孵るまで動かない。孵ったら普通の仔になる */
+function leechEggTick(e, dt){
+  const g=e.egg; g.t -= dt;
+  if(g.t>0) return;
+  e.maxHp=g.hp0; e.hp=g.hp0; e.def=g.def0; e.name=g.name0; e.egg=null; e.hit=0.12;
+  W.fx.push({t:'grave', x:e.x, y:e.y, life:0.4, max:0.4});
+  if(typeof feelPixelArt==='function') feelPixelArt('bl_hatch', e.x, e.y);
+}
+/* 毎フレーム：瓦礫の寿命と押し出し、毒の溜りの削れ、転がる大岩 */
+function tickLeech(dt){
+  const RB=W.rubble, PL=W.pools;
+  if(RB && RB.length){
+    for(const b of RB){ b.life-=dt; b.born+=dt; }
+    W.rubble=RB.filter(b=>b.life>0);
+    /* 瓦礫の中には立てない：重なった者を外へ押し出す（壁は moveEnt が止める） */
+    const ents=[P, ...livingParty(), ...W.enemies.filter(en=>!en.dead && !en.boss && !en.egg)];
+    for(const b of W.rubble) for(const a of ents){
+      if(!a) continue;
+      const dx=a.x-b.x, dy=a.y-b.y, d=Math.hypot(dx,dy), need=b.r+(a.r||0.3)*0.8;
+      if(d>=need) continue;
+      const k=(need-d), ux=d>1e-3?dx/d:1, uy=d>1e-3?dy/d:0;
+      moveEnt(a, ux*k, uy*k);
+    }
+  }
+  if(PL && PL.length){
+    for(const q of PL) q.life-=dt;
+    W.pools=PL.filter(q=>q.life>0);
+    W.poolT=(W.poolT||0)+dt;
+    if(W.poolT>=LEECH.poolTick && S.hero && S.run){
+      const step=W.poolT; W.poolT=0;
+      const hz=HAZARDS.poison, lv=S.run.depth;
+      if(poolAt(P.x, P.y) && !godMode() && (P.invuln||0)<=0){
+        const cap=stats(S.hero).maxHp*dotPct()*step;
+        const dmg=Math.max(1, Math.round(Math.min(hz.dps*step*(1+lv*0.06), cap)));
+        S.hero.hpNow-=dmg; popPlayerDamage(dmg, hz.edge, true);
+        W.fx.push({t:'hurt', life:0.10});
+        if(S.hero.hpNow<=0){ die(); return; }
+      }
+      livingParty().forEach(a=>{
+        if(!poolAt(a.x, a.y)) return;
+        const dmg=Math.max(1, Math.round(hz.dps*step*(1+lv*0.06)*0.5));
+        a.hpNow=Math.max(1, a.hpNow-dmg); pop(a.x, a.y, dmg, hz.edge);
+      });
+    }
+  }
+  /* 大岩。1フレームずつ本当に転がる。通り道の者に1回だけ当たり、瓦礫を砕いて巻き込む。
+     壁か長さの終わりで砕け、礫が扇に散る（巻き込んだ瓦礫の数だけ増える） */
+  for(const f of W.fx){
+    if(f.t!=='boulder' || f.done) continue;
+    f.age+=dt;
+    const cx=Math.cos(f.dir), cy=Math.sin(f.dir), step=Math.min(f.left, LEECH.boulderSpeed*dt);
+    const nx=f.x+cx*step, ny=f.y+cy*step;
+    const wall=solid(nx+cx*0.5, ny+cy*0.5);
+    if(!wall){ f.x=nx; f.y=ny; f.left-=step; }
+    aoeTargets().forEach(t=>{
+      const key=t.ent||'P'; if(f.hit.includes(key)) return;
+      if(Math.hypot(t.x-f.x, t.y-f.y) - t.r < BOSS_MOVES.boulder.wide){
+        f.hit.push(key); aoeHit(f.src, t, f.mult);
+        const side=((t.x-f.x)*-cy+(t.y-f.y)*cx)>=0 ? 1 : -1;
+        moveEnt(t.ent||P, -cy*side*0.9, cx*side*0.9);
+      }
+    });
+    if(W.rubble) W.rubble=W.rubble.filter(b=>{
+      if(Math.hypot(b.x-f.x, b.y-f.y) > LEECH.boulderR+b.r) return true;
+      f.eat++; leechChip(b.x, b.y); return false;
+    });
+    if(wall || f.left<=0.01){
+      f.done=true; f.life=0;
+      const n=Math.min(LEECH.shardCap, LEECH.shards+f.eat), base=wall ? f.dir+Math.PI : f.dir, fan=wall ? 2.2 : 1.6;
+      for(let i=0;i<n;i++){
+        const a=base-fan/2+fan*(n>1?i/(n-1):0.5), sp=LEECH.shardSpeed*(0.85+0.3*((i*7)%5)/4);
+        W.fx.push({t:'bolt', x:f.x, y:f.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1.6,
+                   dmg:f.src.atkV*LEECH.shardMult, lv:f.src.lv, dt:f.src.dt, bsrc:f.src, artId:'bl_shard'});
+      }
+      if(typeof feelPixelArt==='function') feelPixelArt('bl_shatter', f.x, f.y, {range:1.6});
+      if(typeof feelKick==='function') feelKick(3.2, 0.22);
+    }
+  }
+}
+/* ============================================================
+   打ち直しのブレヒト（20F）：2体の掛け合いと合体（2026-11-16 ユーザー指定「2体であることと合体を活かした体験」）
+   ・2体いる間は**交互に溜める**（bossCast）。予兆が2つ重ならない
+   ・掛け合い（相方の手が空いているときだけ）：
+       鎧＋鎧   … 打ち合わせ（2体を結ぶ帯）
+       蛸＋宿借り … 引いて挟む（引き寄せ → 宿借りの前へ引いて鋏）／墨を曳く（墨 → 宿借りが墨を通って転がり、筋を残す）
+                    ／投げる（蛸が宿借りを投げる。宿借りは本当に飛び、着地でひっくり返る）
+   ・同士討ち：片方の技の範囲に相方がいると、相方に当たって崩しが入る
+   ・合体：残った方の技は強い版（長さ・半径 ×1.2）、倒した方の技は弱い版（数が半分・溜め ×1.2・威力 ×0.85）
+     合体後だけの技：内と外／墨の泡／巻き転がり、HP3割で分かれ打ち
+   ワープはしない：飛ぶ・跳ぶ動きは秒速 12 マスで1フレームずつ進める（brechttest の noWarp）。
+   ============================================================ */
+const BRECHT_NEW={anvil:1, throw:1, inout:1, splitslam:1};
+const BRECHT_PAIR={
+  ch:0.40,                            // 手が空いているとき、掛け合いを選ぶ確率
+  anvilPer:0.06,                      // 打ち合わせ：2体の距離1マスごとに溜めが延びる秒数
+  ffDmg:0.5, ffBrk:8,                 // 同士討ち：相方へのダメージ（攻撃力比）と崩し
+  throwNear:5.0, flySpeed:12.0, flip:1.2,
+  comboCh:0.6,                        // 引いて挟む・墨を曳くが続く確率
+  trailR:0.8, trailLife:4.0, trailStep:1.2,
+  popR:0.9, popLife:4.0,              // 墨の泡が残す墨溜まり
+  splitAt:0.30,
+  mergeRoarAt:0.95,                   // 合体してから吠えるまで（bb_merge が白く弾けるのが 0.78 秒）
+  strong:1.2, weakTele:1.2, weakMult:0.85,
+};
+const BRECHT_FF={slam:1, cleave:1, tentacle:1, grab:1, pinch:1, inout:1};
+function brechtMate(e){ return (e && e.brecht && !e.brecht.merged) ? (W.enemies.find(x=>x!==e && x.brecht && !x.dead && !x.brecht.merged) || null) : null; }
+function brechtFree(p){ return !!p && !p.cast && !p.roll && !p.combo && !(p.broken>0) && !(p.recover>0) && !(p.down>0) && !(p.roar>0) && !(p.frz>0); }
+/* 合体後の技の強弱。強い版・弱い版の定義を返す（どちらでもなければ null） */
+function brechtMoveDef(e, id){
+  const b=e && e.brecht; if(!b || !b.merged || !b.strong) return null;
+  const m=BOSS_MOVES[id];
+  if(b.strong.includes(id)){ const o=Object.assign({}, m); if(o.len) o.len*=BRECHT_PAIR.strong; if(o.rad) o.rad*=BRECHT_PAIR.strong; return o; }
+  if(b.weak.includes(id)){ const o=Object.assign({}, m, {tele:m.tele*BRECHT_PAIR.weakTele, one:true}); if(o.mult) o.mult*=BRECHT_PAIR.weakMult; if(o.n) o.n=Math.ceil(o.n/2); return o; }
+  return null;
+}
+/* from から to へ、壁に当たる手前までの点 */
+function brechtReach(x0, y0, x1, y1){
+  const d=Math.hypot(x1-x0, y1-y0); if(d<0.01) return {x:x0, y:y0};
+  let gx=x0, gy=y0;
+  for(let s=0.25; s<=d; s+=0.25){ const nx=x0+(x1-x0)*s/d, ny=y0+(y1-y0)*s/d; if(solid(nx,ny)) break; gx=nx; gy=ny; }
+  return {x:gx, y:gy};
+}
+function brechtBeginCast(e, id, tg, m){
+  const c=e.cast, mt=brechtMate(e);
+  const follow=(p)=>{ p.cast={id, t:c.t, max:c.max, dir:Math.atan2(e.y-p.y, e.x-p.x), follow:e, intr:false}; p.tele=0; p.vx=0; p.vy=0; p.lastMove=id; };
+  if(id==='anvil'){
+    c.x1=e.x; c.y1=e.y;
+    if(mt){ c.x2=mt.x; c.y2=mt.y; c.dir=Math.atan2(mt.y-e.y, mt.x-e.x);
+      const ex=Math.hypot(mt.x-e.x, mt.y-e.y)*BRECHT_PAIR.anvilPer; c.t+=ex; c.max+=ex; follow(mt); }
+    else { c.x2=e.x+Math.cos(c.dir)*6; c.y2=e.y+Math.sin(c.dir)*6; }     // 相方がいなければ、狙った向きへ打ち出す
+  }else if(id==='throw'){
+    const who = mt && brechtFree(mt) ? mt : null;
+    const from = who || e, sp=brechtReach(from.x, from.y, tg.x, tg.y);
+    c.spot=sp;
+    if(who){ follow(who); c.fly={who, x0:who.x, y0:who.y, x1:sp.x, y1:sp.y, T:Math.hypot(sp.x-who.x, sp.y-who.y)/BRECHT_PAIR.flySpeed}; }
+  }else if(id==='splitslam'){
+    const sp=brechtReach(e.x, e.y, tg.x, tg.y);
+    c.spot=sp;
+    c.fly={who:e, x0:e.x, y0:e.y, x1:sp.x, y1:sp.y, T:Math.hypot(sp.x-e.x, sp.y-e.y)/BRECHT_PAIR.flySpeed};
+  }
+}
+/* 飛ぶ・跳ぶ。溜めの終わりの T 秒で、決めておいた点まで1フレームずつ進む（着いた瞬間が着弾） */
+function brechtFlyTick(c){
+  const F=c.fly, w=F.who; if(!w || w.dead || F.T<=0) return;
+  if(c.t > F.T) return;
+  const k=clamp(1-c.t/F.T, 0, 1);
+  w.x=F.x0+(F.x1-F.x0)*k; w.y=F.y0+(F.y1-F.y0)*k; w.vx=0; w.vy=0;
+  w.flyZ=Math.sin(k*Math.PI);                       // 絵を浮かせる高さ（0〜1）
+}
+function brechtResolve(e, m){
+  const c=e.cast, id=c.id;
+  const art=(aid, x, y, o)=>{ if(typeof feelPixelArt==='function') feelPixelArt(aid, x, y, o||{}); };
+  if(c.follow) return;
+  if(id==='anvil'){
+    const a=Math.atan2(c.y2-c.y1, c.x2-c.x1), L=Math.hypot(c.x2-c.x1, c.y2-c.y1);
+    W.fx.push({t:'ultbeam', artId:'bb_anvil', x:c.x1, y:c.y1, a, len:L, wide:m.wide, life:0.3, maxLife:0.3, col:'#ffd8a0'});
+    art('bb_anvil', c.x1, c.y1, {angle:a, range:L, wide:m.wide});
+    if(typeof feelKick==='function') feelKick(3.4, 0.2);
+    aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+  }else if(id==='throw' || id==='splitslam'){
+    const sp=c.spot, who=c.fly && c.fly.who;
+    if(who){ who.x=c.fly.x1; who.y=c.fly.y1; who.flyZ=0; }
+    W.fx.push({t:'shock', artId:'bb_land', x:sp.x, y:sp.y, r:m.rad, life:0.34, max:0.34, col:id==='throw'?'#e08a4a':'#e0b0d0'});
+    art('bb_land', sp.x, sp.y, {range:m.rad, o:{split:id==='splitslam'}});
+    if(typeof feelKick==='function') feelKick(id==='throw'?3.4:4.2, 0.24);
+    aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+    if(id==='throw' && who && who!==e){               // 投げられた宿借りはひっくり返る（大きな隙）
+      who.cast=null; who.recover=BRECHT_PAIR.flip; who.moveCd=Math.max(who.moveCd||0, 1.5);
+      W.pops.push({x:who.x, y:who.y-1.0, txt:'ひっくり返った', c:'#ffd8a0', life:1.0, max:1.0});
+    }
+  }else if(id==='inout'){
+    const R=m.rad+e.r, half=m.arc*Math.PI/180;
+    W.fx.push({t:'cleave', artId:'bb_pinch', x:e.x, y:e.y, a:c.dir, r:R, arc:half, life:0.24, max:0.24, col:'#e08a4a'});
+    art('bb_pinch', e.x, e.y, {angle:c.dir, range:R, arc:half});
+    tentacleDirs(c.dir, m).forEach(a=>{
+      W.fx.push({t:'ultbeam', artId:'bb_tentacle', x:e.x, y:e.y, a, len:m.len, wide:m.wide, life:0.32, maxLife:0.32, col:'#c05a8a'});
+      art('bb_tentacle', e.x, e.y, {angle:a, range:m.len, wide:m.wide});
+    });
+    if(typeof feelKick==='function') feelKick(2.8, 0.18);
+    aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
+  }
+}
+/* ドットの効果（PixelArtFx の bb_*）。絵が読めていなければ今までの図形で出す */
+function brechtArtOn(){ return typeof PIXEL_ART_FX!=='undefined' && !!PIXEL_ART_FX && typeof feelPixelArt==='function'; }
+function brechtArt(e, m){
+  const c=e.cast; if(!e.brecht || !c || c.follow || !brechtArtOn()) return;
+  const id=c.id, dir=c.dir;
+  if(id==='slam') feelPixelArt('bb_slam', e.x, e.y, {range:m.rad+e.r});
+  else if(id==='cleave') feelPixelArt('bb_cleave', e.x, e.y, {angle:dir, range:m.rad+e.r, arc:m.arc*Math.PI/180});
+  else if(id==='tentacle') tentacleDirs(dir, m).forEach(a=>feelPixelArt('bb_tentacle', e.x, e.y, {angle:a, range:m.len, wide:m.wide}));
+  else if(id==='grab') feelPixelArt('bb_tentacle', e.x, e.y, {angle:dir, range:m.len, wide:m.wide, o:{grab:true}});
+  else if(id==='pinch') feelPixelArt('bb_pinch', e.x, e.y, {angle:dir, range:m.rad+e.r, arc:m.arc*Math.PI/180, o:{two:true}});
+}
+/* 同士討ち。技の範囲に相方がいたら、相方に当たって崩しが入る */
+function brechtFF(e, mt){
+  const dmg=Math.max(1, Math.round(e.atkV*BRECHT_PAIR.ffDmg));
+  mt.hp=Math.max(1, mt.hp-dmg); mt.hit=Math.max(mt.hit||0, 0.15);
+  pop(mt.x, mt.y-0.3, dmg, '#ffd8a0');
+  W.pops.push({x:mt.x, y:mt.y-1.2, txt:'同士討ち', c:'#ffd8a0', life:1.0, max:1.0});
+  duelInit(mt); addBreak(mt, BRECHT_PAIR.ffBrk);
+  if(typeof feelPixelArt==='function') feelPixelArt('bb_ff', mt.x, mt.y-0.3);
+  if(e.revealed) log(e.name+'の'+BOSS_MOVES[e.lastMove||'slam'].nm+'が'+mt.name+'に当たった');
+}
+function brechtFriendlyFire(e){
+  const c=e.cast; if(!e.brecht || !c || c.follow || !BRECHT_FF[c.id]) return;
+  const mt=brechtMate(e); if(!mt) return;
+  if(bossMoveHits(e, c, mt.x, mt.y, mt.r*0.5)) brechtFF(e, mt);
+}
+/* 引いて挟む。蛸の引き寄せが当たったとき、宿借りの手が空いていれば、宿借りの前へ引いて鋏 */
+function brechtPullPinch(e, who){
+  const mt=brechtMate(e);
+  if(!mt || !e.brecht.purged || !mt.brecht.purged || mt.brecht.inner!=='crab' || !brechtFree(mt)) return;
+  if(Math.hypot(who.x-mt.x, who.y-mt.y) > 8 || rnd()>=BRECHT_PAIR.comboCh) return;
+  const a=Math.atan2(who.y-mt.y, who.x-mt.x), stop=mt.r+0.9;
+  who.pull={x:mt.x+Math.cos(a)*stop, y:mt.y+Math.sin(a)*stop, t:0.35};
+  bossBeginCast(mt, 'pinch', who.pull, true);
+  W.fx.push({t:'ultline', x:e.x, y:e.y, x2:mt.x, y2:mt.y, life:0.3, maxLife:0.3, col:'#e0b0d0'});
+}
+/* 墨を曳く。蛸の墨のあと、宿借りが足元の墨溜まりを通って転がる。墨に触れてからは筋を残す */
+function brechtInkRoll(e){
+  const mt=brechtMate(e), sp=e.cast.spots && e.cast.spots[0];
+  if(!mt || !sp || !e.brecht.purged || !mt.brecht.purged || mt.brecht.inner!=='crab' || !brechtFree(mt)) return;
+  const d=Math.hypot(sp.x-mt.x, sp.y-mt.y);
+  if(d<BOSS_MOVES.roll.min || d>BOSS_MOVES.roll.len || rnd()>=BRECHT_PAIR.comboCh) return;
+  bossBeginCast(mt, 'roll', sp, true); mt.cast.trail=true;
+}
+function brechtRollExtras(e, R, step){
+  if(R.trail){
+    if(inkSlowAt(e.x, e.y)<1) R.inked=true;
+    if(R.inked){ R.tr=(R.tr||0)+step;
+      if(R.tr>=BRECHT_PAIR.trailStep){ R.tr=0;
+        W.fx.push({t:'ink', x:e.x, y:e.y, r:BRECHT_PAIR.trailR, life:BRECHT_PAIR.trailLife, max:BRECHT_PAIR.trailLife, seed:(e.x*31+e.y*17)|0}); } }
+  }
+  const mt=brechtMate(e);                            // 転がりの同士討ち
+  if(mt && !R.hit.includes('M') && Math.hypot(mt.x-e.x, mt.y-e.y) < e.r+mt.r*0.8){ R.hit.push('M'); brechtFF(e, mt); }
+}
+/* 墨の泡。消える所（壁・寿命・当たる直前）に小さな墨溜まりを残す */
+function tickInkBubbles(dt){
+  for(const f of W.fx){
+    if(f.t!=='bolt' || !f.inky || f.popped) continue;
+    const nx=f.x+f.vx*dt, ny=f.y+f.vy*dt;
+    const hit = f.life<=dt*1.5 || solid(nx,ny) || (S.hero && Math.hypot(nx-P.x, ny-P.y)<0.45) || livingParty().some(a=>Math.hypot(nx-a.x, ny-a.y)<0.45);
+    if(!hit) continue;
+    f.popped=true;
+    if(!solid(f.x, f.y)) W.fx.push({t:'ink', x:f.x, y:f.y, r:BRECHT_PAIR.popR, life:BRECHT_PAIR.popLife, max:BRECHT_PAIR.popLife, seed:(f.x*29+f.y*13)|0});
   }
 }
 /* 引き寄せられている者（主人公・仲間）。pull の点へ残り時間で割って近づく。壁は moveEnt が止める */
@@ -14360,7 +14878,15 @@ function finalBossTick(e, dt){
    散弾・波動は「その瞬間に範囲の中か」で当たる技ではない（弾と広がる輪）ので false。 */
 function pillarHits(sp, m, x, y, r){ return Math.hypot(x-sp.x, y-sp.y) - r < m.rad; }
 function bossMoveHits(e, cast, x, y, r){
-  const m = BOSS_MOVES[cast.id], dir = cast.dir;
+  const m = cast.m || BOSS_MOVES[cast.id], dir = cast.dir;
+  if(cast.follow) return false;                    // 相方の技に合わせて構えているだけ（当たりは相方の側）
+  if(cast.id==='anvil') return bandHits(cast.x1, cast.y1, Math.atan2(cast.y2-cast.y1, cast.x2-cast.x1), Math.hypot(cast.x2-cast.x1, cast.y2-cast.y1), m.wide, x, y, r);
+  if(cast.id==='throw' || cast.id==='splitslam') return Math.hypot(x-cast.spot.x, y-cast.spot.y) - r < m.rad;
+  if(cast.id==='inout'){
+    const dx=x-e.x, dy=y-e.y, d=Math.hypot(dx,dy);
+    if(d - r <= m.rad + e.r && Math.abs(((Math.atan2(dy,dx)-dir+Math.PI*3)%(Math.PI*2))-Math.PI) <= m.arc*Math.PI/180) return true;
+    return tentacleDirs(dir, m).some(a=>bandHits(e.x, e.y, a, m.len, m.wide, x, y, r));
+  }
   if(cast.id==='slam') return Math.hypot(x-e.x, y-e.y) - r < m.rad + e.r;
   if(cast.id==='cleave'){
     const dx=x-e.x, dy=y-e.y, d=Math.hypot(dx,dy);
@@ -14374,9 +14900,17 @@ function bossMoveHits(e, cast, x, y, r){
     const along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
     return along>=-0.4 && along<=len && side<=m.wide+r && !(cast.id==='beam' && coverBlocks(e.x,e.y,x,y));
   }
-  if(cast.id==='pillars' || cast.id==='ink') return (cast.spots||[]).some(sp=>pillarHits(sp, m, x, y, r));
+  if(cast.id==='pillars' || cast.id==='ink' || cast.id==='gravel') return (cast.spots||[]).some(sp=>pillarHits(sp, m, x, y, r));
+  if(cast.id==='venom') return leechVenomDirs(cast, m).some(a=>bandHits(cast.ox, cast.oy, a, leechBandLen(cast.ox, cast.oy, a, m.len, m.wide), m.wide, x, y, r));
+  if(cast.id==='boulder') return bandHits(cast.ox, cast.oy, dir, m.len, m.wide, x, y, r);
+  if(cast.id==='gulp'){               // 当たるのは口元を噛む所だけ（広い扇は引くだけで、当たらない）
+    const dx=x-cast.ox, dy=y-cast.oy, d=Math.hypot(dx,dy);
+    if(d - r > m.rad) return false;
+    if(d < 0.5) return true;
+    return Math.abs(((Math.atan2(dy,dx)-dir+Math.PI*3)%(Math.PI*2))-Math.PI) <= m.arc*Math.PI/180;
+  }
   if(cast.id==='tentacle') return tentacleDirs(cast.dir, m).some(a=>bandHits(e.x, e.y, a, m.len, m.wide, x, y, r));
-  if(cast.id==='grab' || cast.id==='roll') return bandHits(e.x, e.y, dir, m.len, m.wide, x, y, r);
+  if(cast.id==='grab' || cast.id==='roll' || cast.id==='spinroll') return bandHits(e.x, e.y, dir, m.len, m.wide, x, y, r);
   if(cast.id==='pinch'){
     const dx=x-e.x, dy=y-e.y, d=Math.hypot(dx,dy);
     if(d - r > m.rad + e.r) return false;
@@ -14395,10 +14929,10 @@ function bandHits(x0, y0, a, len, wide, x, y, r){
   return along>=-0.4 && along<=len && side<=wide+r;
 }
 /* 触手の3本の向き（真ん中・左右に fan 度） */
-function tentacleDirs(dir, m){ const f=(m.fan||26)*Math.PI/180; return [dir-f, dir, dir+f]; }
+function tentacleDirs(dir, m){ if(m.one) return [dir]; const f=(m.fan||26)*Math.PI/180; return [dir-f, dir, dir+f]; }
 
 function resolveBossMove(e){
-  const m = BOSS_MOVES[e.cast.id];
+  const m = e.cast.m || BOSS_MOVES[e.cast.id];
   const dir = e.cast.dir;
   /* 5F・10F のボスはドットの絵（weapon-art-pixel.js）。当たり判定は下の通りで変えない。
      BA が null のボス（まだ絵の無いボス）は今までの輪・扇・帯のまま。 */
@@ -14491,18 +15025,19 @@ function resolveBossMove(e){
   }else if(e.cast.id==='tentacle'){
     /* 触手。扇に3本の帯が同時に叩く。1人に何本掛かっても1回だけ当たる */
     const col='#c05a8a';
-    tentacleDirs(dir, m).forEach(a=>W.fx.push({t:'ultbeam', x:e.x, y:e.y, a, len:m.len, wide:m.wide, life:0.32, maxLife:0.32, col}));
+    tentacleDirs(dir, m).forEach(a=>W.fx.push({t:'ultbeam', artId:brechtArtOn()?'bb_tentacle':undefined, x:e.x, y:e.y, a, len:m.len, wide:m.wide, life:0.32, maxLife:0.32, col}));
     if(typeof feelKick==='function') feelKick(2.4, 0.16);
     aoeTargets().forEach(t=>{ if(bossMoveHits(e, e.cast, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
 
   }else if(e.cast.id==='grab'){
     /* 引き寄せ。細い触手1本。当たった者は本体の前（体の縁の少し先）まで引かれる（0.25秒かけて。壁は抜けない） */
-    W.fx.push({t:'ultbeam', x:e.x, y:e.y, a:dir, len:m.len, wide:m.wide, life:0.3, maxLife:0.3, col:'#c05a8a'});
+    W.fx.push({t:'ultbeam', artId:brechtArtOn()?'bb_tentacle':undefined, x:e.x, y:e.y, a:dir, len:m.len, wide:m.wide, life:0.3, maxLife:0.3, col:'#c05a8a'});
     aoeTargets().forEach(t=>{
       if(!bossMoveHits(e, e.cast, t.x, t.y, t.r)) return;
       aoeHit(e, t, m.mult);
       const who=t.ent||P, a=Math.atan2(who.y-e.y, who.x-e.x), stop=e.r+0.9;
       who.pull={x:e.x+Math.cos(a)*stop, y:e.y+Math.sin(a)*stop, t:0.25};
+      brechtPullPinch(e, who);                     // 掛け合い「引いて挟む」：宿借りの手が空いていれば、宿借りの前へ引く
       W.fx.push({t:'ultline', x:e.x, y:e.y, x2:who.x, y2:who.y, life:0.28, maxLife:0.28, col:'#e07aa8'});
     });
 
@@ -14514,6 +15049,7 @@ function resolveBossMove(e){
       if(typeof feelSpray==='function') feelSpray(sp.x, sp.y, '#2a1830', 10, 1.6);
       aoeTargets().forEach(t=>{ if(pillarHits(sp, m, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
     });
+    brechtInkRoll(e);                              // 掛け合い「墨を曳く」：宿借りが墨溜まりを通って転がる
 
   }else if(e.cast.id==='pinch'){
     /* 鋏。左半分を挟み、gap 秒あとに右半分。2発目の判定はその時の立ち位置で見る（1発目のあと動けば避けられる） */
@@ -14521,25 +15057,31 @@ function resolveBossMove(e){
     const hit=(side)=>{
       if(e.dead) return;
       const c={id:'pinch', dir, half:side};
-      W.fx.push({t:'cleave', x:e.x, y:e.y, a:dir+(side==='L'?-half/2:half/2), r:R, arc:half/2, life:0.22, max:0.22, col});
+      W.fx.push({t:'cleave', artId:brechtArtOn()?'bb_pinch':undefined, x:e.x, y:e.y, a:dir+(side==='L'?-half/2:half/2), r:R, arc:half/2, life:0.22, max:0.22, col});
       aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
     };
     hit('L');
     (e.pending=e.pending||[]).push({t:m.gap, fn:()=>hit('R')});
 
-  }else if(e.cast.id==='bubble'){
-    /* 泡。狙った向きへ扇に広がる、ゆっくりの弾 */
+  }else if(e.cast.id==='bubble' || e.cast.id==='inkbubble'){
+    /* 泡。狙った向きへ扇に広がる、ゆっくりの弾。墨の泡は消えた所に墨溜まりを残す（tickInkBubbles） */
     const f=m.fan*Math.PI/180;
     for(let i=0;i<m.n;i++){
       const a=dir-f/2+f*i/(m.n-1)+(rnd()-0.5)*0.08, sp=m.speed*rf(0.8,1.15);
       W.fx.push({t:'bolt', x:e.x, y:e.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:4.5,
-                 dmg:e.atkV*m.mult, lv:e.lv, dt:e.dt, bsrc:e, bubble:true});
+                 dmg:e.atkV*m.mult, lv:e.lv, dt:e.dt, bsrc:e, bubble:true, inky:e.cast.id==='inkbubble'});
     }
 
-  }else if(e.cast.id==='roll'){
+  }else if(e.cast.id==='roll' || e.cast.id==='spinroll'){
     /* 転がり。ここでは転がり始めるだけ。進めるのは bossRollTick（bossCast の頭で毎フレーム） */
-    e.roll = {dir, left:m.len, hit:[], dust:0};
+    e.roll = {dir, left:m.len, hit:[], dust:0, mult:m.mult, wide:e.cast.id==='spinroll'?m.wide:0, trail:!!e.cast.trail};
     if(typeof feelKick==='function') feelKick(2.0, 0.12);
+
+  }else if(LEECH_MOVES[e.cast.id]){
+    leechResolve(e, m);
+
+  }else if(BRECHT_NEW[e.cast.id]){
+    brechtResolve(e, m);
 
   }else if(e.cast.id==='summon'){
     /* 取り巻きを呼ぶ。ダメージは無い代わりに、盤面そのものを変える。
@@ -14576,6 +15118,8 @@ function resolveBossMove(e){
     spawnFinalMirrors(e, m.n, m.dur);
     W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.6, life:0.45, maxLife:0.45, col:'#c98adf'});
   }
+  brechtFriendlyFire(e);
+  brechtArt(e, m);
   const cd=m.cd;
   e.moveCd = rf(cd[0],cd[1]) * (e.rage?0.65:1);
 }
@@ -16376,6 +16920,8 @@ function update(dt){
   vera2KeepOut();                 // ヴェラ第二形態の胴と脚の下には入れない
   tickPulls(dt);                  // ブレヒトの引き寄せ
   tickInk(dt);                    // ブレヒトの墨（視界の狭まり）
+  tickLeech(dt);                  // ヒルの瓦礫・毒の溜り・大岩
+  tickInkBubbles(dt);             // ブレヒトの墨の泡
   if(!S.hero || !S.run) return;   // このフレームで死亡した場合はここで抜ける
   // 弾（敵の弾と主人公の飛び道具）
   W.fx=W.fx.filter(f=>{
@@ -16383,6 +16929,7 @@ function update(dt){
     if(f.t==='bolt'){
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
+      if(rubbleAt(f.x,f.y,0.05)){ leechChip(f.x,f.y); return false; }      // 瓦礫は弾を遮る
       // 敵の弾は当たった者に入る。仲間が前に出ていれば仲間が受ける。
       if(npcAwake() && Math.hypot(f.x-W.npc.x,f.y-W.npc.y)<0.45){
         hitAlly(W.npc,null,f.dmg,f.dt,f.lv,f.from||f.bsrc); return false;
@@ -16398,6 +16945,7 @@ function update(dt){
       if(!S.hero || !S.run) return false;
       f.x+=f.vx*dt; f.y+=f.vy*dt;
       if(solid(f.x,f.y)) return false;
+      if(rubbleAt(f.x,f.y,0.05)){ leechChip(f.x,f.y); return false; }      // 瓦礫は主人公の飛び道具も遮る
       let stNow=stats(S.hero);
       /* カンバンテインは弾ごとに別の属性が乗る。撃った時点で焼き付けてあるので、
          当たるまでに武器を持ち替えても、その弾の属性は変わらない。 */
@@ -17318,7 +17866,7 @@ function draw(){
     if(e.dead && e.pixelBurst) return;
     // 跳ねている最中だけ絵を浮かせる（座標は動かさないので当たり判定は素直なまま）
     const motion=finiteXY(feelEntityOffset(e));
-    const sx=e.x*TS-camX+motion.x, sy=e.y*TS-camY-hopLift(e)+motion.y;
+    const sx=e.x*TS-camX+motion.x, sy=e.y*TS-camY-hopLift(e)-(e.flyZ||0)*TS*1.4+motion.y;   // flyZ：ブレヒトの「投げる」「分かれ打ち」で浮く高さ
     // ボスは大きく、予兆の図形はさらに大きいので、切り捨てる余白を広く取る
     const cull = e.boss ? 340 : 60;
     if(sx<-cull||sy<-cull||sx>innerWidth+cull||sy>innerHeight+cull) return;
@@ -17405,6 +17953,7 @@ function draw(){
     const charKey = CharacterArt.enemyKey(e);
     let spriteDrawn=false;
     const drawBody=()=>{
+    if(e.egg){ spriteDrawn = leechEggDraw(e, sx, sy); if(spriteDrawn) return; }   // ヒルの卵は専用の絵
     ctx.save(); ctx.globalAlpha*=feelBlink(e);
     const caveDrawn = !!(window.CAVE && CAVE.on && CAVE.enemy(e,sx,sy,R));   // 洞窟版の絵は激昂の輪郭・オーラ・目を絵のドットで足す
     /* 激昂（2026-11-02 ユーザー指定）：洞窟版の絵が無い敵は、絵の形に沿った赤い光の縁取りを明滅させ、火の粉を昇らせる */
@@ -22014,11 +22563,13 @@ function upgNodeHTML(u){
   const tech=skillDef(u.id), col = stt==='locked'||stt==='noreq' ? '#4a5164' : tech ? tech.col : '#e6e9f0';
   const set = tech && lv>0 && skillEquipped()===tech;
   const pips = Array.from({length:u.max}, (_,i)=>`<b class="${i<lv?'on':''}"></b>`).join('');
+  const cost = lv<u.max ? `<span class="skn-cost">${upgCost(u,lv)} SP</span>`
+                        : '<span class="skn-limit">最大</span>';
   return `<div class="skn ${stt}${lv>0?' own':''}${_upgSel===u.id?' sel':''}${tech?' tech':''}${_upgJust===u.id?' just':''}${_upgJustOpened.includes(u.id)?' opened':''}${set?' set':''}" data-upgsel="${u.id}"
      style="left:${x}px;top:${y}px;--ic:${col}">
     <i style="background-image:${skillIconTint(upgIconId(u), col)}"></i>
     <div class="skn-t"><span class="skn-nm">${stt==='locked'?'<i class="pi pi-lock"></i>':''}${u.nm}</span>
-      <span class="skn-pp">${pips}</span></div>
+      <span class="skn-pp">${pips}</span>${cost}</div>
     ${set?'<em class="skn-set">SET</em>':''}
   </div>`;
 }
@@ -22875,7 +23426,8 @@ function bossCasting(){
   return !!(W.enemies||[]).some(e=>e.boss && !e.dead && e.cast);
 }
 function drawBossCast(e, sx, sy, R){
-  const m = BOSS_MOVES[e.cast.id];
+  if(e.cast.follow) return;                          // 相方の技の構え：図形は相方の側が描く
+  const m = e.cast.m || BOSS_MOVES[e.cast.id];
   const p = 1 - e.cast.t/e.cast.max;          // 0 → 1 で着弾
   const warn = '255,90,70';
   ctx.save();
@@ -22927,7 +23479,44 @@ function drawBossCast(e, sx, sy, R){
     ctx.fillRect(0, -Wd, L*p, Wd*2);
     ctx.restore();
 
-  }else if(e.cast.id==='pillars'){
+  }else if(e.cast.id==='venom' || e.cast.id==='boulder'){
+    /* ヒルの帯。口（cast.ox,oy）から。毒吐きは瓦礫で止まる長さ（判定と同じ leechBandLen） */
+    const c=e.cast, ox=c.ox*TS-(P.x*TS-innerWidth/2), oy=c.oy*TS-(P.y*TS-innerHeight/2), Wd=m.wide*TS;
+    (c.id==='venom' ? leechVenomDirs(c, m) : [c.dir]).forEach(a=>{
+      const L=(c.id==='venom' ? leechBandLen(c.ox, c.oy, a, m.len, m.wide) : m.len)*TS;
+      ctx.save(); ctx.translate(ox,oy); ctx.rotate(a);
+      ctx.fillStyle='rgba('+warn+','+(0.09+p*0.22)+')'; ctx.fillRect(-0.4*TS, -Wd, L+0.4*TS, Wd*2);
+      ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5; ctx.strokeRect(-0.4*TS, -Wd, L+0.4*TS, Wd*2);
+      ctx.fillStyle='rgba(255,255,255,'+(0.14+p*0.22)+')'; ctx.fillRect(-0.4*TS, -Wd, (L+0.4*TS)*p, Wd*2);
+      ctx.restore();
+    });
+
+  }else if(e.cast.id==='gulp'){
+    /* 吸い込み。広い扇は「引かれる範囲」（当たらない）＝白い破線。当たるのは口元の赤い扇だけ */
+    const c=e.cast, ox=c.ox*TS-(P.x*TS-innerWidth/2), oy=c.oy*TS-(P.y*TS-innerHeight/2), half=m.arc*Math.PI/180, a=c.dir;
+    const big=m.len*TS, rad=m.rad*TS;
+    ctx.fillStyle='rgba(200,230,225,0.06)';
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,big,a-half,a+half); ctx.closePath(); ctx.fill();
+    ctx.setLineDash([8,8]); ctx.lineDashOffset=nowSec()*40;
+    ctx.strokeStyle='rgba(215,235,230,0.55)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,big,a-half,a+half); ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba('+warn+','+(0.10+p*0.24)+')';
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,rad,a-half,a+half); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba('+warn+','+(0.6+p*0.4)+')'; ctx.lineWidth=2+p*2.5;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,rad,a-half,a+half); ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,'+(0.3+p*0.5)+')'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,rad*p,a-half,a+half); ctx.closePath(); ctx.stroke();
+
+  }else if(e.cast.id==='spawn'){
+    // 卵の落ちる所。当たらないので赤くしない（白い破線の小さな輪）
+    (e.cast.spots||[]).forEach(sp=>{
+      const px2=sp.x*TS-(P.x*TS-innerWidth/2), py2=sp.y*TS-(P.y*TS-innerHeight/2);
+      ctx.setLineDash([5,5]); ctx.strokeStyle='rgba(230,235,220,'+(0.4+p*0.4)+')'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(px2,py2,m.rad*TS,0,7); ctx.stroke(); ctx.setLineDash([]);
+    });
+
+  }else if(e.cast.id==='pillars' || e.cast.id==='gravel'){
     // 落ちる場所を全部見せる。逃げ先を選ばせるのがこの技の本体なので。
     (e.cast.spots||[]).forEach(sp=>{
       const px2=sp.x*TS-(P.x*TS-innerWidth/2), py2=sp.y*TS-(P.y*TS-innerHeight/2);
@@ -22940,7 +23529,43 @@ function drawBossCast(e, sx, sy, R){
       ctx.beginPath(); ctx.arc(px2,py2,Math.max(0,rad*p),0,7); ctx.stroke();
     });
 
-  }else if(e.cast.id==='tentacle' || e.cast.id==='grab' || e.cast.id==='roll'){
+  }else if(e.cast.id==='anvil'){
+    /* 打ち合わせ。2体を結ぶ帯（bossMoveHits と同じ） */
+    const c=e.cast, ox=c.x1*TS-(P.x*TS-innerWidth/2), oy=c.y1*TS-(P.y*TS-innerHeight/2);
+    const a=Math.atan2(c.y2-c.y1, c.x2-c.x1), L=Math.hypot(c.x2-c.x1, c.y2-c.y1)*TS, Wd=m.wide*TS;
+    ctx.save(); ctx.translate(ox,oy); ctx.rotate(a);
+    ctx.fillStyle='rgba('+warn+','+(0.09+p*0.22)+')'; ctx.fillRect(0, -Wd, L, Wd*2);
+    ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5; ctx.strokeRect(0, -Wd, L, Wd*2);
+    ctx.fillStyle='rgba(255,255,255,'+(0.14+p*0.22)+')';                 // 両端から真ん中へ満ちる
+    ctx.fillRect(0, -Wd, L*p/2, Wd*2); ctx.fillRect(L-L*p/2, -Wd, L*p/2, Wd*2);
+    ctx.restore();
+
+  }else if(e.cast.id==='throw' || e.cast.id==='splitslam'){
+    const sp=e.cast.spot, px2=sp.x*TS-(P.x*TS-innerWidth/2), py2=sp.y*TS-(P.y*TS-innerHeight/2), rad=m.rad*TS;
+    ctx.fillStyle='rgba('+warn+','+(0.10+p*0.24)+')';
+    ctx.beginPath(); ctx.arc(px2,py2,rad,0,7); ctx.fill();
+    ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5;
+    ctx.beginPath(); ctx.arc(px2,py2,rad,0,7); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(px2,py2,Math.max(0,rad*p),0,7); ctx.stroke();
+
+  }else if(e.cast.id==='inout'){
+    /* 内と外。鋏の扇（近く）と触手の帯3本（遠く）を同時に見せる */
+    const rad=(m.rad+e.r)*TS, half=m.arc*Math.PI/180, a=e.cast.dir, L=m.len*TS, Wd=m.wide*TS;
+    tentacleDirs(a, m).forEach(b2=>{
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(b2);
+      ctx.fillStyle='rgba('+warn+','+(0.09+p*0.22)+')'; ctx.fillRect(-0.4*TS, -Wd, L+0.4*TS, Wd*2);
+      ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*2.5; ctx.strokeRect(-0.4*TS, -Wd, L+0.4*TS, Wd*2);
+      ctx.restore();
+    });
+    ctx.fillStyle='rgba('+warn+','+(0.10+p*0.24)+')';
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.arc(sx,sy,rad,a-half,a+half); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba('+warn+','+(0.6+p*0.4)+')'; ctx.lineWidth=2+p*2.5;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.arc(sx,sy,rad,a-half,a+half); ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,'+(0.3+p*0.5)+')'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.arc(sx,sy,rad*p,a-half,a+half); ctx.closePath(); ctx.stroke();
+
+  }else if(e.cast.id==='tentacle' || e.cast.id==='grab' || e.cast.id==='roll' || e.cast.id==='spinroll'){
     /* 帯（触手は扇に3本）。当たる範囲そのもの（bossMoveHits の bandHits と同じ形） */
     const dirs = e.cast.id==='tentacle' ? tentacleDirs(e.cast.dir, m) : [e.cast.dir];
     const L=m.len*TS, Wd=m.wide*TS;
@@ -22975,7 +23600,7 @@ function drawBossCast(e, sx, sy, R){
       ctx.beginPath(); ctx.arc(px2,py2,Math.max(0,rad*p),0,7); ctx.stroke();
     });
 
-  }else if(e.cast.id==='bubble'){
+  }else if(e.cast.id==='bubble' || e.cast.id==='inkbubble'){
     // 泡。狙った向きの扇に短い線を伸ばして「こちらへ来る」を予告する
     const f=m.fan*Math.PI/180, n=5;
     ctx.strokeStyle='rgba('+warn+','+(0.45+p*0.45)+')'; ctx.lineWidth=2;
@@ -24521,13 +25146,13 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20261021a"></script>
+<script src="weapon-art-pixel.js?v=20261116-brecht4"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
-<script src="game-feel.js?v=20261115-dropin-kin"></script>
+<script src="game-feel.js?v=20261116-brecht3"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261114-toad1"></script>
+<script src="cave-look.js?v=20261116-brecht4"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
@@ -24594,7 +25219,7 @@ if(typeof beginFeelWorld === 'function'){
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261013pressure-f5"></script>
-<script src="audio.js?v=20261114-kill"></script>
-<script src="audio-game.js?v=20261114-kill"></script>
+<script src="audio.js?v=20261116-brecht3"></script>
+<script src="audio-game.js?v=20261116-brecht4"></script>
 </body>
 </html>

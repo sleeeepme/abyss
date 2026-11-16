@@ -21,8 +21,17 @@
      遠い敵ほど小さく（where の距離）。たくさんの敵が同時に振っても、音ごとの間隔（cooldown）で間引かれる。 */
   const FOE={swing:'foeSwing',shot:'foeShot',bow:'foeBow',lunge:'foeLunge'};
   wrap('feelFoeAttack',([e,kind])=>{const id=FOE[kind];if(id)emit(id,where(e));});
-  const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam',tentacle:'foeCleave',grab:'foeLunge',ink:'foeShot',pinch:'foeSwing',bubble:'foeShot',roll:'foeLunge'};
-  wrap('resolveBossMove',([e],r,id)=>{const s=BOSS_SFX[id];if(s)emit(s,where(e));},e=>e&&e.cast&&e.cast.id);
+  const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam',tentacle:'foeCleave',grab:'foeLunge',ink:'foeShot',pinch:'foeSwing',bubble:'foeShot',roll:'foeLunge',
+    /* 遺構のヒル（2026-11-16） */ gravel:'foeThud',venom:'foeSpray',gulp:'foeBite',spawn:'foeSpit',boulder:'foeRumble',
+    /* ブレヒトの掛け合いと合体 */ anvil:'foeClang',throw:'foeHeavy',splitslam:'foeHeavy',inout:'foeCleave',inkbubble:'foeShot',spinroll:'foeLunge'};
+  wrap('resolveBossMove',([e],r,o)=>{const s=o&&!o.follow&&BOSS_SFX[o.id];if(s)emit(s,where(e));},e=>e&&e.cast&&{id:e.cast.id,follow:!!e.cast.follow});   // 相方の構え（follow）は鳴らさない
+  /* 溜め始め：ヒルは喉が鳴る（吸い込みは吸う音が溜めの間ずっと続く） */
+  const CAST_SFX={gravel:'foeGurgle',venom:'foeGurgle',spawn:'foeGurgle',boulder:'foeGurgle',gulp:'foeInhale'};
+  wrap('bossBeginCast',([e,id])=>{const s=CAST_SFX[id];if(s)emit(s,where(e));});
+  /* 技の途中の出来事：絵（feelPixelArt）が出た瞬間に鳴らす */
+  const ART_SFX={bl_shatter:'foeHeavy',bl_hatch:'foeHatch',bl_choke:'foeChoke',bb_ff:'foeClang',bb_death:'foeFoam'};
+  wrap('feelPixelArt',([id,x,y])=>{const s=ART_SFX[id];if(s)emit(s,where({x,y}));});
+  wrap('brechtPurge',([e],r,was)=>{if(!was&&e&&e.brecht&&e.brecht.purged)emit('foeShatter',where(e));},e=>!!(e&&e.brecht&&e.brecht.purged));   // 鎧が砕ける
   wrap('zakoBurst',([e])=>emit('foeHeavy',where(e)));
   wrap('tapDash',(_,success)=>{if(success)emit('dash');});
   wrap('feelWeaponArtStart',([ent])=>emit('skill',where(ent,ent!==P)));
@@ -45,6 +54,7 @@
   wrap('tickPits',()=>{if(P.fallAnim&&!fellSeen.has(P.fallAnim)){fellSeen.add(P.fallAnim);emit('fall');}});
   wrap('tickDropIn',(_,r,d)=>{if(d&&d.kind!=='portal'&&d.t>=0&&!landSeen.has(d)){landSeen.add(d);emit('land',{variant:d.list.length});sceneAt=performance.now();}},()=>W.dropIn);
   wrap('bossFormRoar',()=>emit('roar'));
+  wrap('bossDeathRoar',()=>emit('roar'));   // 合体したブレヒトの最期の咆哮（泡になる直前）
   wrap('bossFormShatter',([e])=>emit('foeHeavy',where(e)));   // 変身の殻が割れる
   wrap('duelPhase',([e],r,old)=>{if(e&&e.roar>0&&!(old>0))emit('roar');},e=>e&&e.roar);
   /* ---------- UIの意味のある音 ----------

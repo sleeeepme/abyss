@@ -71,7 +71,7 @@ R.stairLock = await pg.evaluate(async ()=>{
      報酬・クリア画面へ進む。**報酬の確定そのものは killEnemy の中で即座に済んでいる**
      ので S.run.bossAlive は先に落ちるが、画面の遷移だけが後ろにずれる。
      画面を見る検証は、必ず演出を進ませてから行う。 */
-  stepSim(10);   // 撃破演出（1.15秒）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
+  stepSim(14);   // 撃破演出（合体したブレヒトは泡になって消える 3.45秒。2026-11-16）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
   const unlocked = S.run.bossAlive===false;
   return {lockedAtStart, modalBlocked, unlocked};
 });
@@ -195,7 +195,7 @@ R.twinSequential = await pg.evaluate(()=>{
     // 2026-11-06：20階の双子（打ち直しのブレヒト）は、片方を倒すと残った方に合体する（BRECHT.merge）。溜めが短く、速くなる
     teleFaster: t2.teleMul<teleBefore, msFaster: t2.ms>msBefore, merged: !!(t2.brecht && t2.brecht.merged)};
   t2.hp=1; killEnemy(t2);
-  stepSim(10);   // 撃破演出（1.15秒）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
+  stepSim(14);   // 撃破演出（合体したブレヒトは泡になって消える 3.45秒。2026-11-16）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
   const afterSecond = {
     drops:W.drops.length, bossCleared: S.run.bossAlive===false,
     boonShown: document.getElementById('m-boon').classList.contains('on')};
@@ -254,7 +254,7 @@ R.bossWarpsOnSummon = await pg.evaluate(()=>{
           ok: isMallet && moved && stillStandable};
 });
 R.otherSummonBossDoesNotWarp = await pg.evaluate(()=>{
-  S.hero=newHero(); S.upg={}; startRun(15); S.hero.party=[];   // 15Fの主も summon を持つ
+  S.hero=newHero(); S.upg={}; startRun(50); S.hero.party=[];   // 50Fの主も summon を持つ（15Fのヒルは 2026-11-16 に「仔を吐く」へ替えた）
   const boss=W.enemies.find(e=>e.boss);
   const notMallet = boss.uniqueBoss!==POISON_BOSS_DEPTH;
   const hasSummon = boss.moves.includes('summon');
@@ -317,7 +317,7 @@ R.finalClearGate = await pg.evaluate(()=>{
   S.upg={}; S.hero=newHero(); startRun(50); S.hero.party=[];
   const boss50=W.enemies.find(e=>e.boss);
   boss50.hp=1; killEnemy(boss50);
-  stepSim(10);   // 撃破演出（1.15秒）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
+  stepSim(14);   // 撃破演出（合体したブレヒトは泡になって消える 3.45秒。2026-11-16）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
   const notClearedAt50 = S.screen!=='clear';
   document.getElementById('m-boon').classList.remove('on'); S.screen='game'; _boonPending=null;
   const clearedBefore=S.cleared||0;
@@ -325,7 +325,7 @@ R.finalClearGate = await pg.evaluate(()=>{
   S.upg={}; S.hero=newHero(); startRun(51); S.hero.party=[];
   const boss51=W.enemies.find(e=>e.boss);
   boss51.hp=1; killEnemy(boss51);
-  stepSim(10);   // 撃破演出（1.15秒）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
+  stepSim(14);   // 撃破演出（合体したブレヒトは泡になって消える 3.45秒。2026-11-16）＋演出のあとに順に出す知らせ（報酬・レベルアップ・資質・大技、約7秒）
   const clearedAt51 = S.screen==='clear';
   const clearedAfter=S.cleared||0;
   document.getElementById('m-clear').classList.remove('on'); document.getElementById('m-boon').classList.remove('on');

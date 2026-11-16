@@ -4040,6 +4040,8 @@ function bpxPick(a,el,loop){
   for(let i=0;i<n;i++){ x-=d[i]/1000; if(x<0) return s+i; }
   return s+n-1;
 }
+const BRECHT_DEATH={pale:1.1, melt:2.0, tail:.5, foam:0xffeee9df>>>0, foamHi:0xfffff4e6>>>0};   // 秒。色は ABGR（泡の白・明るい泡）
+CAVE.brechtDeathLen=e=>(e&&e.brecht&&e.brecht.merged&&BPX.fu&&BPX.fu.u)?BRECHT_DEATH.pale+BRECHT_DEATH.melt+BRECHT_DEATH.tail:0;
 function bpxDraw(e,t,S){
   const A=S.anims, sum=a=>a.reduce((p,q)=>p+q,0)/1000;
   const casting=!e.dead&&(!!e.cast||e.tele>0);
@@ -4090,12 +4092,26 @@ function bpxDraw(e,t,S){
     L.set(c,v); return v; };
   const N=PT.N, u=SPR.u32, W=S.w, H=S.h, SW=S.sw, src=S.u;
   const X0=Math.round(PT.ox-S.ax), Y0=Math.round(PT.oy-S.feet)+oy, fx=(f%S.cols)*W, fy=((f/S.cols)|0)*H;
+  if(e.dead && e.brecht && e.brecht.merged){
+    /* 合体したブレヒトの最期：泡になって消える（2026-11-16 ユーザー指定）。
+       はじめ 1.1 秒は吠えて震えながら色が泡の白へ抜け（咆哮 0.95 秒。本編の bossDeathRoar）、そのあと上から・まだらに、ドットが白く光って消えていく（BRECHT_DEATH）。
+       昇る泡そのものは PixelArtFx の bb_death が同じ時刻で描く。 */
+    if(e._bdT==null) e._bdT=t;
+    const a=t-e._bdT, B=BRECHT_DEATH, sh=a<B.pale ? ((Math.floor(a*30)&1)?1:-1) : 0, pk=Math.min(1,a/B.pale)*.5;
+    for(let y=0;y<H;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const r0=(fy+y)*SW+fx, out=Y*N;
+      for(let x=0;x<W;x++){ const X=X0+x+sh; if(X<0||X>=N) continue; const c=src[r0+x]; if(!(c>>>24)) continue;
+        const h=((((x>>1)*73856093)^((y>>1)*19349663))>>>0)%1000/1000, T=B.pale+B.melt*(.5*h+.5*(y/H));
+        if(a>=T) continue;
+        u[out+X] = T-a<.05 ? 0xffffffff : T-a<.14 ? B.foamHi : mixU(lit(c>>>0), B.foam, pk); } }
+    return [0,-S.anc];
+  }
   for(let y=0;y<H;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const r0=(fy+y)*SW+fx, out=Y*N;
     for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue; const c=src[r0+x]; if(c>>>24) u[out+X]=lit(c>>>0); } }
   return [0,-S.anc];
 }
 CAVE.bpx={key:e=>bpxKey(e), ready:k=>!!(BPX[k]&&BPX[k].u), frame:e=>e&&e._bpF, anims:k=>BPX[k]&&BPX[k].anims};   // テスト用
 /*BPX_END*/
+if(BPX.le) BPX.le.side=true;   // 遺構のヒル（絵は左向き）は標的の側を向く：向きは本編の e.face（口から吐く技のため 2026-11-16）
 const MID={5:'toad',10:'vera',15:'leech',25:'spider',35:'serpent',45:'eye'};
 const BODY_SIZE={ beast:{range:.70}, slater:{swarm:.40} };   // 磯虫は半分くらいに（ユーザー要望）   // 系統×形式 → 絵の倍率（当たり判定は変えない）
 
@@ -4115,6 +4131,7 @@ const RAGE_AURA=5, RAGE_BLINK=7.5;
 const RAGE_COL={out:[[0x7a,0x0c,0x0c],[0xff,0x3a,0x2a]], aura:['#ff5a2a','#d42a18','#9a1410','#5c0a0a'], ember:'#ffb060', eye:'#ff3a26', eyeHot:'#ffe0c8', glow:'#ff2a1a'};
 const rgbU=(r,g,b)=>(0xff000000|(b<<16)|(g<<8)|r)>>>0;
 const hexU=h=>{ const n=parseInt(h.slice(1),16); return rgbU(n>>16,(n>>8)&255,n&255); };
+const RAGE_EYE_MID=0xff1a20b8>>>0, RAGE_EYE_DARK=0xff100e6a>>>0;   // 大きな目の塊の中間・暗部（ABGR）
 const RAGE_U={aura:RAGE_COL.aura.map(hexU), ember:hexU(RAGE_COL.ember), eye:hexU(RAGE_COL.eye), eyeHot:hexU(RAGE_COL.eyeHot), glow:hexU(RAGE_COL.glow)};
 let rageD=null;
 function rageFx(N,u,t,x0,y0,x1,y1,seed){
@@ -4158,10 +4175,14 @@ function rageFx(N,u,t,x0,y0,x1,y1,seed){
     const r=c&255,g=(c>>8)&255,b=(c>>16)&255, mx=Math.max(r,g,b), mn=Math.min(r,g,b);
     if((mx>140 && (mx-mn)/mx>.42) || (r>90 && r>g+35 && r>b+60)) eyes.push(i); }   // 鮮やかな色か、琥珀・橙（ヴェラの目など）
   if(eyes.length && eyes.length<=Math.max(10,w*hgt*.04)){
-    for(const i of eyes){ const X=i%N, Y=(i/N)|0;
+    if(eyes.length<=10) for(const i of eyes){ const X=i%N, Y=(i/N)|0;   // まわり1ドットを赤く照らすのは小さな目だけ（大きな塊では瞳まで赤く潰れる）
       for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ const xx=X+dx, yy=Y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const k=yy*N+xx;
         if(D[k]===255&&u[k]>>>24) u[k]=mixU(u[k],RAGE_U.glow,.45+.25*p); } }
-    for(const i of eyes) u[i]=p>.55&&(i&1)?RAGE_U.eyeHot:RAGE_U.eye;
+    /* 小さな目（10ドットまで）は今までどおり赤く灼く。大きな塊（ブレヒトの金の目や飾りなど）は
+       ベタ塗りにすると形が潰れるので、元の明るさの段を残して赤へ寄せる（2026-11-16 ユーザー指摘「目が赤く塗りつぶされている」） */
+    if(eyes.length<=10){ for(const i of eyes) u[i]=p>.55&&(i&1)?RAGE_U.eyeHot:RAGE_U.eye; }
+    else for(const i of eyes){ const c=u[i], v=Math.max(c&255,(c>>8)&255,(c>>16)&255);
+      u[i]=mixU(c, v>215?RAGE_U.eyeHot:v>150?RAGE_U.eye:v>95?RAGE_EYE_MID:RAGE_EYE_DARK, .55+.2*p); }
   }
   CAVE.rageLast={eyes:eyes.length, t};                                // テスト用
 }
@@ -4384,7 +4405,7 @@ function renderFoe(e,noFlash){
     const an=bpxDraw(e,t,BS);
     if(!noFlash && e.hit>0 && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
     SPR.cx.putImageData(SPR.id,0,0);
-    return {N,face:BS.side?-face:1,mid,k,fam,arch,anchor:[PT.ox+an[0],PT.oy+an[1]],px:BS.px};
+    return {N,face:BS.side?-(e.face||face):1,mid,k,fam,arch,anchor:[PT.ox+an[0],PT.oy+an[1]],px:BS.px};
   }
   else if(mid==='toad') toad(p,t,e);
   else if(mid==='leech') leech(p,t);
@@ -4532,6 +4553,8 @@ function install(){
   };
   const oldBurst=window.burstEnemyPixels;
   if(typeof oldBurst==='function') window.burstEnemyPixels=function(e){ if(e&&e.uniqueBoss===10&&!e.form2&&vera2DeathReady()) return;   // ヴェラ第二形態は撃破演出で爆散する
+    if(CAVE.brechtDeathLen && CAVE.brechtDeathLen(e)>0) return;                        // 合体したブレヒトは泡になって消える（体の絵をそのまま溶かす）
+    if(e&&e.brecht&&!e.brecht.merged&&typeof W!=='undefined'&&W.enemies.some(x=>x!==e&&x.brecht&&!x.dead)){ e.pixelBurst=true; return; }   // 相方に合わさった方：赤く散らさない（粒になって流れ込む絵 bb_merge が出る）
     try{ if(caveBurst(e)) return; }catch(err){ console.error(err); } return oldBurst(e); };
   // 光と暗がりは地形の側で描く
   window.drawPlayerLight=noop;

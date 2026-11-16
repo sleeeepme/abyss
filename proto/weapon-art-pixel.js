@@ -53,7 +53,19 @@
        灰緑の岩（体の地の色）＋ 青緑の結晶（体の鉱石）。前は灰色（#8c8c8e〜#0b0c10）だった */
     rk0: '#86a39e', rk1: '#6c8883', rk2: '#4e6663', rk3: '#334746', rk4: '#1f2d2d', rk5: '#0b1212',  // 礫の岩（マット：光らせない）
     rs1: '#141d1d', rs2: '#33484a', rs3: '#55716d', rs4: '#7a9893',                   // 礫の岩のスプライト（参考画像の4色）
-    vc0: '#c8fff4', vc1: '#7fe0d4', vc2: '#3fa89c'                                    // 礫に混じる結晶（ヴェラの体の鉱石の青緑）
+    vc0: '#c8fff4', vc1: '#7fe0d4', vc2: '#3fa89c',                                   // 礫に混じる結晶（ヴェラの体の鉱石の青緑）
+    /* 遺構のヒル（15F）。絵（leech-redesign）から取った色。毒の明るい1色（lv0・lv1）だけ絵に無い */
+    ls0: '#bcb79a', ls1: '#aba38a', ls2: '#796d59', ls3: '#4e463d', ls4: '#313024', ls5: '#1e2215',   // 遺構の石
+    lm0: '#78884d', lm1: '#5a6933', lm2: '#4a5a2b',                                   // 苔
+    lv0: '#e6f7a6', lv1: '#a9c95a', lv2: '#78884d', lv3: '#4a5a2b', lv4: '#252d11',   // 毒（苔の緑から）
+    lf0: '#c99391', lf1: '#997a71', lf2: '#85605f', lf3: '#5c4043', lf4: '#2f1d24',   // 肉（卵）
+    lw0: '#dae6e1', lw1: '#cedcd7',                                                   // 水面
+    /* 打ち直しのブレヒト（20F）。5体の絵から取った色 */
+    bi0: '#ecd0bb', bi1: '#d9b8b0', bi2: '#a18790', bi3: '#76616f', bi4: '#56495c', bi5: '#170e24',   // 鉄
+    bo0: '#dfb996', bo1: '#a25792', bo2: '#843e76', bo3: '#6b305b', bo4: '#502545',   // 蛸
+    bc0: '#759699', bc1: '#55767a', bc2: '#3d565b', bc3: '#293c42',                   // 宿借りの甲
+    bg0: '#f9ba38', bg1: '#884d48',                                                   // 火花
+    ba0: '#633a7d'                                                                    // 鎧の紫
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -2775,6 +2787,514 @@
   }
   function btJabGround(t, o) { dust(o.x + Math.cos(o.ang) * o.R, o.y + 4 + Math.sin(o.ang) * o.R, t - 0.06, 3, 895, 6, 0.4, ASH_DUST); }
 
+  /* ============================================================
+     打ち直しのブレヒト（20F）：鎧・蛸・宿借り・合体の技（2026-11-16）
+     色は5体の絵から取った：鉄（bi）・蛸の肉（bo）・宿借りの甲（bc）・火花の金（bg）。
+     ============================================================ */
+  const BRECHT_DUST = [P.bi2, P.bi3, P.bi4];
+  const brechtSparks = (x, y, t, n, sd, sp = 60, dur = 0.35, grav = 160) => {
+    for (let i = 0; i < n; i++) {
+      const b = t - hash(i, sd) * 0.03; if (b < 0 || b > dur) continue;
+      const a = hash(i, sd + 1) * TAU, v = sp * (0.4 + 0.6 * hash(i, sd + 2)), X = x + Math.cos(a) * v * b, Y = y + Math.sin(a) * v * b * 0.7 - 30 * b + grav * b * b;
+      px(X, Y, b < dur * 0.4 ? P.W : i & 1 ? P.bg0 : P.bg1, 1 - b / dur); if (i % 3 === 0) px(X - Math.cos(a), Y - Math.sin(a), P.bg1, 0.7 * (1 - b / dur));
+    }
+  };
+  /* 溜め。o.form＝'armor'｜'octo'｜'crab'｜'merge'。体のまわりに粒が立つ（鉄の火花／墨色の粒／泡） */
+  function bbChargeAir(t, o) {
+    if (t < 0) return;
+    const p = clamp(t / (o.life || 1)), f = o.form, n = 10;
+    for (let i = 0; i < n; i++) {
+      const ph = (t * 1.5 + hash(i, 1201)) % 1, a = hash(i, 1202) * TAU, r = 20 - 12 * ph * p;
+      const x = o.x + Math.cos(a) * r, y = o.y - 6 + Math.sin(a) * r * 0.6 - ph * 10;
+      const c = f === 'armor' ? (ph > 0.7 ? P.W : i & 1 ? P.bg0 : P.bi1) : f === 'octo' ? (i & 1 ? P.bo1 : P.bo0) : f === 'crab' ? (i & 1 ? P.bc0 : P.W) : (i % 3 === 0 ? P.bo1 : i % 3 === 1 ? P.bc0 : P.bg0);
+      px(x, y, c, (ph < 0.2 ? ph / 0.2 : 1) * (0.4 + 0.6 * p));
+      if (f === 'crab' && i % 3 === 0) ring(x, y, 1, P.bc0, 0.6 * p);
+    }
+  }
+  /* 触手。帯（o.ang・長さ o.R）に沿って鞭のように伸び、戻る。o.grab は先が巻く */
+  function bbTentacleGround(t, o) { if (t < 0 || t > 0.4) return; const cx = Math.cos(o.ang), cy = Math.sin(o.ang); for (let i = 0; i < 5; i++) { const d = o.R * (0.2 + 0.18 * i); dust(o.x + cx * d, o.y + cy * d + 3, t - 0.02 * i, 2, 1211 + i, 5, 0.35, [P.bo3, P.bo4, P.bi4], 0.8, 0.5); } }
+  function bbTentacleAir(t, o) {
+    if (t < 0 || t > 0.36) return;
+    const L = o.R, cx = Math.cos(o.ang), cy = Math.sin(o.ang);
+    const ext = t < 0.08 ? easeOut(t / 0.08) : t < 0.2 ? 1 : 1 - (t - 0.2) / 0.16, len = L * ext, wig = (1 - ext) * 6 + 2;
+    for (let d = 0; d < len; d += 1) {
+      const k = d / L, w = 3.2 * (1 - k * 0.7) + 0.6, wob = Math.sin(d * 0.22 - t * 30) * wig * k, X = o.x + cx * d - cy * wob, Y = o.y + cy * d + cx * wob - 4;
+      for (let s = -w; s <= w; s++) { const q = Math.abs(s) / w; px(X - cy * s, Y + cx * s, q > 0.75 ? P.bo4 : s < 0 ? P.bo1 : P.bo2); }
+      if ((d | 0) % 5 === 0 && d > 6) px(X - cy * (w - 1), Y + cx * (w - 1), P.bo0);            // 吸盤
+    }
+    if (ext > 0.9) {                                                                     // 先端：はじける／巻きつく
+      const X = o.x + cx * len, Y = o.y + cy * len - 4;
+      if (o.grab) { ring(X, Y, 4, P.bo1); ring(X, Y, 3, P.bo0, 0.8); } else { plus(X, Y, P.W, 3); for (let i = 0; i < 6; i++) { const a = o.ang + (hash(i, 1215) - 0.5) * 2.4; px(X + Math.cos(a) * (3 + 14 * (t - 0.08)), Y + Math.sin(a) * (3 + 14 * (t - 0.08)), i & 1 ? P.bo0 : P.W); } }
+    }
+  }
+  /* 鋏。扇（o.ang±o.arc・半径 o.R）を、片側ずつ（o.two：0.18 秒あけて）か両側同時に、三日月の刃が閉じる */
+  function bbPinchAir(t, o) {
+    if (t < 0 || t > 0.5) return;
+    const R = o.R, arc = o.arc || 0.9, gap = o.two ? 0.18 : 0;
+    for (let side = -1; side <= 1; side += 2) {
+      const b = t - (side > 0 ? gap : 0); if (b < 0 || b > 0.24) continue;
+      const k = easeOut(clamp(b / 0.09)), a0 = o.ang + side * arc, a1 = o.ang + side * arc * (1 - k);    // 外から中心線へ閉じる
+      const lo = Math.min(a0, a1), hi = Math.max(a0, a1), fade = b < 0.12 ? 1 : 1 - (b - 0.12) / 0.12;
+      for (let a = lo; a <= hi; a += 0.02) {
+        const edge = Math.abs(a - a1) < 0.12;
+        for (let r = R * 0.45; r <= R; r += 1) { const q = (r - R * 0.45) / (R * 0.55); px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r - 3, edge ? (q > 0.8 ? P.W : P.bc0) : q > 0.9 ? P.bc0 : P.bc2, fade * (edge ? 1 : 0.7)); }
+      }
+      if (b > 0.07 && b < 0.2) { const X = o.x + Math.cos(o.ang) * R * 0.8, Y = o.y + Math.sin(o.ang) * R * 0.8 - 3; plus(X, Y, P.W, 4); brechtSparks(X, Y, b - 0.07, 8, 1221 + side, 50, 0.2); }
+    }
+  }
+  /* 叩きつけ（鎧）。鉄の輪と火花 */
+  function bbSlamGround(t, o) {
+    if (t < 0 || t > 0.7) return; const R = o.R;
+    if (t < 0.28) { const r = R * easeOut(clamp(t / 0.16)); for (let k = 0; k < 3; k++) ellRing(o.x, o.y + 3, r - k * 2, (r - k * 2) * 0.62, k === 0 ? (t < 0.05 ? P.W : P.bi0) : k === 1 ? P.bi2 : P.bi4, 1 - t / 0.28); }
+    cracks(o.x, o.y + 3, t, 8, R * 0.8, 1231, 0.07, 0.7, P.bi0, P.bi5);
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8; dust(o.x + Math.cos(a) * R * 0.7, o.y + 3 + Math.sin(a) * R * 0.45, t - 0.04, 2, 1232 + i, 8, 0.6, BRECHT_DUST, 1.1, 0.7); }
+  }
+  function bbSlamAir(t, o) { if (t < 0 || t > 0.45) return; if (t < 0.05) plus(o.x, o.y, P.W, 8); brechtSparks(o.x, o.y, t, 18, 1235, 90, 0.4); }
+  /* 薙ぎ払い（鎧）。鉄色の三日月が扇を掃く */
+  function bbCleaveAir(t, o) {
+    if (t < 0 || t > 0.32) return;
+    const R = o.R, arc = o.arc || 1, k = easeOut(clamp(t / 0.12)), a1 = o.ang - arc + 2 * arc * k, fade = t < 0.14 ? 1 : 1 - (t - 0.14) / 0.18;
+    for (let a = o.ang - arc; a <= a1; a += 0.02) { const near = (a1 - a) < 0.5 ? 1 - (a1 - a) / 0.5 : 0; for (let r = R * 0.55; r <= R; r += 1) { const q = (r - R * 0.55) / (R * 0.45); px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r - 3, near > 0.7 && q > 0.6 ? P.W : q > 0.85 ? P.bi0 : P.bi2, fade * (0.25 + 0.75 * near)); } }
+    brechtSparks(o.x + Math.cos(a1) * R, o.y + Math.sin(a1) * R - 3, t, 6, 1241, 40, 0.25);
+  }
+  /* 打ち合わせ。帯（o から o.ang へ長さ o.R）の両端から鎚が走り、真ん中でぶつかる */
+  function bbAnvilGround(t, o) {
+    if (t < 0 || t > 0.7) return; const cx = Math.cos(o.ang), cy = Math.sin(o.ang), L = o.R, lv = t < 0.4 ? 1 : 1 - (t - 0.4) / 0.3;
+    for (let d = 4; d < L - 4; d += 3) { px(o.x + cx * d, o.y + cy * d + 2, (d | 0) % 2 ? P.bi4 : P.bi5, lv * 0.8); px(o.x + cx * d - cy * 2, o.y + cy * d + cx * 2 + 2, P.bi5, lv * 0.5); }   // 床の擦り跡
+    const mx = o.x + cx * L / 2, my = o.y + cy * L / 2;
+    if (t > 0.08) { cracks(mx, my + 2, t - 0.08, 8, 22, 1251, 0.06, 0.6, P.bi0, P.bi5); for (let i = 0; i < 6; i++) dust(mx + (hash(i, 1252) - 0.5) * 20, my + 3, t - 0.1, 2, 1253 + i, 9, 0.5, BRECHT_DUST, 1.1, 0.7); }
+  }
+  function bbAnvilAir(t, o) {
+    if (t < 0 || t > 0.6) return; const cx = Math.cos(o.ang), cy = Math.sin(o.ang), L = o.R, mx = o.x + cx * L / 2, my = o.y + cy * L / 2 - 4;
+    if (t < 0.08) { const k = t / 0.08; for (let side = 0; side < 2; side++) { const d = side ? L - (L / 2) * k : (L / 2) * k, X = o.x + cx * d, Y = o.y + cy * d - 4, s = side ? 1 : -1;
+        for (let j = 1; j < 12; j++) px(X + s * cx * j * 2, Y + s * cy * j * 2, j < 4 ? P.bi0 : P.bi2, 1 - j / 12);                    // 尾
+        for (let u = -3; u <= 3; u++) for (let v = -2; v <= 2; v++) px(X + cx * v - cy * u, Y + cy * v + cx * u, Math.abs(u) === 3 || Math.abs(v) === 2 ? P.bi5 : v < 0 ? P.bi1 : P.bi3); } }   // 鎚の頭
+    else { const b = t - 0.08; if (b < 0.06) { disc(mx, my, 7, P.bg0); plus(mx, my, P.W, 11); } else if (b < 0.14) { ring(mx, my, 6 + b * 90, P.bg0, 0.9); ring(mx, my, 4 + b * 90, P.W, 0.7); }
+      brechtSparks(mx, my, b, 26, 1255, 110, 0.45);
+      for (let i = 0; i < 6; i++) { const q = b - 0.02; if (q < 0 || q > 0.4) continue; const a = hash(i, 1256) * TAU; px(mx + Math.cos(a) * 60 * q, my + Math.sin(a) * 40 * q - 40 * q + 150 * q * q, P.bi1); px(mx + Math.cos(a) * 60 * q + 1, my + Math.sin(a) * 40 * q - 40 * q + 150 * q * q, P.bi4); } }   // 鉄の欠片
+  }
+  /* 着地（投げられた宿借り／分かれ打ちで合わさる）。o.split は左右から寄る2色の筋が先に走る */
+  function bbLandGround(t, o) {
+    if (t < 0 || t > 0.8) return; const R = o.R;
+    if (t < 0.26) { const r = R * easeOut(clamp(t / 0.14)); for (let k = 0; k < 3; k++) ellRing(o.x, o.y + 2, r - k * 2, (r - k * 2) * 0.62, k === 0 ? (t < 0.05 ? P.W : o.split ? P.bo0 : P.bc0) : k === 1 ? (o.split ? P.bo1 : P.bc1) : P.bi4, 1 - t / 0.26); }
+    cracks(o.x, o.y + 2, t, 9, R * 0.85, 1261, 0.07, 0.75, P.bi0, P.bi5);
+    for (let i = 0; i < 9; i++) { const a = i * TAU / 9; dust(o.x + Math.cos(a) * R * 0.7, o.y + 3 + Math.sin(a) * R * 0.45, t - 0.03, 2, 1262 + i, 9, 0.65, BRECHT_DUST, 1.2, 0.8); }
+  }
+  function bbLandAir(t, o) {
+    if (t < 0 || t > 0.6) return;
+    if (t < 0.06) { disc(o.x, o.y - 3, 8, o.split ? P.bo0 : P.bc0); plus(o.x, o.y - 3, P.W, 10); }
+    if (o.split && t < 0.16) for (let side = -1; side <= 1; side += 2) for (let j = 0; j < 14; j++) px(o.x + side * (6 + j * 3 + t * 120), o.y - 3 - j, side < 0 ? P.bo1 : P.bc0, 1 - t / 0.16);   // 左右へ抜ける残像
+    brechtSparks(o.x, o.y - 3, t, 16, 1265, 80, 0.4);
+    for (let i = 0; i < 10; i++) { const b = t - 0.02; if (b < 0 || b > 0.5) continue; const a = hash(i, 1266) * TAU, sp = 30 + 50 * hash(i, 1267), X = o.x + Math.cos(a) * sp * b, Y = o.y - 3 + Math.sin(a) * sp * b * 0.6 - 70 * b + 190 * b * b; px(X, Y, o.split && (i & 1) ? P.bo2 : P.bc1, 1 - b / 0.5); px(X + 1, Y, P.bi4, 1 - b / 0.5); }
+  }
+  /* 同士討ち：金物どうしが当たった火花と星 */
+  function bbFFAir(t, o) { if (t < 0 || t > 0.4) return; if (t < 0.08) { plus(o.x, o.y, P.W, 7); for (let i = 0; i < 4; i++) { const a = 0.785 + i * 1.571; line(o.x + Math.cos(a) * 3, o.y + Math.sin(a) * 3, o.x + Math.cos(a) * 8, o.y + Math.sin(a) * 8, P.bg0); } } brechtSparks(o.x, o.y, t, 14, 1271, 70, 0.35); }
+  /* 巻き転がり：転がる体のまわりで触手が回る（o.R＝届く半径）。t は流れ続ける時間 */
+  function bbSpinAir(t, o) {
+    const R = o.R;
+    for (let i = 0; i < 4; i++) { const a0 = t * 22 + i * 1.571;
+      for (let d = 8; d < R; d += 1) { const k = d / R, a = a0 - k * 1.1, w = 2.2 * (1 - k * 0.6); const X = o.x + Math.cos(a) * d, Y = o.y - 4 + Math.sin(a) * d * 0.75; for (let s = -w; s <= w; s++) px(X, Y + s, Math.abs(s) > w * 0.7 ? P.bo4 : s < 0 ? P.bo1 : P.bo2); if ((d | 0) % 5 === 0) px(X, Y + w - 1, P.bo0); } }
+    for (let i = 0; i < 6; i++) { const a = t * 22 + i * 1.05; px(o.x + Math.cos(a) * (R + 2), o.y - 4 + Math.sin(a) * (R + 2) * 0.75, i & 1 ? P.bo0 : P.W, 0.8); }
+  }
+  /* 飛んでいる間の影と風切り（投げられた宿借り／分かれ打ちの本体）。o.k＝進み 0〜1、o.ang＝向き */
+  function bbFlyGround(t, o) { ellipse(o.x, o.y + 2, 9 - 4 * Math.sin((o.k || 0) * Math.PI), 4 - 2 * Math.sin((o.k || 0) * Math.PI), P.bi5, 0.5); }
+  function bbFlyAir(t, o) { const cx = Math.cos(o.ang), cy = Math.sin(o.ang), z = (o.z || 0) * 22; for (let j = 1; j < 9; j++) { px(o.x - cx * (10 + j * 3), o.y - 8 - z - cy * (10 + j * 3) + (j & 1 ? 3 : -3), o.split ? (j & 1 ? P.bo1 : P.bc0) : P.bc0, 1 - j / 9); px(o.x - cx * (10 + j * 3), o.y - 8 - z - cy * (10 + j * 3), P.W, 0.8 - j / 11); } }
+
+  /* ---------- ブレヒトの場面の演出（2026-11-16）：鎧が砕ける／合体／撃破 ---------- */
+  /* 鎧の板。角ばった鉄片。s＝大きさ、rot で回る。lv で薄くなる */
+  function armorPlate(x, y, s, rot, sd, lv = 1) {
+    x = Math.round(x); y = Math.round(y); const c = Math.cos(rot), n = Math.sin(rot), w = s, h = s * 0.65;
+    for (let v = -s - 1; v <= s + 1; v++) for (let u = -s - 1; u <= s + 1; u++) {
+      const a = u * c + v * n, b = -u * n + v * c, cut = (a + b) > (w + h) * 0.62;                 // 一隅が欠けた板
+      if (Math.abs(a) > w || Math.abs(b) > h || cut) continue;
+      const edge = Math.abs(a) > w - 1 || Math.abs(b) > h - 1 || (a + b) > (w + h) * 0.62 - 1.2;
+      px(x + u, y + v, edge ? P.bi5 : b < -h * 0.3 ? P.bi0 : (sd & 1) && a > 0 ? P.ba0 : b > h * 0.3 ? P.bi3 : P.bi2, lv);
+    }
+  }
+  /* 鎧が砕ける。光のひび → 白く弾ける → 板が飛び、床で跳ねて転がり、しばらく残る。o.inner＝中身（蛸は墨色の粒、宿借りは泡） */
+  function bbPurgeGround(t, o) {
+    if (t < 0) return;
+    if (t > 0.14 && t < 0.5) { const r = 44 * easeOut(clamp((t - 0.14) / 0.2)); for (let k = 0; k < 3; k++) ellRing(o.x, o.y + 6, r - k * 2, (r - k * 2) * 0.6, k === 0 ? P.bi0 : k === 1 ? P.bi2 : P.bi4, 1 - (t - 0.14) / 0.36); }
+    if (t > 0.14) for (let i = 0; i < 10; i++) { const a = i * TAU / 10; dust(o.x + Math.cos(a) * 26, o.y + 6 + Math.sin(a) * 15, t - 0.16, 2, 1301 + i, 10, 0.7, BRECHT_DUST, 1.3, 0.8); }
+    for (let i = 0; i < 12; i++) {                                                         // 床に落ちて残る板
+      const b = t - 0.14, T = 0.42 + 0.2 * hash(i, 1311); if (b < T) continue;
+      const a = hash(i, 1312) * TAU, d = 24 + 34 * hash(i, 1313), lv = clamp((2.6 - t) / 0.6);
+      const roll = Math.min(1, (b - T) / 0.3) * 6;
+      armorPlate(o.x + Math.cos(a) * (d + roll), o.y + 6 + Math.sin(a) * (d + roll) * 0.6, 2.5 + 2.5 * hash(i, 1314), a + roll * 0.3, i, lv);
+    }
+  }
+  function bbPurgeAir(t, o) {
+    if (t < 0 || t > 1.2) return;
+    if (t < 0.14) {                                                                      // 鎧に走る光のひび（弾ける前の一瞬）
+      for (let i = 0; i < 7; i++) { if (t < i * 0.015) continue; let x = o.x + (hash(i, 1321) - 0.5) * 30, y = o.y - 26 + hash(i, 1322) * 30;
+        for (let j = 0; j < 9; j++) { px(x, y, P.W); px(x + 1, y, P.bg0, 0.8); x += Math.round((hash(i * 9 + j, 1323) - 0.5) * 3); y += 1 + (hash(i * 9 + j, 1324) > 0.5 ? 1 : 0); } }
+      return;
+    }
+    const b = t - 0.14;
+    if (b < 0.07) { disc(o.x, o.y - 10, 22 - b * 120, P.W); plus(o.x, o.y - 10, P.W, 30); }
+    else if (b < 0.2) { ring(o.x, o.y - 10, 16 + b * 150, P.bi0, 1 - b / 0.2); ring(o.x, o.y - 10, 12 + b * 150, P.W, 0.7 * (1 - b / 0.2)); }
+    for (let i = 0; i < 12; i++) {                                                         // 飛ぶ板（着地までは宙）
+      const T = 0.42 + 0.2 * hash(i, 1311); if (b > T) continue;
+      const a = hash(i, 1312) * TAU, d = 24 + 34 * hash(i, 1313), k = b / T, H = 26 + 26 * hash(i, 1315);
+      armorPlate(o.x + Math.cos(a) * d * k, o.y + 6 + Math.sin(a) * d * 0.6 * k - 10 * (1 - k) - H * 4 * k * (1 - k), 2.5 + 2.5 * hash(i, 1314), a + b * (10 + 8 * hash(i, 1316)), i);
+    }
+    brechtSparks(o.x, o.y - 10, b, 26, 1331, 120, 0.5);
+    for (let i = 0; i < 12; i++) {                                                         // 中身の気配：蛸は墨の粒、宿借りは泡
+      const q = b - 0.05 - hash(i, 1341) * 0.2; if (q < 0 || q > 0.7) continue;
+      const x = o.x + (hash(i, 1342) - 0.5) * 34, y = o.y - 4 - q * 40;
+      if (o.inner === 'crab') { ring(x, y, 1 + q * 2, P.bc0, 1 - q / 0.7); px(x - 1, y - 1, P.W, 1 - q / 0.7); } else { px(x, y, i & 1 ? P.bo1 : P.bo3, 1 - q / 0.7); px(x + 1, y + 1, P.bo4, 0.8 * (1 - q / 0.7)); }
+    }
+  }
+  /* 合体。倒れた方（o.dx,o.dy＝こちらから見た位置・ドット）がほどけて流れ込み、巻きつき、継ぎ目が縫われて弾ける。o.inner＝倒れた方 */
+  function bbMergeGround(t, o) {
+    if (t < 0) return;
+    if (t > 0.78 && t < 1.2) { const r = 54 * easeOut(clamp((t - 0.78) / 0.22)); for (let k = 0; k < 4; k++) ellRing(o.x, o.y + 6, r - k * 2, (r - k * 2) * 0.6, k === 0 ? P.W : k === 1 ? P.bo0 : k === 2 ? P.bc0 : P.bi4, 1 - (t - 0.78) / 0.42); }
+    if (t < 0.6) { const lv = 1 - t / 0.6; ellipse(o.x + (o.dx || 0), o.y + (o.dy || 0) + 6, 16 * lv, 7 * lv, P.bi5, 0.6 * lv); }      // 倒れた方の影が縮む
+  }
+  function bbMergeAir(t, o) {
+    if (t < 0 || t > 1.4) return;
+    const dx = o.dx || 0, dy = o.dy || 0, A = o.inner === 'crab' ? [P.bc0, P.bc1, P.bc2] : [P.bo0, P.bo1, P.bo2], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    for (let i = 0; i < 80; i++) {                                                         // ほどけて流れ込む粒（弧を描く）
+      const st = hash(i, 1351) * 0.3, b = (t - st) / 0.5; if (b < 0 || b > 1) continue;
+      const k = b * b * (3 - 2 * b), bend = (hash(i, 1352) - 0.5) * 60 * Math.sin(k * Math.PI);
+      const x = o.x + dx * (1 - k) + nx * bend + (hash(i, 1353) - 0.5) * 16 * (1 - k), y = o.y - 8 + dy * (1 - k) + ny * bend + (hash(i, 1354) - 0.5) * 16 * (1 - k) - 14 * Math.sin(k * Math.PI);
+      px(x, y, A[i % 3]); px(x + 1, y, A[i % 3]); px(x, y + 1, A[(i + 1) % 3]); px(x + 1, y + 1, P.bi5, 0.8); if (i % 4 === 0) { px(x, y - 1, P.W); px(x + 1, y - 1, P.W); }
+      const k2 = Math.max(0, k - 0.08), bend2 = (hash(i, 1352) - 0.5) * 60 * Math.sin(k2 * Math.PI);                                  // 尾
+      px(o.x + dx * (1 - k2) + nx * bend2, o.y - 8 + dy * (1 - k2) + ny * bend2 - 14 * Math.sin(k2 * Math.PI), A[(i + 2) % 3], 0.6);
+    }
+    if (t > 0.35 && t < 0.85) {                                                          // 巻きつく帯（体のまわりを回りながら締まる）
+      const q = (t - 0.35) / 0.5, R = 30 - 14 * q;
+      for (let i = 0; i < 40; i++) { const a = t * 16 + i * 0.16, x = o.x + Math.cos(a) * R, y = o.y - 8 + Math.sin(a) * R * 0.5 - (i % 8) * 2 + 8; px(x, y, A[i % 3], 0.5 + 0.5 * q); if (Math.sin(a) > 0) px(x, y + 1, P.bi5, 0.5); }
+    }
+    if (t > 0.5 && t < 0.9) for (let i = 0; i < 8; i++) {                                   // 継ぎ目：金の縫い目が順に打たれる
+      const q = t - 0.5 - i * 0.035; if (q < 0) continue;
+      const a = -1.9 + i * 0.55, x = o.x + Math.cos(a) * 18, y = o.y - 10 + Math.sin(a) * 14, c = q < 0.05 ? P.W : P.bg0;
+      px(x - 1, y - 1, c); px(x, y, c); px(x + 1, y + 1, c); px(x + 1, y - 1, c); px(x - 1, y + 1, c);
+    }
+    if (t > 0.78) { const b = t - 0.78;
+      if (b < 0.07) { disc(o.x, o.y - 10, 24 - b * 100, P.W); plus(o.x, o.y - 10, P.W, 34); }
+      brechtSparks(o.x, o.y - 10, b, 30, 1361, 130, 0.5);
+      for (let i = 0; i < 16; i++) { const q = b - 0.02; if (q < 0 || q > 0.5) continue; const a = i * TAU / 16, r = 14 + 90 * q; px(o.x + Math.cos(a) * r, o.y - 10 + Math.sin(a) * r * 0.6, i & 1 ? P.bo1 : P.bc0, 1 - q / 0.5); }
+    }
+  }
+  /* 撃破：泡になって消える（2026-11-16）。体の絵そのものは cave-look.js の bpxDraw が同じ時刻で溶かす（BRECHT_DEATH：0.7 秒で白へ抜け、2.0 秒かけて上から消える）。
+     ここは、縫い目が弾ける → 体の形から泡が次々に昇る → 床に泡の輪が残って消える。 */
+  const BD_PALE = 1.1, BD_MELT = 2.0;   // cave-look.js の BRECHT_DEATH と同じ値（吠えている 1.1 秒は溶けない）
+  function bbBubble(x, y, r, lv, c) { if (r < 1) { px(x, y, c, lv); return; } ring(x, y, r, c, lv); if (r >= 2) { px(x - r + 1, y - r + 1, P.W, lv); if (r >= 3) px(x - r + 2, y - r + 1, P.W, lv * 0.8); } }
+  function bbDeathGround(t, o) {
+    if (t < 0) return;
+    if (t > BD_PALE) {                                                                   // 床の泡だまり：広がって、薄れる
+      const q = t - BD_PALE, R = 34 * easeOut(clamp(q / 1.2)), lv = clamp((BD_PALE + BD_MELT + 0.6 - t) / 0.8);
+      for (let i = 0; i < 44; i++) { const a = hash(i, 1401) * TAU, d = R * Math.sqrt(hash(i, 1402)), ph = (t * 0.8 + hash(i, 1403)) % 1;
+        bbBubble(o.x + Math.cos(a) * d, o.y + 7 + Math.sin(a) * d * 0.5, 1 + (i % 3) * (ph < 0.8 ? 1 : 0.4), lv * (ph < 0.9 ? 0.9 : 0.4), i % 4 === 0 ? P.bc0 : P.lw0); }
+      ellRing(o.x, o.y + 7, R + 2, (R + 2) * 0.5, P.lw1, 0.5 * lv, 6, t * 3);
+    }
+  }
+  function bbDeathAir(t, o) {
+    if (t < 0 || t > 4.0) return;
+    if (t < BD_PALE + 0.2) for (let i = 0; i < 10; i++) {                                   // 縫い目が1つずつ弾ける（震えている間）
+      const q = t - i * 0.06; if (q < 0 || q > 0.3) continue;
+      const a = -2.2 + i * 0.5, x = o.x + Math.cos(a) * 20, y = o.y - 12 + Math.sin(a) * 16;
+      if (q < 0.05) plus(x, y, P.W, 4); brechtSparks(x, y, q, 5, 1371 + i, 50, 0.28);
+      const fx = x + Math.cos(a) * q * 60, fy = y + Math.sin(a) * q * 40 - 30 * q + 160 * q * q; px(fx, fy, P.bg0); px(fx + 1, fy, P.bg0); px(fx, fy + 1, P.bg1);
+    }
+    /* 泡：体の形（横±34・縦 −44〜+4 ドットの楕円）の、溶けていく高さから生まれて昇る。上から順に、最後は足もと */
+    for (let i = 0; i < 150; i++) {
+      const yn = hash(i, 1411), born = BD_PALE + BD_MELT * (0.15 * hash(i, 1412) + 0.85 * yn) - 0.1, q = t - born; if (q < 0) continue;
+      const life = 0.7 + 0.9 * hash(i, 1413); if (q > life) { if (q < life + 0.08) { const X = o.x + (hash(i, 1414) - 0.5) * 68, Y = o.y - 44 + 48 * yn - (22 + 50 * hash(i, 1415)) * life; px(X - 2, Y, P.W); px(X + 2, Y, P.W); px(X, Y - 2, P.W); px(X, Y + 2, P.W); } continue; }   // 弾ける
+      const wide = 34 * Math.sqrt(Math.max(0.15, 1 - Math.pow(yn * 2 - 1, 2) * 0.6));
+      const x = o.x + (hash(i, 1414) - 0.5) * 2 * wide + Math.sin(q * 7 + i) * 2.5, y = o.y - 44 + 48 * yn - (22 + 50 * hash(i, 1415)) * q * (1 + 0.4 * q);
+      const r = (i % 7 === 0 ? 4 : i % 3 === 0 ? 3 : i % 2 ? 2 : 1) * Math.min(1, q / 0.12 + 0.3);
+      bbBubble(x, y, r, q > life - 0.15 ? 0.6 : 1, i % 5 === 0 ? P.bo0 : i % 3 === 0 ? P.bc0 : P.lw0);
+    }
+    for (let i = 0; i < 40; i++) {                                                         // 細かい気泡（速く昇る）
+      const born = BD_PALE + BD_MELT * hash(i, 1421), q = t - born; if (q < 0 || q > 0.6) continue;
+      px(o.x + (hash(i, 1422) - 0.5) * 60 + Math.sin(q * 12 + i), o.y - 44 + 48 * hash(i, 1421) - 110 * q, i & 1 ? P.W : P.lw1, 1 - q / 0.6);
+    }
+    const e = t - (BD_PALE + BD_MELT); if (e > 0 && e < 0.5) { ring(o.x, o.y - 6, 4 + e * 90, P.lw0, 1 - e / 0.5); ring(o.x, o.y - 6, 2 + e * 70, P.W, 0.7 * (1 - e / 0.5)); }   // 最後のひと泡
+  }
+
+  /* ============================================================
+     遺構のヒル（15F）：呑んで、吐く（2026-11-16）
+     色はヒルの絵から取った：遺構の石（ls）・苔（lm）・肉（lf）・水面（lw）。毒は苔の緑＋明るい1色（lv0）。
+     o.x,o.y は効果の中心（口・着弾点・物の位置）。予兆（赤い円・帯）は本編が描く。
+     ============================================================ */
+  const LS = [P.ls0, P.ls1, P.ls2, P.ls3, P.ls4, P.ls5];
+  const LEECH_DUST = [P.ls1, P.ls2, P.ls3];
+  const VENOM_MIST = [P.lv1, P.lv2, P.lv3];
+  /* 遺構の石。s＝半径（ドット）。rot で表面の模様（欠け・苔）が回る。暗い縁取り→地→明るい面→光の順 */
+  function leechRock(x, y, s, seed, rot = 0, lv = 1) {
+    x = Math.round(x); y = Math.round(y);
+    const ri = Math.ceil(s) + 1;
+    for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
+      const a = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
+      const lump = s * (1 + 0.16 * Math.sin(a * 3 + seed + rot) + 0.10 * Math.sin(a * 5 + seed * 1.7 - rot));   // でこぼこの輪郭
+      if (d > lump + 0.9) continue;
+      let c;
+      if (d > lump - 0.2) c = P.ls5;                                                    // 縁取り
+      else {
+        const nx = dx / Math.max(1, s), ny = dy / Math.max(1, s), lit = -nx * 0.6 - ny * 0.8;   // 左上から光
+        c = lit > 0.45 ? P.ls0 : lit > 0.05 ? P.ls1 : lit > -0.4 ? P.ls2 : P.ls3;
+        const m = Math.sin((a + rot) * 2 + seed * 3) + Math.sin((a + rot) * 5 + seed);  // 表面に貼り付いた模様（回る）
+        if (s >= 3 && d > lump * 0.45 && m > 1.35) c = P.lm1;                           // 苔
+        else if (s >= 3 && d < lump * 0.75 && m < -1.5) c = P.ls4;                      // 欠け
+      }
+      px(x + dx, y + dy, c, lv);
+    }
+  }
+  const leechShadow = (x, y, rx, lv = 0.5) => ellipse(x, y, rx, Math.max(1, rx * 0.45), P.ls5, lv);
+  /* 毒の滴（丸い粒。明るい芯） */
+  function venomDrop(x, y, r, lv = 1) {
+    disc(x, y, r, P.lv3, lv); if (r >= 1) disc(x, y, r - 1, P.lv1, lv); if (r >= 1.5) px(x - 1, y - 1, P.lv0, lv);
+  }
+
+  /* ---------- 溜め（口元）。o.mv＝技。口のまわりの膨らみの色で中身が読める：灰＝石、緑＝毒、白い粒＝卵 ---------- */
+  function blChargeGround(t, o) {
+    if (t < 0) return;
+    const life = o.life || 1, p = clamp(t / life);
+    if (o.mv === 'gulp') {
+      /* 吸い込み：扇の中の水面が口へ流れる。床の層に長い流れ筋 */
+      const R = o.R, half = o.arc || 0.7;
+      for (let i = 0; i < 46; i++) {
+        const ph = (t * (0.9 + 0.5 * hash(i, 901)) + hash(i, 902)) % 1, a = o.ang + (hash(i, 903) * 2 - 1) * half * 0.96;
+        const r1 = R * (1 - ph) * (0.25 + 0.75 * hash(i, 904)) + 5, len = 5 + 9 * ph;
+        const lv = (ph < 0.15 ? ph / 0.15 : 1) * (0.5 + 0.5 * p);
+        const x0 = o.x + Math.cos(a) * (r1 + len), y0 = o.y + Math.sin(a) * (r1 + len), x1 = o.x + Math.cos(a) * r1, y1 = o.y + Math.sin(a) * r1;
+        line(x0, y0, x1, y1, i % 3 ? P.lw1 : P.lw0, lv * 0.8);
+        if (i % 4 === 0) px(x1, y1, P.W, lv);
+      }
+      for (let k = 0; k < 3; k++) { const r = 5 + ((t * 26 + k * 9) % 27); ellRing(o.x, o.y, 32 - r, (32 - r) * 0.6, k ? P.lw1 : P.lw0, 0.55, 10, t * 6 + k); }   // 口元へ縮む渦
+      return;
+    }
+    const col = o.mv === 'venom' ? VENOM_MIST : o.mv === 'spawn' ? [P.lf0, P.lf1, P.lf3] : LEECH_DUST;
+    for (let k = 0; k < 6; k++) {                                                        // 口の下に落ちる屑・滴
+      const b = (t - k * 0.13) % 0.5; if (t < k * 0.13 || b > 0.4) continue;
+      px(o.x + (hash(k, 911) - 0.5) * 10, o.y + 5 + b * 34, col[k % 3], 1 - b / 0.4);
+    }
+  }
+  function blChargeAir(t, o) {
+    if (t < 0) return;
+    const life = o.life || 1, p = clamp(t / life), fr = Math.floor(t * 12), mv = o.mv;
+    if (mv === 'gulp') {
+      for (let i = 0; i < 14; i++) {                                                     // 口へ吸われる飛沫と屑
+        const ph = (t * 1.6 + hash(i, 921)) % 1, a = o.ang + (hash(i, 922) * 2 - 1) * (o.arc || 0.7) * 0.8, r = 46 * (1 - ph) + 3;
+        px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r - 3 * Math.sin(ph * 3.1), i % 3 ? P.lw0 : P.ls1, ph < 0.2 ? ph / 0.2 : 1);
+      }
+      if (fr & 1) ring(o.x, o.y, 4, P.lw0, 0.8);
+      return;
+    }
+    const cA = mv === 'venom' ? P.lv1 : mv === 'spawn' ? P.lf0 : P.ls1, cB = mv === 'venom' ? P.lv3 : mv === 'spawn' ? P.lf2 : P.ls3, cH = mv === 'venom' ? P.lv0 : mv === 'spawn' ? P.W : P.ls0;
+    /* 膨らみ：口のまわりで脈打つ輪。溜めが進むほど大きく、速く */
+    const pulse = 0.5 + 0.5 * Math.sin(t * (10 + 14 * p)), rr = (mv === 'boulder' ? 6 : 4) + 4 * p + pulse * 1.5;
+    ellRing(o.x, o.y, rr, rr * 0.85, cB, 0.9); if (p > 0.3) ellRing(o.x, o.y, rr - 1, (rr - 1) * 0.85, cA, 0.55 + 0.4 * p);
+    for (let i = 0; i < 12; i++) {                                                       // 喉から口へ集まる粒
+      const ph = (t * 1.7 + hash(i, 931)) % 1, a = hash(i, 932) * TAU, r = (16 - 13 * ph) * (0.7 + 0.3 * p);
+      px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.8, ph > 0.7 ? cH : cA, (ph < 0.2 ? ph / 0.2 : 1) * (0.5 + 0.5 * p));
+    }
+    if (mv === 'gravel') { for (let i = 0; i < 3; i++) leechRock(o.x + (i - 1) * 3 + (fr & 1), o.y + ((i + fr) & 1), 1.2 + p, 940 + i, 0, 0.6 + 0.4 * p); }
+    else if (mv === 'venom') { venomDrop(o.x, o.y, 1 + 2.5 * p); if (p > 0.6 && (fr & 1)) plus(o.x, o.y, P.lv0, 1); }
+    else if (mv === 'spawn') { for (let i = 0; i < 3; i++) { disc(o.x + (i - 1) * 3, o.y + (i & 1), 1 + p, P.lf1, 0.7 + 0.3 * p); px(o.x + (i - 1) * 3 - 1, o.y + (i & 1) - 1, P.W, p); } }
+    else if (mv === 'boulder') {                                                         // 大岩：口元で岩がせり出し、震える
+      const s = 3 + 9 * easeOut(p), jx = p > 0.6 ? ((fr & 1) ? 1 : -1) : 0;
+      leechRock(o.x + Math.cos(o.ang) * s * 0.4 + jx, o.y + Math.sin(o.ang) * s * 0.4, s, 951, 0);
+      if (p > 0.5) dust(o.x, o.y + s, (t * 2) % 0.4, 2, 952 + fr, 8, 0.4, LEECH_DUST, 0.8, 0.7);
+    }
+  }
+  /* ---------- 吐いた物が飛ぶ（礫・卵）。溜めの終わりの 0.45 秒で、口（o.cx,o.cy）から着弾点へ山なりに ---------- */
+  function blSpitGround(t, o) {
+    const L = o.life || 1, f = clamp((t - (L - 0.45)) / 0.45);
+    if (f > 0) leechShadow(o.x, o.y + 1, 2 + f * (o.egg ? 3 : 6), 0.25 + 0.4 * f);
+  }
+  function blSpitAir(t, o) {
+    const L = o.life || 1, f = (t - (L - 0.45)) / 0.45; if (f < 0 || f > 1 || o.cx == null) return;
+    const H = 46 + 10 * hash(o.seed | 0, 961);
+    const pos = g => [o.cx + (o.x - o.cx) * g, o.cy + (o.y - o.cy) * g - H * 4 * g * (1 - g)];
+    if (o.egg) {
+      const [x, y] = pos(f); disc(x, y, 3, P.lf3); disc(x, y, 2, P.lf1); px(x - 1, y - 1, P.lf0);
+      for (let k = 1; k <= 2; k++) { const g = f - k * 0.06; if (g > 0) { const [a, b] = pos(g); px(a, b + 2, P.lf2, 0.7 - k * 0.2); } }   // 糸を引く粘液
+      return;
+    }
+    for (let k = 3; k >= 1; k--) { const g = f - k * 0.05; if (g < 0) continue; const [x, y] = pos(g); px(x, y, P.ls2, 0.8 - k * 0.2); px(x + 1, y + 1, P.ls3, 0.6 - k * 0.15); }
+    const [x, y] = pos(f);
+    leechRock(x, y, 3.2, 970 + (o.seed | 0), f * 9);
+  }
+  /* ---------- 礫の着弾：石くずと土煙。瓦礫そのもの（bl_rubble）は本編が同じ所に置く ---------- */
+  function blStoneHitGround(t, o) {
+    if (t < 0 || t > 0.9) return;
+    const R = o.R;
+    if (t < 0.22) { const r = R * easeOut(clamp(t / 0.12)); ellRing(o.x, o.y, r, r * 0.62, t < 0.05 ? P.W : P.ls0, 1 - t / 0.22); ellRing(o.x, o.y, r - 2, (r - 2) * 0.62, P.ls2, 0.7 * (1 - t / 0.22)); }
+    cracks(o.x, o.y, t, 6, R * 0.8, 981, 0.06, 0.8, P.ls0, P.ls4);
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + hash(i, 982); dust(o.x + Math.cos(a) * R * 0.7, o.y + Math.sin(a) * R * 0.45, t - 0.03, 2, 983 + i, 7, 0.6, LEECH_DUST, 1.0, 0.7); }
+  }
+  function blStoneHitAir(t, o) {
+    if (t < 0 || t > 0.6) return;
+    if (t < 0.05) plus(o.x, o.y - 2, P.W, 3);
+    for (let i = 0; i < 12; i++) {
+      const b = t - hash(i, 991) * 0.03; if (b < 0 || b > 0.5) continue;
+      const a = hash(i, 992) * TAU, sp = 26 + 40 * hash(i, 993), x = o.x + Math.cos(a) * sp * b, y = o.y + Math.sin(a) * sp * b * 0.6 - 66 * b + 190 * b * b;
+      if (i % 4 === 0) leechRock(x, y, 1.3, 994 + i, b * 20); else px(x, y, (i & 1) ? P.ls1 : P.ls3);
+    }
+    for (let i = 0; i < 4; i++) { const b = t - 0.02; if (b < 0 || b > 0.45) continue; px(o.x + (hash(i, 995) - 0.5) * 14, o.y - 6 - b * 30, P.lw0, 1 - b / 0.45); }   // 水しぶき
+  }
+  /* ---------- 瓦礫（残る物）。o.born＝置かれてからの秒、o.left＝残り秒。最後の1秒で崩れて消える ---------- */
+  function blRubble(t, o) {
+    const born = o.born || 0, left = o.left == null ? 9 : o.left, sd = o.seed | 0;
+    const lv = left < 1 ? clamp(left / 1) : 1, drop = born < 0.12 ? Math.round(4 * (1 - born / 0.12)) : 0;
+    const jx = left < 1 && (Math.floor(left * 20) & 1) ? 1 : 0;
+    leechShadow(o.x, o.y + 4, 10, 0.5 * lv);
+    const n = 3 + (sd & 1);
+    for (let i = n - 1; i >= 1; i--) {                                                   // 小さい石（奥から）
+      const a = sd + i * 2.3, rx = 5 + 2 * hash(i, sd + 1), s = 2.2 + 1.4 * hash(i, sd + 2);
+      leechRock(o.x + Math.cos(a) * rx + jx, o.y + 2 + Math.sin(a) * rx * 0.4 - drop, s, sd + i * 7, 0, lv);
+    }
+    leechRock(o.x + jx, o.y - 1 - drop, 5.2, sd + 3, 0, lv);                              // 真ん中の大きい石
+    if (lv >= 1) { px(o.x - 3, o.y - 6, P.lm0); px(o.x - 2, o.y - 6, P.lm1); px(o.x + 3, o.y - 5, P.lm1); }   // 苔
+    if (born < 0.3) dust(o.x, o.y + 3, born, 4, sd + 9, 9, 0.3, LEECH_DUST, 0.9, 0.7);
+  }
+  /* ---------- 毒吐き：口から帯（o.ang・長さ o.R・半幅 o.wide）を根元から先へ掃く ---------- */
+  function blVenomGround(t, o) {
+    if (t < 0 || t > 0.9) return;
+    const L = o.R, W2 = Math.max(4, o.wide || 9), cx = Math.cos(o.ang), cy = Math.sin(o.ang), front = L * easeOut(clamp(t / 0.2));
+    const lv = t < 0.45 ? 1 : 1 - (t - 0.45) / 0.45;
+    for (let d = 3; d < front; d += 3) {                                                 // 床に落ちた毒の筋（溜りになる前の一瞬）
+      const w = W2 * (0.45 + 0.4 * hash(d | 0, 1001)) * Math.min(1, d / 12), x = o.x + cx * d, y = o.y + cy * d;
+      for (let s = -w; s <= w; s += 2) px(x - cy * s, y + cx * s * 0.9, Math.abs(s) > w * 0.6 ? P.lv3 : P.lv2, lv * 0.75);
+    }
+  }
+  function blVenomAir(t, o) {
+    if (t < 0 || t > 0.8) return;
+    const L = o.R, W2 = Math.max(4, o.wide || 9), cx = Math.cos(o.ang), cy = Math.sin(o.ang), front = L * easeOut(clamp(t / 0.2));
+    if (t < 0.34) {                                                                      // 噴き出す流れ：波打つ太い帯。芯は明るい
+      const tail = t < 0.2 ? 0 : L * clamp((t - 0.2) / 0.14);
+      for (let d = tail; d < front; d += 1) {
+        const wob = Math.sin(d * 0.35 - t * 40) * 1.5, w = W2 * 0.55 * Math.min(1, d / 8) * (0.8 + 0.2 * Math.sin(d * 0.9)), x = o.x + cx * d - cy * wob, y = o.y + cy * d + cx * wob - 3;
+        for (let s = -w; s <= w; s++) { const k = Math.abs(s) / Math.max(1, w); px(x - cy * s, y + cx * s, k > 0.8 ? P.lv3 : k > 0.45 ? P.lv2 : k > 0.15 ? P.lv1 : P.lv0); }
+      }
+      const hx = o.x + cx * front, hy = o.y + cy * front - 3;                              // 先頭の飛沫
+      for (let i = 0; i < 8; i++) { const a = o.ang + (hash(i, 1011) - 0.5) * 2.2, r = 3 + 6 * hash(i, 1012 + Math.floor(t * 24)); venomDrop(hx + Math.cos(a) * r, hy + Math.sin(a) * r, i % 3 ? 0.5 : 1.5); }
+    }
+    for (let i = 0; i < 22; i++) {                                                       // 帯の両脇へ跳ねる滴
+      const d = L * hash(i, 1021), b = t - (d / L) * 0.2; if (b < 0 || b > 0.45) continue;
+      const side = (i & 1 ? 1 : -1) * (W2 * 0.6 + 26 * b * hash(i, 1022)), x = o.x + cx * d - cy * side, y = o.y + cy * d + cx * side - 30 * b + 110 * b * b;
+      venomDrop(x, y, i % 4 ? 0.5 : 1, 1 - b / 0.45);
+    }
+    for (let i = 0; i < 6; i++) {                                                        // 立ちのぼる毒の気
+      const d = L * (0.15 + 0.8 * hash(i, 1031)), b = t - 0.18 - hash(i, 1032) * 0.1; if (b < 0 || b > 0.5) continue;
+      dust(o.x + cx * d, o.y + cy * d - 2, b, 1, 1033 + i, 4, 0.5, VENOM_MIST, 0.9, 0.5);
+    }
+  }
+  /* ---------- 毒の溜り（残る物）。o.age＝できてからの秒、o.left＝残り秒 ---------- */
+  function blPool(t, o) {
+    const age = o.age || 0, left = o.left == null ? 9 : o.left, sd = o.seed | 0, R = o.R * (0.55 + 0.45 * easeOut(clamp(age / 0.25)));
+    const lv = left < 1 ? clamp(left) : 1, ry = R * 0.8, ri = Math.ceil(R) + 2;
+    for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
+      const a = Math.atan2(dy / 0.8, dx), d = Math.hypot(dx, dy / 0.8);
+      const edge = R * (1 + 0.10 * Math.sin(a * 3 + sd) + 0.07 * Math.sin(a * 5 + sd * 1.7 + age * 1.3));
+      if (d > edge) continue;
+      const k = d / edge;
+      let c = k > 0.86 ? P.lv4 : k > 0.6 ? P.lv3 : P.lv2;
+      if (k < 0.55 && Math.sin(dx * 0.9 + age * 2 + sd) + Math.sin(dy * 1.3 - age * 1.6) > 1.3) c = P.lv1;   // ゆっくり動く照り
+      px(o.x + dx, o.y + dy, c, lv * (k > 0.86 ? 0.8 : 0.95));
+    }
+    px(o.x - R * 0.35, o.y - ry * 0.4, P.lv0, lv); px(o.x - R * 0.35 + 1, o.y - ry * 0.4, P.lv0, lv);
+    for (let i = 0; i < 3; i++) {                                                        // 泡：ふくらんで弾ける
+      const ph = (age * (0.7 + 0.3 * hash(i, sd + 4)) + hash(i, sd + 5)) % 1, bx = o.x + (hash(i, sd + 6) - 0.5) * R * 1.1, by = o.y + (hash(i, sd + 7) - 0.5) * ry * 0.9;
+      if (ph < 0.7) { ring(bx, by, 1 + ph * 2, P.lv1, lv); px(bx - 1, by - 1, P.lv0, lv); }
+      else if (ph < 0.8) { px(bx - 3, by - 2, P.lv0, lv); px(bx + 3, by - 2, P.lv0, lv); px(bx, by - 4, P.lv0, lv); }
+    }
+  }
+  /* ---------- 吸い込みの終わり：口元を噛む（o.ang・半径 o.R） ---------- */
+  function blBiteGround(t, o) { if (t >= 0 && t < 0.5) for (let i = 0; i < 5; i++) dust(o.x + Math.cos(o.ang) * o.R * 0.5, o.y + Math.sin(o.ang) * o.R * 0.5 + 3, t - 0.04, 2, 1041 + i, 12, 0.45, [P.lw0, P.lw1, P.ls2], 1, 0.6); }
+  function blBiteAir(t, o) {
+    if (t < 0 || t > 0.45) return;
+    const R = o.R, cx = Math.cos(o.ang), cy = Math.sin(o.ang), mx = o.x + cx * R * 0.55, my = o.y + cy * R * 0.55;
+    const close = easeOut(clamp(t / 0.07)), gap = Math.round(R * 0.5 * (1 - close));
+    if (t < 0.2) for (let side = -1; side <= 1; side += 2) {                               // 両の歯列が閉じる（歯は内向き）
+      const pxn = -cy * side, pyn = cx * side, step = R * 0.15;
+      for (let i = -3; i <= 3; i++) {
+        const bx = mx + cx * i * step + pxn * (gap + 4), by = my + cy * i * step + pyn * (gap + 4), len = 4 - Math.abs(i);
+        px(bx + pxn, by + pyn, P.lf3); px(bx, by, P.lf1);                                   // 歯ぐき
+        for (let k = 1; k <= len; k++) px(bx - pxn * k, by - pyn * k, k === len ? P.W : P.lf0);
+      }
+    }
+    if (t >= 0.06 && t < 0.14) { plus(mx, my, P.W, 5); ring(mx, my, 3 + (t - 0.06) * 80, P.lw0, 0.9); }
+    for (let i = 0; i < 12; i++) { const b = t - 0.07; if (b < 0 || b > 0.38) continue; const a = hash(i, 1051) * TAU, sp = 30 + 40 * hash(i, 1052); px(mx + Math.cos(a) * sp * b, my + Math.sin(a) * sp * b * 0.7 - 40 * b + 140 * b * b, i % 3 ? P.lw0 : P.lw1, 1 - b / 0.38); }
+  }
+  /* ---------- むせる（吸い込みを潰された）：口から唾と屑を咳き出す ---------- */
+  function blChokeAir(t, o) {
+    if (t < 0 || t > 0.7) return;
+    for (let k = 0; k < 3; k++) {
+      const b = t - k * 0.16; if (b < 0 || b > 0.35) continue;
+      const d = 6 + 30 * easeOut(b / 0.35);
+      for (let i = 0; i < 7; i++) { const a = o.ang + (hash(i, 1061 + k) - 0.5) * 1.3, r = d * (0.5 + 0.5 * hash(i, 1062 + k)); px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.8 + 8 * b, i % 3 === 0 ? P.ls1 : i % 3 === 1 ? P.lw0 : P.lv1, 1 - b / 0.35); }
+      dust(o.x + Math.cos(o.ang) * d * 0.5, o.y, b, 2, 1063 + k, 6, 0.35, [P.lw0, P.lw1, P.ls2], 0.9, 0.6);
+    }
+  }
+  /* ---------- 卵（残る物）。t＝置かれてからの秒、o.life＝孵るまで。進むほど揺れ、ひびが入る ---------- */
+  function blEgg(t, o) {
+    const L = o.life || 1.8, p = clamp(t / L), sd = o.seed | 0;
+    const sq = t < 0.12 ? 1 - t / 0.12 : 0, wob = p > 0.35 ? Math.round(Math.sin(t * (14 + 26 * p)) * (0.6 + 1.6 * p)) : 0;
+    const rx = 4 + sq * 2, ry = 5 - sq * 2, x = o.x + wob, y = o.y - 3 + sq * 2;
+    leechShadow(o.x, o.y + 3, 6, 0.45);
+    ellipse(x, y, rx + 1, ry + 1, P.lf4); ellipse(x, y, rx, ry, P.lf2); ellipse(x - 1, y - 1, rx - 1.5, ry - 1.5, P.lf1);
+    px(x - 2, y - 3, P.lf0); px(x - 1, y - 3, P.lf0); px(x - 2, y - 2, P.lf0);
+    line(x + 1, y - 2, x + 2, y + 1, P.lf3, 0.8); line(x - 3, y + 1, x - 1, y + 3, P.lf3, 0.8);          // 血管
+    const pulse = 0.5 + 0.5 * Math.sin(t * (8 + 14 * p));
+    if (pulse > 0.6) { px(x, y, P.lm0); px(x + 1, y + 1, P.lm1); }                         // 中で動く仔の影（苔の緑）
+    if (p > 0.55) { line(x - 1, y - 4, x, y - 1, P.lf4); if (p > 0.8) { line(x, y - 1, x - 2, y + 2, P.lf4); line(x, y - 1, x + 2, y + 1, P.lf4); } }   // ひび
+    if (o.hurt) ellRing(x, y, rx + 1, ry + 1, P.W);                                       // 叩かれた：縁だけ白く（中の絵は潰さない）
+    for (let i = 0; i < 3; i++) px(o.x + (i - 1) * 4, o.y + 4, P.lf3, 0.7);                // 垂れた粘液
+  }
+  function blEggLandAir(t, o) { if (t < 0 || t > 0.35) return; for (let i = 0; i < 8; i++) { const a = hash(i, 1071) * TAU, r = 3 + 30 * t; px(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r * 0.5 - 18 * t + 60 * t * t, i & 1 ? P.lf1 : P.lf3, 1 - t / 0.35); } }
+  function blHatchAir(t, o) {
+    if (t < 0 || t > 0.55) return;
+    if (t < 0.06) plus(o.x, o.y - 3, P.W, 4);
+    for (let i = 0; i < 12; i++) { const a = hash(i, 1081) * TAU, sp = 28 + 30 * hash(i, 1082), x = o.x + Math.cos(a) * sp * t, y = o.y - 3 + Math.sin(a) * sp * t * 0.6 - 50 * t + 170 * t * t;
+      if (i % 3 === 0) { px(x, y, P.lf1, 1 - t / 0.55); px(x + 1, y, P.lf3, 1 - t / 0.55); px(x, y + 1, P.lf4, 1 - t / 0.55); } else px(x, y, i & 1 ? P.lf0 : P.lm1, 1 - t / 0.55); }
+    dust(o.x, o.y, t, 3, 1083, 8, 0.5, [P.lf0, P.lf1, P.lf3], 0.9, 0.6);
+  }
+  /* ---------- 大岩（転がる物）。o.age＝転がり始めてからの秒、o.ang＝進む向き ---------- */
+  function blBoulderGround(t, o) {
+    const age = o.age || 0, cx = Math.cos(o.ang), cy = Math.sin(o.ang);
+    leechShadow(o.x, o.y + 9, 14, 0.55);
+    for (let k = 0; k < 5; k++) {                                                        // 後ろに残る土煙と水しぶき
+      const b = (age - k * 0.045) % 0.225; if (age < k * 0.045) continue;
+      const d = 10 + k * 9;
+      dust(o.x - cx * d, o.y - cy * d + 8, b + k * 0.03, 2, 1091 + k, 6, 0.4, LEECH_DUST, 1.1, 0.7);
+      px(o.x - cx * d - cy * 8, o.y - cy * d + cx * 8 + 6, P.lw0, 0.8); px(o.x - cx * d + cy * 8, o.y - cy * d - cx * 8 + 6, P.lw0, 0.8);
+    }
+  }
+  function blBoulderAir(t, o) {
+    const age = o.age || 0, rot = age * 11 * (Math.cos(o.ang) >= 0 ? 1 : -1), hop = Math.abs(Math.sin(age * 16)) * 1.5;
+    leechRock(o.x, o.y - 2 - hop, 12.5, 1101, rot);
+    for (let i = 0; i < 4; i++) { const a = rot + i * 1.57; px(o.x + Math.cos(a) * 6, o.y - 2 - hop + Math.sin(a) * 6, i & 1 ? P.ls4 : P.lm0); px(o.x + Math.cos(a) * 6 + 1, o.y - 2 - hop + Math.sin(a) * 6, i & 1 ? P.ls3 : P.lm1); }   // 回っているのが読める印
+    for (let i = 0; i < 5; i++) { const b = (age * 3 + hash(i, 1102)) % 1; px(o.x - Math.cos(o.ang) * (12 + b * 10) + (hash(i, 1103) - 0.5) * 14, o.y + 6 - b * 14, i & 1 ? P.ls1 : P.ls3, 1 - b); }   // 跳ねる石くず
+  }
+  /* ---------- 大岩が砕ける ---------- */
+  function blShatterGround(t, o) {
+    if (t < 0 || t > 0.9) return;
+    const R = o.R;
+    if (t < 0.25) { const r = R * easeOut(clamp(t / 0.14)); for (let k = 0; k < 3; k++) ellRing(o.x, o.y + 2, r - k, (r - k) * 0.62, k === 0 ? (t < 0.05 ? P.W : P.ls0) : k === 1 ? P.ls1 : P.ls3, 1 - t / 0.25); }
+    cracks(o.x, o.y + 2, t, 9, R * 0.9, 1111, 0.08, 0.85, P.ls0, P.ls4);
+    for (let i = 0; i < 9; i++) { const a = i * TAU / 9 + hash(i, 1112) * 0.4; dust(o.x + Math.cos(a) * R * 0.7, o.y + 3 + Math.sin(a) * R * 0.45, t - 0.03, 2, 1113 + i, 9, 0.7, LEECH_DUST, 1.3, 0.8); }
+  }
+  function blShatterAir(t, o) {
+    if (t < 0 || t > 0.7) return;
+    if (t < 0.05) { disc(o.x, o.y - 2, 9, P.ls0); plus(o.x, o.y - 2, P.W, 9); }
+    for (let i = 0; i < 20; i++) {
+      const b = t - hash(i, 1121) * 0.03; if (b < 0 || b > 0.6) continue;
+      const a = hash(i, 1122) * TAU, sp = 30 + 60 * hash(i, 1123), x = o.x + Math.cos(a) * sp * b, y = o.y - 2 + Math.sin(a) * sp * b * 0.6 - 80 * b + 200 * b * b;
+      if (i % 3 === 0) leechRock(x, y, 2.4 - b * 2, 1124 + i, b * 18); else px(x, y, (i & 1) ? P.ls1 : P.ls3, 1 - b / 0.6);
+    }
+  }
+  /* ---------- 砕けた礫（弾）。o.ang＝飛ぶ向き。t は流れ続ける時間（回る） ---------- */
+  function blShardAir(t, o) {
+    const cx = Math.cos(o.ang), cy = Math.sin(o.ang);
+    for (let k = 1; k <= 3; k++) px(o.x - cx * k * 3, o.y - 3 - cy * k * 3, k === 1 ? P.ls2 : P.ls3, 0.8 - k * 0.2);
+    leechShadow(o.x, o.y + 3, 3, 0.35);
+    leechRock(o.x, o.y - 3, 2.6, 1131 + (o.seed | 0), t * 14);
+  }
+
   /* ================= ヴェラ ================= */
   const isStone = o => o.kind === 'stone';
   /* 溜め（貫き）：弓を引く。形の無い矢が光で組み上がる／石の槍に礫が集まる */
@@ -3593,6 +4113,35 @@
     bt_spit: { aux: true, span: 5, pad: 12, sky: 80, ground: btSpitGround, air: btSpitAir },
     bt_pillar: { aux: true, span: 1.2, pad: 20, sky: 50, ground: btPillarGround, air: btPillarAir },
     bt_jab: { aux: true, span: 0.4, pad: 12, sky: 14, ground: btJabGround, air: btJabAir },
+    /* ==== 打ち直しのブレヒト（20F） ==== */
+    bb_charge: { aux: true, span: 5, ext: 26, pad: 6, sky: 20, ground() {}, air: bbChargeAir },
+    bb_tentacle: { aux: true, span: 0.4, pad: 16, sky: 16, ground: bbTentacleGround, air: bbTentacleAir },
+    bb_pinch: { aux: true, span: 0.5, pad: 14, sky: 16, ground() {}, air: bbPinchAir },
+    bb_slam: { aux: true, span: 0.7, pad: 18, sky: 40, ground: bbSlamGround, air: bbSlamAir },
+    bb_cleave: { aux: true, span: 0.32, pad: 14, sky: 16, ground() {}, air: bbCleaveAir },
+    bb_anvil: { aux: true, span: 0.7, pad: 30, sky: 50, ground: bbAnvilGround, air: bbAnvilAir },
+    bb_land: { aux: true, span: 0.8, pad: 60, sky: 50, ground: bbLandGround, air: bbLandAir },
+    bb_ff: { aux: true, span: 0.4, ext: 40, pad: 6, sky: 30, ground() {}, air: bbFFAir },
+    bb_spin: { aux: true, span: 1e9, pad: 8, sky: 10, ground() {}, air: bbSpinAir },
+    bb_fly: { aux: true, span: 1e9, ext: 44, pad: 6, sky: 40, ground: bbFlyGround, air: bbFlyAir },
+    bb_purge: { aux: true, span: 2.6, ext: 76, pad: 8, sky: 70, ground: bbPurgeGround, air: bbPurgeAir },
+    bb_merge: { aux: true, span: 1.4, pad: 40, sky: 60, ground: bbMergeGround, air: bbMergeAir },
+    bb_death: { aux: true, span: 4.0, ext: 60, pad: 8, sky: 150, ground: bbDeathGround, air: bbDeathAir },
+    /* ==== 遺構のヒル（15F） ==== */
+    bl_charge: { aux: true, span: 5, pad: 10, sky: 20, ground: blChargeGround, air: blChargeAir },
+    bl_spit: { aux: true, span: 5, ext: 16, pad: 12, sky: 90, ground: blSpitGround, air: blSpitAir },
+    bl_stonehit: { aux: true, span: 0.9, pad: 16, sky: 40, ground: blStoneHitGround, air: blStoneHitAir },
+    bl_rubble: { aux: true, span: 1e9, ext: 14, pad: 6, sky: 8, ground: blRubble, air() {} },
+    bl_venom: { aux: true, span: 0.9, pad: 20, sky: 24, ground: blVenomGround, air: blVenomAir },
+    bl_pool: { aux: true, span: 1e9, pad: 6, sky: 6, ground: blPool, air() {} },
+    bl_bite: { aux: true, span: 0.5, pad: 20, sky: 24, ground: blBiteGround, air: blBiteAir },
+    bl_choke: { aux: true, span: 0.7, ext: 44, pad: 8, sky: 12, ground() {}, air: blChokeAir },
+    bl_egg: { aux: true, span: 1e9, ext: 10, pad: 6, sky: 8, ground() {}, air: blEgg },
+    bl_eggland: { aux: true, span: 0.35, ext: 20, pad: 6, sky: 12, ground() {}, air: blEggLandAir },
+    bl_hatch: { aux: true, span: 0.55, ext: 34, pad: 8, sky: 30, ground() {}, air: blHatchAir },
+    bl_boulder: { aux: true, span: 1e9, ext: 60, pad: 8, sky: 12, ground: blBoulderGround, air: blBoulderAir },
+    bl_shatter: { aux: true, span: 0.9, pad: 20, sky: 60, ground: blShatterGround, air: blShatterAir },
+    bl_shard: { aux: true, span: 1e9, ext: 14, pad: 4, sky: 6, ground() {}, air: blShardAir },
     bv_charge: { aux: true, span: 5, ext: 40, pad: 8, sky: 16, ground: bvChargeGround, air: bvChargeAir },
     bv_beam: { aux: true, span: 1.4, pad: 24, sky: 20, ground: bvBeamGround, air: bvBeamAir },
     bv_release: { aux: true, span: 0.9, ext: 56, pad: 12, sky: 16, ground: bvReleaseGround, air: bvReleaseAir },
