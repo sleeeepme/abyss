@@ -23,7 +23,8 @@
   wrap('feelFoeAttack',([e,kind])=>{const id=FOE[kind];if(id)emit(id,where(e));});
   const BOSS_SFX={slam:'foeHeavy',burst:'foeHeavy',wave:'foeHeavy',pillars:'foeHeavy',cleave:'foeCleave',charge:'foeLunge',beam:'foeBeam',tentacle:'foeCleave',grab:'foeLunge',ink:'foeShot',pinch:'foeSwing',bubble:'foeShot',roll:'foeLunge',
     /* 遺構のヒル（2026-11-16） */ gravel:'foeThud',venom:'foeSpray',gulp:'foeBite',spawn:'foeSpit',boulder:'foeRumble',
-    /* ブレヒトの掛け合いと合体 */ anvil:'foeClang',throw:'foeHeavy',splitslam:'foeHeavy',inout:'foeCleave',inkbubble:'foeShot',spinroll:'foeLunge'};
+    /* ブレヒトの掛け合いと合体 */ anvil:'foeClang',throw:'foeHeavy',splitslam:'foeHeavy',inout:'foeCleave',inkbubble:'foeShot',spinroll:'foeLunge',
+    /* 施しのマレット（2026-11-16。音は今ある物の流用） */ offer:'foeSpit',hands:'foeRumble',reach:'foeThud',lightfall:'foeBeam',confuse:'foeHeavy',giveall:'foeHeavy',hourglass:'foeClang'};
   wrap('resolveBossMove',([e],r,o)=>{const s=o&&!o.follow&&BOSS_SFX[o.id];if(s)emit(s,where(e));},e=>e&&e.cast&&{id:e.cast.id,follow:!!e.cast.follow});   // 相方の構え（follow）は鳴らさない
   /* 溜め始め：ヒルは喉が鳴る（吸い込みは吸う音が溜めの間ずっと続く） */
   const CAST_SFX={gravel:'foeGurgle',venom:'foeGurgle',spawn:'foeGurgle',boulder:'foeGurgle',gulp:'foeInhale'};

@@ -145,7 +145,7 @@ R.allMovesFire = await pg.evaluate(()=>{
   const all=Object.keys(BOSS_MOVES);
   const missing=all.filter(id=>!fired.has(id));
   return {all, missing, threw, count:all.length,
-          ok: threw===null && missing.length===0 && all.length===26};   // 9 ＋ ブレヒトの中身の技6つ（2026-11-06）＋ ヒルの技5つ ＋ ブレヒトの掛け合いと合体の技6つ（2026-11-16）
+          ok: threw===null && missing.length===0 && all.length===33};   // 9 ＋ ブレヒトの中身の技6つ（2026-11-06）＋ ヒルの技5つ ＋ ブレヒトの掛け合いと合体の技6つ ＋ マレットの技7つ（2026-11-16）
 });
 
 /* 2-b. 落石は**溜めの時点で**落ちる場所が決まっている。

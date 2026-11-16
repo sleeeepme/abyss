@@ -4080,7 +4080,7 @@ function bpxDraw(e,t,S){
     else if(moving) f=bpxPick(A.walk,t+(e._cg||0)*.01,true);
     else f=bpxPick(A.idle,t+(e.uidA||0)*.37,true);
   }else{
-    f=(casting||e.rage)&&A.open?A.open[0]:A.idle[0];
+    f=((casting&&!(e.cast&&e.cast.closed))||e.rage)&&A.open?A.open[0]:A.idle[0];   // マレット：施し・手を招くは目を閉じたまま
   }
   if(S.float&&!e.dead) oy=Math.round(Math.sin(t*1.7+(e.uidA||0))*1.2);
   e._bpF=f;

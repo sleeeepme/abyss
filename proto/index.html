@@ -6638,6 +6638,21 @@ const BOSS_MOVES={
   spawn:   {nm:'仔を吐く', tele:0.80, n:2, rad:0.6, spread:3.0, cd:[10.0,13.0], min:0, max:99},
   // 大岩（激昂）。口から太い帯を大岩が本当に転がる。壁で砕けて礫が散る
   boulder: {nm:'大岩',     tele:1.00, len:9.0, wide:1.1, mult:1.50, cd:[5.0,6.8], min:0, max:99},
+  /* ---- 施しのマレット（30F）：配る。受け取るのは誰でもいい。MARETH 参照（2026-11-16） ---- */
+  // 施し。薬瓶を場に置く（目は閉じたまま。当たらない）。誰が踏んでも効く
+  offer:    {nm:'施し',           tele:0.80, n:3, cd:[6.0,8.0], min:0, max:99},
+  // 手を招く。床から手が生える（招来の置き換え。呼んだあと広間のどこかへ跳ぶ）
+  hands:    {nm:'手を招く',       tele:0.70, n:2, cd:[9.0,12.0], min:0, max:99},
+  // 差し伸べる手。足元から手が掴む。当たると短く掴まれ、1服飲まされる
+  reach:    {nm:'差し伸べる手',   tele:0.95, rad:1.5, n:3, spread:4.2, mult:1.00, cd:[4.0,5.6], min:0, max:99},
+  // 降り注ぐ光。上から順に落ちる（1本ずつ予兆が出る）。当たると1服。薬瓶に落ちると薬の溜りになる
+  lightfall:{nm:'降り注ぐ光',     tele:0.60, mult:0.90, cd:[6.0,8.0], min:0, max:99},
+  // 見分けを失くす（激昂）。広がる輪。触れた者は混乱する（削らない）
+  confuse:  {nm:'見分けを失くす', tele:1.10, cd:[11.0,14.0], min:0, max:99},
+  // 一斉に配る（激昂）。広がる輪。触れた全員に削り＋1服
+  giveall:  {nm:'一斉に配る',     tele:1.00, mult:0.90, cd:[7.0,9.0], min:0, max:99},
+  // 砂時計を返す（激昂）。薬から受けた癒しの合計が、まとめて削りとして返る
+  hourglass:{nm:'砂時計を返す',   tele:2.00, cd:[13.0,17.0], min:0, max:99},
   // 分身。本体そっくりの幻を数体だす。幻はHPが無いに等しく、削っても本体は減らない
   // ——「本体を見失わない」ことそのものを体で覚えさせる、門番だけの技。
   clone: {nm:'分身',     tele:0.60, n:2, dur:4.5, cd:[10.0,14.0], min:0, max:99},
@@ -6732,8 +6747,8 @@ const UNIQUE_BOSSES={
        line:'脚が七本ある。離さないのではない。離す機能が最初から無い。'},
 
   30: {nm:'施しのマレット', reg:'登録：薬・九番',     fam:'undead', dt:'arcane',
-       // 配る相手。柱と召喚で「置いていく」形にそろえる
-       moves:['summon','pillars','beam'],   rage:['wave'],
+       // 配る。受け取るのは誰でもいい（2026-11-16）。目が開いた技だけが削る。激昂で混乱・一斉・砂時計
+       moves:['offer','hands','reach','lightfall'],   rage:['confuse','giveall','hourglass'],
        line:'いまも配っている。悪意はない。区別する機能がもう無いだけ。'},
 
   35: {nm:'炉の大蛇',      reg:'現象体・四号／熱',   fam:'flame',  dt:'fire',
@@ -9713,6 +9728,9 @@ function enterFloor(depth, opt){
                  // 階変化検知がここより後に走り、直前に発生させた瞬歩を巻き戻してしまう）。
   W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
   W.rubble=[]; W.pools=[];   // ヒルの瓦礫と毒の溜り
+  W.vials=[]; W.mpools=[]; W.mrings=[]; W.mlights=[];   // マレットの薬瓶・薬の溜り・輪・降る光
+  P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0;
+  party().forEach(a=>{ a.mDose=null; a.mHeal=0; a.confT=0; a.odT=0; });
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
   W.enemies.push(...spawnSlaters(fl, depth));   // 水の層：磯虫の群れ
@@ -10629,7 +10647,7 @@ function onGreatBossDown(e){
    主人公だけが損をする仕掛けは「避けるだけの作業」になって判断にならない。
    敵を溶岩へ誘い込めるなら、同じ床が武器にもなる。 */
 const HAZ_TICK = 0.5;            // この間隔でまとめてダメージを入れる（毎フレームは重い）
-function hazardSlowAt(x,y){ return hazardSlowAt0(x,y)*inkSlowAt(x,y); }   // ブレヒトの墨溜まりも同じ規則で遅くする
+function hazardSlowAt(x,y){ return hazardSlowAt0(x,y)*inkSlowAt(x,y)*marethSlowAt(x,y); }   // ブレヒトの墨溜まりも同じ規則で遅くする
 function hazardSlowAt0(x,y){
   const h=hazardAt(x,y);
   if(!h) return 1;
@@ -12175,6 +12193,7 @@ function allyUpdate(a, dt){
      全員の技が一斉に飛ぶなら、止められていた数秒はただの巻き戻しになる。 */
   if(frozenNow()) return;
   if(a.fallAnim) return;             // 落下演出の最中は動かない
+  if(a.confT>0 && marethAllyConfused(a, st, dt)){ a.swing=Math.max(0,a.swing-dt); a.hit=Math.max(0,a.hit-dt); return; }   // マレットの混乱：一番近い者を敵味方なく殴る
   const slow = hasStatus(a,'chill') ? (1-CHILL_SLOW) : 1;
 
   a.atkCd=Math.max(0,a.atkCd-dt);
@@ -13664,6 +13683,7 @@ function enemyUpdate(e,dt){
   });
   if(e.dead) return;
   if(e.egg){ leechEggTick(e, dt); return; }   // ヒルの卵：孵るまで動かない・攻撃しない
+  if(e.hand){ if(!(e.frz>0) && !hasStatus(e,'stagger')) marethHandTick(e, dt); else if(e.frz>0){ e.frz-=dt; } return; }   // マレットの手：歩かない。専用の動き
   /* フロストノヴァの凍結。動きも、溜めている技の時計も止まる（溶けたら続きから） */
   if(e.frz>0){ e.frz-=dt; if(e.frz<=0){ e.frz=0; e.frzMax=0; } return; }
   if(hasStatus(e,'stagger')){ e.hit=Math.max(e.hit,0.05); return; }   // 打撃で止まる
@@ -14012,19 +14032,22 @@ const DUEL={
   rec:{slam:0.9, cleave:0.6, burst:0.4, wave:1.0, charge:1.2, pillars:0.5, beam:0.8, summon:0, clone:0,
        tentacle:0.7, ink:0.5, grab:0.6, pinch:0.5, bubble:0.4, roll:1.2,
        gravel:0.5, venom:0.8, gulp:1.0, spawn:0, boulder:0.9,
-       anvil:0.8, throw:0.6, inout:0.8, inkbubble:0.4, spinroll:1.2, splitslam:1.0},
+       anvil:0.8, throw:0.6, inout:0.8, inkbubble:0.4, spinroll:1.2, splitslam:1.0,
+       offer:0, hands:0, reach:0.6, lightfall:1.0, confuse:0.8, giveall:0.9, hourglass:1.2},
   recRage:0.7, recCombo:1.5,
   /* 連携（1発目 → 2発目）。両方の技を持っているボスでだけ出る。2発目からは繋がない。 */
   combo:{cleave:'slam', charge:'cleave', beam:'burst', pillars:'slam', slam:'wave',
          grab:'tentacle', roll:'pinch', ink:'bubble',    // ブレヒト：引き寄せて触手、転がって鋏、墨のあと泡
-         gulp:'gravel', venom:'gulp', gravel:'boulder'}, // ヒル：呑んで礫、毒のあと呑む、礫のあと大岩（激昂後）
+         gulp:'gravel', venom:'gulp', gravel:'boulder',  // ヒル：呑んで礫、毒のあと呑む、礫のあと大岩（激昂後）
+         offer:'hands', reach:'lightfall', confuse:'giveall', giveall:'hourglass'},   // マレット：置いて手を呼ぶ、掴んで光、混乱のあと一斉、一斉のあと砂時計
   comboGap:0.3, comboCh:[0, 0.35, 0.60], // 段階ごとの連携の確率
   phase3:0.20, phase3BrkMul:0.8, roar:0.6,
 };
 /* 体で溜める大技。妨害も見切り（歩いて抜ける）も、この5つが対象 */
 const DUEL_BODY={slam:1, cleave:1, charge:1, beam:1, pillars:1, tentacle:1, grab:1, pinch:1, roll:1, ink:1,
                  gravel:1, venom:1, gulp:1, boulder:1,
-                 anvil:1, throw:1, inout:1, spinroll:1, splitslam:1};
+                 anvil:1, throw:1, inout:1, spinroll:1, splitslam:1,
+                 reach:1, lightfall:1};
 let duelCtx=null;        // いま当たっているのが武器技／大技か（artHit・fireUlt が立てる）
 let duelBoltSrc=null;    // ボスの弾が主人公に届いたとき、撃ったボス（見切りの持ち主）
 
@@ -14108,7 +14131,7 @@ function bossInterrupt(e){
   e.cast=null; e.combo=null; e.tele=0; e.vx=0; e.vy=0;
   e.recover=DUEL.intrStun; e.noIntr=id;
   e.moveCd=Math.max(e.moveCd||0, m.cd[0]*(e.rage?0.65:1));
-  if(e.revealed) log(e.name+'の'+m.nm+'を潰した');
+  if(e.revealed) log(e.name+'の技を潰した');
   W.pops.push({x:e.x, y:e.y-1.0, txt:'妨害', c:'#ffe08a', life:1.0, max:1.0});
   if(id==='gulp') leechChoke(e);       // ヒル：吸い込みを潰すと、むせて呑んだ物を吐き戻す（隙が長い）
   if(typeof feelKick==='function') feelKick(2.6, 0.18);
@@ -14166,8 +14189,8 @@ function bossBeginCast(e, id, tg, combo){
     e.cast.spots=spots;
   }
   if(LEECH_MOVES[id]) leechBeginCast(e, id, tg);
+  if(MARETH_MOVES[id]) marethBeginCast(e, id, tg);
   e.tele = 0;                        // 通常攻撃の予兆は打ち消す（二重に出さない）
-  if(e.revealed) log(e.name+'の'+m.nm);
 }
 
 /* キャスト中なら true を返して通常行動を止める。
@@ -14679,7 +14702,7 @@ function brechtFF(e, mt){
   W.pops.push({x:mt.x, y:mt.y-1.2, txt:'同士討ち', c:'#ffd8a0', life:1.0, max:1.0});
   duelInit(mt); addBreak(mt, BRECHT_PAIR.ffBrk);
   if(typeof feelPixelArt==='function') feelPixelArt('bb_ff', mt.x, mt.y-0.3);
-  if(e.revealed) log(e.name+'の'+BOSS_MOVES[e.lastMove||'slam'].nm+'が'+mt.name+'に当たった');
+  if(e.revealed) log(e.name+'の技が'+mt.name+'に当たった');
 }
 function brechtFriendlyFire(e){
   const c=e.cast; if(!e.brecht || !c || c.follow || !BRECHT_FF[c.id]) return;
@@ -14726,6 +14749,522 @@ function tickInkBubbles(dt){
   }
 }
 /* 引き寄せられている者（主人公・仲間）。pull の点へ残り時間で割って近づく。壁は moveEnt が止める */
+/* ============================================================
+   施しのマレット（30F）：配る。受け取るのは誰でもいい（2026-11-16 ユーザー指定）
+   ・薬瓶（W.vials）を場に置く。主人公・仲間・手の誰が踏んでも効く（赤＝癒し、琥珀＝昂り）
+   ・服数（mDose）：薬を1つ受けるたび＋1、目が開いた技に当たっても＋1。3服で毒に転じる（削り＋鈍足）
+   ・雑魚は床から生える「手」（e.hand）。歩かない。沈んで、狙う相手のそばに生え直す
+   ・降り注ぐ光：マレットからは出ない。上から順に落ちる（W.mlights）。薬瓶に落ちると薬の溜り（W.mpools）
+   ・激昂：見分けを失くす（混乱の輪）／一斉に配る（削り＋1服の輪）／砂時計を返す
+   ・砂時計：この戦いで薬から受けた癒しの合計（mHeal）が、まとめて削りとして返る。軽減できない。取りすぎていれば即死
+   ・混乱：主人公は操作が反転し、仲間が「手」に見える。仲間と手は一番近い者を敵味方なく殴る
+   目が閉じている技（施し・手を招く）は当たらない。目が開いた技だけが削る。
+   ============================================================ */
+const MARETH_MOVES={offer:1, hands:1, reach:1, lightfall:1, confuse:1, giveall:1, hourglass:1};
+const MARETH={
+  vialMax:6, vialLife:16, vialR:0.55,
+  healPct:0.25,                       // 癒しの薬1つで戻る量（最大HPの割合）。同じ量が砂時計で返る
+  mightCut:0.5,                       // 昂りの薬：技の待ち時間をこの割合だけ縮める（手は次の一撃 ×1.3）
+  doseWin:12, doseMax:3,              // 服数は最後に受けてから12秒で抜ける。3服で毒
+  odTime:6, odPct:0.05, odSlow:0.6, odFoePct:0.15, odTick:0.5,   // 飲みすぎ：毎秒 最大HPの5%（手は15%）・速さ×0.6
+  handMax:5, handRise:0.6, handSink:0.5, handReach:1.5, handWind:0.6, handR:0.9, handCd:1.6, handWait:1.2, handMight:1.3,
+  grabHold:0.7,                       // 差し伸べる手に掴まれている時間
+  lightGap:0.3, lightTele:0.75, lightR:1.1, lightN:6, lightRage:8,
+  poolR:0.9, poolLife:7,
+  ringSpeed:5.0, ringMax:10, ringBand:0.55,
+  confT:5.0, confCd:0.9, confHit:0.35,   // 混乱の長さ／混乱した仲間が殴る間隔と強さ（攻撃力の割合）
+};
+function marethOn(){ return !!(S.run && S.run.depth===POISON_BOSS_DEPTH); }
+/* 相手ごとの器。主人公は P、仲間・敵は本人に持たせる */
+function mIsAlly(o){ return o!==P && party().includes(o); }
+function mMaxHp(o){ return o===P ? stats(S.hero).maxHp : (mIsAlly(o) ? allyStats(o).maxHp : o.maxHp); }
+function mEveryone(){            // 薬・輪・砂時計が効く全員（マレット本体は除く）
+  const out=[]; if(S.hero && S.run) out.push(P);
+  livingParty().forEach(a=>out.push(a));
+  W.enemies.forEach(e=>{ if(!e.dead && !e.boss && !e.egg) out.push(e); });
+  return out;
+}
+function mHurt(o, dmg, col){      // 軽減なしで削る（毒・砂時計）
+  dmg=Math.max(1, Math.round(dmg));
+  if(o===P){
+    if(godMode()) return;
+    S.hero.hpNow-=dmg; popPlayerDamage(dmg, col, true); W.fx.push({t:'hurt', life:0.10});
+    if(S.hero.hpNow<=0) die();
+  }else if(mIsAlly(o)){ o.hpNow=Math.max(1, o.hpNow-dmg); pop(o.x, o.y-0.4, dmg, col); }
+  else{ o.hp-=dmg; pop(o.x, o.y, dmg, col); if(o.boss) o.revealed=true; if(o.hp<=0 && !o.dead) killEnemy(o); }
+}
+/* 1服。kind：'heal' 癒し／'might' 昂り／null 目が開いた技に当たったぶん（効き目なし） */
+function marethDose(o, kind){
+  if(!o || o.dead || o.boss) return;
+  if(o===P && (!S.hero || !S.run)) return;
+  if(kind==='heal'){
+    const amt=Math.round(mMaxHp(o)*MARETH.healPct);
+    if(o===P || mIsAlly(o)){ const h=o===P?S.hero:o; healEnt(h, amt); }
+    else o.hp=Math.min(o.maxHp, o.hp+amt);
+    o.mHeal=(o.mHeal||0)+amt;                       // 満タンで受けても勘定に入る（取った分は必ず返る）
+    W.pops.push({x:o.x, y:o.y-0.5, txt:'+'+amt, c:'#8fe08a', life:0.8, max:0.8});
+  }else if(kind==='might'){
+    if(o===P){ const k=1-MARETH.mightCut; P.ultCd=(P.ultCd||0)*k; P.waveCd=(P.waveCd||0)*k; P.artCd=(P.artCd||0)*k; }
+    else if(mIsAlly(o)){ o.atkCd=0; if(o.artCd>0) o.artCd*=1-MARETH.mightCut; }
+    else o.mMight=true;
+  }
+  const D=(o.mDose=o.mDose||{n:0, t:0});
+  D.n++; D.t=MARETH.doseWin;
+  if(D.n>=MARETH.doseMax){
+    D.n=0; D.t=0; o.odT=MARETH.odTime; o.odAcc=0;
+    if(typeof feelSpray==='function') feelSpray(o.x, o.y, '#9ad048', 10, 1.4);
+  }
+}
+function marethSlowAt(x, y){      // 飲みすぎの鈍足（hazardSlowAt に掛ける。位置で本人を探す）
+  if(!marethOn()) return 1;
+  if(x===P.x && y===P.y) return (P.odT>0) ? MARETH.odSlow : 1;
+  for(const a of livingParty()) if(a.x===x && a.y===y) return (a.odT>0) ? MARETH.odSlow : 1;
+  return 1;
+}
+function marethAddVial(x, y, kind){
+  if(!standable(x, y)) return null;
+  const L=(W.vials=W.vials||[]);
+  const v={x, y, kind, life:MARETH.vialLife, born:0, seed:(L.length*41+Math.round(x*17+y*29))&255};
+  L.push(v); if(L.length>MARETH.vialMax) L.shift();
+  return v;
+}
+function marethHands(){ return W.enemies.filter(e=>e.hand && !e.dead); }
+function marethSpawnHand(src, x, y){
+  if(!standable(x, y)) return null;
+  const lv=Math.max(1, src.lv-2), fams=floorFamilies(S.run?S.run.depth:1);
+  const a2=ARCH.find(a=>a.id==='rush')||ARCH[0], fam2=fams.length?fams[0]:FAMILY[0];
+  const k={x, y, arch:a2, fam:fam2, lv, elite:false, aff:[],
+    maxHp:Math.round((26+lv*11)*0.9), atkV:(5+lv*2.6)*0.8, def:lv*1.6,
+    res:fam2.res, dt:'arcane', st:{}, bu:{},
+    state:'chase', t:0, cd:9, vx:0, vy:0, hit:0, tele:0, dead:false, r:0.36,
+    ms:0, pinned:true, teleMul:1, col:'#c9a98a', name:'差し出す手', summoned:true};
+  k.hp=k.maxHp;
+  k.hand={st:'rise', t:MARETH.handRise, hold:null, cd:0.4, wait:0, sx:x, sy:y};
+  W.enemies.push(k);
+  W.fx.push({t:'grave', x, y, life:0.4, max:0.4});
+  return k;
+}
+/* 手が狙う相手。混乱していれば、敵味方なく一番近い者（マレット本体も含む） */
+function marethHandTarget(e){
+  if(!(e.confT>0)){ const t=enemyTarget(e); return {x:t.x, y:t.y, o:t.ent||P}; }
+  let best=null, bd=1e9;
+  const all=[...mEveryone(), ...W.enemies.filter(b=>b.boss && !b.dead)];
+  for(const o of all){ if(o===e) continue; const d=Math.hypot(o.x-e.x, o.y-e.y); if(d<bd){ bd=d; best=o; } }
+  return best ? {x:best.x, y:best.y, o:best} : null;
+}
+function marethHandHit(e){
+  const H=e.hand, mul=e.mMight ? MARETH.handMight : 1; e.mMight=false;
+  const hitOne=(o)=>{
+    if(o===e || o.dead) return;
+    if(Math.hypot(o.x-H.tx, o.y-H.ty) - (o.r||0.3) >= MARETH.handR) return;
+    const conf=e.confT>0;
+    let landed=false;
+    if(o===P){ if(!S.hero||!S.run) return; const h0=S.hero.hpNow; hitPlayer(e, e.atkV*mul); landed=!!(S.hero && S.run && S.hero.hpNow<h0); }
+    else if(mIsAlly(o)){ const h0=o.hpNow; hitAlly(o, e, e.atkV*mul); landed=o.hpNow<h0; }
+    else if(conf){ mHurt(o, e.atkV*mul*(o.boss?2:1), '#c9a0e8'); landed=true; }
+    if(landed && H.hold && !o.boss){ marethDose(o, H.hold); H.hold=null; }
+  };
+  const list=[...mEveryone(), ...(e.confT>0 ? W.enemies.filter(b=>b.boss && !b.dead) : [])];
+  list.forEach(hitOne);
+  W.fx.push({t:'shock', x:H.tx, y:H.ty, r:MARETH.handR, life:0.22, max:0.22, col:'#c9a98a'});
+  if(typeof feelFoeAttack==='function') feelFoeAttack(e, 'swing');
+}
+/* 手の1フレーム。生える → 待つ → 振りかぶる → 叩く。届かなければ沈んで生え直す */
+function marethHandTick(e, dt){
+  const H=e.hand; e.hit=Math.max(0, e.hit-dt); e.vx=0; e.vy=0; e.x=H.sx; e.y=H.sy; e.tele=0;
+  if(H.st==='rise'){ H.t-=dt; if(H.t<=0){ H.st='idle'; H.wait=0; } return; }
+  if(H.st==='sink'){
+    H.t-=dt; if(H.t>0) return;
+    /* 生え直す先：持っていなければ4割で薬瓶のそば、そうでなければ狙う相手のそば */
+    const tg=marethHandTarget(e); let px=e.x, py=e.y, ok=false;
+    const V=W.vials||[];
+    if(!H.hold && V.length && rnd()<0.4){ const v=pick(V); px=v.x; py=v.y; }
+    else if(tg){ px=tg.x; py=tg.y; }
+    for(let i=0;i<8 && !ok;i++){
+      const a=rnd()*Math.PI*2, r=rf(0.9, 1.3), x=px+Math.cos(a)*r, y=py+Math.sin(a)*r;
+      if(standable(x, y)){ H.sx=x; H.sy=y; e.x=x; e.y=y; ok=true; }
+    }
+    H.st='rise'; H.t=MARETH.handRise; W.fx.push({t:'grave', x:e.x, y:e.y, life:0.3, max:0.3});
+    return;
+  }
+  if(H.st==='wind'){ H.t-=dt; if(H.t<=0){ marethHandHit(e); H.st='idle'; H.cd=MARETH.handCd; H.wait=0; } return; }
+  /* 待ち：そばの薬瓶を拾う */
+  if(!H.hold && W.vials){
+    const i=W.vials.findIndex(v=>Math.hypot(v.x-e.x, v.y-e.y)<1.3);
+    if(i>=0){ H.hold=W.vials[i].kind; W.vials.splice(i,1); }
+  }
+  H.cd-=dt;
+  const tg=marethHandTarget(e); if(!tg){ return; }
+  const d=Math.hypot(tg.x-e.x, tg.y-e.y);
+  if(d<=MARETH.handReach+(tg.o.r||0.3)){
+    H.wait=0;
+    if(H.cd<=0){ H.st='wind'; H.t=MARETH.handWind; H.tx=tg.x; H.ty=tg.y; }
+  }else{
+    H.wait+=dt;
+    if(H.wait>=MARETH.handWait){ H.st='sink'; H.t=MARETH.handSink; }
+  }
+}
+/* 混乱した仲間。一番近い者（主人公・ほかの仲間・敵）へ歩いて殴る。true＝ふだんの動きは止める */
+function marethAllyConfused(a, st, dt){
+  let best=null, bd=1e9;
+  const all=[...mEveryone(), ...W.enemies.filter(b=>b.boss && !b.dead)];
+  for(const o of all){ if(o===a) continue; const d=Math.hypot(o.x-a.x, o.y-a.y); if(d<bd){ bd=d; best=o; } }
+  if(!best) return false;
+  const reach=1.0+(best.r||0.3);
+  if(bd>reach){ const sp=(st.ms||3.6)*0.9*dt; moveEnt(a, (best.x-a.x)/bd*sp, (best.y-a.y)/bd*sp); a.dirx=(best.x-a.x)/bd; a.diry=(best.y-a.y)/bd; }
+  a.confCd=(a.confCd||0)-dt;
+  if(bd<=reach && a.confCd<=0){
+    a.confCd=MARETH.confCd; a.swing=0.18;
+    const dmg=Math.max(1, st.atk*MARETH.confHit);
+    if(best===P) hitPlayer(null, dmg, 'blunt', S.run?S.run.depth:1);
+    else if(mIsAlly(best)) hitAlly(best, null, dmg, 'blunt', S.run?S.run.depth:1);
+    else hitEnemyByAlly(a, st, best, 1);
+  }
+  return true;
+}
+function marethConfuse(o){
+  if(!o || o.dead || o.boss) return;
+  o.confT=MARETH.confT; o.confCd=0.3;
+}
+/* 溜め始め。落ちる所・置く所はここで決める（予兆と着弾を揃える） */
+function marethBeginCast(e, id, tg){
+  const m=BOSS_MOVES[id], c=e.cast;
+  if(id==='offer' || id==='hands') c.closed=true;            // 目を閉じたままの技（cave-look が見る）
+  if(id==='offer'){
+    const n=m.n+(e.rage?1:0), spots=[];
+    const near=[{x:tg.x, y:tg.y}, ...livingParty().map(a=>({x:a.x, y:a.y}))];
+    for(let i=0;i<n;i++){
+      const base=i<near.length ? near[i] : {x:e.x, y:e.y};
+      let sp=null;
+      for(let k=0;k<8 && !sp;k++){
+        const a=rnd()*Math.PI*2, r=i<near.length ? rf(1.6, 2.8) : rf(2.5, 6.0);
+        const x=base.x+Math.cos(a)*r, y=base.y+Math.sin(a)*r;
+        if(standable(x, y)) sp={x, y};
+      }
+      if(sp){ sp.kind=(i%3===2)?'might':'heal'; spots.push(sp); }
+    }
+    c.spots=spots;
+  }else if(id==='hands'){
+    const n=Math.max(0, Math.min(m.n+(e.rage?1:0), MARETH.handMax-marethHands().length)), spots=[];
+    const near=[{x:tg.x, y:tg.y}, ...livingParty().map(a=>({x:a.x, y:a.y}))];
+    for(let i=0;i<n;i++){
+      const base=near[i%near.length];
+      for(let k=0;k<8;k++){
+        const a=rnd()*Math.PI*2, r=rf(1.4, 2.6), x=base.x+Math.cos(a)*r, y=base.y+Math.sin(a)*r;
+        if(standable(x, y)){ spots.push({x, y}); break; }
+      }
+    }
+    c.spots=spots;
+  }else if(id==='reach'){
+    const spots=[{x:tg.x, y:tg.y}];
+    livingParty().forEach(a=>{ if(spots.length<m.n && Math.hypot(a.x-tg.x, a.y-tg.y)>0.8) spots.push({x:a.x, y:a.y}); });
+    while(spots.length<m.n){ const a=rnd()*Math.PI*2, r=rf(m.rad*1.3, m.spread); spots.push({x:tg.x+Math.cos(a)*r, y:tg.y+Math.sin(a)*r}); }
+    c.spots=spots;
+  }else if(id==='hourglass'){
+    c.debt=Math.round(P.mHeal||0);
+  }
+}
+function marethRing(e, kind, m){
+  (W.mrings=W.mrings||[]).push({kind, x:e.x, y:e.y, r:e.r*0.9, max:MARETH.ringMax, src:e, hit:[], dmg:e.atkV*(m.mult||0)});
+  if(typeof feelKick==='function') feelKick(2.4, 0.18);
+}
+function marethResolve(e, m){
+  const c=e.cast, id=c.id;
+  if(id==='offer'){
+    (c.spots||[]).forEach(sp=>{ const v=marethAddVial(sp.x, sp.y, sp.kind); if(v) W.fx.push({t:'grave', x:sp.x, y:sp.y, life:0.3, max:0.3}); });
+  }else if(id==='hands'){
+    (c.spots||[]).forEach(sp=>marethSpawnHand(e, sp.x, sp.y));
+    W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:3.2, life:0.5, maxLife:0.5, col:'#c9a98a'});
+    warpBossRandom(e);                              // 招来と同じ：呼んだ瞬間に広間のどこかへ跳ぶ
+  }else if(id==='reach'){
+    (c.spots||[]).forEach(sp=>{
+      W.fx.push({t:'shock', x:sp.x, y:sp.y, r:m.rad, life:0.34, max:0.34, col:'#c9a98a'});
+      W.fx.push({t:'mgrab', x:sp.x, y:sp.y, life:MARETH.grabHold, max:MARETH.grabHold});
+      aoeTargets().forEach(t=>{
+        if(!pillarHits(sp, m, t.x, t.y, t.r)) return;
+        const o=t.ent||P, hpOf=()=>o===P ? (S.hero?S.hero.hpNow:0) : o.hpNow, h0=hpOf();
+        aoeHit(e, t, m.mult);
+        if(o===P && (!S.hero || !S.run)) return;
+        if(hpOf()<h0){ o.pull={x:sp.x, y:sp.y, t:MARETH.grabHold}; marethDose(o, null); }
+      });
+    });
+    if(typeof feelKick==='function') feelKick(2.2, 0.16);
+  }else if(id==='lightfall'){
+    const L=(W.mlights=W.mlights||[]), n=e.rage?MARETH.lightRage:MARETH.lightN;
+    for(let i=0;i<n;i++) L.push({delay:i*MARETH.lightGap, src:e, mult:m.mult, track:true});
+    (W.vials||[]).forEach((v,i)=>L.push({delay:0.15+i*MARETH.lightGap, src:e, mult:m.mult, x:v.x, y:v.y, vial:v}));
+  }else if(id==='confuse' || id==='giveall'){
+    marethRing(e, id, m);
+  }else if(id==='hourglass'){
+    let any=false;
+    mEveryone().forEach(o=>{
+      const debt=Math.round(o.mHeal||0); o.mHeal=0;
+      if(debt<=0) return;
+      any=true;
+      W.fx.push({t:'shock', x:o.x, y:o.y, r:1.2, life:0.4, max:0.4, col:'#e8c070'});
+      mHurt(o, debt, '#e8c070');
+    });
+    if(typeof feelKick==='function') feelKick(any?5.0:1.5, 0.3);
+  }
+}
+/* 毎フレーム：薬瓶・溜り・服数・毒・混乱・輪・降る光 */
+function tickMareth(dt){
+  if(!marethOn() && !(W.vials&&W.vials.length) && !(W.mrings&&W.mrings.length) && !(W.mlights&&W.mlights.length) && !(W.mpools&&W.mpools.length)) return;
+  const V=W.vials;
+  if(V && V.length){
+    for(const v of V){ v.life-=dt; v.born+=dt; }
+    W.vials=V.filter(v=>{
+      if(v.life<=0) return false;
+      if(v.born<0.35) return true;                           // 置かれた直後は拾えない（足元に出て即受けるのを防ぐ）
+      for(const o of [P, ...livingParty()]){
+        if(o===P && (!S.hero||!S.run)) continue;
+        if(Math.hypot(o.x-v.x, o.y-v.y) < MARETH.vialR+(o.r||0.3)*0.5){ marethDose(o, v.kind); return false; }
+      }
+      return true;
+    });
+  }
+  const Q=W.mpools;
+  if(Q && Q.length){
+    for(const q of Q) q.life-=dt;
+    W.mpools=Q.filter(q=>q.life>0);
+    for(const q of W.mpools) for(const o of mEveryone()){
+      if(q.took.includes(o)) continue;
+      if(Math.hypot(o.x-q.x, (o.y-q.y)*1.15) < q.r){ q.took.push(o); marethDose(o, q.kind); }
+    }
+  }
+  /* 服数が抜ける・飲みすぎの毒・混乱の残り */
+  for(const o of mEveryone()){
+    if(o.mDose && o.mDose.n>0){ o.mDose.t-=dt; if(o.mDose.t<=0) o.mDose.n=0; }
+    if(o.confT>0) o.confT=Math.max(0, o.confT-dt);
+    if(o.odT>0){
+      o.odT-=dt; o.odAcc=(o.odAcc||0)+dt;
+      if(o.odAcc>=MARETH.odTick){
+        const step=o.odAcc; o.odAcc=0;
+        const foe=o!==P && !mIsAlly(o);
+        if(!(o===P && (P.invuln||0)>0)) mHurt(o, mMaxHp(o)*(foe?MARETH.odFoePct:MARETH.odPct)*step, '#b8e060');
+        if(!S.hero || !S.run) return;
+      }
+    }
+  }
+  /* 輪。帯が通り過ぎた者に1回だけ。混乱の輪は削らない */
+  const R=W.mrings;
+  if(R && R.length){
+    for(const f of R){
+      f.r+=MARETH.ringSpeed*dt;
+      for(const o of mEveryone()){
+        if(f.hit.includes(o)) continue;
+        const d=Math.hypot(o.x-f.x, o.y-f.y);
+        if(Math.abs(d-f.r) > MARETH.ringBand+(o.r||0.3)) continue;
+        f.hit.push(o);
+        if(coverBlocks(f.x, f.y, o.x, o.y)) continue;
+        if(f.kind==='confuse'){
+          if(o===P && ((P.invuln||0)>0 || (typeof feelJustDodge==='function' && feelJustDodge()))){ pop(P.x, P.y-0.4, 0, '#8fc7ff', '⟡'); continue; }
+          marethConfuse(o);
+        }else{
+          if(o===P){ const h0=S.hero.hpNow; hitPlayer(f.src, f.dmg); if(!S.hero||!S.run) return; if(S.hero.hpNow<h0) marethDose(P, null); }
+          else if(mIsAlly(o)){ const h0=o.hpNow; hitAlly(o, f.src, f.dmg); if(o.hpNow<h0) marethDose(o, null); }
+          else marethDose(o, null);
+        }
+      }
+    }
+    W.mrings=R.filter(f=>f.r<f.max);
+  }
+  /* 降り注ぐ光。順番が来たら落ちる所を決めて予兆を出し、lightTele 秒後に落ちる */
+  const L=W.mlights;
+  if(L && L.length){
+    for(const f of L){
+      if(f.done) continue;
+      if(f.t==null){
+        f.delay-=dt;
+        if(f.delay<=0){
+          if(f.track){ const tg=(f.src && !f.src.dead) ? enemyTarget(f.src) : {x:P.x, y:P.y}; f.x=tg.x; f.y=tg.y; }
+          f.t=MARETH.lightTele;
+        }
+        continue;
+      }
+      f.t-=dt;
+      if(f.t<=0){
+        f.done=true; f.flash=0.25;
+        const sp={x:f.x, y:f.y}, m={rad:MARETH.lightR};
+        if(f.src && !f.src.dead) aoeTargets().forEach(t=>{
+          if(!pillarHits(sp, m, t.x, t.y, t.r)) return;
+          const o=t.ent||P, hpOf=()=>o===P ? (S.hero?S.hero.hpNow:0) : o.hpNow, h0=hpOf();
+          aoeHit(f.src, t, f.mult);
+          if(o===P && (!S.hero || !S.run)) return;
+          if(hpOf()<h0) marethDose(o, null);
+        });
+        if(!S.hero || !S.run) return;
+        marethHands().forEach(h=>{ if(Math.hypot(h.x-f.x, h.y-f.y)<MARETH.lightR) marethDose(h, null); });
+        if(f.vial && W.vials && W.vials.includes(f.vial)){     // 薬瓶が割れて溜りになる
+          W.vials=W.vials.filter(v=>v!==f.vial);
+          (W.mpools=W.mpools||[]).push({x:f.x, y:f.y, r:MARETH.poolR, life:MARETH.poolLife, max:MARETH.poolLife, kind:f.vial.kind, took:[]});
+        }
+        if(typeof feelKick==='function') feelKick(1.6, 0.1);
+        if(typeof feelFoeAttack==='function' && f.src) feelFoeAttack(f.src, 'shot');
+      }
+    }
+    for(const f of L) if(f.done) f.flash-=dt;
+    W.mlights=L.filter(f=>!(f.done && f.flash<=0));
+  }
+}
+/* ---------- 見た目（仮）：ドットの升目で直に描く ---------- */
+const MARETH_PAL={k:'#1a1014', s:'#c9a98a', d:'#96745e', r:'#a02828', h:'#0c0a0e', w:'#f4ecd8', R:'#d84a4a', A:'#e8a83a', g:'#5c6a70'};
+const MARETH_HAND=["...k.k.k...","..ksksksk..","..ksksksk.k",".kksksksksk","kskssssssdk","kssssrrssdk",".ksssrrssk.",".kssssssdk.","..kssssdk..","..ksssdk...","..ksssdk...","..ksssdk..."];
+const MARETH_HOLE=[".hhhhhhhhh.","hhhhhhhhhhh",".hhhhhhhhh."];
+const MARETH_VIAL=[".kkk.",".kgk.",".kwk.","kccck","kcwck","kccck",".kkk."];
+function mPix(rows, x0, y0, u, col, rowsShown){
+  const n=rowsShown==null ? rows.length : rowsShown;
+  for(let j=0;j<n;j++){ const row=rows[j];
+    for(let i=0;i<row.length;i++){ const ch=row[i]; if(ch==='.') continue;
+      ctx.fillStyle = ch==='c' ? col : MARETH_PAL[ch]; ctx.fillRect(Math.round(x0+i*u), Math.round(y0+j*u), Math.ceil(u), Math.ceil(u)); } }
+}
+function mVialDraw(sx, sy, kind, u){ mPix(MARETH_VIAL, sx-2.5*u, sy-7*u, u, kind==='might'?MARETH_PAL.A:MARETH_PAL.R); }
+/* 手（敵としても、混乱した主人公に見える仲間としても使う）。k＝生えている割合 0〜1、wind＝振りかぶり 0〜1 */
+function marethHandSprite(sx, sy, k, wind, hold, hurt){
+  const u=Math.max(1, Math.round(TS/16)), W0=11*u, rows=MARETH_HAND.length;
+  const shown=Math.max(0, Math.min(rows, Math.round(rows*k)));
+  const lift=Math.round((wind||0)*3)*u, by=sy+3*u;                  // by＝穴の上端
+  mPix(MARETH_HOLE, sx-W0/2, by-u, u);
+  if(shown>0){
+    const y0=by-shown*u-lift;
+    mPix(MARETH_HAND, sx-W0/2, y0, u, null, shown);
+    for(let l=0;l<lift/u;l++) mPix([MARETH_HAND[rows-1]], sx-W0/2, y0+(shown+l)*u, u);   // 振りかぶって伸びた腕
+    if(hold && shown>=rows-2) mVialDraw(sx, y0+1*u, hold, u);
+    if(hurt){ ctx.save(); ctx.globalAlpha=0.6; ctx.fillStyle='#fff'; ctx.fillRect(sx-W0/2+u, y0, W0-2*u, shown*u+lift); ctx.restore(); }
+  }
+}
+function marethHandDraw(e, sx, sy){
+  const H=e.hand;
+  const k = H.st==='rise' ? 1-H.t/MARETH.handRise : H.st==='sink' ? H.t/MARETH.handSink : 1;
+  const wind = H.st==='wind' ? 1-H.t/MARETH.handWind : 0;
+  if(H.st==='wind'){                                           // 叩く所の予兆（当たる円そのもの）
+    const tx=H.tx*TS-(e.x*TS-sx), ty=H.ty*TS-(e.y*TS-sy), rad=MARETH.handR*TS;
+    ctx.fillStyle='rgba(255,90,70,'+(0.10+wind*0.22)+')'; ctx.beginPath(); ctx.arc(tx,ty,rad,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,90,70,'+(0.55+wind*0.45)+')'; ctx.lineWidth=2+wind*2; ctx.beginPath(); ctx.arc(tx,ty,rad,0,7); ctx.stroke();
+  }
+  marethHandSprite(sx, sy, k, wind, H.hold, e.hit>0);
+  if(e.confT>0){ ctx.fillStyle='#c9a0e8'; ctx.font='bold '+Math.round(TS*0.4)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('?', sx, sy-TS*0.9+Math.sin(nowSec()*8)*2); }
+  return true;
+}
+function marethDosePips(o, sx, sy){
+  const n=o.mDose ? o.mDose.n : 0, od=o.odT>0;
+  if(!n && !od) return;
+  const u=Math.max(2, Math.round(TS/8)), x0=sx-(MARETH.doseMax*(u+2)-2)/2, y0=sy-TS*1.05;
+  for(let i=0;i<MARETH.doseMax;i++){
+    ctx.fillStyle='#1a1014'; ctx.fillRect(Math.round(x0+i*(u+2))-1, Math.round(y0)-1, u+2, u+2);
+    ctx.fillStyle = od ? '#b8e060' : (i<n ? '#e8d8b0' : '#4a4038'); ctx.fillRect(Math.round(x0+i*(u+2)), Math.round(y0), u, u);
+  }
+}
+/* 床の物：薬の溜り・薬瓶・降る光の予兆（敵・仲間より前に描く） */
+function drawMarethGround(camX, camY){
+  if(!W.vials && !W.mpools && !W.mlights) return;
+  const u=Math.max(1, Math.round(TS/16)), t=nowSec();
+  for(const q of (W.mpools||[])){
+    const sx=q.x*TS-camX, sy=q.y*TS-camY, a=Math.min(1, q.life/1.0)*0.55, col=q.kind==='might'?'232,168,58':'216,74,74';
+    ctx.fillStyle='rgba('+col+','+a+')'; ctx.beginPath(); ctx.ellipse(sx, sy, q.r*TS, q.r*TS*0.87, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle='rgba(255,240,220,'+a*0.8+')'; ctx.lineWidth=u; ctx.beginPath(); ctx.ellipse(sx, sy, q.r*TS*0.7, q.r*TS*0.6, 0, 0, 7); ctx.stroke();
+  }
+  for(const v of (W.vials||[])){
+    const sx=v.x*TS-camX, sy=v.y*TS-camY, bob=Math.round(Math.sin(t*3+v.seed)*1.5)*u*0.5;
+    if(v.life<3 && Math.floor(v.life*6)%2===0) continue;        // 消える前に点滅
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(Math.round(sx-2*u), Math.round(sy+u), 4*u, u);
+    ctx.fillStyle=v.kind==='might'?'rgba(232,168,58,0.22)':'rgba(216,74,74,0.22)'; ctx.beginPath(); ctx.arc(sx, sy-3*u, 6*u, 0, 7); ctx.fill();
+    mVialDraw(sx, sy+bob, v.kind, u);
+  }
+  for(const f of (W.mlights||[])){
+    if(f.done || f.t==null) continue;
+    const sx=f.x*TS-camX, sy=f.y*TS-camY, p=1-f.t/MARETH.lightTele, rad=MARETH.lightR*TS;
+    ctx.fillStyle='rgba(255,90,70,'+(0.10+p*0.22)+')'; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,90,70,'+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*3; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,rad*p,0,7); ctx.stroke();
+  }
+}
+/* 上に重ねる物：降る光・輪・服数・混乱・砂時計の数字 */
+function drawMarethOver(camX, camY){
+  if(!marethOn() && !W.mrings && !W.mlights) return;
+  const u=Math.max(1, Math.round(TS/16)), t=nowSec();
+  for(const f of (W.mlights||[])){
+    if(f.t==null) continue;
+    const sx=f.x*TS-camX, sy=f.y*TS-camY;
+    if(f.done){                                                 // 落ちた瞬間：上から足元までの光の柱
+      const a=Math.max(0, f.flash/0.25), w=MARETH.lightR*TS*(0.5+0.5*a);
+      ctx.fillStyle='rgba(255,214,130,'+(0.55*a)+')'; ctx.fillRect(Math.round(sx-w), 0, Math.round(w*2), Math.round(sy));
+      ctx.fillStyle='rgba(255,250,232,'+(0.9*a)+')'; ctx.fillRect(Math.round(sx-w*0.4), 0, Math.round(w*0.8), Math.round(sy));
+      ctx.fillStyle='rgba(255,236,190,'+(0.7*a)+')'; ctx.beginPath(); ctx.ellipse(sx, sy, MARETH.lightR*TS, MARETH.lightR*TS*0.6, 0, 0, 7); ctx.fill();
+    }else if(f.t!=null){                                     // 落ちる前：細い光の筋が降りてくる
+      const p=1-f.t/MARETH.lightTele;
+      ctx.fillStyle='rgba(255,224,150,'+(0.15+p*0.35)+')'; ctx.fillRect(Math.round(sx-u), 0, 2*u, Math.round(sy*p));
+    }
+  }
+  for(const f of (W.mrings||[])){
+    const sx=f.x*TS-camX, sy=f.y*TS-camY, rad=f.r*TS, fade=1-f.r/f.max, col=f.kind==='confuse'?'#b48ae0':'#e8a83a';
+    ctx.strokeStyle=rgba(col, 0.25*fade); ctx.lineWidth=TS*1.10; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke();
+    ctx.strokeStyle=rgba(col, 0.95*fade); ctx.lineWidth=TS*0.22;
+    if(f.kind==='confuse') ctx.setLineDash([TS*0.5, TS*0.3]);
+    ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle=rgba('#ffffff', 0.5*fade); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke();
+  }
+  for(const f of W.fx){ if(f.t!=='mgrab') continue;            // 掴んでいる手
+    marethHandSprite(f.x*TS-camX, f.y*TS-camY+TS*0.2, Math.min(1, (f.max-f.life)/0.12), 0.6, null, false); }
+  if(!S.hero || !S.run) return;
+  const px=P.x*TS-camX, py=P.y*TS-camY;
+  marethDosePips(P, px, py);
+  livingParty().forEach(a=>{ if(!(P.confT>0)) marethDosePips(a, a.x*TS-camX, a.y*TS-camY); });
+  marethHands().forEach(h=>marethDosePips(h, h.x*TS-camX, h.y*TS-camY-TS*0.2));
+  if(P.confT>0){
+    ctx.fillStyle='#c9a0e8'; ctx.font='bold '+Math.round(TS*0.45)+'px sans-serif'; ctx.textAlign='center';
+    for(let i=0;i<3;i++){ const a=t*4+i*2.1; ctx.fillText('?', px+Math.cos(a)*TS*0.5, py-TS*1.25+Math.sin(a*1.3)*TS*0.12); }
+    const g=ctx.createRadialGradient(innerWidth/2, innerHeight/2, Math.min(innerWidth, innerHeight)*0.35, innerWidth/2, innerHeight/2, Math.max(innerWidth, innerHeight)*0.7);
+    g.addColorStop(0, 'rgba(120,70,170,0)'); g.addColorStop(1, 'rgba(120,70,170,'+(0.30+0.08*Math.sin(t*5))+')');
+    ctx.fillStyle=g; ctx.fillRect(0, 0, innerWidth, innerHeight);
+  }
+  /* 砂時計の溜めの間だけ、返る量を頭上に出す */
+  const boss=W.enemies.find(e=>e.boss && !e.dead && e.cast && e.cast.id==='hourglass');
+  if(boss){
+    const p=1-boss.cast.t/boss.cast.max, debt=Math.round(P.mHeal||0);
+    ctx.font='bold '+Math.round(TS*0.42)+'px sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='#1a1014'; ctx.fillText(''+debt, px+1, py-TS*1.55+1);
+    ctx.fillStyle = debt>=S.hero.hpNow ? '#ff5a46' : '#e8c070'; ctx.fillText(''+debt, px, py-TS*1.55);
+    const bw=TS*1.2; ctx.fillStyle='#1a1014'; ctx.fillRect(Math.round(px-bw/2)-1, Math.round(py-TS*1.45)-1, Math.round(bw)+2, 2*u+2);
+    ctx.fillStyle='#e8c070'; ctx.fillRect(Math.round(px-bw/2), Math.round(py-TS*1.45), Math.round(bw*(1-p)), 2*u);
+  }
+}
+/* マレットの技の予兆（drawBossCast から） */
+function marethDrawCast(e, sx, sy, R, m, p){
+  const c=e.cast, id=c.id, ox=e.x*TS-sx, oy=e.y*TS-sy, warn='255,90,70';
+  if(id==='offer' || id==='hands'){                           // 当たらない：白い破線の小さな輪
+    ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(240,232,210,'+(0.4+p*0.5)+')'; ctx.lineWidth=2;
+    (c.spots||[]).forEach(sp=>{ ctx.beginPath(); ctx.arc(sp.x*TS-ox, sp.y*TS-oy, TS*(id==='hands'?0.55:0.4), 0, 7); ctx.stroke(); });
+    ctx.setLineDash([]);
+  }else if(id==='reach'){
+    (c.spots||[]).forEach(sp=>{
+      const x=sp.x*TS-ox, y=sp.y*TS-oy, rad=m.rad*TS;
+      ctx.fillStyle='rgba('+warn+','+(0.10+p*0.22)+')'; ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.fill();
+      ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*3; ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad*p,0,7); ctx.stroke();
+      marethHandSprite(x, y+TS*0.2, p*0.45, 0, null, false);   // 指先が床から覗く
+    });
+  }else if(id==='lightfall'){                                 // 頭上へ光が昇る（落ちる所は1本ずつ別に出る）
+    ctx.fillStyle='rgba(255,224,150,'+(0.2+p*0.5)+')'; ctx.fillRect(Math.round(sx-2), 0, 4, Math.round(sy-R));
+  }else if(id==='confuse' || id==='giveall'){
+    const col=id==='confuse'?'180,138,224':'232,168,58', rad=(e.r+1.2)*TS;
+    ctx.fillStyle='rgba('+col+','+(0.10+p*0.22)+')'; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.fill();
+    if(id==='confuse') ctx.setLineDash([TS*0.5, TS*0.3]);
+    ctx.strokeStyle='rgba('+col+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*3; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,rad*p,0,7); ctx.stroke();
+  }else if(id==='hourglass'){                                 // 頭上の砂時計：上の砂が落ちきったら返る
+    const u=Math.max(2, Math.round(TS/8)), x=sx, y=sy-R-TS*0.9;
+    ctx.fillStyle='#1a1014'; ctx.fillRect(x-4*u, y-5*u, 8*u, u); ctx.fillRect(x-4*u, y+4*u, 8*u, u);
+    ctx.fillStyle='rgba(244,236,216,0.25)';
+    for(let j=0;j<4;j++){ const w=(4-j)*2*u-2*u+2*u; ctx.fillRect(x-w/2, y-4*u+j*u, w, u); ctx.fillRect(x-w/2, y+3*u-j*u, w, u); }
+    ctx.fillStyle='#e8c070';
+    const top=Math.round(4*(1-p)), bot=4-top;
+    for(let j=4-top;j<4;j++){ const w=(4-j)*2*u; ctx.fillRect(x-w/2, y-4*u+j*u, w, u); }
+    for(let j=0;j<bot;j++){ const w=(4-j)*2*u; ctx.fillRect(x-w/2, y+3*u-j*u, w, u); }
+    ctx.fillRect(x-1, y-u, 2, 2*u);
+  }
+}
+
 function tickPulls(dt){
   for(const a of [P, ...livingParty()]){
     const p=a && a.pull; if(!p) continue;
@@ -14900,7 +15439,7 @@ function bossMoveHits(e, cast, x, y, r){
     const along=dx*cx+dy*cy, side=Math.abs(-dx*cy+dy*cx);
     return along>=-0.4 && along<=len && side<=m.wide+r && !(cast.id==='beam' && coverBlocks(e.x,e.y,x,y));
   }
-  if(cast.id==='pillars' || cast.id==='ink' || cast.id==='gravel') return (cast.spots||[]).some(sp=>pillarHits(sp, m, x, y, r));
+  if(cast.id==='pillars' || cast.id==='ink' || cast.id==='gravel' || cast.id==='reach') return (cast.spots||[]).some(sp=>pillarHits(sp, m, x, y, r));
   if(cast.id==='venom') return leechVenomDirs(cast, m).some(a=>bandHits(cast.ox, cast.oy, a, leechBandLen(cast.ox, cast.oy, a, m.len, m.wide), m.wide, x, y, r));
   if(cast.id==='boulder') return bandHits(cast.ox, cast.oy, dir, m.len, m.wide, x, y, r);
   if(cast.id==='gulp'){               // 当たるのは口元を噛む所だけ（広い扇は引くだけで、当たらない）
@@ -15082,6 +15621,9 @@ function resolveBossMove(e){
 
   }else if(BRECHT_NEW[e.cast.id]){
     brechtResolve(e, m);
+
+  }else if(MARETH_MOVES[e.cast.id]){
+    marethResolve(e, m);
 
   }else if(e.cast.id==='summon'){
     /* 取り巻きを呼ぶ。ダメージは無い代わりに、盤面そのものを変える。
@@ -16806,6 +17348,7 @@ function update(dt){
   let ix=stickDx, iy=stickDy;
   if(keys['a']||keys['arrowleft'])ix=-1; if(keys['d']||keys['arrowright'])ix=1;
   if(keys['w']||keys['arrowup'])iy=-1;  if(keys['s']||keys['arrowdown'])iy=1;
+  if(P.confT>0){ ix=-ix; iy=-iy; }    // マレットの混乱：操作が逆さまになる
   const m=Math.hypot(ix,iy);
 
   S.run.ft = (S.run.ft||0) + dt;
@@ -16921,6 +17464,8 @@ function update(dt){
   tickPulls(dt);                  // ブレヒトの引き寄せ
   tickInk(dt);                    // ブレヒトの墨（視界の狭まり）
   tickLeech(dt);                  // ヒルの瓦礫・毒の溜り・大岩
+  tickMareth(dt);                 // マレットの薬・手・輪・降る光
+  if(!S.hero || !S.run) return;
   tickInkBubbles(dt);             // ブレヒトの墨の泡
   if(!S.hero || !S.run) return;   // このフレームで死亡した場合はここで抜ける
   // 弾（敵の弾と主人公の飛び道具）
@@ -17954,6 +18499,7 @@ function draw(){
     let spriteDrawn=false;
     const drawBody=()=>{
     if(e.egg){ spriteDrawn = leechEggDraw(e, sx, sy); if(spriteDrawn) return; }   // ヒルの卵は専用の絵
+    if(e.hand){ spriteDrawn = marethHandDraw(e, sx, sy); return; }                // マレットの手
     ctx.save(); ctx.globalAlpha*=feelBlink(e);
     const caveDrawn = !!(window.CAVE && CAVE.on && CAVE.enemy(e,sx,sy,R));   // 洞窟版の絵は激昂の輪郭・オーラ・目を絵のドットで足す
     /* 激昂（2026-11-02 ユーザー指定）：洞窟版の絵が無い敵は、絵の形に沿った赤い光の縁取りを明滅させ、火の粉を昇らせる */
@@ -18099,6 +18645,7 @@ function draw(){
     }
     ctx.globalAlpha=1;
   };
+  drawMarethGround(camX, camY);   // マレットの薬瓶・薬の溜り・降る光の予兆（敵より下）
   W.enemies.forEach(e=>{ drawEnemyOne(e); ctx.globalAlpha=1; occOne(e); });
 
   // --- 仲間と仲間候補 ---
@@ -18122,6 +18669,7 @@ function draw(){
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
     const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
     if(vanishGuard(a, (a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0), _drawDt)) return;
+    if(P.confT>0 && !isNpc && marethOn()){ marethHandSprite(sx, sy, 1, a.swing>0?0.8:0, null, a.hit>0); return; }   // マレットの混乱：仲間が「手」に見える
     const j=jobDef(a.job), R=TS*0.30*aScale;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
@@ -18726,6 +19274,7 @@ function draw(){
     }
     if(f.t==='feelring') drawFeelRing(f,camX,camY);
   });
+  drawMarethOver(camX, camY);     // マレットの降る光・輪・服数・混乱・砂時計の数字
 
   // 主人公（候補B・遺跡の斥候）。
   }catch(_fxErr){
@@ -23431,6 +23980,7 @@ function drawBossCast(e, sx, sy, R){
   const p = 1 - e.cast.t/e.cast.max;          // 0 → 1 で着弾
   const warn = '255,90,70';
   ctx.save();
+  if(MARETH_MOVES[e.cast.id]){ marethDrawCast(e, sx, sy, R, m, p); ctx.restore(); return; }
 
   if(e.cast.id==='slam' || e.cast.id==='wave'){
     const rad = (e.cast.id==='slam' ? m.rad + e.r : m.rad*0.45) * TS;
@@ -25152,7 +25702,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="game-feel.js?v=20261116-brecht3"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261116-brecht4"></script>
+<script src="cave-look.js?v=20261116-mareth"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
@@ -25220,6 +25770,6 @@ if(typeof beginFeelWorld === 'function'){
 <script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261013pressure-f5"></script>
 <script src="audio.js?v=20261116-brecht3"></script>
-<script src="audio-game.js?v=20261116-brecht4"></script>
+<script src="audio-game.js?v=20261116-mareth"></script>
 </body>
 </html>
