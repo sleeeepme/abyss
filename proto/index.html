@@ -2455,6 +2455,11 @@ const TRAITS=[
   {id:'yamiuchi',nm:'闇討ち',     sl:'weapon', r:[15,35], d:v=>`灯りが3以下のとき、ダメージ +${v}%`},
   {id:'ganjo',   nm:'頑丈',       sl:'weapon', r:[20,50], d:v=>`耐久の減り -${v}%`},
   {id:'keitou',  nm:'系統狩り',   sl:'weapon', r:[15,35], fam:1, d:(v,a)=>`${traitFamNm(a)}へのダメージ +${v}%`},
+  /* 衝撃波（2026-11-19 ユーザー指定「近接武器についている付帯にランダムで衝撃波を追加」）。
+     近接武器（短剣・剣・戦斧・戦槌・槍・大剣）にだけ付く。並・良・★がそのまま大きさの小・中・大。
+     形は武器種で決まる：戦槌は自分を中心に円（ゴルディオンと同じ）、槍は直線、ほかは扇。
+     レジェンドの衝撃波（専用・太い）より必ず小さく弱い。中身は traitWave。 */
+  {id:'shoha',   nm:'衝撃波',     sl:'weapon', r:[15,45], melee:1, d:(v,a)=>shohaText(v,a)},
   // ---- 盾 ----
   {id:'fudou',   nm:'不動',       sl:'shield', r:[3,8],   d:v=>`ガード中は押し戻されない。ガード軽減 +${v}`},
   {id:'togetate',nm:'棘の盾',     sl:'shield', r:[20,50], d:v=>`ガードで受けたダメージの ${v}% を返す`},
@@ -2493,8 +2498,9 @@ function rollTrait(it, rarId){
   const R = traitRng(it);
   if(R() >= (TRAIT_ATTACH_P[rarId]||0)) return null;
   const quirk = R() < (TRAIT_QUIRK_P[rarId]||0);
-  let pool = TRAITS.filter(t=>t.sl===it.slot && !!t.q===quirk);
-  if(!pool.length) pool = TRAITS.filter(t=>t.sl===it.slot);
+  const fits = t=>t.sl===it.slot && (!t.melee || isMeleeBase(it.base));
+  let pool = TRAITS.filter(t=>fits(t) && !!t.q===quirk);
+  if(!pool.length) pool = TRAITS.filter(fits);
   if(!pool.length) return null;
   const def = pool[Math.floor(R()*pool.length)];
   const w = TRAIT_Q_W[rarId] || TRAIT_Q_W[0];
@@ -2506,12 +2512,34 @@ function rollTrait(it, rarId){
   if(def.sc) v *= scaleOf(it.ilvl||1);
   v = Math.max(1, Math.round(v));
   const af = {t:'tr', id:def.id, nm:def.nm, v, q};
+  if(def.id==='shoha') af.sh = shohaShape(it.base);
   if(def.fam){
     const fams = (typeof FAMILY!=='undefined' ? FAMILY : []).filter(f=>(f.minDepth||1) <= Math.max(1, it.ilvl||1)+6);
     const fs = fams.length ? fams : FAMILY;
     af.fam = fs[Math.floor(R()*fs.length)].id;
   }
   return af;
+}
+/* 近接武器か（間合いが前衛の線より短い武器）。前衛・後衛の分け方（isMeleeJob）と同じ基準。 */
+function isMeleeBase(id){
+  const b=BASES.find(x=>x.id===id);
+  return !!b && b.slot===SLOT.W && (b.reach||0) < 2.6;
+}
+/* 衝撃波の形と大きさ。q（並・良・★）＝小・中・大。
+   r は届く距離（マス）、w は絵の太さ（lg_wave の o.w。レジェンドは 1）。
+   扇の届く距離は武器の間合いより少し先まで、ただし大でもレジェンド（3.6〜4.0）より短い。 */
+function shohaShape(base){ return base==='mace' ? 'ring' : base==='spear' ? 'line' : 'cone'; }
+/* 出る頻度（2026-11-19 ユーザー指定「5回に一度くらいでランダムで」）。振るたびに抽選。テストで 1 にできるよう let */
+let SHOHA_CHANCE = 0.2;
+const SHOHA_SIZE = [
+  {nm:'小', w:0.30, cone:2.3, over:0.6, cap:2.9, ring:1.9, line:3.4, wide:0.45},
+  {nm:'中', w:0.42, cone:2.8, over:0.9, cap:3.2, ring:2.3, line:4.2, wide:0.55},
+  {nm:'大', w:0.56, cone:3.3, over:1.2, cap:3.5, ring:2.7, line:5.0, wide:0.65},
+];
+function shohaText(v, a){
+  const z=SHOHA_SIZE[(a&&a.q)||0], sh=(a&&a.sh)||'cone';
+  const where = sh==='ring' ? '自分の周りに円の' : sh==='line' ? '前へまっすぐ' : '前方に扇の';
+  return `攻撃の${Math.round(1/SHOHA_CHANCE)}回に1回ほど、${where}衝撃波（大きさ ${z.nm}・威力 ${v}%）`;
 }
 /* 表示用の数値（div があれば割る） */
 function traitVal(a){ const d=traitDef(a.id); return d && d.div ? +(a.v/d.div).toFixed(2) : a.v; }
@@ -10454,6 +10482,7 @@ function meleeSwing(st, ang, mult){
     relicShockwave(st, e);          // 遺物「震撼」
   });
   legendWave(st, ang);              // 得物そのものが放つ衝撃波
+  traitWave(st, ang, mult);         // 特性「衝撃波」
 }
 /* ==================== レジェンドの一手 ====================
    数値で済む効果は stats() の蓄積器（LG.ap）に流してある。ここに置くのは
@@ -10468,6 +10497,15 @@ function legendSpread(st){ const L=legendOf(st); return (L && L.spread) || null;
 function isCaster(e){
   return !!(e && (e.dt==='arcane' || (e.fam && e.fam.id==='arcane')));
 }
+/* 衝撃波の絵（2026-11-19 ユーザー提示の動画に合わせて作り直した。ドット絵の lg_wave）。
+   ドット絵の仕組みが無いとき（読み込み失敗など）だけ、前の線で描く絵に戻す。 */
+function legendWaveArt(mode, ang, r, extra){
+  if(typeof PIXEL_ART_FX==='undefined' || !PIXEL_ART_FX || typeof feelPixelArt!=='function' || !PIXEL_ART_FX.span('lg_wave')) return false;
+  const at=extra&&extra.at, o=Object.assign({angle:ang, range:r, o:{mode}}, extra||{});
+  delete o.at;
+  feelPixelArt('lg_wave', at?at.x:P.x, at?at.y:P.y, o);
+  return true;
+}
 function legendWave(st, ang){
   const L=legendOf(st);
   if(!L || !L.wave || !S.hero) return 0;
@@ -10479,12 +10517,14 @@ function legendWave(st, ang){
 
   if(w.shape==='ring'){                       // ゴルディオン：自分を中心に円
     const r=w.r;
-    W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:r, life:0.34, maxLife:0.34, col});
+    if(!legendWaveArt('ring', ang, r, {elem:dt}))
+      W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:r, life:0.34, maxLife:0.34, col});
     nearEnemies(P.x,P.y,r+1).forEach(e=>{ if(eSurf(e,P.x,P.y)<=r) hit(e); });
 
   }else if(w.shape==='line'){                 // ゲイボルグ／ハイペリオン：前方へ一直線
     const len=w.r, wide=w.wide||0.7;
-    W.fx.push({t:'ultbeam', x:P.x, y:P.y, a:ang, len, wide, life:0.30, maxLife:0.30, col});
+    if(!legendWaveArt('line', ang, len, {elem:dt, wide}))
+      W.fx.push({t:'ultbeam', x:P.x, y:P.y, a:ang, len, wide, life:0.30, maxLife:0.30, col});
     nearEnemies(P.x, P.y, len+1).forEach(e=>{
       if(e.dead) return;
       const dx=e.x-P.x, dy=e.y-P.y;
@@ -10498,10 +10538,55 @@ function legendWave(st, ang){
        ただの空振りと見分けが付かず、**衝撃波が出ていることに気付けなかった。**
        広がる帯として描けば、届く範囲もそのまま目で読める。 */
     const r=w.r, half=(w.arc||70)*Math.PI/180/2;
-    W.fx.push({t:'lwave', x:P.x, y:P.y, a:ang, life:0.34, max:0.34, r, arc:half, dt});
+    if(!legendWaveArt('cone', ang, r, {elem:dt, arc:half}))
+      W.fx.push({t:'lwave', x:P.x, y:P.y, a:ang, life:0.34, max:0.34, r, arc:half, dt});
     nearEnemies(P.x,P.y,r+1).forEach(e=>{
       if(e.dead) return;
       const n_=eNear(e,P.x,P.y), dx=n_.x-P.x, dy=n_.y-P.y;
+      if(n_.d>r) return;
+      const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(da<=half) hit(e);
+    });
+  }
+  return n;
+}
+/* 特性「衝撃波」。レジェンドの衝撃波と同じ当たり方・同じ絵（lg_wave）を、細く小さく使う。
+   レジェンドには特性が付かないので、両方が同時に出ることはない。 */
+function traitWave(st, ang, mult, ally){
+  /* ally を渡すと仲間の振り（2026-11-19 ユーザー指定「仲間の武器にも付けて」）。位置・装備・当たりの出どころを仲間にする */
+  const who = ally || S.hero;
+  if(!who) return 0;
+  const a=trAff(who, 'shoha');
+  if(!a) return 0;
+  if(rnd() >= SHOHA_CHANCE) return 0;
+  const ox = ally ? ally.x : P.x, oy = ally ? ally.y : P.y;
+  const z=SHOHA_SIZE[a.q||0], sh=a.sh||'cone';
+  const wst=Object.assign({}, st);
+  const m=(a.v/100)*(mult||1);
+  const elem=elemOf(st) || st.dmgType;          // 属性が無ければ白（無属性）
+  let n=0;
+  const hit=e=>{ if(!e.dead){ hitEnemy(e, wst, m, ally ? {src:ally} : undefined); n++; } };
+  const art=(mode, r, extra)=>legendWaveArt(mode, ang, r, Object.assign({elem, at:{x:ox, y:oy}}, extra, {o:{mode, w:z.w}}));
+  if(sh==='ring'){
+    const r=z.ring;
+    art('ring', r, {});
+    nearEnemies(ox,oy,r+1).forEach(e=>{ if(eSurf(e,ox,oy)<=r) hit(e); });
+  }else if(sh==='line'){
+    const len=Math.max(z.line, st.range+1.0), wide=z.wide;
+    art('line', len, {wide});
+    nearEnemies(ox, oy, len+1).forEach(e=>{
+      if(e.dead) return;
+      const dx=e.x-ox, dy=e.y-oy;
+      const along=dx*Math.cos(ang)+dy*Math.sin(ang);
+      const side =Math.abs(-dx*Math.sin(ang)+dy*Math.cos(ang));
+      if(along>=-0.4 && along<=len && side<=wide+e.r) hit(e);
+    });
+  }else{
+    const r=Math.min(z.cap, Math.max(z.cone, st.range+z.over)), half=(st.arc||75)*Math.PI/180;
+    art('cone', r, {arc:half});
+    nearEnemies(ox,oy,r+1).forEach(e=>{
+      if(e.dead) return;
+      const n_=eNear(e,ox,oy), dx=n_.x-ox, dy=n_.y-oy;
       if(n_.d>r) return;
       const da=Math.abs(((Math.atan2(dy,dx)-ang+Math.PI*3)%(Math.PI*2))-Math.PI);
       if(da<=half) hit(e);
@@ -12932,6 +13017,7 @@ function allyAttack(a, st, tgt){
     // 重騎士の「打ち払い」: 大剣の一撃でよろめかせる
     if(j.sk.id==='crush' && !e.dead && rnd()<0.30) addStatus(e,'stagger',a.lv);
   });
+  traitWave(st, ang, 1, a);             // 特性「衝撃波」（仲間の武器）
 }
 
 /* 仲間の被弾。主人公と違って盾のパリイは無い（構える操作を持たないので）。 */
@@ -15001,7 +15087,7 @@ function marethHandHit(e){
 }
 /* 手の1フレーム。生える → 待つ → 振りかぶる → 叩く。届かなければ沈んで生え直す */
 function marethHandTick(e, dt){
-  const H=e.hand; e.hit=Math.max(0, e.hit-dt); e.vx=0; e.vy=0; e.x=H.sx; e.y=H.sy; e.tele=0;
+  const H=e.hand; e.hit=Math.max(0, e.hit-dt); e.vx=0; e.vy=0; e.x=H.sx; e.y=H.sy; e.tele=0; if(H.slap>0) H.slap-=dt;
   if(H.st==='rise'){ H.t-=dt; if(H.t<=0){ H.st='idle'; H.wait=0; } return; }
   if(H.st==='sink'){
     H.t-=dt; if(H.t>0) return;
@@ -15017,7 +15103,7 @@ function marethHandTick(e, dt){
     H.st='rise'; H.t=MARETH.handRise; W.fx.push({t:'grave', x:e.x, y:e.y, life:0.3, max:0.3});
     return;
   }
-  if(H.st==='wind'){ H.t-=dt; if(H.t<=0){ marethHandHit(e); H.st='idle'; H.cd=MARETH.handCd; H.wait=0; } return; }
+  if(H.st==='wind'){ H.t-=dt; if(H.t<=0){ marethHandHit(e); H.st='idle'; H.cd=MARETH.handCd; H.wait=0; H.slap=0.22; } return; }
   /* 待ち：そばの薬瓶を拾う */
   if(!H.hold && W.vials){
     const i=W.vials.findIndex(v=>Math.hypot(v.x-e.x, v.y-e.y)<1.3);
@@ -15028,6 +15114,7 @@ function marethHandTick(e, dt){
   const d=Math.hypot(tg.x-e.x, tg.y-e.y);
   if(d<=MARETH.handReach+(tg.o.r||0.3)){
     H.wait=0;
+    H.lean = tg.x<e.x-0.2 ? -1 : tg.x>e.x+0.2 ? 1 : 0;
     if(H.cd<=0){ H.st='wind'; H.t=MARETH.handWind; H.tx=tg.x; H.ty=tg.y; }
   }else{
     H.wait+=dt;
@@ -15239,8 +15326,6 @@ function tickMareth(dt){
 }
 /* ---------- 見た目（仮）：ドットの升目で直に描く ---------- */
 const MARETH_PAL={k:'#1a1014', s:'#c9a98a', d:'#96745e', r:'#a02828', h:'#0c0a0e', w:'#f4ecd8', R:'#d84a4a', A:'#e8a83a', g:'#5c6a70'};
-const MARETH_HAND=["...k.k.k...","..ksksksk..","..ksksksk.k",".kksksksksk","kskssssssdk","kssssrrssdk",".ksssrrssk.",".kssssssdk.","..kssssdk..","..ksssdk...","..ksssdk...","..ksssdk..."];
-const MARETH_HOLE=[".hhhhhhhhh.","hhhhhhhhhhh",".hhhhhhhhh."];
 const MARETH_VIAL=[".kkk.",".kgk.",".kwk.","kccck","kcwck","kccck",".kkk."];
 function mPix(rows, x0, y0, u, col, rowsShown){
   const n=rowsShown==null ? rows.length : rowsShown;
@@ -15249,19 +15334,123 @@ function mPix(rows, x0, y0, u, col, rowsShown){
       ctx.fillStyle = ch==='c' ? col : MARETH_PAL[ch]; ctx.fillRect(Math.round(x0+i*u), Math.round(y0+j*u), Math.ceil(u), Math.ceil(u)); } }
 }
 function mVialDraw(sx, sy, kind, u){ mPix(MARETH_VIAL, sx-2.5*u, sy-7*u, u, kind==='might'?MARETH_PAL.A:MARETH_PAL.R); }
-/* 手（敵としても、混乱した主人公に見える仲間としても使う）。k＝生えている割合 0〜1、wind＝振りかぶり 0〜1 */
-function marethHandSprite(sx, sy, k, wind, hold, hurt){
-  const u=Math.max(1, Math.round(TS/16)), W0=11*u, rows=MARETH_HAND.length;
-  const shown=Math.max(0, Math.min(rows, Math.round(rows*k)));
-  const lift=Math.round((wind||0)*3)*u, by=sy+3*u;                  // by＝穴の上端
-  mPix(MARETH_HOLE, sx-W0/2, by-u, u);
-  if(shown>0){
-    const y0=by-shown*u-lift;
-    mPix(MARETH_HAND, sx-W0/2, y0, u, null, shown);
-    for(let l=0;l<lift/u;l++) mPix([MARETH_HAND[rows-1]], sx-W0/2, y0+(shown+l)*u, u);   // 振りかぶって伸びた腕
-    if(hold && shown>=rows-2) mVialDraw(sx, y0+1*u, hold, u);
-    if(hurt){ ctx.save(); ctx.globalAlpha=0.6; ctx.fillStyle='#fff'; ctx.fillRect(sx-W0/2+u, y0, W0-2*u, shown*u+lift); ctx.restore(); }
+/* 手（敵としても、混乱した主人公に見える仲間としても使う）。泥の溜りから生えて、指をうねらせる手。
+   2026-11-17 第3版：マレット本体と同じドット密度（絵16ドット＝0.6マス）・同じ肌5色と血3色で、関節のある指を骨組みから描く。
+   指は3節。曲げると手前へ折れて短く見え、さらに曲げると指先が掌の上へ降りてくる（握り拳）。形ごとに小さなキャンバスへ焼いて使い回す */
+const MARETH_HAND_W=42, MARETH_HAND_H=46;
+const MARETH_SKIN=['#edb395','#d3947d','#bf735b','#9b5a46','#7d4530','#613220'];
+const marethHandCache={};
+function marethHandBake(key, curl, thumb, tilt){
+  if(marethHandCache[key]) return marethHandCache[key];
+  const W0=MARETH_HAND_W, H0=MARETH_HAND_H, N=W0*H0;
+  const tone=new Float32Array(N).fill(-1), grp=new Int16Array(N).fill(-1), zz=new Int16Array(N).fill(-1);
+  const PX=W0/2, PY=H0-1;                                    // 手首の付け根（回す中心）
+  const ca=Math.cos(tilt), sa=Math.sin(tilt);
+  const R=(x, y)=>{ const dx=x-PX, dy=y-PY; return [PX+dx*ca-dy*sa, PY+dx*sa+dy*ca]; };
+  let zc=0;
+  /* 太さの変わる棒を塗る。lit＝明るい側（-1 左 … +1 右）からの陰。dark＝全体を暗くする量 */
+  const cap=(x0, y0, x1, y1, r0, r1, g, dark)=>{
+    const a=R(x0, y0), b=R(x1, y1), z=zc++;
+    const minx=Math.floor(Math.min(a[0], b[0])-r0-1), maxx=Math.ceil(Math.max(a[0], b[0])+r0+1);
+    const miny=Math.floor(Math.min(a[1], b[1])-r0-1), maxy=Math.ceil(Math.max(a[1], b[1])+r0+1);
+    const vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy||1e-6;
+    for(let y=Math.max(0, miny); y<=Math.min(H0-1, maxy); y++) for(let x=Math.max(0, minx); x<=Math.min(W0-1, maxx); x++){
+      const px=x+0.5-a[0], py=y+0.5-a[1]; let s=(px*vx+py*vy)/L2; s=Math.max(0, Math.min(1, s));
+      const cx=a[0]+vx*s, cy=a[1]+vy*s, r=r0+(r1-r0)*s, d=Math.hypot(x+0.5-cx, y+0.5-cy);
+      if(d>r) continue;
+      const i=y*W0+x, side=(x+0.5-cx)/Math.max(0.8, r);      // 左が明るく、右が暗い
+      tone[i]=0.9+side*1.25+(dark||0)+(d>r-0.9 && side>0 ? 0.5 : 0);
+      grp[i]=g; zz[i]=z;
+    }
+  };
+  /* 前腕と掌 */
+  cap(PX, PY+2, PX, PY-11, 5.2, 5.6, 0, 0.35);
+  cap(PX-0.3, PY-12, PX, PY-19, 8.2, 8.8, 1, 0);
+  cap(PX-5.5, PY-21.5, PX+6.2, PY-21, 4.2, 3.8, 1, 0);       // 指の付け根の盛り上がり
+  /* 指4本（人差し・中・薬・小）。θ は手前への折れ。cos が負になった節は下向き（掌にかぶさる） */
+  const F=[{x:-7.2, y:-23.5, a:-0.20, L:[5.2,4.2,3.4], r:2.25}, {x:-2.4, y:-25.0, a:-0.05, L:[6.0,4.8,3.6], r:2.35},
+           {x: 2.6, y:-24.6, a: 0.09, L:[5.6,4.4,3.4], r:2.25}, {x: 7.0, y:-22.6, a: 0.26, L:[4.2,3.4,2.8], r:1.95}];
+  const order=[3,0,2,1];                                      // 中指をいちばん手前に
+  order.forEach(fi=>{ const f=F[fi], c=Math.max(0, Math.min(1, curl[fi]));
+    const th=[c*1.15, c*1.15+c*1.75, c*1.15+c*1.75+c*1.2];
+    let x=PX+f.x, y=PY+f.y, rr=f.r;
+    for(let k=0;k<3;k++){
+      const pr=Math.cos(th[k]), len=f.L[k]*pr, lat=f.a*(1-c*0.6);
+      const nx=x+Math.sin(lat)*len, ny=y-Math.cos(lat)*len, r1=rr*(k===2?0.78:0.9);
+      const folded=pr<0;
+      cap(x, y, nx, ny, rr, r1, 10+fi*2+(folded?1:0), folded?0.9:(Math.abs(pr)<0.75?0.45:0));
+      x=nx; y=ny; rr=r1;
+    }
+  });
+  /* 親指：開くと左上へ。握ると掌の上を横切る */
+  { const c=Math.max(0, Math.min(1, thumb)), a0=-1.15+c*1.75, a1=a0+0.25+c*0.5;
+    let x=PX-7.6, y=PY-13.5;
+    const x1=x+Math.sin(a0)*5.4, y1=y-Math.cos(a0)*5.4; cap(x, y, x1, y1, 3.0, 2.5, 30, c>0.5?0.5:0.1);
+    const x2=x1+Math.sin(a1)*4.4, y2=y1-Math.cos(a1)*4.4; cap(x1, y1, x2, y2, 2.5, 1.9, 30, c>0.5?0.5:0.1);
   }
+  /* 色に落とす */
+  const col=new Array(N).fill(null);
+  for(let i=0;i<N;i++){ if(tone[i]<0) continue; col[i]=MARETH_SKIN[Math.max(0, Math.min(4, Math.round(tone[i])))]; }
+  /* 重なりの縁：手前の部位の輪郭に沿って、奥の側を1ドット暗くする（指と指・指と掌・親指と掌の境） */
+  for(let y=0;y<H0;y++) for(let x=0;x<W0;x++){ const i=y*W0+x; if(grp[i]<0) continue;
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const xx=x+d[0], yy=y+d[1]; if(xx<0||yy<0||xx>=W0||yy>=H0) continue; const j=yy*W0+xx;
+      if(grp[j]>=0 && grp[j]!==grp[i] && zz[j]>zz[i] && grp[j]>=10 && !(grp[i]===0 && grp[j]===1)){ col[i]=MARETH_SKIN[5]; break; } } }
+  /* 掌のしわと血。掌（grp 1）の上だけに置く */
+  const mark=(dx, dy, c)=>{ const q=R(PX+dx, PY+dy), x=Math.floor(q[0]), y=Math.floor(q[1]); if(x<0||y<0||x>=W0||y>=H0) return; const i=y*W0+x; if(grp[i]===1 && col[i]!==MARETH_SKIN[5]) col[i]=c; };
+  for(let k=0;k<=10;k++) mark(-5+k, -18.5+Math.sin(k/10*Math.PI)*-1.6+k*0.25, MARETH_SKIN[3]);            // 上のしわ
+  for(let k=0;k<=6;k++) mark(-3.5+k*0.35, -16.5+k*1.1, MARETH_SKIN[3]);                                      // 親指の付け根のしわ
+  [[-1,-17,'#c73e31'],[0,-17,'#c73e31'],[1,-17,'#9f2c24'],[2,-16,'#c73e31'],[-2,-16,'#9f2c24'],[-1,-16,'#c73e31'],[0,-16,'#9f2c24'],[1,-16,'#c73e31'],
+   [0,-15,'#c73e31'],[1,-15,'#9f2c24'],[-1,-15,'#822418'],[1,-14,'#c73e31'],[1,-13,'#9f2c24'],[2,-12,'#822418'],[4,-18,'#9f2c24'],[-4,-14,'#c73e31'],[3,-20,'#c73e31'],[-3,-20,'#9f2c24']]
+    .forEach(b=>mark(b[0], b[1], b[2]));
+  /* 外の縁取り（黒） */
+  const out=[]; for(let y=0;y<H0;y++) for(let x=0;x<W0;x++){ const i=y*W0+x; if(col[i]) continue;
+    if((y>0&&grp[i-W0]>=0)||(y<H0-1&&grp[i+W0]>=0)||(x>0&&grp[i-1]>=0)||(x<W0-1&&grp[i+1]>=0)) out.push(i); }
+  out.forEach(i=>{ col[i]='#000000'; });
+  const mk=(white)=>{ const c=document.createElement('canvas'); c.width=W0; c.height=H0; const g=c.getContext('2d');
+    for(let i=0;i<N;i++){ if(!col[i]) continue; g.fillStyle=white?'#ffffff':col[i]; g.fillRect(i%W0, (i/W0)|0, 1, 1); } return c; };
+  return (marethHandCache[key]={img:mk(false), white:mk(true)});
+}
+/* k＝生えている割合 0〜1、wind＝振りかぶり 0〜1、slap＝叩いた直後 0〜1、lean＝狙う側（-1 左／+1 右）。seed は動きの位相 */
+function marethHandSprite(sx, sy, k, wind, hold, hurt, lean, slap, seed){
+  const u=TS*0.6/16, W0=MARETH_HAND_W, H0=MARETH_HAND_H, t=nowSec()+(seed||0)*0.37, ln=lean||0;
+  const base=Math.round(sy+TS*0.30), rx=8.5*u, ry=2.8*u;
+  const shown=Math.max(0, Math.min(1, k));
+  /* 形：ふだんは指が順にうねる（24コマで一巡）。振りかぶりは握り拳、叩いた直後は開いた掌、生え際と沈み際は握っている */
+  let C=null, lift=0;
+  if(shown>0.03){
+    if(slap>0){ C=marethHandBake('s'+ln, [0,0,0,0], 0, ln*0.30); lift=-3*u*slap; }
+    else if(wind>0){ const q=Math.round(wind*4); C=marethHandBake('w'+q+'_'+ln, [1,1,1,1].map(()=>0.55+0.45*q/4), 1, -ln*0.26*q/4); lift=7*u*wind; }
+    else if(shown<1){ const q=Math.round(shown*4); C=marethHandBake('r'+q, [1,1,1,1].map(()=>1-q/4*0.55), 1-q/4*0.5, 0); }
+    else if(hold){ const ph=Math.floor(t*6)%12; C=marethHandBake('h'+ph, [0.42,0.38,0.40,0.46], 0.25, Math.sin(ph/12*Math.PI*2)*0.07); }
+    else{ const ph=((Math.floor(t*10)%24)+24)%24, a=ph/24*Math.PI*2;
+      C=marethHandBake('i'+ph, [0,1,2,3].map(i=>0.30+0.30*Math.sin(a*2-i*0.95)), 0.35+0.35*Math.sin(a*2+1.2), Math.sin(a)*0.13); }
+  }
+  /* 泥の溜り（奥） */
+  ctx.fillStyle='#000000'; ctx.beginPath(); ctx.ellipse(sx, base, rx+u, ry+u, 0, 0, 7); ctx.fill();
+  ctx.fillStyle='#441308'; ctx.beginPath(); ctx.ellipse(sx, base, rx, ry, 0, 0, 7); ctx.fill();
+  ctx.fillStyle='#240808'; ctx.beginPath(); ctx.ellipse(sx, base+u*0.4, rx*0.72, ry*0.62, 0, 0, 7); ctx.fill();
+  if(C){
+    const rows=Math.max(2, Math.round(H0*shown)), bob=(shown>=1 && !(wind>0) && !(slap>0)) ? Math.round(Math.sin(t*3.2))*u : 0;
+    const top=base-rows*u-lift+bob+2*u, x0=sx-W0*u/2;
+    const sm=ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled=false;
+    const put=(img)=>{
+      ctx.drawImage(img, 0, 0, W0, rows, x0, top, W0*u, rows*u);
+      if(lift>0 || bob<0) ctx.drawImage(img, 0, H0-1, W0, 1, x0, top+rows*u, W0*u, lift-bob+u);     // 伸びたぶんの腕
+    };
+    put(C.img);
+    if(hurt){ ctx.save(); ctx.globalAlpha*=0.7; put(C.white); ctx.restore(); }
+    ctx.imageSmoothingEnabled=sm;
+    if(hold && shown>0.9){ const vu=Math.max(1, Math.round(TS/16)); mVialDraw(sx, top+(H0-21)*u, hold, vu); }
+  }
+  /* 泥の手前の縁と、縁で跳ねる泥の粒 */
+  ctx.save(); ctx.beginPath(); ctx.rect(sx-rx-3*u, base+u*0.6, 2*rx+6*u, ry+3*u); ctx.clip();
+  ctx.fillStyle='#000000'; ctx.beginPath(); ctx.ellipse(sx, base, rx+u, ry+u, 0, 0, 7); ctx.fill();
+  ctx.fillStyle='#61170f'; ctx.beginPath(); ctx.ellipse(sx, base-u*0.5, rx, ry, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  const pu=Math.max(1, Math.round(u*1.5));
+  for(let i=0;i<3;i++){ const a=t*2.2+i*2.1, bx=sx+Math.cos(i*2.4+0.6)*rx*0.85, by=base-Math.abs(Math.sin(a))*3*u-u;
+    ctx.fillStyle='#000000'; ctx.fillRect(Math.round(bx)-1, Math.round(by)-1, pu+2, pu+2);
+    ctx.fillStyle='#822418'; ctx.fillRect(Math.round(bx), Math.round(by), pu, pu); }
 }
 function marethHandDraw(e, sx, sy){
   const H=e.hand;
@@ -15272,7 +15461,7 @@ function marethHandDraw(e, sx, sy){
     ctx.fillStyle='rgba(255,90,70,'+(0.10+wind*0.22)+')'; ctx.beginPath(); ctx.arc(tx,ty,rad,0,7); ctx.fill();
     ctx.strokeStyle='rgba(255,90,70,'+(0.55+wind*0.45)+')'; ctx.lineWidth=2+wind*2; ctx.beginPath(); ctx.arc(tx,ty,rad,0,7); ctx.stroke();
   }
-  marethHandSprite(sx, sy, k, wind, H.hold, e.hit>0);
+  marethHandSprite(sx, sy, k, wind, H.hold, e.hit>0, H.lean||0, Math.max(0,(H.slap||0)/0.22), Math.round(H.sx*7+H.sy*3)%9);
   if(e.confT>0){ ctx.fillStyle='#c9a0e8'; ctx.font='bold '+Math.round(TS*0.4)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('?', sx, sy-TS*0.9+Math.sin(nowSec()*8)*2); }
   return true;
 }
@@ -15335,7 +15524,7 @@ function drawMarethOver(camX, camY){
     ctx.strokeStyle=rgba('#ffffff', 0.5*fade); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,rad,0,7); ctx.stroke();
   }
   for(const f of W.fx){ if(f.t!=='mgrab') continue;            // 掴んでいる手
-    marethHandSprite(f.x*TS-camX, f.y*TS-camY+TS*0.2, Math.min(1, (f.max-f.life)/0.12), 0.6, null, false); }
+    marethHandSprite(f.x*TS-camX, f.y*TS-camY+TS*0.2, Math.min(1, (f.max-f.life)/0.12), 0.0001, null, false, 0, 0, 3); }
   if(!S.hero || !S.run) return;
   const px=P.x*TS-camX, py=P.y*TS-camY;
   marethDosePips(P, px, py);
@@ -15372,7 +15561,7 @@ function marethDrawCast(e, sx, sy, R, m, p){
       ctx.fillStyle='rgba('+warn+','+(0.10+p*0.22)+')'; ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.fill();
       ctx.strokeStyle='rgba('+warn+','+(0.55+p*0.45)+')'; ctx.lineWidth=2+p*3; ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.stroke();
       ctx.strokeStyle='rgba(255,255,255,'+(0.25+p*0.5)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad*p,0,7); ctx.stroke();
-      marethHandSprite(x, y+TS*0.2, p*0.45, 0, null, false);   // 指先が床から覗く
+      marethHandSprite(x, y+TS*0.2, p*0.45, 0, null, false, 0, 0, 5);   // 指先が床から覗く
     });
   }else if(id==='lightfall'){                                 // 頭上へ光が昇る（落ちる所は1本ずつ別に出る）
     ctx.fillStyle='rgba(255,224,150,'+(0.2+p*0.5)+')'; ctx.fillRect(Math.round(sx-2), 0, 4, Math.round(sy-R));
@@ -18799,7 +18988,7 @@ function draw(){
     const aScale = a.fallAnim ? Math.max(0.04, 1-aFallK) : 1;
     const aRot   = a.fallAnim ? aFallK*Math.PI*2.4 : 0;
     if(vanishGuard(a, (a.fallBlink>0) && (Math.floor(a.fallBlink*16)%2===0), _drawDt)) return;
-    if(P.confT>0 && !isNpc && marethOn()){ marethHandSprite(sx, sy, 1, a.swing>0?0.8:0, null, a.hit>0); return; }   // マレットの混乱：仲間が「手」に見える
+    if(P.confT>0 && !isNpc && marethOn()){ marethHandSprite(sx, sy, 1, a.swing>0?0.8:0, null, a.hit>0, (a.dirx||0)<0?-1:1, 0, (a.slot||0)*2+1); return; }   // マレットの混乱：仲間が「手」に見える
     const j=jobDef(a.job), R=TS*0.30*aScale;
     /* ドゥラントリーは苔玉そのものなので、敵側と同じ絵を使う。
        **味方であることは白いリングのほうが伝える**（形ではなく印で割る）ので、
@@ -25827,7 +26016,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20261116-brecht4"></script>
+<script src="weapon-art-pixel.js?v=20261119-lgwave10"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
 <script src="game-feel.js?v=20261116-brecht3"></script>

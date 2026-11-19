@@ -65,7 +65,11 @@
     bo0: '#dfb996', bo1: '#a25792', bo2: '#843e76', bo3: '#6b305b', bo4: '#502545',   // 蛸
     bc0: '#759699', bc1: '#55767a', bc2: '#3d565b', bc3: '#293c42',                   // 宿借りの甲
     bg0: '#f9ba38', bg1: '#884d48',                                                   // 火花
-    ba0: '#633a7d'                                                                    // 鎧の紫
+    ba0: '#633a7d',                                                                   // 鎧の紫
+    /* レジェンド武器の衝撃波（2026-11-19 ユーザー提示の動画に合わせる：白い先端・琥珀の筋・ディザの粒） */
+    sw0: '#fff6e0', sw1: '#ffe2a0', sw2: '#f6b54a', sw3: '#d9832a', sw4: '#8a4a18',
+    /* 無属性の衝撃波（2026-11-19：白。炎の段は薄い灰へ）と、粒の焦げ茶 */
+    nw0: '#f6f8fc', nw1: '#e2e7ef', nw2: '#bcc4d0', nw3: '#8d96a6', nw4: '#5e6676', db0: '#6b4526'
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -88,7 +92,8 @@
     aegis: [P.W, P.ag0, P.ag1, P.ag2, P.ag3],
     leaf: [P.W, P.lf0, P.lf1, P.lf2, P.lf3],
     ash: [P.as0, P.as1, P.as2, P.as3, P.as4, P.as5],
-    ghost: [P.W, P.vg0, P.vg1, P.vg2, P.vg3, P.vg4]
+    ghost: [P.W, P.vg0, P.vg1, P.vg2, P.vg3, P.vg4],
+    gold: [P.W, P.sw0, P.sw1, P.sw2, P.sw3, P.sw4]
   };
   const rampAt = (r, f) => r[f <= 0 ? 0 : f >= 1 ? r.length - 1 : Math.floor(f * r.length)];
 
@@ -2843,6 +2848,226 @@
     }
   }
   /* 叩きつけ（鎧）。鉄の輪と火花 */
+
+  /* ---------- レジェンド武器の衝撃波（lg_wave）2026-11-19 ----------
+     ユーザー提示の動画に合わせた形：
+       1. 振った瞬間、足元に白い輪が広がり、琥珀の点線の輪になって消える（ground）
+       2. 白く光る三日月の先端が前へ走る。先端のすぐ後ろは明るい塗り、その奥に琥珀の炎のような筋が後ろへ伸びる
+       3. 届いた所で白が抜け、琥珀の縁だけが少し進んで、ディザの粒にほどけて消える
+     形は「円弧の先端」1つで3つの形をまかなう（当たりの形と同じ広がり方）：
+       cone … 振った人が中心。半径＝今の先端までの距離、角度は ±arc
+       ring … 同じで全周（ゴルディオン）
+       line … 中心が先端と一緒に前へ動く小さな円弧（ハイペリオン。半幅＝wide）
+     o.mode＝'cone'|'ring'|'line'、o.elem＝属性（arcane だけ紫、ほかは金） */
+  /* 2026-11-19 第2版：動画を1コマずつ測り直した（60fps）。
+       0秒       振った瞬間、武器の先に白いトゲの光 → 黄色いトゲの円盤と橙の輪が1コマおきに入れ替わる（0.13秒まで）
+       0秒       足元に白い楕円の塗り → 0.1秒で大きな白い輪 → 琥珀の点線になって少し広がり、消える
+       0.03秒    武器の先から小さな丸い白い塊が出て、0.16秒で届く（ほぼ一定の速さ）。進みながら縦に広がる
+                 白の後ろはディザの霞、その奥に琥珀のジグザグの筋（先端側が太く、出どころ側へ細い）
+       半ばから  白が細く暗くなり、届く頃には琥珀の縁になって抜ける（減衰）
+       届いたあと 筋が切れ端に崩れて消え（0.35秒まで）、四角い粒が減速しながら漂って消える（0.75秒まで） */
+  const LGW = { born: 0.03, travel: 0.16, end: 0.78, fps: 60, tip: 14 };
+  /* 属性ごとの色（2026-11-19 ユーザー指定：無属性は白、属性は属性の色）。
+     斬撃・刺突・打撃（無属性）＝白、炎＝橙、冷気＝水色、雷＝黄、魔法＝紫。どれも先頭（芯）は白 */
+  const LGW_RAMPS = {
+    neutral: [P.W, P.nw0, P.nw1, P.nw2, P.nw3, P.nw4],
+    fire: [P.W, P.fi1, P.fi2, P.fi3, P.fi4, P.fi5],                 // 雷（黄）と分けるため、炎は1段濃く（橙）
+    frost: RAMP.frost, shock: RAMP.shock, arcane: RAMP.arcane
+  };
+  function lgwRamp(o) { return LGW_RAMPS[o.elem] || LGW_RAMPS.neutral; }
+  /* 形ごとの時間（2026-11-19 第8版：ユーザー指定「全方向のやつが一瞬で消え過ぎに見える」）。
+     travel＝届くまで、fade＝届いてから消えるまで、fade2＝第2波が消えるまで */
+  /* 太さ（2026-11-19 第9版：ユーザー指定「通常武器にも衝撃波付きを考えているのでもっと細いものも作ってみて」）。
+     o.w＝1 がレジェンド（今まで）、0.5 が細、0.3 が極細。形・時間・色の作りは同じで、帯・炎・網掛け・光・粒を細く小さくする */
+  function lgwW(o) { return Math.max(0.2, Math.min(1, o.w == null ? 1 : o.w)); }
+  function lgwTime(o) { return o.mode === 'ring' ? { travel: 0.22, fade: 0.15, fade2: 0.12 } : { travel: LGW.travel, fade: 0.07, fade2: 0.06 }; }
+  function lgwQ(t) { return Math.floor(t * LGW.fps) / LGW.fps; }
+  /* 先端の位置と形。s＝進み 0→1。d0＝出どころ（cone と line は武器の先、ring は足元） */
+  function lgwGeom(t, o) {
+    const R = Math.max(8, o.R), mode = o.mode || 'cone', d0 = mode === 'ring' ? 4 : Math.min(LGW.tip, R * 0.4);
+    const s = clamp((t - LGW.born) / lgwTime(o).travel), mv = 1 - Math.pow(1 - s, 1.35);
+    const dist = d0 + (R * 1.1 - d0) * mv;
+    const base = { R, s, mv, dist, d0, mode };
+    if (mode === 'ring') return Object.assign(base, { cx: 0, cy: 0, rad: dist, th: Math.PI, full: true, hw: dist });
+    const hw = mode === 'line' ? Math.max(5, o.wide || 11) * (0.55 + 0.45 * mv) : Math.max(6, (dist - d0 * 0.4) * Math.sin(Math.max(0.2, o.arc || 0.6)));
+    const rc = Math.max(hw * 1.05, mode === 'line' ? hw * 1.25 : dist * 0.62);
+    const th = Math.min(1.45, Math.asin(Math.min(1, hw / rc)));
+    return Object.assign(base, { cx: Math.cos(o.ang) * (dist - rc), cy: Math.sin(o.ang) * (dist - rc), rad: rc, th, full: false, hw: rc * Math.sin(th) });
+  }
+  /* 白の残り：出てすぐ満ちて、半ばから細り、届いたら消える */
+  function lgwWhite(t, o) {
+    if (t < LGW.born) return 0;
+    const s = (t - LGW.born) / lgwTime(o).travel, up = clamp(0.35 + s / 0.12);
+    return up * (s < 0.55 ? 1 : Math.max(0, 1 - Math.pow((s - 0.55) / 0.45, 1.1)));
+  }
+  /* 2026-11-19 第3版：ユーザー指定「全部ドットで構成されているのが違和感があるので斬撃エフェクトと同じような作り方に」
+     「最後に舞うパーティクルは小さくなって消えて欲しい」。
+     斬撃（smear）と同じく、ディザ（網掛け）を使わず、塗った形を段の色（白い縁 → 薄い金 → 金 → 琥珀）で描く。
+     消えるときは半透明にせず、形が細って塊ごと欠けていく。粒は 3→2→1 ドットと小さくなって消える。 */
+  function lgWaveGround(t, o) {
+    if (t < 0 || t > 0.24) return;
+    t = lgwQ(t);
+    const ramp = lgwRamp(o), mode = o.mode || 'cone';
+    const w = lgwW(o), big = Math.max(10, Math.min(o.R, 58) * (mode === 'line' ? 0.34 : mode === 'ring' ? 0.62 : 0.5) * (0.55 + 0.45 * w));
+    const cy = o.y + 2;
+    if (t < 0.04) {                                                     // 白い楕円の塗り（縁は薄い金）
+      const rx = (4 + (t / 0.04) * 7) * (0.6 + 0.4 * w), ry = rx * 0.45;
+      for (let y = Math.floor(-ry); y <= Math.ceil(ry); y++) for (let x = Math.floor(-rx); x <= Math.ceil(rx); x++) {
+        const q = (x * x) / (rx * rx) + (y * y) / (ry * ry);
+        if (q <= 1) px(o.x + x, cy + y, q < 0.6 ? ramp[0] : ramp[1]);
+      }
+      return;
+    }
+    const k = t < 0.1 ? (t - 0.04) / 0.06 : 1, late = t < 0.1 ? 0 : (t - 0.1) / 0.14;
+    const rx = t < 0.1 ? 11 + easeOut(k) * (big - 11) : big * (1 + 0.1 * late), ry = rx * 0.45;
+    const thick = t < 0.08 && w > 0.45 ? 2 : 1, n = Math.ceil(rx * 7);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      if (late > 0) { const back = Math.abs(((a - o.ang + Math.PI * 3) % TAU) - Math.PI); if (back > Math.PI * (1 - late)) continue; }   // つながったまま後ろ側から縮んで消える
+      const x = o.x + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+      const c = late === 0 ? ramp[0] : late < 0.4 ? ramp[1] : ramp[2];
+      px(x, y, c);
+      if (thick > 1) px(x, y + 1, ramp[1]);
+    }
+  }
+  /* 武器の先のトゲの光（cone と line） */
+  function lgwBurst(t, o, ramp) {
+    if (o.mode === 'ring' || t > 0.13) return;
+    const d = Math.min(LGW.tip, o.R * 0.4), bx = o.x + Math.cos(o.ang) * d, by = o.y + Math.sin(o.ang) * d;
+    const f = Math.floor(t * 60), spikes = 10;
+    const star = (r0, r1, c, rot) => {
+      for (let y = -r1 - 1; y <= r1 + 1; y++) for (let x = -r1 - 1; x <= r1 + 1; x++) {
+        const dd = Math.hypot(x, y), a = Math.atan2(y, x) + rot;
+        if (dd <= r0 + (r1 - r0) * Math.pow(Math.abs(Math.cos(a * spikes / 2)), 6)) px(bx + x, by + y, c);
+      }
+    };
+    const bs = 0.45 + 0.55 * lgwW(o);
+    if (t < 0.025) { star(3 * bs, 11 * bs, ramp[0], 0.2); return; }               // 白いトゲの光（1コマ）
+    const shrink = clamp((t - 0.07) / 0.06);                             // 最後は小さくなって消える
+    if (f % 2 === 0 || bs < 0.75) { star(6 * bs * (1 - shrink * 0.6), 9 * bs * (1 - shrink * 0.5), ramp[2], 0); star(3 * bs * (1 - shrink), 5 * bs * (1 - shrink * 0.6), ramp[0], 0.3); }
+    else {
+      const rr = 8 * bs * (1 - shrink * 0.4);
+      for (let i = 0; i < 56; i++) { const a = i / 56 * TAU; px(bx + Math.cos(a) * rr, by + Math.sin(a) * rr, ramp[3]); }
+      star(2 * bs, 4 * bs * (1 - shrink * 0.5), ramp[0], 0);
+    }
+  }
+  function lgWaveAir(t, o) {
+    if (t < 0 || t > LGW.end) return;
+    t = lgwQ(t);
+    const ramp = lgwRamp(o), G = lgwGeom(t, o), seed = (o.seed || 0) * 131 + 7;
+    lgwBurst(t, o, ramp);
+    if (t < LGW.born) return;
+    /* 2026-11-19 第4版：ユーザー指定「それぞれの波が分散しているが、動画では繋がって消えていってる」。
+       波は1つにつながった重なりの帯で描く（前から）：白 → クリーム → 金 → 琥珀。琥珀の帯の内側の縁がギザギザ（トゲ）。
+       白が先に細って抜け、残りの帯がつながったまま細り、両端から縮んで消える。塊ごと欠けさせない */
+    const TM = lgwTime(o), wK = lgwWhite(t, o);
+    const after = Math.max(0, t - LGW.born - TM.travel);
+    const fadeK = clamp(after / TM.fade);                                   // 届いてからの細り 0→1（第6版：動画は白が抜けてから 0.07 秒ほどで消える）
+    const live = 1 - fadeK;
+    const sK = clamp((t - LGW.born - 0.01) / 0.06);                      // 帯とトゲの伸び
+    const F = G.rad;
+    const WW = lgwW(o), Wmax = Math.max(1.2, Math.min(G.full ? 8 : 18, 3 + G.dist * 0.32) * Math.pow(WW, 1.5));
+    const toothMax = Math.min(G.full ? 18 : 44, 4 + G.dist * 0.6) * Math.pow(WW, 1.1);      // 第7版：尻尾を長く
+    /* 1ドットの色。d＝先端から後ろへの距離、prof＝両端ほど 0、lat＝ギザギザを刻む横の位置 */
+    /* 2026-11-19 第5版：ユーザー指定「動画と比べると色の付いている箇所が多いのかも」。
+       白を主にする（白を太く）。後ろの炎はクリームで塗り、橙はギザギザの縁取りに1ドットだけ。金の帯は外した */
+    const shade = (x, y, d, prof, lat) => {
+      if (d < 0 || prof <= 0) return;
+      const wW = Wmax * 1.25 * wK * prof;                                // 白
+      const wC = Math.max(0.8, (1.5 + 1.8 * prof) * Math.pow(WW, 1.3)) * sK * (wK > 0.05 ? 1 : live);       // クリーム
+      const wA = Math.max(0.6, (1.0 + 1.4 * prof) * WW) * sK * live;                          // ギザギザの土台
+      let e = wW;
+      if (d < e) { px(x, y, d < Math.max(1, wW * 0.7) ? ramp[0] : ramp[1]); return; }
+      e += wC; if (d < e) { px(x, y, ramp[1]); return; }
+      /* ギザギザ：歯の幅は 7 ドット、長さと傾きは歯ごとにばらつく三角。隣の歯とつながっている。
+         中はクリーム → 薄い金、縁の1ドットだけ橙 */
+      const P0 = 7, bi = Math.floor(lat / P0), h1 = hash(bi + 700, seed), h2 = hash(bi + 700, seed + 1);
+      const ph = (lat / P0 - bi), apex = 0.3 + 0.4 * h2;
+      const tri = ph < apex ? ph / apex : (1 - ph) / (1 - apex);
+      const tooth = toothMax * prof * sK * live * (0.35 + 0.65 * h1) * tri;
+      const da = d - e, lim = wA + tooth;
+      if (da < lim) {
+        const edge = lim - da < 1.2 && tooth > 1.5;
+        px(x, y, edge ? ramp[3] : ramp[2]);
+        return;
+      }
+      /* 第7版：ユーザー指定「動画の方が衝撃波の尻尾が長いのと網掛けがされているのでそこも真似て」。
+         炎の奥と炎のすき間に網掛け（くっきりした模様）。手前は市松（1つおき）、奥はまばら（4つに1つ）。
+         長さは炎より長く、出どころの近くまで。消えるときは奥から縮む */
+      const P1 = 9, bj = Math.floor((lat + 3.5) / P1), g1 = hash(bj + 900, seed), g2 = hash(bj + 900, seed + 1);
+      const ph2 = ((lat + 3.5) / P1 - bj), ap2 = 0.3 + 0.4 * g2, tri2 = ph2 < ap2 ? ph2 / ap2 : (1 - ph2) / (1 - ap2);
+      const hl = (tooth * 0.55 + toothMax * 0.75 * prof * (0.3 + 0.7 * g1) * tri2) * WW * sK * live;   // 炎の外側のギザギザの縁
+      if (da - lim > hl) return;
+      const q = (da - lim) / Math.max(1, hl), xi = Math.round(x), yi = Math.round(y);
+      if (q < 0.55) { if (((xi + yi) & 1) === 0) px(x, y, ramp[2]); }
+      else if ((xi & 1) === 0 && (yi & 1) === 0) px(x, y, ramp[3]);
+    };
+    /* 第2波：主の波の後ろを遅れて付いてくる細い白い弧（動画のスローの 151〜159 コマ目）。
+       主の白が抜け始める頃に出て、主と一緒に細って消える。途中に1〜2か所の切れ目 */
+    const lag2 = Math.max(6, (G.dist - G.d0) * 0.42);                    // 主の先端からの遅れ（ドット）
+    const w2on = clamp((G.s - 0.4) / 0.15) * (1 - clamp(after / TM.fade2));
+    /* d＝主の先端から後ろへの距離、prof＝主の両端ほど 0、lat＝切れ目を刻む横の位置 */
+    const wave2 = (x, y, d, prof, lat) => {
+      if (w2on <= 0 || prof < 0.35) return false;
+      const th2 = Math.max(1, (1.2 + 1.6 * prof) * (0.5 + 0.5 * WW)) * w2on, d2 = d - lag2;
+      if (d2 < 0 || d2 > th2) return false;
+      const seg = Math.floor((lat + 300) / 7);
+      if (Math.abs(lat) > 6 && hash(seg, seed + 77) < 0.16) return false;   // 切れ目（真ん中は切らない）
+      px(x, y, d2 < th2 * 0.6 ? ramp[0] : ramp[1]);
+      return true;
+    };
+    if (G.full) {
+      const reach = F + 1, inner = Math.max(0, F - Math.max(Wmax * 1.25 + 8 + toothMax * 1.5, lag2 + 4) - 2);
+      for (let y = Math.floor(o.y - reach); y <= Math.ceil(o.y + reach); y++) for (let x = Math.floor(o.x - reach); x <= Math.ceil(o.x + reach); x++) {
+        const dx = x - o.x, dy = y - o.y, r = Math.hypot(dx, dy);
+        if (r > reach || r < inner) continue;
+        const lat = (Math.atan2(dy, dx) + Math.PI) * F;
+        if (!wave2(x, y, F - r, 1, lat)) shade(x, y, F - r, 1, lat);
+      }
+    } else {
+      const ca = Math.cos(o.ang), sa = Math.sin(o.ang), cu = G.dist - F, hwE = G.hw;
+      const hwL = hwE * (1 - 0.55 * fadeK);                              // 消えるときは両端から縮む
+      const u0 = Math.max(G.d0 - 2, cu + F * Math.cos(G.th) - Math.max(Wmax * 1.25 + 8 + toothMax * 1.5, lag2 + 4) - 2), u1 = G.dist + 2, v0 = -hwE - 2, v1 = hwE + 2;
+      const xs = [u0 * ca - v0 * sa, u0 * ca - v1 * sa, u1 * ca - v0 * sa, u1 * ca - v1 * sa], ys = [u0 * sa + v0 * ca, u0 * sa + v1 * ca, u1 * sa + v0 * ca, u1 * sa + v1 * ca];
+      for (let y = Math.floor(o.y + Math.min(...ys)); y <= Math.ceil(o.y + Math.max(...ys)); y++)
+        for (let x = Math.floor(o.x + Math.min(...xs)); x <= Math.ceil(o.x + Math.max(...xs)); x++) {
+          const dx = x - o.x, dy = y - o.y, u = dx * ca + dy * sa, v = -dx * sa + dy * ca;
+          if (u < u0 || u > u1 || Math.abs(v) > hwL + 0.5) continue;
+          const uf = cu + Math.sqrt(Math.max(0, F * F - v * v));
+          if (u > uf + 0.5) continue;
+          const av = Math.min(1, Math.abs(v) / hwL), prof = Math.pow(1 - av * av, 0.55);   // 真ん中が太く、両端は細く尖る
+          if (!wave2(x, y, uf - u, prof, v)) shade(x, y, uf - u, prof, v + 400);
+        }
+    }
+    /* 速さの線は 第4版で外した（帯を横切る継ぎ目に見えた） */
+    /* 四角い粒：先端が通った所から湧き、減速しながら前へ流れ、3→2→1 ドットと小さくなって消える */
+    const nP = Math.round((G.full ? 70 : 34 + G.th * 22) * (0.3 + 0.7 * WW));
+    for (let i = 0; i < nP; i++) {
+      const tb = LGW.born + hash(i, seed + 4) * TM.travel * 0.95;
+      if (t < tb) continue;
+      const age = t - tb, life = 0.32 + 0.36 * hash(i, seed + 7);
+      if (age > life) continue;
+      const s0 = WW < 0.6 ? (hash(i, seed + 9) < 0.35 ? 2 : 1) + (WW < 0.4 ? 0 : 0) : (hash(i, seed + 9) < 0.35 ? 3 : 2);
+      const size = Math.ceil(s0 * (1 - age / life));                    // 小さくなって消える
+      if (size <= 0) continue;
+      const Gb = lgwGeom(tb, o), back = 2 + hash(i, seed + 5) * 14;
+      const sp = 20 + hash(i, seed + 6) * 50, drift = sp * (1 - Math.exp(-age * 5)) / 5;
+      const dark = hash(i, seed + 8) < 0.06, c = dark ? ramp[4] : ramp[1 + Math.floor(hash(i, seed + 8) * 3)];   // まれに濃い色の欠片（1ドット）
+      let xx, yy;
+      if (G.full) {
+        const a = hash(i, seed + 3) * TAU, rr = Gb.dist - back + drift;
+        if (rr < 2) continue;
+        xx = o.x + Math.cos(a) * rr; yy = o.y + Math.sin(a) * rr;
+      } else {
+        const v = (hash(i, seed + 3) * 2 - 1) * Gb.hw * 0.95, u = Gb.dist - back + drift;
+        if (u < Gb.d0) continue;
+        xx = o.x + u * Math.cos(o.ang) - v * Math.sin(o.ang); yy = o.y + u * Math.sin(o.ang) + v * Math.cos(o.ang);
+      }
+      if (dark) { px(xx, yy, c); continue; }
+      const ox = Math.round(xx - (size - 1) / 2), oy = Math.round(yy - (size - 1) / 2);
+      for (let a2 = 0; a2 < size; a2++) for (let b2 = 0; b2 < size; b2++) px(ox + a2, oy + b2, c);
+    }
+  }
   function bbSlamGround(t, o) {
     if (t < 0 || t > 0.7) return; const R = o.R;
     if (t < 0.28) { const r = R * easeOut(clamp(t / 0.16)); for (let k = 0; k < 3; k++) ellRing(o.x, o.y + 3, r - k * 2, (r - k * 2) * 0.62, k === 0 ? (t < 0.05 ? P.W : P.bi0) : k === 1 ? P.bi2 : P.bi4, 1 - t / 0.28); }
@@ -4118,6 +4343,7 @@
     bb_tentacle: { aux: true, span: 0.4, pad: 16, sky: 16, ground: bbTentacleGround, air: bbTentacleAir },
     bb_pinch: { aux: true, span: 0.5, pad: 14, sky: 16, ground() {}, air: bbPinchAir },
     bb_slam: { aux: true, span: 0.7, pad: 18, sky: 40, ground: bbSlamGround, air: bbSlamAir },
+    lg_wave: { aux: true, span: 0.78, pad: 22, sky: 4, ground: lgWaveGround, air: lgWaveAir },
     bb_cleave: { aux: true, span: 0.32, pad: 14, sky: 16, ground() {}, air: bbCleaveAir },
     bb_anvil: { aux: true, span: 0.7, pad: 30, sky: 50, ground: bbAnvilGround, air: bbAnvilAir },
     bb_land: { aux: true, span: 0.8, pad: 60, sky: 50, ground: bbLandGround, air: bbLandAir },

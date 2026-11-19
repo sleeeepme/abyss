@@ -355,20 +355,25 @@ R.spreadShots = await pg.evaluate(()=>{
 
 // 5-d. 衝撃波（扇・線・円）
 R.shockwaves = await pg.evaluate(()=>{
+  /* 2026-11-19：絵はドット絵の lg_wave（FEEL.weaponArts）に変わった。形は o.mode で見る。
+     ドット絵が無いときだけ前の W.fx（lwave／ultbeam／ultring）に戻る */
   const cast=(id)=>{ const st=LT.arm(id); LT.target(1.0);
+                     FEEL.weaponArts.length=0;
                      const n=legendWave(st, 0);
-                     return {hits:n, fx:W.fx.map(f=>f.t)}; };
+                     const art=FEEL.weaponArts.filter(f=>f.id==='lg_wave').map(f=>f.o&&f.o.mode);
+                     return {hits:n, fx:W.fx.map(f=>f.t), art}; };
   const king=cast('kingsword'), gae=cast('gaebolg'),
         gor=cast('gordion'), hyp=cast('hyperion'), moon=cast('moonlight');
-  const none=(()=>{ const st=LT.arm('yoichi'); LT.target(1.0);
-                    return {hits:legendWave(st,0), fx:W.fx.map(f=>f.t)}; })();
+  const none=(()=>{ const st=LT.arm('yoichi'); LT.target(1.0); FEEL.weaponArts.length=0;
+                    return {hits:legendWave(st,0), fx:W.fx.map(f=>f.t), art:FEEL.weaponArts.map(f=>f.id)}; })();
+  const drew=(c, fx, mode)=>c.fx.includes(fx) || c.art.includes(mode);
   return {king, gae, gor, hyp, moon, none,
-          coneHits:  king.hits>0 && king.fx.includes('lwave'),
-          lineHits:  gae.hits>0  && gae.fx.includes('ultbeam'),
-          ringHits:  gor.hits>0  && gor.fx.includes('ultring'),
-          bowLineHits: hyp.hits>0 && hyp.fx.includes('ultbeam'),
-          moonConeHits: moon.hits>0 && moon.fx.includes('lwave'),
-          quietWithoutOne: none.hits===0 && none.fx.length===0,
+          coneHits:  king.hits>0 && drew(king,'lwave','cone'),
+          lineHits:  gae.hits>0  && drew(gae,'ultbeam','line'),
+          ringHits:  gor.hits>0  && drew(gor,'ultring','ring'),
+          bowLineHits: hyp.hits>0 && drew(hyp,'ultbeam','line'),
+          moonConeHits: moon.hits>0 && drew(moon,'lwave','cone'),
+          quietWithoutOne: none.hits===0 && none.fx.length===0 && none.art.length===0,
           ok: king.hits>0 && gae.hits>0 && gor.hits>0 && hyp.hits>0 && moon.hits>0
               && none.hits===0};
 });
