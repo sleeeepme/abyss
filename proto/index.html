@@ -1503,7 +1503,7 @@
 
   <h2>ユニークな敵</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
-    ・<b style="color:#c07fe0">紫の輪</b>と固有の名前を持つ一体が、まれに道中に紛れている。<br>
+    ・<b style="color:#c07fe0">紫の縁取り</b>と固有の名前を持つ一体が、まれに道中に紛れている。<br>
     ・エリートより強く、中ボスよりは弱い。<b>倒すと恩寵が確定で手に入る。</b><br>
     ・<b>穴は塞がない</b>ので、勝てないと思ったら無視して降りてよい。<br>
     ・ミニマップに紫の点で出る。
@@ -18917,7 +18917,8 @@ function draw(){
       ctx.fill();
       ctx.globalAlpha=1;
     }
-    if(e.elite && !e.intruder && !e.revenant){ ctx.strokeStyle='#d6b34a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(sx,sy,R+4,0,7); ctx.stroke(); }
+    // 規格外は輪を出さない（紫の縁取りで分かる。2026-11-19 ユーザー指定）
+    if(e.elite && !e.intruder && !e.revenant && !e.uniq){ ctx.strokeStyle='#d6b34a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(sx,sy,R+4,0,7); ctx.stroke(); }
     // 侵入者は赤い脈。金（エリート）や紫（ユニーク）と混ざらない色にして、
     // 画面の端に映った一瞬で「あれは戦う相手ではない」と分かるようにする。
     if(e.intruder && !e.dead){
@@ -18933,14 +18934,7 @@ function draw(){
         ctx.globalAlpha=1;
       }
     }
-    // ユニーク敵は紫の脈打つリング。ボスの金とは色で区別する。
-    /* 内側の太い輪はやめた（2026-11-19）。絵の紫の縁取りと重なって、絵と輪のあいだが紫で埋まって見えた */
-    if(e.uniq && !e.dead){
-      ctx.strokeStyle='#c07fe0';
-      ctx.globalAlpha=0.3+0.3*Math.sin(performance.now()/260);
-      ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,R+10,0,7); ctx.stroke();
-      ctx.globalAlpha=1;
-    }
+    /* 規格外の紫の輪はやめた（2026-11-19 ユーザー指定）。絵の紫の縁取り（UNIQ_OUTLINE）と名前の色で分かる */
     /* ボスの頭上の王冠もやめた（報告「ボスの上の王冠マークは無くして」）。
        主の印は上の HP バー（#bossbar）と大きさで足りている。 */
     if(!e.dead){
