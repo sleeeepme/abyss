@@ -6423,7 +6423,25 @@ const UNIQUE_NAMES=[
    名前と中身を合わせるために系統も寄せる（まだ解禁されていなければ寄せない） */
 const ZONE_FAM = {stone:'beast', sump:'slime', root:'arcane',
                   ruin:'armor', furnace:'flame', pale:'frost'};
-function uniqueChanceAt(depth){ return clamp(0.22 + depth*0.006, 0.22, 0.42); }
+function uniqueChanceAt(depth){
+  const base=clamp(0.22 + depth*0.006, 0.22, 0.42);
+  /* 踏破済みの階層（knownFloor）は規格外が出やすい（2026-11-19 ユーザー指定）。
+     抜けた階に戻る理由を作る。落とす物も良くなる（KNOWN_UNIQ・uniqueDrop）。 */
+  return (typeof knownFloor==='function' && knownFloor(depth)) ? Math.min(KNOWN_UNIQ.cap, base+KNOWN_UNIQ.chanceAdd) : base;
+}
+/* 踏破済みの階層の規格外。出やすさと、落とす物の良さ */
+const KNOWN_UNIQ = {chanceAdd:0.30, cap:0.80, mfAdd:80, picks:2};
+/* 規格外の落とし物。踏破済みの階層では発見力を足し、2つ引いて良い方を落とす
+   （レア度 → 接頭辞・接尾辞の本数 → 特性の強さ の順で比べる） */
+const UNIQ_OUTLINE = '#c07fe0';   // 規格外の名前の色と同じ
+function uniqueDrop(ilvl, mf, depth){
+  if(!(S.run && knownFloor(S.run.depth))) return genItem(ilvl, mf, depth);
+  const score=it=>{ const t=(typeof traitOf==='function') && traitOf(it);
+    return it.rar*100 + (it.aff||[]).filter(a=>a.t==='p'||a.t==='s'||a.t==='c').length*10 + (t ? 1+(t.q||0) : 0); };
+  let best=null;
+  for(let i=0;i<KNOWN_UNIQ.picks;i++){ const it=genItem(ilvl, mf+KNOWN_UNIQ.mfAdd, depth); if(!best || score(it)>score(best)) best=it; }
+  return best;
+}
 
 /* ---------- ラストボスは51階 ----------
    以前はここが 50（5・10刻みの並びにそのまま乗る「50の倍数」）だった。
@@ -13782,7 +13800,7 @@ function killEnemy(e, byAlly){
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.7,max:0.7});
     for(let i=0;i<2;i++)
       W.drops.push({x:e.x+rf(-0.6,0.6), y:e.y+rf(-0.6,0.6),
-                    it:genItem(rewardDepth+4, st.mf+25, S.run.depth)});
+                    it:uniqueDrop(rewardDepth+4, st.mf+25, S.run.depth)});
     openBoonPick('unique', e.name);
     return;
   }
@@ -18412,7 +18430,7 @@ function enemyLit(e){
    今は**必要な矩形ぶんだけの大きさ**（大きくなるときだけ作り直す。縮めない）にして、
    本編の変換行列から矩形の左上ぶんを引いた座標系で描く。貼る位置・黒の色・不透明度は従来と同じ。 */
 let _silCv=null, _silCx=null;
-function drawSilhouette(sx, sy, rad, fn, alpha, col){
+function drawSilhouette(sx, sy, rad, fn, alpha, col, offs){
   const main=ctx, m=main.getTransform(), d=m.a||1;
   const x0=Math.max(0,Math.floor(m.e+(sx-rad)*d)), y0=Math.max(0,Math.floor(m.f+(sy-rad)*d));
   const w=Math.min(cv.width-x0, Math.ceil(rad*2*d)+2), h=Math.min(cv.height-y0, Math.ceil(rad*2*d)+2);
@@ -18427,10 +18445,20 @@ function drawSilhouette(sx, sy, rad, fn, alpha, col){
   ctx=c;
   try{ fn(); } finally { ctx=main; }
   c.setTransform(1,0,0,1,0,0); c.globalAlpha=1;
-  c.globalCompositeOperation='source-in'; c.fillStyle=col||'#04050a'; c.fillRect(0,0,w,h);
-  c.globalCompositeOperation='source-over';
+  if(offs){
+    /* 縁取りは、絵のドット（ほぼ不透明な所）だけを形にする。
+       薄い光や影まで拾うと、絵より大きな丸い塊になる */
+    const id=c.getImageData(0,0,w,h), u=id.data;
+    const hex=(col||'#04050a').replace('#',''), cr=parseInt(hex.slice(0,2),16), cg=parseInt(hex.slice(2,4),16), cb=parseInt(hex.slice(4,6),16);
+    for(let i=0;i<u.length;i+=4){ if(u[i+3]>=160){ u[i]=cr; u[i+1]=cg; u[i+2]=cb; u[i+3]=255; } else u[i+3]=0; }
+    c.putImageData(id,0,0);
+  }else{
+    c.globalCompositeOperation='source-in'; c.fillStyle=col||'#04050a'; c.fillRect(0,0,w,h);
+    c.globalCompositeOperation='source-over';
+  }
   main.save(); main.setTransform(1,0,0,1,0,0); main.globalAlpha=alpha==null?0.94:alpha;
-  main.drawImage(_silCv, 0,0,w,h, x0,y0,w,h);
+  if(offs) for(const o of offs) main.drawImage(_silCv, 0,0,w,h, x0+Math.round(o[0]*d),y0+Math.round(o[1]*d),w,h);   // 縁取り：ずらして重ねる
+  else main.drawImage(_silCv, 0,0,w,h, x0,y0,w,h);
   main.restore();
 }
 function draw(){
@@ -18869,6 +18897,12 @@ function draw(){
     };
     /* 灯りの外は黒い影だけ。名前・HP帯・印も出さない（何がいるかは近づくまで分からない） */
     if(litSt==='shadow'){ drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody); ctx.globalAlpha=1; return; }
+    /* 規格外は名前と同じ紫（#c07fe0）の縁取り（2026-11-19 ユーザー指定）。
+       同じ絵を紫一色にして上下左右に1ドットずらして先に敷き、その上に本体を描く */
+    if(e.uniq && !e.dead){
+      const ow=Math.max(1, Math.round(TS/16));
+      drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9)+ow, drawBody, 1, UNIQ_OUTLINE, [[ow,0],[-ow,0],[0,ow],[0,-ow]]);
+    }
     drawBody();
     /* 前の代は、主人公の絵を暗く色を抜いて描く（同じ絵を影の色で半分重ねる） */
     if(e.revenant && !e.dead) drawSilhouette(sx, sy, Math.max(R*1.6, TS*0.9), drawBody, 0.55, '#0b0d1c');
@@ -18899,10 +18933,10 @@ function draw(){
         ctx.globalAlpha=1;
       }
     }
-    // ユニーク敵は紫の脈打つ二重リング。ボスの金とは色で区別する。
+    // ユニーク敵は紫の脈打つリング。ボスの金とは色で区別する。
+    /* 内側の太い輪はやめた（2026-11-19）。絵の紫の縁取りと重なって、絵と輪のあいだが紫で埋まって見えた */
     if(e.uniq && !e.dead){
-      ctx.strokeStyle='#c07fe0'; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.arc(sx,sy,R+5,0,7); ctx.stroke();
+      ctx.strokeStyle='#c07fe0';
       ctx.globalAlpha=0.3+0.3*Math.sin(performance.now()/260);
       ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy,R+10,0,7); ctx.stroke();
       ctx.globalAlpha=1;
