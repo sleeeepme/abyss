@@ -20,7 +20,8 @@ R.one = await pg.evaluate(()=>{
           rows: gains[0] ? gains[0].rows.map(r=>r.txt) : [], hasRows: !!gains[0] && gains[0].rows.length>=1,
           noCenterBanner: !banner, drawsFine: threw===null,
           // 火花（見本の6）：1回だけ、28粒
-          oneSpark: sparks.length===1 && sparks[0].ps.length===LVSPARK.n};
+          oneSpark: sparks.length===1 && sparks[0].ps.length===LVSPARK.n,
+          noRing: !W.fx.some(f=>f.t==='levelup')};
 });
 R.gone = await pg.evaluate(()=>{
   TH.immortal(); TH.clearEnemies(); TH.step(3);

@@ -323,7 +323,7 @@ R.levelUp = await pg.evaluate(()=>{
   const allyRing=W.fx.filter(f=>f.t==='levelup').length;
   return {lv0, lv1, ring, pop, noCenterBanner, gainRows: gain?gain.rows.map(r=>r.txt):[], glow, threw, allyRing,
           gainedPct:gained, healPct:LEVEL_HEAL_PCT,
-          ringShown: ring===1,
+          noRingForHero: ring===0,   // 主人公の二重の輪は消した（2026-11-19）
           popShown: pop===1,
           gainShown: !!gain && gain.rows.length>0,
           barGlows: !!glow,
@@ -334,7 +334,7 @@ R.levelUp = await pg.evaluate(()=>{
           matchesConstant: Math.abs(gained - LEVEL_HEAL_PCT) <= 2,
           allyAlsoShows: allyRing===1,
           drawsFine: threw===null,
-          ok: lv1===lv0+1 && ring===1 && pop===1 && noCenterBanner && !!gain
+          ok: lv1===lv0+1 && ring===0 && pop===1 && noCenterBanner && !!gain
               && !!glow && healed && notFull
               && allyRing===1 && threw===null};
 });
