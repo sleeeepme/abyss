@@ -13250,7 +13250,23 @@ function lvTextFx(){
   const live=W.fx.find(f=>f.t==='lvtext' && f.life>0);
   const life=LVFX.text.length*LVFX.letterGap + LVFX.hold + LVFX.fade;
   if(live){ live.life=live.max; return; }            // 一度に何レベル上がっても1つ
+  lvSparkFx();                                        // 火花は文字の後ろに（先に積む）
   W.fx.push({t:'lvtext', life, max:life});
+}
+/* 見本の動画の6：火花が扇に吹き上がり、減速して、瞬いて消える（2026-11-19 ユーザー指定）。
+   見た目だけなので本編の乱数（RNG）は使わない。出た所（世界の座標）に残る。 */
+const LVSPARK = {n:28, fan:62, v:[4.2,8.4], drag:3.4, grav:2.2, life:[0.75,1.15], blinkFrom:0.55,
+                 cols:['#fff4c8','#ffd06a','#ffb347','#ffffff']};
+function lvSparkFx(){
+  const L=LVSPARK, ps=[];
+  for(let i=0;i<L.n;i++){
+    const a=(-90 + (Math.random()*2-1)*L.fan) * Math.PI/180;
+    const v=L.v[0]+Math.random()*(L.v[1]-L.v[0]);        // マス/秒
+    ps.push({x:P.x, y:P.y-0.35, vx:Math.cos(a)*v, vy:Math.sin(a)*v,
+             life:L.life[0]+Math.random()*(L.life[1]-L.life[0]), c:L.cols[i%L.cols.length], big:i%5===0});
+  }
+  const life=L.life[1]+0.05;
+  W.fx.push({t:'lvspark', ps, life, max:life});
 }
 /* 上がった数値。st0 はレベルが上がる前の stats() */
 function lvGainFx(h, st0){
@@ -13268,6 +13284,21 @@ function lvGainFx(h, st0){
   };
   if(_feelHold) _feelHold.lv.push(push); else push();   // ボスの撃破演出中は演出のあとに
 }
+/* 火花。動きは描くときに経過時間から解く（減速は指数、重力は少し） */
+function drawLvSpark(f, camX, camY){
+  const t=f.max-f.life, L=LVSPARK, k=L.drag;
+  const m=(1-Math.exp(-k*t))/k;                          // 減速つきの進んだ距離の係数
+  for(const p of f.ps){
+    if(t>p.life) continue;
+    // 瞬き：寿命の後半は 60ms ごとに点いたり消えたり
+    if(t>p.life*L.blinkFrom && Math.floor(t/0.06)%2===1) continue;
+    const x=(p.x+p.vx*m)*TS-camX, y=(p.y+p.vy*m + 0.5*L.grav*t*t)*TS-camY;
+    const s=p.big?4:2;
+    ctx.globalAlpha=1;
+    ctx.fillStyle=p.c;
+    ctx.fillRect(Math.round(x)-1, Math.round(y)-1, s, s);
+  }
+}
 /* 段で決まる「跳ね」：大きく出て、縮みすぎて、戻る */
 function lvLetterPose(t){
   if(t<0.04) return {s:2.0, dy:-8};
@@ -13278,7 +13309,9 @@ function lvLetterPose(t){
 }
 function drawLevelFx(camX, camY){
   for(const f of W.fx){
-    if(f.life<=0 || (f.t!=='lvtext' && f.t!=='lvgain')) continue;
+    if(f.life<=0) continue;
+    if(f.t==='lvspark'){ drawLvSpark(f, camX, camY); continue; }
+    if(f.t!=='lvtext' && f.t!=='lvgain') continue;
     const age=f.max-f.life;
     const hx=Math.round(P.x*TS-camX), hy=Math.round(P.y*TS-camY);
     ctx.save();
