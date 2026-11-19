@@ -293,10 +293,11 @@ R.levelUp = await pg.evaluate(()=>{
   addXp(S.hero, 1, true);
   const lv1=S.hero.lv;
   const ring=W.fx.filter(f=>f.t==='levelup').length;
-  const pop =W.pops.filter(p=>p.txt==='LEVEL UP').length;
+  /* 2026-11-19：主人公は頭の上の「LEVEL UP!」（1字ずつ跳ねて入る）と、横に上がる数値。中央の「Lv.N」の帯は出さない */
+  const pop =W.fx.filter(f=>f.t==='lvtext').length;
+  const gain=W.fx.find(f=>f.t==='lvgain');
   draw(); updateHUD();
-  const bannerShown=!!_banner && _banner.title==='Lv.'+lv1;
-  const bannerSub=_banner?_banner.sub:'';
+  const noCenterBanner=!(_banner && _banner.title==='Lv.'+lv1);
   const glow=document.getElementById('hpfill').style.boxShadow;
   /* ---------- 上がっても全快はしない ----------
      以前はここで全回復していた。そのせいで**序盤に消耗という概念が無かった**——
@@ -320,13 +321,11 @@ R.levelUp = await pg.evaluate(()=>{
   a.xp=xpNeed(a.lv);
   addXp(a, 1, false);
   const allyRing=W.fx.filter(f=>f.t==='levelup').length;
-  return {lv0, lv1, ring, pop, bannerShown, bannerSub, glow, threw, allyRing,
+  return {lv0, lv1, ring, pop, noCenterBanner, gainRows: gain?gain.rows.map(r=>r.txt):[], glow, threw, allyRing,
           gainedPct:gained, healPct:LEVEL_HEAL_PCT,
           ringShown: ring===1,
           popShown: pop===1,
-          /* 回復量は文章で言わない。HPバーが伸びて光るので見れば分かる。
-             分かることを重ねて書くと、Lv がいくつになったかが読み飛ばされる。 */
-          bannerHasNoHealText: bannerSub==='',
+          gainShown: !!gain && gain.rows.length>0,
           barGlows: !!glow,
           healsSome: healed,
           // **ここが本題。** 全快すると序盤の消耗が毎階リセットされる
@@ -335,8 +334,8 @@ R.levelUp = await pg.evaluate(()=>{
           matchesConstant: Math.abs(gained - LEVEL_HEAL_PCT) <= 2,
           allyAlsoShows: allyRing===1,
           drawsFine: threw===null,
-          ok: lv1===lv0+1 && ring===1 && pop===1 && bannerShown
-              && bannerSub==='' && !!glow && healed && notFull
+          ok: lv1===lv0+1 && ring===1 && pop===1 && noCenterBanner && !!gain
+              && !!glow && healed && notFull
               && allyRing===1 && threw===null};
 });
 

@@ -13182,6 +13182,7 @@ const LEVEL_HEAL_PCT = 35;   // レベルアップで戻る量（最大HPに対�
 function addXp(h, amount, isPlayer){
   // 研鑽の恩寵。受け取る本人の恩寵で伸びる（パーティ全体の分配とは別勘定）
   h.xp += amount * (1 + boonSum(h,'xp')/100);
+  const lv0=h.lv, st0=(isPlayer && h.xp >= xpNeed(h.lv)) ? stats(h) : null;   // 上がった数値を見せるため（lvGainFx）
   while(h.xp >= xpNeed(h.lv)){
     h.xp -= xpNeed(h.lv); h.lv++;
     h.str+=1; h.dex+=1; h.vit+=1;
@@ -13203,6 +13204,8 @@ function addXp(h, amount, isPlayer){
     log(isPlayer ? ('LEVEL UP! Lv.'+h.lv) : (h.name+' が Lv.'+h.lv+' になった'));
     onLevelUp(h, isPlayer);
   }
+  // 何レベル上がっても、上がった数値は1回にまとめて出す
+  if(isPlayer && st0 && h.lv>lv0) lvGainFx(h, st0);
   // 何レベル上がっても通知は1枚。ループを抜けてから、まとめて出す。
   if(isPlayer) flushCharPotNotice();
 }
@@ -13219,16 +13222,109 @@ function onLevelUp(h, isPlayer){
   const show=()=>{
     const x = isPlayer ? P.x : h.x, y = isPlayer ? P.y : h.y;   // 後回しにした時は、出す瞬間の居場所で光らせる
     W.fx.push({t:'levelup', x, y, life:1.1, max:1.1, col:isPlayer?'#ffd06a':jobDef(h.job).col});
-    W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:isPlayer?'#ffd06a':jobDef(h.job).col, life:1.2});
+    /* 主人公は「LEVEL UP!」の文字が1字ずつ跳ねて入る（lvTextFx）。仲間は今までの浮き文字 */
+    if(isPlayer) lvTextFx();
+    else W.pops.push({x, y:y-0.7, txt:'LEVEL UP', c:jobDef(h.job).col, life:1.2});
     if(isPlayer) _lvFlash = 1.0; // HPバーを光らせる
   };
   if(_feelHold) _feelHold.lv.push(show); else show();      // ボスの撃破演出中は演出のあとに
   if(isPlayer){
-    showBanner('Lv.'+lv, '', '#ffd06a', 2.2);
+    /* 画面中央の「Lv.N」の帯はやめた（2026-11-19 ユーザー指定）。
+       頭の上の「LEVEL UP!」と、横に上がる数値（lvGainFx）で見せる。Lv の数は左上の帯に出ている。 */
     grantCharPotential(h);       // レベルアップごとに1個、必ず潜在が手に入る（ユーザー要望）
   }
 }
 let _lvFlash=0;
+/* ==================== レベルアップの文字と上がった数値（2026-11-19） ====================
+   ユーザー指定（見本の動画の2と5）：
+   ・2：頭の上に「LEVEL UP!」。文字が 0.05 秒ずつ1字ずつ、大げさに跳ねて入り、少しして消える。
+   ・5：横に、上がった数値（攻撃・HP・防御）が1行ずつ上がって出て、順に消える。
+   どちらも段で動く（ドット絵に合わせて、なめらかに補間しない）。 */
+const LVFX = {
+  text:'LEVEL UP!', col:'#ffd06a', size:16,
+  letterGap:0.05,          // 1字ずつの間（秒）
+  hold:1.25, fade:0.3,     // 全部入ってから消え始めるまで・消える長さ
+  gainStart:0.25, gainGap:0.14, gainRise:6, gainHold:1.1, gainFade:0.24, gainSize:12,
+};
+function lvTextFx(){
+  const live=W.fx.find(f=>f.t==='lvtext' && f.life>0);
+  const life=LVFX.text.length*LVFX.letterGap + LVFX.hold + LVFX.fade;
+  if(live){ live.life=live.max; return; }            // 一度に何レベル上がっても1つ
+  W.fx.push({t:'lvtext', life, max:life});
+}
+/* 上がった数値。st0 はレベルが上がる前の stats() */
+function lvGainFx(h, st0){
+  const st1=stats(h);
+  const rows=[];
+  const da=Math.round(st1.atk-st0.atk), dh=Math.round(st1.maxHp-st0.maxHp), dd=Math.round(st1.def-st0.def);
+  if(da>0) rows.push({txt:'+'+da+' 攻撃', c:'#ff9a5a'});
+  if(dh>0) rows.push({txt:'+'+dh+' HP',  c:'#7fe08a'});
+  if(dd>0) rows.push({txt:'+'+dd+' 防御', c:'#7fb8ff'});
+  if(!rows.length) return;
+  const push=()=>{
+    W.fx=W.fx.filter(f=>f.t!=='lvgain');
+    const life=LVFX.gainStart + LVFX.gainGap*rows.length + LVFX.gainHold + LVFX.gainFade*rows.length;
+    W.fx.push({t:'lvgain', rows, life, max:life});
+  };
+  if(_feelHold) _feelHold.lv.push(push); else push();   // ボスの撃破演出中は演出のあとに
+}
+/* 段で決まる「跳ね」：大きく出て、縮みすぎて、戻る */
+function lvLetterPose(t){
+  if(t<0.04) return {s:2.0, dy:-8};
+  if(t<0.08) return {s:1.4, dy:-3};
+  if(t<0.12) return {s:0.8, dy:2};
+  if(t<0.16) return {s:1.1, dy:0};
+  return {s:1, dy:0};
+}
+function drawLevelFx(camX, camY){
+  for(const f of W.fx){
+    if(f.life<=0 || (f.t!=='lvtext' && f.t!=='lvgain')) continue;
+    const age=f.max-f.life;
+    const hx=Math.round(P.x*TS-camX), hy=Math.round(P.y*TS-camY);
+    ctx.save();
+    ctx.textBaseline='middle'; ctx.lineJoin='round'; ctx.strokeStyle='#091017'; ctx.lineWidth=3;
+    if(f.t==='lvtext'){
+      ctx.font=LVFX.size+'px '+FONT; ctx.textAlign='left';
+      const chars=[...LVFX.text], ws=chars.map(c=>ctx.measureText(c).width), W0=ws.reduce((a,b)=>a+b,0);
+      const tEnd=chars.length*LVFX.letterGap + LVFX.hold;
+      // 消えるときは2段で薄くなりながら2px上がる
+      const fp = age<tEnd ? 0 : Math.min(1, Math.ceil((age-tEnd)/LVFX.fade*2)/2);
+      ctx.globalAlpha=1-fp*0.95;
+      let x=hx-Math.round(W0/2);
+      const y=hy-Math.round(TS*1.25)-fp*2;
+      chars.forEach((c,i)=>{
+        const lt=age-i*LVFX.letterGap;
+        if(lt>=0){
+          const p=lvLetterPose(lt);
+          ctx.save(); ctx.translate(Math.round(x+ws[i]/2), Math.round(y+p.dy)); ctx.scale(p.s,p.s);
+          ctx.strokeText(c,-ws[i]/2,0); ctx.fillStyle=LVFX.col; ctx.fillText(c,-ws[i]/2,0);
+          ctx.restore();
+        }
+        x+=ws[i];
+      });
+    }else{
+      ctx.font=LVFX.gainSize+'px '+FONT; ctx.textAlign='left';
+      const n=f.rows.length, lh=LVFX.gainSize+2;
+      const fadeFrom=LVFX.gainStart + LVFX.gainGap*n + LVFX.gainHold;
+      f.rows.forEach((r,i)=>{
+        const lt=age-LVFX.gainStart-i*LVFX.gainGap;
+        if(lt<0) return;
+        // 上がって出る（3段）
+        const rise = lt<0.05 ? LVFX.gainRise : lt<0.10 ? Math.round(LVFX.gainRise/2) : 0;
+        // 上の行から順に消える（2段）
+        const ft=age-fadeFrom-i*LVFX.gainFade;
+        const a = ft<0 ? 1 : ft<LVFX.gainFade/2 ? 0.5 : 0;
+        if(a<=0) return;
+        ctx.globalAlpha=a*(lt<0.05?0.6:1);
+        const x=hx+Math.round(TS*0.6), y=hy-Math.round(TS*0.55)+i*lh+rise;
+        ctx.strokeText(r.txt,x,y); ctx.fillStyle=r.c; ctx.fillText(r.txt,x,y);
+      });
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+}
+
 
 /* ---------- プレイヤーの潜在（レベルアップ演出） ----------
    ユーザー要望：「プレイヤーキャラのレベルアップごとにランダムに1個潜在が
@@ -19415,6 +19511,7 @@ function draw(){
     ctx.strokeText(txt,tx,ty); ctx.fillText(txt,tx,ty);
   });
   ctx.globalAlpha=1;
+  drawLevelFx(camX, camY);            // LEVEL UP! と上がった数値
   // 閃きの電球（ピコーン！）。数字より上に出す
   for(const f of W.fx) if(f.t==='flashbulb' && f.life>0) drawFlashBulb(f, camX, camY);
   // 漂う粒（層ごとの塵・火の粉・雪・胞子）。エンティティの上に薄く重ねる。
