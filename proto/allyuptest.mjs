@@ -353,8 +353,25 @@ R.beaconHelpText = await pg.evaluate(()=>{
   S.beacons=[]; S.startDepth=1; setScreen('town');
   return {locked, open,
           lockedIsButtonsOnly: locked==='第1階層',
-          saysOutfit: open.includes('引き上げ') && open.includes('支給'),
-          ok: locked==='第1階層' && open.includes('支給')};
+          noOutfitText: !open.includes('引き上げ') && !open.includes('支給'),
+          ok: locked==='第1階層' && !open.includes('引き上げ') && !open.includes('支給')};
+});
+
+R.returnKeepsGrowth = await pg.evaluate(()=>{
+  S.hero=newHero();S.upg={};S.carry=[];S.beacons=[5];S.midDown={5:1};S.startDepth=1;
+  startRun(1);
+  S.hero.lv=3;S.hero.xp=7;S.hero.str=7;S.hero.dex=7;S.hero.vit=7;
+  const ally=makeAlly(1,S.hero);S.hero.party=[ally];
+  S.hero.equip.accessory=genBaseItem('ring',1,0);
+  ally.equip.accessory=genBaseItem('ring',1,0);
+  const snapshot=()=>JSON.stringify([S.hero,...party()].map(h=>({
+    lv:h.lv,xp:h.xp,str:h.str,dex:h.dex,vit:h.vit,int:h.int,
+    equip:h.equip,boons:h.boons,charPot:h.charPot,
+  })));
+  S.run.depth=5;returnToTown();
+  const before=snapshot();
+  startRun(5);
+  return {same:before===snapshot(),lv:S.hero.lv,xp:S.hero.xp,ok:before===snapshot()};
 });
 
 await done(b, errs, R);
