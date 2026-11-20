@@ -210,6 +210,11 @@ R.tree = await pg.evaluate(()=>{
   const board = document.querySelector('.skt-board');
   const wide = board.offsetWidth > innerWidth;
   const scrollX = getComputedStyle(document.getElementById('skt-scroll')).overflowX === 'auto';
+  const costMatches = id => {
+    const u=UPGRADES.find(u=>u.id===id);
+    return document.querySelector(`[data-upgsel="${id}"] .skn-cost`)?.textContent===upgCost(u,upgLv(id))+' SP';
+  };
+  const costBefore=costMatches('wave') && costMatches('chain') && costMatches('nova');
   // 前提が無いと覚えられない（タップしても選ぶだけ。理由が札に出る）
   click('[data-upgsel="chain"]');
   const selShows = document.getElementById('skt-detail').textContent.includes('チェインライトニング');
@@ -218,6 +223,7 @@ R.tree = await pg.evaluate(()=>{
   // ノードをタップすると覚える。もう一度タップで Lv が上がる
   click('[data-upgsel="wave"]');
   const bought = upgLv('wave') === 1 && S.skill === 'wave';
+  const costAfter=costMatches('wave');
   click('[data-upgsel="wave"]');
   const again = upgLv('wave') === 2;
   // 札のボタンでも上がる
@@ -240,9 +246,15 @@ R.tree = await pg.evaluate(()=>{
   const lockNoBtn = !document.querySelector('[data-upg="nova"]');
   // 線が引かれている
   const lines = document.querySelectorAll('.skt-lines path').length;
+  S.upg.wave=UPGRADES.find(u=>u.id==='wave').max;
+  renderUpg();
+  const maxed=document.querySelector('[data-upgsel="wave"] .skn-limit')?.textContent==='最大'
+    && !document.querySelector('[data-upgsel="wave"] .skn-cost');
   setScreen('town');
   return {wide, scrollX, selShows, reqMsg, noBtn, bought, again, byBtn, chainOk, setOk, poorBlocked, crisp, lockMsg, lockNoBtn, lines,
-    ok: wide && scrollX && selShows && reqMsg && noBtn && bought && again && byBtn && chainOk && setOk && poorBlocked && crisp && lockMsg && lockNoBtn && lines > 15};
+    costBefore, costAfter, maxed,
+    ok: wide && scrollX && selShows && reqMsg && noBtn && bought && again && byBtn && chainOk && setOk && poorBlocked && crisp && lockMsg && lockNoBtn && lines > 15
+      && costBefore && costAfter && maxed};
 });
 
 /* --- 6. HUD のボタンは載せた技の絵と名前になる --- */
