@@ -1645,8 +1645,8 @@
     自分の目で見つけるまで、画面にもミニマップにも出ません。<br>
     <span style="font-size:12px">入った瞬間に出口が見えていると、やることが
     「最短距離で ▼ へ歩く」に決まってしまい、部屋を見る理由が消えるからです。</span><br><br>
-    ただし <b>40 秒</b> ほど経つと <b>穴の気配</b>（方向を指す矢印）が出て、
-    そこから 20 秒かけてだんだんはっきりしていきます。迷い続けることはありません。<br><br>
+    ただし <b>40 秒</b> ほど経つと <b>穴の気配</b>がして、ランタンが穴の方へ飛び出しては戻って知らせます。
+    そこから 20 秒かけて、だんだん遠くまで飛ぶようになります。迷い続けることはありません。<br><br>
     <span style="color:#7fe0c0">踏破済みの階層では、最初から見えています。</span>
     <span style="font-size:12px">もう知っている場所を探し直す意味は無いので。</span>
   </div>
@@ -18632,31 +18632,9 @@ function draw(){
   drawFeelRipples(camX,camY);
   // 穴マーク（未踏の階層では、自分の目で見つけるまで描かない）
   const stx=f.stair.x*TS-camX, sty=f.stair.y*TS-camY;
-  if(!stairRevealed()){
-    const h=stairHint();
-    if(h>0){
-      /* 気配。位置ではなく向きだけを、主人公の足元から指す。
-         「あっちだ」とは言うが「そこだ」とは言わない。 */
-      const px=P.x*TS-camX, py=P.y*TS-camY;
-      const ang=Math.atan2(f.stair.y-P.y, f.stair.x-P.x);
-      const r0=TS*1.15, r1=TS*1.15+TS*0.55;
-      ctx.save();
-      ctx.globalAlpha=0.18+0.42*h;
-      ctx.strokeStyle='#7fc3e0'; ctx.lineWidth=3; ctx.lineCap='round';
-      ctx.beginPath();
-      ctx.moveTo(px+Math.cos(ang)*r0, py+Math.sin(ang)*r0);
-      ctx.lineTo(px+Math.cos(ang)*r1, py+Math.sin(ang)*r1);
-      ctx.stroke();
-      ctx.beginPath();
-      [0.55,-0.55].forEach(o=>{
-        ctx.moveTo(px+Math.cos(ang)*r1, py+Math.sin(ang)*r1);
-        ctx.lineTo(px+Math.cos(ang+Math.PI-o)*(r1-r0)*0.9+Math.cos(ang)*r1,
-                   py+Math.sin(ang+Math.PI-o)*(r1-r0)*0.9+Math.sin(ang)*r1);
-      });
-      ctx.stroke();
-      ctx.restore();
-    }
-  }else{
+  /* 穴の気配の矢印はやめた（2026-11-20 ユーザー指定）。ランタンが穴の方へ「あっちあっち」と
+     飛び出して知らせる（drawLantern の lanternGuide）。 */
+  if(!stairRevealed()){ /* 見つけるまでは何も出さない */ }else{
   /* 穴の周りの点線の輪と、封鎖中の赤い輪はやめた（報告「下への穴…に出ている円をなくして」）。
      穴そのものは地形の側で描いてある。印は▼と文字だけにする。 */
   // 穴の中の▼はやめた（2026-10-18 ユーザー指定）。穴そのものは地形の側で描いてある
@@ -20720,6 +20698,20 @@ function drawLanternOnGround(sx, sy, d){
   ctx.restore();
 }
 /* 付いてくるランタン。主人公を描いたすぐ後に呼ぶ */
+/* 穴の方へ飛び出す動き。周期 LANTERN_GUIDE.period 秒のうち、はじめに2回「あっち」と飛び出して戻り、
+   あとは主人公のそばで待つ。気配が濃くなるほど遠くまで飛ぶ */
+const LANTERN_GUIDE = {period:3.2, out:[1.0,1.7], back:0.55, ease:11,
+  beats:[[0,0.30,1],[0.30,0.52,0],[0.52,0.82,1],[0.82,1.10,0]]};   // [始め,終わり,1=飛び出す/0=戻りかけ]（秒）
+function lanternGuide(dt){
+  const h=stairHint(); if(!(h>0) || !W.fl || !W.fl.stair) { LAN.gT=0; return null; }
+  LAN.gT=(LAN.gT||0)+dt;
+  const G=LANTERN_GUIDE, t=LAN.gT % G.period;
+  const b=G.beats.find(q=>t>=q[0] && t<q[1]);
+  if(!b) return null;                                     // 待つ
+  const ang=Math.atan2(W.fl.stair.y-P.y, W.fl.stair.x-P.x);
+  const far=G.out[0]+(G.out[1]-G.out[0])*h, d=b[2] ? far : G.back;
+  return {dx:Math.cos(ang)*d, dy:Math.sin(ang)*d, face:Math.cos(ang)>=0?1:-1};
+}
 function drawLantern(camX, camY, dt, dropY){
   if(!S.run || S.run.noStone || !S.hero || S.screen!=='game') { LAN.x=null; LAN.get=null; LAN.eat=null; LAN.alert=null; return; }   // 街では見せない
   dt = Math.min(0.1, dt||0.016); LAN.t += dt;
@@ -20736,6 +20728,10 @@ function drawLantern(camX, camY, dt, dropY){
   if(ak==='treasure'){ ax += Math.cos(ah)*0.25; ay += Math.sin(ah)*0.25; }   // 身を乗り出す
   if(ak==='danger'){ ax -= Math.cos(ah)*0.18; ay -= Math.sin(ah)*0.18; }     // 身を引く
   if(ak==='hole'){ ay += 0.12; }                                          // 沈む
+  /* 穴の気配（stairHint）が出たら、穴の方へ飛び出しては戻る——「あっちあっち」（2026-11-20 ユーザー指定）。
+     矢印の代わり。位置は言わず向きだけ。知らせ（危険・宝など）の最中は控える */
+  const gd = (!ak && !LAN.get && !LAN.eat && !dropY) ? lanternGuide(dt) : null;
+  if(gd){ ax = P.x + gd.dx; ay = P.y - 0.52 + gd.dy; k = 1-Math.exp(-dt*LANTERN_GUIDE.ease); LAN.face = gd.face; }
   const G=LAN.get; let gk=-1;
   if(G){
     G.t += dt; gk = G.t/LANTERN_GET_SEC;
