@@ -20701,7 +20701,7 @@ function drawLanternOnGround(sx, sy, d){
 /* 穴の方へ飛び出す動き（2026-11-20 ユーザー指定）。
    気配が出ている間は、定位置を肩の後ろ（左上）から**穴の側**へ移し、そこから
    周期 LANTERN_GUIDE.period 秒のうち、はじめに2回「あっち」と飛び出して戻る。気配が濃くなるほど遠くまで飛ぶ */
-const LANTERN_GUIDE = {period:3.2, rest:0.75, out:[1.3,2.0], back:0.95, ease:11,
+const LANTERN_GUIDE = {period:3.2, rest:0.75, out:[1.0,1.4], back:0.85, ease:11,   // 飛び出す幅は定位置から 0.25〜0.65 マス（2026-11-20 半分に）
   beats:[[0,0.30,1],[0.30,0.52,0],[0.52,0.82,1],[0.82,1.10,0]]};   // [始め,終わり,1=飛び出す/0=戻りかけ]（秒）。それ以外は定位置で待つ
 function lanternGuide(dt){
   const h=stairHint(); if(!(h>0) || !W.fl || !W.fl.stair) { LAN.gT=0; return null; }
