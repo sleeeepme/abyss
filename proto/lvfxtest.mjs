@@ -27,4 +27,19 @@ R.gone = await pg.evaluate(()=>{
   TH.immortal(); TH.clearEnemies(); TH.step(3);
   return {cleared: !W.fx.some(f=>(f.t==='lvtext'||f.t==='lvgain'||f.t==='lvspark') && f.life>0)};
 });
+R.mastery = await pg.evaluate(()=>{
+  // 武器種の熟練（2026-11-20）：中央の帯を出さず、頭の上の文字・火花・左に上がった数値
+  S.hero=newHero(); TH.run(3,{seed:22}); setScreen('game'); TH.immortal();
+  W.fx=[]; _banner=null; S.mastery={};
+  addXp(S.hero, xpNeed(S.hero.lv)+1, true);           // レベルアップと同時
+  gainMastery('sword', masteryNeed(1));
+  TH.step(0.2);
+  const txt=W.fx.find(f=>f.t==='lvtext' && f.kind==='mastery'), lvt=W.fx.find(f=>f.t==='lvtext' && !f.kind);
+  const gain=W.fx.find(f=>f.t==='lvgain' && f.kind==='mastery'), lvg=W.fx.find(f=>f.t==='lvgain' && !f.kind);
+  let threw=null; try{ for(let i=0;i<4;i++) draw(); }catch(e){ threw=e.message; }
+  const banner=!!(_banner && /熟練/.test(_banner.title||''));
+  return {text: txt?txt.text:'', noCenterBanner: !banner, hasText: !!txt && /熟練1/.test(txt.text),
+          aboveLevelUp: !!txt && !!lvt && txt.row===1, gainLeft: !!gain && gain.side===-1 && gain.rows.length===3,
+          levelGainStays: !!lvg, drawsFine: threw===null};
+});
 await done(b, errs, R);

@@ -171,7 +171,9 @@ R.canvasTextHasNoTags = await pg.evaluate(()=>{
   TH.run(3,{seed:12}); setScreen('game'); TH.immortal();
   // 熟練の帯（剣で熟練を1段上げる）に、タグが入っていない
   S.mastery={}; gainMastery('sword', masteryNeed(1));
-  const title=(_banner&&_banner.title)||'';
+  // 2026-11-20：熟練は中央の帯ではなく、頭の上の文字（masteryFx の lvtext）で出す
+  const mf=W.fx.find(f=>f.t==='lvtext' && f.kind==='mastery');
+  const title=(mf&&mf.text)||'';
   // 描く所の砦：タグ付きの文字を描いても、タグ無しと同じ絵になる
   const pix=t=>{ const c=document.createElement('canvas'); c.width=120; c.height=30; const x=c.getContext('2d');
     x.font='16px sans-serif'; x.fillStyle='#fff'; x.fillText(t,4,20); return c.toDataURL(); };

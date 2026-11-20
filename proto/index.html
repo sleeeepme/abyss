@@ -6985,8 +6985,9 @@ function gainMastery(baseId, n){
     /* 帯はキャンバスに文字を描くだけなので、アイコン（<i …> のタグ）を混ぜない。混ぜると
        「<i class="pi" style="background-image:url(data:image/png;base64,…」がそのまま出る（報告「謎の英文字列」）。 */
     const bn=(b?b.nm:baseId);
-    if(m.lv===MASTERY_MAX){ m.xp=0; showBanner(bn+'　熟練 極み', '攻撃力 +'+(MASTERY_ATK*MASTERY_MAX)+'%　攻速 +'+(MASTERY_ASPD*MASTERY_MAX)+'%', '#d6b34a', 2.6); }
-    else showBanner(bn+'　熟練 '+m.lv, '攻撃力 +'+(MASTERY_ATK*m.lv).toFixed(1)+'%　攻速 +'+(MASTERY_ASPD*m.lv).toFixed(1)+'%', '#d6b34a', 1.8);
+    /* 画面中央の帯はやめた（2026-11-20 ユーザー指定）。レベルアップと同じ見せ方（masteryFx） */
+    if(m.lv===MASTERY_MAX) m.xp=0;
+    masteryFx(bn, m.lv);
   }
 }
 function stashCap(){ return 20 + bldLv('stash')*6; }
@@ -13404,11 +13405,33 @@ function lvGainFx(h, st0){
   if(dd>0) rows.push({txt:'+'+dd+' 防御', c:'#7fb8ff'});
   if(!rows.length) return;
   const push=()=>{
-    W.fx=W.fx.filter(f=>f.t!=='lvgain');
+    W.fx=W.fx.filter(f=>!(f.t==='lvgain' && !f.kind));
     const life=LVFX.gainStart + LVFX.gainGap*rows.length + LVFX.gainHold + LVFX.gainFade*rows.length;
     W.fx.push({t:'lvgain', rows, life, max:life});
   };
   if(_feelHold) _feelHold.lv.push(push); else push();   // ボスの撃破演出中は演出のあとに
+}
+/* 武器種の熟練が上がったとき（2026-11-20 ユーザー指定）：画面中央の帯をやめ、レベルアップと同じ見せ方にする。
+   頭の上に「剣 熟練3!」が1字ずつ跳ねて入り、火花が上がり、上がった分（攻撃・攻速・射程の%）が
+   主人公の**左**に1行ずつ出る（レベルアップの数値は右なので、同時に起きても重ならない）。
+   文字はレベルアップの「LEVEL UP!」が出ていれば、その1段上に出す。 */
+function masteryFx(name, lv){
+  const text = name+' 熟練'+(lv>=MASTERY_MAX ? '極み!' : lv+'!');
+  const rows=[{txt:'+'+MASTERY_ATK+'% 攻撃', c:'#ff9a5a'}, {txt:'+'+MASTERY_ASPD+'% 攻速', c:'#ffd06a'}, {txt:'+'+MASTERY_RANGE+'% 射程', c:'#7fb8ff'}];
+  const push=()=>{
+    const live=W.fx.find(f=>f.t==='lvtext' && f.kind==='mastery' && f.life>0);
+    const life=[...text].length*LVFX.letterGap + LVFX.hold + LVFX.fade;
+    if(live){ live.text=text; live.life=live.max=life; }
+    else{
+      lvSparkFx();
+      const lvLive=W.fx.some(f=>f.t==='lvtext' && !f.kind && f.life>0);
+      W.fx.push({t:'lvtext', kind:'mastery', text, col:'#d6b34a', row:lvLive?1:0, life, max:life});
+    }
+    W.fx=W.fx.filter(f=>!(f.t==='lvgain' && f.kind==='mastery'));
+    const gl=LVFX.gainStart + LVFX.gainGap*rows.length + LVFX.gainHold + LVFX.gainFade*rows.length;
+    W.fx.push({t:'lvgain', kind:'mastery', side:-1, rows, life:gl, max:gl});
+  };
+  if(_feelHold) _feelHold.lv.push(push); else push();
 }
 /* 火花。動きは描くときに経過時間から解く（減速は指数、重力は少し） */
 function drawLvSpark(f, camX, camY){
@@ -13452,25 +13475,25 @@ function drawLevelFx(camX, camY){
     ctx.textBaseline='middle'; ctx.lineJoin='round'; ctx.strokeStyle='#091017'; ctx.lineWidth=3;
     if(f.t==='lvtext'){
       ctx.font=LVFX.size+'px '+FONT; ctx.textAlign='left';
-      const chars=[...LVFX.text], ws=chars.map(c=>ctx.measureText(c).width), W0=ws.reduce((a,b)=>a+b,0);
+      const chars=[...(f.text||LVFX.text)], ws=chars.map(c=>ctx.measureText(c).width), W0=ws.reduce((a,b)=>a+b,0);
       const tEnd=chars.length*LVFX.letterGap + LVFX.hold;
       // 消えるときは2段で薄くなりながら2px上がる
       const fp = age<tEnd ? 0 : Math.min(1, Math.ceil((age-tEnd)/LVFX.fade*2)/2);
       ctx.globalAlpha=1-fp*0.95;
       let x=hx-Math.round(W0/2);
-      const y=hy-Math.round(TS*1.25)-fp*2;
+      const y=hy-Math.round(TS*1.25)-fp*2-(f.row||0)*(LVFX.size+6);   // 熟練の文字は LEVEL UP! の1段上
       chars.forEach((c,i)=>{
         const lt=age-i*LVFX.letterGap;
         if(lt>=0){
           const p=lvLetterPose(lt);
           ctx.save(); ctx.translate(Math.round(x+ws[i]/2), Math.round(y+p.dy)); ctx.scale(p.s,p.s);
-          ctx.strokeText(c,-ws[i]/2,0); ctx.fillStyle=LVFX.col; ctx.fillText(c,-ws[i]/2,0);
+          ctx.strokeText(c,-ws[i]/2,0); ctx.fillStyle=f.col||LVFX.col; ctx.fillText(c,-ws[i]/2,0);
           ctx.restore();
         }
         x+=ws[i];
       });
     }else{
-      ctx.font=LVFX.gainSize+'px '+FONT; ctx.textAlign='left';
+      ctx.font=LVFX.gainSize+'px '+FONT; ctx.textAlign=f.side<0?'right':'left';
       const n=f.rows.length, lh=LVFX.gainSize+2;
       const fadeFrom=LVFX.gainStart + LVFX.gainGap*n + LVFX.gainHold;
       f.rows.forEach((r,i)=>{
@@ -13483,7 +13506,7 @@ function drawLevelFx(camX, camY){
         const a = ft<0 ? 1 : ft<LVFX.gainFade/2 ? 0.5 : 0;
         if(a<=0) return;
         ctx.globalAlpha=a*(lt<0.05?0.6:1);
-        const x=hx+Math.round(TS*0.6), y=hy-Math.round(TS*0.55)+i*lh+rise;
+        const x=hx+(f.side<0?-1:1)*Math.round(TS*0.6), y=hy-Math.round(TS*0.55)+i*lh+rise;   // 熟練は左
         ctx.strokeText(r.txt,x,y); ctx.fillStyle=r.c; ctx.fillText(r.txt,x,y);
       });
     }
