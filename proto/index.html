@@ -1300,6 +1300,8 @@
   <p class="sub" id="fal-sub"></p>
   <div class="card" id="fal-body" style="text-align:left"></div>
   <div style="height:14px"></div>
+  <button class="primary" id="fal-revive-sp">SPで蘇生させる</button>
+  <div style="height:8px"></div>
   <button class="primary" id="fal-revive">広告を見て蘇生させる</button>
   <div style="height:8px"></div>
   <button class="ghost" id="fal-let">見送る（ロスト）</button>
@@ -1523,7 +1525,7 @@
     ・<b>最大3名</b>。武器種はジョブごとに固定で、能力はあなたより一段弱い。<br>
     ・指示は出せない（操作は移動だけ）。勝手に追ってきて勝手に戦う。<br>
     ・仲間が増えると<b>経験値は頭数で分配</b>される。ただし総量は人数ぶん少し増える。<br>
-    ・倒れると失われる。広告を見れば<b>レベルも装備もそのまま</b>蘇生できる
+    ・倒れると失われる。SPか広告で<b>レベルも装備もそのまま</b>蘇生できる
       （パーティ共通で、階層帯ごとに回数制限あり）。<br>
     ・仲間はあなたに属している。<b>あなたが死ねば全員失われる</b>。<br>
     ・あなたの<b>足跡を辿って</b>ついてきます（壁で置いていかれません）。<br>
@@ -1678,7 +1680,7 @@
   <h2>広告でできること</h2>
   <div class="card" style="font-size:12px;line-height:1.9;color:var(--dim)">
     ・街の<b>ガチャ</b>：持ち込む武器か護符が手に入る（<b>1日5回</b>まで）<br>
-    ・仲間が倒れたとき：<b>蘇生</b>（Lv.1・装備ランダムロスト／1人1回だけ）<br>
+    ・仲間が倒れたとき：<b>SPか広告で蘇生</b>（レベル・装備を保持／5階ごとに全員で4回）<br>
     ・<b>穴で「全員回復」</b>：あなたと仲間のHPが全快する
       （<b>1回の探索につき2回</b>まで・探索ごとに戻る）<br>
     <span style="font-size:12px">回復の回数を絞っているのは、消耗が積み上がるからこそ
@@ -21822,9 +21824,9 @@ function renderBld(){
 }
 
 /* ---------- 慰霊碑 ----------
-   失った仲間を、金を払って呼び戻せる場所。
+   失った仲間を、SPを払って呼び戻せる場所。
 
-   道中の広告蘇生（Lv.1・装備ランダムロスト・1人1回）とは役割を分けてある。
+   道中ではSPか広告で蘇生できる。慰霊碑は見送った後に呼び戻す場所。
    あちらは「今この場をしのぐ」ための手で、こちらは
    「あの子をもう一度連れて行きたい」という気持ちのための手。
    だから **レベルと恩寵はそのまま戻る**。時間を注いだ相手が
@@ -21833,18 +21835,15 @@ function renderBld(){
    代わりに **装備は戻らない**。装備は失われた物として扱わないと、
    死んでも何も減らないことになってしまう。
 
-   値段は金。以前はSP（旧マナ）だったが、死に戻りを土台にした以上
-   SPの行き先はスキルツリー一本に絞る。仲間を呼び戻すたびに
-   ツリーが遠のくと、仲間を連れること自体が罰になってしまう。
-   資源の役割をはっきり分ける——**SPは自分の恒久成長、金は仲間と街**。
-
    全滅していても使える。むしろ全滅したときのための場所なので。 */
 const MEM_MAX = 6;              // 刻まれる名前の上限（古い順に消える）
-/* 呼び戻す値段。**レベルに正面から比例させる。**
-   以前は上限 140 で頭打ちだったので、Lv.8 と Lv.45 がほぼ同じ値段だった。
-   育てた相手ほど重い、が成立していないと、
-   「深いところで失う」ことの痛みが数字にならない。 */
-function memCost(f){ return clamp(20 + Math.round((f.lv||1)*7), 20, 520); }
+/* Lv.20まではレベル×2 SP。以降は1レベルにつき倍率+0.025。
+   道中のSP蘇生は慰霊碑の1.5倍（端数切り上げ）。 */
+function memCost(f){
+  const lv=Math.max(1,f.lv||1);
+  return Math.ceil(lv*(2+Math.max(0,lv-20)/40));
+}
+function fallenReviveCost(a){ return Math.ceil(memCost(a)*1.5); }
 /* 失った仲間を刻む。口座と同じでアカウント単位——キャラが死んでも残る。 */
 function memInter(a){
   S.fallen = S.fallen || [];
@@ -21860,7 +21859,7 @@ function memCheck(f){
   if(!f) return {ok:false, why:'選ばれていない'};
   if(!S.hero) return {ok:false, why:'冒険者がいない'};
   const c=canJoin(f); if(!c.ok) return c;
-  if((S.gold||0) < memCost(f)) return {ok:false, why:'金が足りない'};
+  if((S.shards||0) < memCost(f)) return {ok:false, why:'SPが足りない'};
   return {ok:true};
 }
 function memRevive(uidA){
@@ -21870,7 +21869,6 @@ function memRevive(uidA){
   const f = S.fallen[i];
   const c = memCheck(f);
   if(!c.ok) return c;
-  S.gold -= memCost(f);
   const a = makeAlly(Math.max(1,f.lv), S.hero);
   // 生まれ直しではなく「あの子」なので、名前もレベルも恩寵も見た目もそのまま戻す
   a.uidA=f.uidA; a.job=f.job; a.name=f.name; a.lv=f.lv; a.xp=0;
@@ -21881,6 +21879,7 @@ function memRevive(uidA){
   a.equip={weapon:null, shield:null, armor:null, accessory:null};   // 装備は戻らない
   a.dead=false; a.hpNow=allyStats(a).maxHp;
   a.slot=party().length;
+  S.shards -= memCost(f);
   S.hero.party.push(a);
   S.fallen.splice(i,1);
   return {ok:true, ally:a, cost:memCost(f)};
@@ -25437,7 +25436,7 @@ function openFallen(a){
          <span style="color:#d6b34a;font-size:12px">${allyLossGold(a)} G が残る（慰霊碑で呼び戻せる）</span>
          ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:12px">弔いの恩寵が発動する</span>':''}</span></div>
        <div class="row"><span class="k">蘇生すると</span><span>レベルも装備も恩寵もそのまま<br>
-         <span style="color:var(--dim);font-size:12px">代償は下の蘇生回数を1つ使うだけ</span></span></div>
+         <span style="color:var(--dim);font-size:12px">SPか広告で蘇生。下の蘇生回数を1つ使う</span></span></div>
        <div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}
          <span style="color:var(--dim);font-size:12px">（誰に使ってもよい）</span><br>
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
@@ -25446,6 +25445,10 @@ function openFallen(a){
   const btn=el('fal-revive');
   btn.textContent = can ? ('広告を見て蘇生させる（残り '+left+'）') : 'この帯の蘇生は使い切った';
   btn.className   = can ? 'primary' : 'ghost';
+  const sp=el('fal-revive-sp'), cost=fallenReviveCost(a);
+  sp.textContent=can ? cost+' SPで蘇生させる（所持 '+(S.shards||0)+' SP）' : 'この帯の蘇生は使い切った';
+  sp.disabled=!can || (S.shards||0)<cost;
+  sp.className=sp.disabled?'ghost':'primary';
   el('m-fallen').classList.add('on');
 }
 function closeFallen(){
@@ -25641,32 +25644,29 @@ function letFallenGo(){
   igniteAvenge();
   closeFallen();
 }
-/* 広告視聴 → Lv1 + 装備ランダムロストで復帰。回数はパーティ共通の持ち分から引く。 */
+/* SPと広告は同じ蘇生処理と、帯ごとのパーティ共通回数を使う。 */
+function completeFallenRevive(a, paySP=false){
+  if(!a || a!==_fallen || !a.dead || !S.run || !party().includes(a) || !canRevive(a)) return false;
+  const cost=paySP?fallenReviveCost(a):0;
+  if((S.shards||0)<cost) return false;
+  S.shards=(S.shards||0)-cost;
+  S.run.revLeft=Math.max(0,revivesLeft()-1);
+  a.revived=true; a.revivedAt=S.run.depth; a.dead=false;
+  a.st={}; a.bu={};
+  a.x=P.x; a.y=P.y;
+  a.hpNow=allyStats(a).maxHp;
+  log(a.name+'が蘇生した（Lv.'+a.lv+(paySP?' / '+cost+' SP':'')+'）');
+  W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
+  closeFallen();
+  return true;
+}
 function reviveFallen(){
   const a=_fallen; if(!a || !canRevive(a)) return;
   openAd(()=>{
-    if(!canRevive(a)){ closeFallen(); return; }   // 視聴中に帯が変わる可能性は無いが、念のため
-    S.run.revLeft = Math.max(0, revivesLeft()-1);
-    a.revived=true; a.revivedAt=(S.run?S.run.depth:0); a.dead=false;
-    /* ---------- レベルは戻さない ----------
-       以前は Lv.1 に落としていた。「死んだ意味を残す」つもりだったが、
-       慰霊碑（SPを払ってレベルと恩寵を保ったまま呼び戻す）が既にあるので、
-       **広告で立たせるほうが厳密に損**という並びになっていた。
-       払う物が違うだけで、結果まで劣るなら誰も押さない。
-
-       ---------- 装備ロストは撤廃 ----------
-       以前は代償として装備を1〜2枠ランダムに失わせていたが、
-       「帰還した際に味方の装備がなくなる事がある」という報告のあと、
-       ユーザー指示で「広告蘇生の代償をなくして」となったため撤廃した。
-       代償は帯ごとの回数制限（revLeft）だけに絞る。 */
-    a.st={}; a.bu={};
-    a.x=P.x; a.y=P.y;
-    a.hpNow=allyStats(a).maxHp;
-    log(a.name+'が蘇生した（Lv.'+a.lv+'）');
-    W.fx.push({t:'grave',x:a.x,y:a.y,life:0.8,max:0.8});
-    closeFallen();
+    if(!completeFallenRevive(a) && a===_fallen) openFallen(a);
   }, 'revive');
 }
+bindTap(el('fal-revive-sp'), ()=>completeFallenRevive(_fallen,true));
 bindTap(el('fal-revive'), reviveFallen);
 bindTap(el('fal-let'), letFallenGo);
 
