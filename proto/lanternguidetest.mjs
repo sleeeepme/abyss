@@ -13,8 +13,11 @@ R.guide = await pg.evaluate(()=>{
   const run=(sec)=>{ let best=-9; for(let i=0;i<sec*20;i++){ drawLantern(0,0,0.05); LAN.alert=null; best=Math.max(best, along()); } return best; };
   S.run.ft=0; LAN.x=null; const before=run(1.2);
   S.run.ft=STAIR_HINT_FULL+1; LAN.x=null; LAN.gT=0; const after=run(1.2);
+  // 待っている間も穴の側にいる（定位置が肩の後ろから穴の側へ移る）
+  LAN.gT=LANTERN_GUIDE.period*0.8; for(let i=0;i<30;i++){ drawLantern(0,0,0.05); LAN.alert=null; LAN.gT=LANTERN_GUIDE.period*0.8; }
+  const restAlong=along();
   let threw=null; try{ for(let i=0;i<3;i++) draw(); }catch(e){ threw=e.message; }
   return {before:+before.toFixed(2), after:+after.toFixed(2),
-          quietBefore: before<0.5, goesTowardHole: after>1.0, drawsFine: threw===null};
+          quietBefore: before<0.5, goesTowardHole: after>1.2, drawsFine: threw===null, restOnHoleSide: restAlong>0.5, restAlong:+restAlong.toFixed(2)};
 });
 await done(b, errs, R);
