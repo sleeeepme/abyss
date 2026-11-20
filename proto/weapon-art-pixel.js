@@ -3948,6 +3948,94 @@
   function burstArrows(t, o, n) {
     for (let i = 0; i < n; i++) { const a = i / n * TAU + hash(i, 999) * 0.25, d = 10 + t * 90; if (d > 110) continue; bvArrowAir(t, { x: o.x + Math.cos(a) * d, y: o.y - 2 + Math.sin(a) * d, ang: a, kind: o.kind }); }
   }
+
+  /* ---------- 僧侶の「祈り」（全体回復） ----------
+     2026-11-20 ユーザー指定「僧侶の回復スキルにサークルが出るだけなので、サークルはなくして全体回復のエフェクトをつけて。
+     僧侶から発動したことも分かるように」。
+     pr_cast：僧侶の頭上に光の十字が灯り、光が真上へ昇る（ここから出たと分かる印）。
+     pr_mend：僧侶の頭上から光の玉が山なりに飛んで、仲間（と主人公・僧侶自身）に届くと、
+              胸で小さく光り、体から光の筋と十字が立ち昇る。o.trav＝飛ぶ秒数、o.self＝僧侶自身。
+     半透明（ディザ）にはせず、形が細る・小さくなることで消す。 */
+  const PR_HEAD = 17;                 // 足もとから頭上の印までの高さ（ドット）
+  function prCross(x, y, L, core) {
+    for (let i = -L; i <= L; i++) {
+      const a = Math.abs(i), c = a === 0 ? P.W : a <= (core ? 2 : 1) ? P.hl0 : a < L ? P.hl1 : P.hl2;
+      px(x + i, y, c); px(x, y + i, c);
+    }
+  }
+  function prCastAir(t, o) {
+    const hx = o.x, hy = o.y - PR_HEAD;
+    // 光の柱：頭上の印から真上へ伸び、根元から細って抜ける（0.02〜0.42）
+    if (t >= 0.02 && t < 0.42) {
+      const g = easeOut(clamp((t - 0.02) / 0.16)), H = Math.round(10 + 34 * g);
+      const fade = t < 0.24 ? 0 : (t - 0.24) / 0.18;                 // 根元から抜ける割合
+      const y0 = hy - 3 - Math.round(H * fade), y1 = hy - 3 - H;
+      const half = t < 0.24 ? 1 : 0;
+      for (let y = y0; y >= y1; y--) {
+        const top = (y0 - y) / Math.max(1, y0 - y1);
+        px(hx, y, top > 0.85 ? P.hl0 : P.W);
+        if (half && top < 0.7) { px(hx - 1, y, P.hl0); px(hx + 1, y, P.hl0); }
+        if (half && top < 0.35 && (y & 1)) { px(hx - 2, y, P.hl1); px(hx + 2, y, P.hl1); }
+      }
+    }
+    // 頭上の十字（印）。灯る瞬間は大きく白く、そのあと縮んで消える（0〜0.6）
+    if (t < 0.6) {
+      if (t < 0.05) { prCross(hx, hy, 6, true); for (let k = 1; k <= 3; k++) { px(hx - k, hy - k, P.hl0); px(hx + k, hy - k, P.hl0); px(hx - k, hy + k, P.hl0); px(hx + k, hy + k, P.hl0); } }
+      else { const L = Math.max(1, Math.round(4 - 3 * clamp((t - 0.3) / 0.3))); prCross(hx, hy, L, L >= 3); }
+    }
+    // 足もとから僧侶の体に沿って昇る粒（0〜0.7）。小さくなって消える
+    for (let i = 0; i < 7; i++) {
+      const b = t - hash(i, 911) * 0.25; if (b < 0 || b > 0.45) continue;
+      const q = b / 0.45, xx = o.x + (hash(i, 912) - 0.5) * 14, yy = o.y - 2 - q * 22;
+      const c = q < 0.4 ? P.W : q < 0.75 ? P.hl0 : P.hl1;
+      if (q < 0.5) { px(xx, yy, c); px(xx + 1, yy, c); px(xx, yy + 1, c); px(xx + 1, yy + 1, c); } else px(xx, yy, c);
+    }
+  }
+  function prMendAir(t, o) {
+    const trav = o.self ? 0 : (o.trav || 0.25), bx = o.x, by = o.y - 7;
+    // 飛ぶ光の玉（僧侶の頭上 → 胸）
+    if (!o.self && o.cx != null && t < trav) {
+      const sx = o.cx, sy = o.cy - PR_HEAD, H = 10 + Math.hypot(bx - sx, by - sy) * 0.18;
+      const pos = g => [sx + (bx - sx) * g, sy + (by - sy) * g - H * 4 * g * (1 - g)];
+      const g = t / trav;
+      for (let k = 5; k >= 1; k--) {                                   // 尾
+        const gk = g - k * 0.07; if (gk < 0) continue;
+        const [x, y] = pos(gk); px(x, y, k <= 1 ? P.hl0 : k <= 3 ? P.hl1 : P.hl2);
+      }
+      const [x, y] = pos(g);
+      px(x - 1, y, P.hl0); px(x + 1, y, P.hl0); px(x, y - 1, P.hl0); px(x, y + 1, P.hl0); px(x, y, P.W);
+      px(x - 1, y - 1, P.hl1, 1); px(x + 1, y + 1, P.hl1);
+      return;
+    }
+    const b = t - trav;
+    if (b > 0.85) return;
+    // 届いた瞬間の光（胸で）
+    if (b < 0.1) {
+      const L = b < 0.04 ? 5 : 3;
+      prCross(bx, by, L, b < 0.04);
+      if (b < 0.06) for (let k = 2; k <= 3; k++) { px(bx - k, by - k, P.hl0); px(bx + k, by - k, P.hl0); px(bx - k, by + k, P.hl0); px(bx + k, by + k, P.hl0); }
+    }
+    // 体から立ち昇る光の筋（3本。下から上へ走り、短くなって消える）
+    for (let i = 0; i < 3; i++) {
+      const c0 = b - 0.03 - i * 0.07; if (c0 < 0 || c0 > 0.45) continue;
+      const q = c0 / 0.45, x = bx + (i - 1) * 5 + (i === 1 ? 0 : (hash(i, 921) - 0.5) * 2);
+      const head = o.y - 1 - q * 26, len = Math.round(9 * (1 - q) + 1);
+      for (let k = 0; k < len; k++) px(x, head + k, k === 0 ? P.W : k < len * 0.5 ? P.hl0 : P.hl1);
+    }
+    // 十字が浮かんで小さくなって消える
+    for (let i = 0; i < 3; i++) {
+      const c0 = b - 0.08 - i * 0.12; if (c0 < 0 || c0 > 0.6) continue;
+      const q = c0 / 0.6, x = bx + [-4, 4, 0][i], y = by - 3 - q * 16;
+      if (q < 0.55) healCross(x, y, q < 0.25 ? P.hl0 : P.hl1); else px(x, y, P.hl1);
+    }
+    // 粒
+    for (let i = 0; i < 6; i++) {
+      const c0 = b - hash(i, 931) * 0.3; if (c0 < 0 || c0 > 0.5) continue;
+      const q = c0 / 0.5, x = bx + (hash(i, 932) - 0.5) * 12 + Math.sin(q * 6 + i) * 1.5, y = o.y - 2 - q * 20;
+      px(x, y, q < 0.5 ? P.hl0 : P.hl1);
+    }
+  }
+
   const DEFS = {
     /* ---- 大魔導士 ---- */
     collapse: {
@@ -4344,6 +4432,8 @@
     bb_pinch: { aux: true, span: 0.5, pad: 14, sky: 16, ground() {}, air: bbPinchAir },
     bb_slam: { aux: true, span: 0.7, pad: 18, sky: 40, ground: bbSlamGround, air: bbSlamAir },
     lg_wave: { aux: true, span: 0.78, pad: 22, sky: 4, ground: lgWaveGround, air: lgWaveAir },
+    pr_cast: { aux: true, span: 0.7, ext: 24, pad: 12, sky: 64, ground() {}, air: prCastAir },
+    pr_mend: { aux: true, span: 1.4, pad: 16, sky: 40, ground() {}, air: prMendAir },
     bb_cleave: { aux: true, span: 0.32, pad: 14, sky: 16, ground() {}, air: bbCleaveAir },
     bb_anvil: { aux: true, span: 0.7, pad: 30, sky: 50, ground: bbAnvilGround, air: bbAnvilAir },
     bb_land: { aux: true, span: 0.8, pad: 60, sky: 50, ground: bbLandGround, air: bbLandAir },

@@ -10466,6 +10466,23 @@ function hitEnemy(e, st, mult, opt){
   return r;
 }
 /* 主人公 / 仲間の共通回復 */
+/* 僧侶の「祈り」の絵（2026-11-20 ユーザー指定「サークルはなくして全体回復のエフェクトをつけて。僧侶から発動したことも分かるように」）。
+   僧侶の頭上に光の十字が灯って光が昇り（pr_cast）、そこから光の玉が一人ずつへ飛んで、
+   届いた人の体から光が立ち昇る（pr_mend）。回復した量は玉が届いた時に緑の数字で出す（満タンで0なら出さない）。
+   回復そのものは今までどおり発動の瞬間に入る。 */
+function prayerFx(a, got){
+  const ok = typeof PIXEL_ART_FX!=='undefined' && PIXEL_ART_FX && typeof feelPixelArt==='function' && PIXEL_ART_FX.span('pr_cast');
+  if(!ok){ W.fx.push({t:'grave',x:a.x,y:a.y,life:0.45,max:0.45}); return; }
+  feelPixelArt('pr_cast', a.x, a.y, {ent:a});
+  const LEAVE = 0.1;                          // 印が灯ってから玉が出るまで
+  got.forEach(([h, v])=>{
+    const ent = h===S.hero ? P : h, x = ent.x, y = ent.y, self = h===a;
+    const d = Math.hypot(x-a.x, y-a.y);
+    const trav = self ? 0 : clamp(0.16 + d*0.035, 0.16, 0.5);
+    feelPixelArt('pr_mend', x, y, {ent, delay:LEAVE, cx:a.x, cy:a.y, o:{trav, self}});
+    if(v >= 1) W.pops.push({x, y:y-0.35, txt:'+'+Math.round(v), c:'#9ff0b0', life:0.8, max:0.8, delay:LEAVE+trav});
+  });
+}
 function healEnt(h, v){
   if(!h) return;
   const mx = (h===S.hero) ? stats(h).maxHp : allyStats(h).maxHp;
@@ -12323,9 +12340,8 @@ function allyUpdate(a, dt){
     if(a.prayCd<=0){
       a.prayCd=6;
       const amt = (4 + a.lv*1.6) * (1 + (allySkillSum(a).pray||0));
-      healEnt(S.hero, amt);
-      livingParty().forEach(m=>healEnt(m, amt));
-      W.fx.push({t:'grave',x:a.x,y:a.y,life:0.45,max:0.45});
+      const got = [S.hero, ...livingParty()].map(h=>{ const h0=h.hpNow; healEnt(h, amt); return [h, h.hpNow-h0]; });
+      prayerFx(a, got);
     }
   }
 
@@ -26041,7 +26057,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20261119-lgwave10"></script>
+<script src="weapon-art-pixel.js?v=20261120-prayer1"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
 <script src="game-feel.js?v=20261116-brecht3"></script>
