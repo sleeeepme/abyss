@@ -9,11 +9,11 @@ const R = await pg.evaluate(()=>{ try{
   let e=boss();
   W.haz=null;
   R.moves = JSON.stringify(e.moves)===JSON.stringify(['offer','hands','reach','lightfall']);
-  const C={x:17.5, y:13.5};
+  const C={x:24.5, y:15.5};   // 遺跡の広間（MARETH_HALL）の真ん中あたり
   const mx=()=>stats(S.hero).maxHp;
   const reset=()=>{ e=boss(); e.cast=null; e.combo=null; e.recover=0; e.moveCd=99; e.pending=[]; e.hp=e.maxHp; e.rage=false; e.roar=0; e.atkV=3; e.cd=99; e.ms=0;
     W.vials=[]; W.mpools=[]; W.mrings=[]; W.mlights=[]; W.fx=W.fx.filter(f=>f.t!=='bolt'); W.enemies=W.enemies.filter(x=>x.boss); S.hero.party=[];
-    e.x=C.x; e.y=C.y; P.x=e.x+4; P.y=e.y; P.pull=null; P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0; P.invuln=0; S.hero.hpNow=mx(); W.haz=null; };
+    e.x=C.x; e.y=C.y; P.x=e.x+4; P.y=e.y; P.pull=null; P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0; P.mConf=0; P.mConfT=0; P.invuln=0; S.hero.hpNow=mx(); W.haz=null; };
   const finish=()=>{ let n=0; while(e.cast && n++<400) stepSim(1/60); };
   const hp=()=>S.hero.hpNow;
   // --- 施し：薬瓶が置かれる。当たらない。目は閉じたまま
@@ -86,15 +86,21 @@ const R = await pg.evaluate(()=>{ try{
   // --- 激昂で開く技
   reset(); e.hp=e.maxHp*0.4; bossRage(e);
   R.rageMoves = ['confuse','giveall','hourglass'].every(id=>e.moves.includes(id)) && !e.moves.includes('wave');
-  // 見分けを失くす：輪に触れると混乱。削らない。操作が逆さま
+  // 見分けを失くす：輪に触れると混乱が溜まる（1本では 0.6、混乱しない）。2本目で混乱。削らない。操作が逆さま
   reset(); bossBeginCast(e,'confuse',{x:P.x,y:P.y},false); finish(); h0=hp(); stepSim(1.2);
-  R.confuse = P.confT>0 && hp()===h0;
+  R.confuseBuild = !(P.confT>0) && Math.abs(P.mConf-MARETH.confGain)<1e-6 && hp()===h0;
+  stepSim(MARETH.confHold-1.5); R.confuseHold = Math.abs(P.mConf-MARETH.confGain)<1e-6;
+  stepSim(2.0); R.confuseDrain = P.mConf<MARETH.confGain && P.mConf>0;
+  P.mConf=MARETH.confGain; e.cast=null; bossBeginCast(e,'confuse',{x:P.x,y:P.y},false); finish(); stepSim(1.2);
+  R.confuse = P.confT>0 && P.mConf===0 && hp()===h0;
+  // 目が開いた技に当たっても少し溜まる
+  { const keep={c:P.confT}; P.confT=0; P.mConf=0; marethDose(P, null); R.confuseFromHit = Math.abs(P.mConf-MARETH.confHitGain)<1e-6; P.confT=keep.c; P.mConf=0; }
   const x0=P.x; stickDx=1; stickDy=0; stepSim(0.3); stickDx=0;
   R.confuseReverse = P.x<x0-0.3;
   stepSim(MARETH.confT+0.2); R.confuseEnds = !(P.confT>0);
   const x1=P.x; stickDx=1; stepSim(0.3); stickDx=0; R.normalMove = P.x>x1+0.3;
   // 瞬歩の無敵で抜けられる
-  reset(); bossBeginCast(e,'confuse',{x:P.x,y:P.y},false); finish(); P.invuln=3; stepSim(1.2); R.confuseDodge = !(P.confT>0);
+  reset(); P.mConf=0.9; bossBeginCast(e,'confuse',{x:P.x,y:P.y},false); finish(); P.invuln=3; stepSim(1.2); R.confuseDodge = !(P.confT>0);
   // 混乱した手は、手どうし・マレット本体も殴る
   reset(); const ha=marethSpawnHand(e, C.x-7, C.y), hb=marethSpawnHand(e, C.x-7.9, C.y); P.x=C.x+9; P.y=C.y+4;
   stepSim(MARETH.handRise+0.05); ha.confT=5; const hb0=hb.hp; stepSim(1.6);

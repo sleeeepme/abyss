@@ -3754,7 +3754,8 @@ function pickSpot(fl, tries){
 const HAZARDS={
   lava:  {nm:'溶岩',   col:'#e0552e', edge:'#ffb066', dt:'fire',   dps:12, st:'heat',
           slow:0,    glow:true,  desc:'焼かれる'},
-  poison:{nm:'毒沼',   col:'#4f7a3a', edge:'#9fd06a', dt:'arcane', dps:6,  st:'bleed',
+  /* 毒沼は30階（マレットの広間）だけの床。黄色（2026-11-21 ユーザー指定）。もとは緑 #4f7a3a / #9fd06a */
+  poison:{nm:'毒沼',   col:'#8a7a22', edge:'#e8d25a', dt:'arcane', dps:6,  st:'bleed',
           slow:0.35, glow:false, desc:'蝕まれ、足を取られる'},
   slick: {nm:'濡れ石',  col:'#4a7fa8', edge:'#bfe4ff', dt:'frost',  dps:3,  st:'chill',
           slow:0,    glow:false, desc:'冷えて、滑る', slip:true},
@@ -3820,7 +3821,9 @@ function spawnHazards(fl, depth){
     /* 入口・穴の周りだけでは息継ぎが2ヶ所しかなく、広間の反対側で
        固定砲台になりがち。楕円の**上・下・中央**にも、同じ大きさの
        息継ぎ場所を空ける——どこに逃げても近くに1つはある形にする。 */
-    const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5, ry=fl.H/2-2.5;
+    const Hl=fl.hall;                  // 根の層の遺跡の広間（genRootRuinArena）なら、その部屋の上・中央・下
+    const cx=Hl ? Hl.x+Hl.w/2 : (fl.W-1)/2, cy=Hl ? Hl.y+Hl.h/2 : (fl.H-1)/2;
+    const rx=Hl ? Hl.w/2 : fl.W/2-2.5, ry=Hl ? Hl.h/2 : fl.H/2-2.5;
     const safeSpots = [
       {x:fl.stair.x, y:fl.stair.y},
       {x:fl.start.cx+0.5, y:fl.start.cy+0.5},
@@ -6695,7 +6698,7 @@ const BOSS_MOVES={
   reach:    {nm:'差し伸べる手',   tele:0.95, rad:1.5, n:3, spread:4.2, mult:1.00, cd:[4.0,5.6], min:0, max:99},
   // 降り注ぐ光。上から順に落ちる（1本ずつ予兆が出る）。当たると1服。薬瓶に落ちると薬の溜りになる
   lightfall:{nm:'降り注ぐ光',     tele:0.60, mult:0.90, cd:[6.0,8.0], min:0, max:99},
-  // 見分けを失くす（激昂）。広がる輪。触れた者は混乱する（削らない）
+  // 見分けを失くす（激昂）。広がる輪。触れた者は混乱が溜まる（削らない。溜まりが1で混乱）
   confuse:  {nm:'見分けを失くす', tele:1.10, cd:[11.0,14.0], min:0, max:99},
   // 一斉に配る（激昂）。広がる輪。触れた全員に削り＋1服
   giveall:  {nm:'一斉に配る',     tele:1.00, mult:0.90, cd:[7.0,9.0], min:0, max:99},
@@ -7556,6 +7559,7 @@ function tileWalk(fl,x,y){ const t=fl.g[y][x]; return t!==T.WALL && t!==T.PIT; }
    「広間に入る＝逃げられない」がそのまま成立する。 */
 function isArenaDepth(depth){ return bossTierAt(depth)==='great' || bossTierAt(depth)==='final'; }
 function genArena(depth){
+  if(depth===POISON_BOSS_DEPTH && zoneAt(depth).id==='root') return genRootRuinArena(depth);
   const big = bossTierAt(depth)==='final';
   const vera = uniqueBossAt(depth)===UNIQUE_BOSSES[10];
   /* ヴェラの広間は一回り広い（2026-10-19：第二形態を主人公と同じドットの大きさ＝横7.5マスに描くようになったので、
@@ -7592,6 +7596,31 @@ function genArena(depth){
   }
   return {W,H,g,rooms,start,stair:{x:sx+0.5,y:sy+0.5},
           arena:true, zone:zoneAt(depth), cycle:zoneCycle(depth), cover};
+}
+/* ---------- 30階（施しのマレット）：根の層の遺跡の部屋で組む ----------
+   2026-11-21 ユーザー指定「マレットのマップは根の層の遺跡部分で構築して」。
+   楕円の大広間をやめ、根の層の道中と同じ作り（遺跡の部屋＝北と左右に石積み・南の縁は落ちる所、
+   部屋どうしは根の橋）で組む。見た目は cave-look.js の rlPlan がそのまま描く（fl.rootRuin）。
+     西：降りてくる小部屋（6×6）── 根の橋（2マス幅）── 東：遺跡の大広間（24×18、穴は広間の東寄り）
+   ボスは穴の位置に置かれるので、最初から広間の中にいる。乱数は引かない（間取りは毎回同じ）。 */
+const MARETH_HALL = {x:12, y:7, w:24, h:18};
+const MARETH_ENTRY = {x:2, y:13, w:6, h:6};
+function genRootRuinArena(depth){
+  const Wd=MARETH_HALL.x+MARETH_HALL.w+3, Hd=MARETH_HALL.y+MARETH_HALL.h+6;
+  const g=Array.from({length:Hd},()=>new Uint8Array(Wd));
+  const mk=(r)=>Object.assign({}, r, {cx:Math.floor(r.x+r.w/2), cy:Math.floor(r.y+r.h/2)});
+  const hall=mk(MARETH_HALL), start=mk(MARETH_ENTRY);
+  for(const r of [hall,start]) for(let y=r.y;y<r.y+r.h;y++) for(let x=r.x;x<r.x+r.w;x++) g[y][x]=T.FLOOR;
+  // 根の橋：小部屋の真ん中から広間の真ん中へ（genFloor の connect と同じ 2マス幅・同じ控え方）
+  const by=start.cy;
+  for(let x=start.cx;x<=hall.cx;x++){ g[by][x]=T.FLOOR; g[by+1][x]=T.FLOOR; }
+  const corr=[[start.cx, by, hall.cx, by, 0]];
+  const sx=hall.x+hall.w-4, sy=hall.cy;
+  g[sy][sx]=T.STAIR;
+  const fl={W:Wd, H:Hd, g, rooms:[hall,start], start, stair:{x:sx+0.5, y:sy+0.5},
+            arena:true, rootRuin:true, hall, zone:zoneAt(depth), cycle:zoneCycle(depth), cover:[], corr};
+  applyZoneTerrain(fl, depth);
+  return fl;
 }
 const ARENA_PILLAR_R = 0.8;      // 柱を立てる輪の大きさ（広間の楕円の半径に対する割合）
 const ARENA_PILLAR_HOURS = [1.5, 4.5, 7.5, 10.5];   // 柱を立てる向き（時計の何時か）
@@ -9782,8 +9811,8 @@ function enterFloor(depth, opt){
   W.risen=[];      // 起き上がり待ちの亡者。階を出れば忘れる
   W.rubble=[]; W.pools=[];   // ヒルの瓦礫と毒の溜り
   W.vials=[]; W.mpools=[]; W.mrings=[]; W.mlights=[];   // マレットの薬瓶・薬の溜り・輪・降る光
-  P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0;
-  party().forEach(a=>{ a.mDose=null; a.mHeal=0; a.confT=0; a.odT=0; });
+  P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0; P.mConf=0; P.mConfT=0;
+  party().forEach(a=>{ a.mDose=null; a.mHeal=0; a.confT=0; a.odT=0; a.mConf=0; a.mConfT=0; });
   // 苔玉。層ごとに別の種が、雑魚とは別枠で少しだけ混じる
   if(!bossTierAt(depth)) W.enemies.push(...spawnMoss(fl, depth));
   W.enemies.push(...spawnSlaters(fl, depth));   // 水の層：磯虫の群れ
@@ -15046,7 +15075,7 @@ function tickInkBubbles(dt){
    ・降り注ぐ光：マレットからは出ない。上から順に落ちる（W.mlights）。薬瓶に落ちると薬の溜り（W.mpools）
    ・激昂：見分けを失くす（混乱の輪）／一斉に配る（削り＋1服の輪）／砂時計を返す
    ・砂時計：この戦いで薬から受けた癒しの合計（mHeal）が、まとめて削りとして返る。軽減できない。取りすぎていれば即死
-   ・混乱：主人公は操作が反転し、仲間が「手」に見える。仲間と手は一番近い者を敵味方なく殴る
+   ・混乱：輪と目が開いた技で溜まり（mConf）、1 に届くとかかる。主人公は操作が反転し、仲間が「手」に見える。仲間と手は一番近い者を敵味方なく殴る
    目が閉じている技（施し・手を招く）は当たらない。目が開いた技だけが削る。
    ============================================================ */
 const MARETH_MOVES={offer:1, hands:1, reach:1, lightfall:1, confuse:1, giveall:1, hourglass:1};
@@ -15062,6 +15091,11 @@ const MARETH={
   poolR:0.9, poolLife:7,
   ringSpeed:5.0, ringMax:10, ringBand:0.55,
   confT:5.0, confCd:0.9, confHit:0.35,   // 混乱の長さ／混乱した仲間が殴る間隔と強さ（攻撃力の割合）
+  /* 混乱は**溜まってから**かかる（2026-11-21 ユーザー指定「混乱状態が蓄積するようにして」）。
+     溜まり（mConf）が 1 に届くと confT 秒の混乱。かかったら溜まりは 0 に戻り、混乱の間は溜まらない。
+     輪 1 本では届かない（0.6）。輪の前後に目が開いた技を受けている、輪を2本続けて浴びた、で混乱する。
+     最後に溜まってから confHold 秒は減らず、その後 confDrain/秒 で抜ける（輪の間隔 11〜14秒で 0.2 ほど残る） */
+  confGain:0.6, confHitGain:0.15, confHold:8, confDrain:0.05,
 };
 function marethOn(){ return !!(S.run && S.run.depth===POISON_BOSS_DEPTH); }
 /* 相手ごとの器。主人公は P、仲間・敵は本人に持たせる */
@@ -15097,6 +15131,7 @@ function marethDose(o, kind){
     else if(mIsAlly(o)){ o.atkCd=0; if(o.artCd>0) o.artCd*=1-MARETH.mightCut; }
     else o.mMight=true;
   }
+  if(!kind) marethConfuse(o, MARETH.confHitGain);        // 目が開いた技に当たると、混乱も少し溜まる
   const D=(o.mDose=o.mDose||{n:0, t:0});
   D.n++; D.t=MARETH.doseWin;
   if(D.n>=MARETH.doseMax){
@@ -15212,9 +15247,15 @@ function marethAllyConfused(a, st, dt){
   }
   return true;
 }
-function marethConfuse(o){
+function marethConfuse(o, amt){
   if(!o || o.dead || o.boss) return;
-  o.confT=MARETH.confT; o.confCd=0.3;
+  if(o.confT>0) return;                                   // 混乱の間は溜まらない
+  o.mConf=(o.mConf||0)+(amt==null ? MARETH.confGain : amt); o.mConfT=MARETH.confHold;
+  if(o.mConf>=1){
+    o.mConf=0; o.mConfT=0; o.confT=MARETH.confT; o.confCd=0.3;
+    if(typeof feelSpray==='function') feelSpray(o.x, o.y, '#b48ae0', 10, 1.4);
+    W.pops.push({x:o.x, y:o.y-0.6, txt:'混乱', c:'#c9a0e8', life:0.9, max:0.9});
+  }
 }
 /* 溜め始め。落ちる所・置く所はここで決める（予兆と着弾を揃える） */
 function marethBeginCast(e, id, tg){
@@ -15326,6 +15367,7 @@ function tickMareth(dt){
   for(const o of mEveryone()){
     if(o.mDose && o.mDose.n>0){ o.mDose.t-=dt; if(o.mDose.t<=0) o.mDose.n=0; }
     if(o.confT>0) o.confT=Math.max(0, o.confT-dt);
+    if(o.mConf>0){ if(o.mConfT>0) o.mConfT-=dt; else o.mConf=Math.max(0, o.mConf-MARETH.confDrain*dt); }
     if(o.odT>0){
       o.odT-=dt; o.odAcc=(o.odAcc||0)+dt;
       if(o.odAcc>=MARETH.odTick){
@@ -15539,9 +15581,16 @@ function marethHandDraw(e, sx, sy){
   return true;
 }
 function marethDosePips(o, sx, sy){
-  const n=o.mDose ? o.mDose.n : 0, od=o.odT>0;
-  if(!n && !od) return;
+  const n=o.mDose ? o.mDose.n : 0, od=o.odT>0, mc=o.confT>0 ? 0 : (o.mConf||0);
   const u=Math.max(2, Math.round(TS/8)), x0=sx-(MARETH.doseMax*(u+2)-2)/2, y0=sy-TS*1.05;
+  if(mc>0){                                                    // 混乱の溜まり：服数の升の下の紫の帯（1で混乱）
+    const bw=MARETH.doseMax*(u+2)-2, yb=Math.round(y0+u+3), h=Math.max(2, Math.round(u*0.6));
+    ctx.fillStyle='#1a1014'; ctx.fillRect(Math.round(x0)-1, yb-1, Math.round(bw)+2, h+2);
+    ctx.fillStyle='#3a2a4a'; ctx.fillRect(Math.round(x0), yb, Math.round(bw), h);
+    ctx.fillStyle=(o.mConfT>0 || Math.floor(nowSec()*6)%2) ? '#b48ae0' : '#8a68b0';
+    ctx.fillRect(Math.round(x0), yb, Math.max(1, Math.round(bw*Math.min(1, mc))), h);
+  }
+  if(!n && !od) return;
   for(let i=0;i<MARETH.doseMax;i++){
     ctx.fillStyle='#1a1014'; ctx.fillRect(Math.round(x0+i*(u+2))-1, Math.round(y0)-1, u+2, u+2);
     ctx.fillStyle = od ? '#b8e060' : (i<n ? '#e8d8b0' : '#4a4038'); ctx.fillRect(Math.round(x0+i*(u+2)), Math.round(y0), u, u);
@@ -15709,6 +15758,14 @@ function drawInkVision(){
    楕円の広間の縁ぎりぎりは壁に埋まりやすいので、pad ぶん内側に絞って探す。 */
 function randomArenaPoint(pad){
   const fl=W.fl; if(!fl || !fl.arena) return null;
+  if(fl.hall){                       // 遺跡の広間（四角い部屋）。縁から pad＋0.5 内側
+    const H=fl.hall, m=(pad||0)+0.5;
+    for(let tries=0; tries<24; tries++){
+      const px=H.x+m+rnd()*(H.w-2*m), py=H.y+m+rnd()*(H.h-2*m);
+      if(standable(px,py)) return {x:px, y:py};
+    }
+    return null;
+  }
   const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5-(pad||0), ry=fl.H/2-2.5-(pad||0);
   for(let tries=0; tries<24; tries++){
     const ang=rnd()*Math.PI*2, rad=Math.sqrt(rnd());

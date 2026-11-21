@@ -287,7 +287,8 @@ const HZ={
     abyss:cs(['#020509','#03080f','#050d17','#081522','#12304a','#1e4a68']),
     shelf:C('#8ad0d0'), drop:C('#3c78a4')},
   lava:{ramp:cs(['#6a1a08','#b0360e','#e8661a','#ffb040']), hi:C('#fff0b0'), glow:true},
-  poison:{ramp:cs(['#15240f','#243c18','#3a5a24','#6a9a3a']), hi:C('#b8e070'), glow:false},
+  /* 毒沼（30階だけ）は黄色（2026-11-21 ユーザー指定。もとは緑 #15240f〜#6a9a3a） */
+  poison:{ramp:cs(['#2a220a','#4a3c10','#7a6418','#b89a2c']), hi:C('#f4e27a'), glow:false},
   spore:{ramp:cs(['#1a1428','#2a2040','#44345e','#7a5ea0']), hi:C('#e8c0ff'), glow:false},
   grit:{ramp:cs(['#1a1814','#2e2a22','#4a4436','#8a806a']), hi:C('#e0d6b4'), glow:false},
   slick:{ramp:cs(['#101c28','#1a3044','#2a4a68','#5a8ab0']), hi:C('#e8f6ff'), glow:false},
@@ -723,7 +724,7 @@ const RL_BARK=['#141210','#24201b','#383129','#4f463a','#695e4e','#857865','#a39
 const RL_MOSS=['#1c2612','#2c3a18','#3e5220','#55692a','#6f8436','#8ea044'].map(C);
 const RL_FOG=C('#173038'), RL_VOID=C('#04060a');
 const RL_AMB=.3;                                   // 灯りの外もうっすら見える明るさ（根の層だけ）
-function rlOn(f){ return CAVE.rootLayer!==false && f && !f.arena && f.zone && f.zone.id==='root'; }
+function rlOn(f){ return CAVE.rootLayer!==false && f && (!f.arena||f.rootRuin) && f.zone && f.zone.id==='root'; }   // rootRuin：30階のマレットの広間も遺跡の部屋で組む
 function rlRand(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
 
 /* ---------- 部品集（tools/rootkit.py が焼いた root-kit.js）を読む ----------

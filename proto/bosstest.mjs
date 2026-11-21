@@ -216,7 +216,8 @@ R.poisonSafeZones = await pg.evaluate(()=>{
   RNG=mulberry32(30*7919);
   const fl=genFloor(30);
   const h=spawnHazards(fl,30);
-  const cx=(fl.W-1)/2, cy=(fl.H-1)/2, rx=fl.W/2-2.5, ry=fl.H/2-2.5;
+  // 2026-11-21：30階は根の層の遺跡の広間（fl.hall）で組む。上・中央・下は広間の四角で測る
+  const Hl=fl.hall, cx=Hl?Hl.x+Hl.w/2:(fl.W-1)/2, cy=Hl?Hl.y+Hl.h/2:(fl.H-1)/2, rx=Hl?Hl.w/2:fl.W/2-2.5, ry=Hl?Hl.h/2:fl.H/2-2.5;
   const spots={
     center:[cx,cy], top:[cx,cy-ry+2.0], bottom:[cx,cy+ry-2.0],
     stair:[fl.stair.x,fl.stair.y], start:[fl.start.cx+0.5,fl.start.cy+0.5]};
