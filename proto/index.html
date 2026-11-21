@@ -6786,7 +6786,10 @@ const UNIQUE_BOSSES={
 
   /* 2026-11-06：鎧の中に蛸と宿借り。三つの形で技が入れ替わる（BRECHT）。
      moves は三つの形の技を全部並べた物（どの形で何を使うかは BRECHT が決める）。激昂の代わりに脱ぐ */
-  20: {nm:'打ち直しのブレヒト', reg:'登録：鎚・三十一番', fam:'armor', dt:'blunt', brecht:true,
+  /* hpMul（2026-11-21 ユーザー指定「デバッグで入ったレベルで余裕で勝ててしまった」・目標は2〜3回目で勝てる）：
+     デバッグの支給（Lv=階×1.1）で、無敵の自動操縦が倒すまでの時間を 10F のヴェラ（約120秒、2〜3回で勝てるよう調整済み）に揃えた。
+     20F 70〜92秒 → 1.5 倍で 126秒、30F 50秒 → 2.5 倍（proto/_boss.mjs --god で測る） */
+  20: {nm:'打ち直しのブレヒト', reg:'登録：鎚・三十一番', fam:'armor', dt:'blunt', brecht:true, hpMul:1.5,
        moves:['slam','cleave','tentacle','ink','grab','pinch','bubble','roll'], rage:[],
        line:'戦いながら自分を打ち直している。直すたび、元の形から遠くなる。'},
 
@@ -6794,7 +6797,7 @@ const UNIQUE_BOSSES={
        moves:['pillars','slam','cleave'],   rage:['wave'],
        line:'脚が七本ある。離さないのではない。離す機能が最初から無い。'},
 
-  30: {nm:'施しのマレット', reg:'登録：薬・九番',     fam:'undead', dt:'arcane',
+  30: {nm:'施しのマレット', reg:'登録：薬・九番',     fam:'undead', dt:'arcane', hpMul:2.5,
        // 配る。受け取るのは誰でもいい（2026-11-16）。目が開いた技だけが削る。激昂で混乱・一斉・砂時計
        moves:['offer','hands','reach','lightfall'],   rage:['confuse','giveall','hourglass'],
        line:'いまも配っている。悪意はない。区別する機能がもう無いだけ。'},
