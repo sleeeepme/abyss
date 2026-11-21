@@ -1304,7 +1304,7 @@
   <div style="height:8px"></div>
   <button class="primary" id="fal-revive">広告を見て蘇生させる</button>
   <div style="height:8px"></div>
-  <button class="ghost" id="fal-let">見送る（ロスト）</button>
+  <button class="ghost" id="fal-let">見送る</button>
 </div></div>
 
 <!-- ============ デバッグ ============
@@ -2451,7 +2451,7 @@ const TRAITS=[
   {id:'haisui',  nm:'背水',       sl:'weapon', r:[10,25], d:v=>`自分のHPが半分以下のとき、ダメージ +${v}%`},
   {id:'ikioi',   nm:'勢い',       sl:'weapon', r:[8,20],  d:v=>`敵を倒すと4秒、攻撃速度 +${v}%`},
   {id:'kate',    nm:'血の糧',     sl:'weapon', r:[2,6], sc:1, d:v=>`敵を倒すとHPが ${v} 回復`},
-  {id:'kudaki',  nm:'砕き',       sl:'weapon', r:[15,40], d:v=>`ボスの崩しゲージの溜まり +${v}%`},
+  {id:'kudaki',  nm:'砕き',       sl:'weapon', r:[15,40], d:v=>`ボスのブレイクゲージの溜まり +${v}%`},
   {id:'koou',    nm:'呼応',       sl:'weapon', r:[10,25], d:v=>`連携値の溜まり +${v}%`},
   {id:'mikiri',  nm:'見切りの刃', sl:'weapon', r:[30,80], d:v=>`見切りの後の一撃のダメージ +${v}%`, solo:1},
   {id:'yamiuchi',nm:'闇討ち',     sl:'weapon', r:[15,35], d:v=>`灯りが3以下のとき、ダメージ +${v}%`},
@@ -5194,7 +5194,7 @@ const ULT_RUIN_EVERY  = 0.22;             // その間隔（秒）
 const ULT_RUIN_BOLT   = 0.2;              // 1本の威力（本体の倍率に対して）。画面全体・狙い不要なので単体火力は控えめに（2026-11-10 レビュー）
 const ULT_RUIN_FIN    = 1.0;              // Lv.5 の締めの雷（本体の倍率に対して）
 const ULT_STEP_TEXT = {
-  quake:['', '2発目は半径1.25倍に広がる', '3発目は半径1.5倍まで広がり、最後の1発は押し返して崩す'],
+  quake:['', '2発目は半径1.25倍に広がる', '3発目は半径1.5倍まで広がり、最後の1発は押し返してブレイクを入れる'],
   blink:['', '', '最後に全ての斬り跡が爆ぜる'],
   blaze:['', '左右にも火柱の列（3列）', '5列に広がり、火柱が近い敵へ寄る'],
   ward: ['', '効いている間 1発まで無効', '2発まで無効。割れるたびに周りを押し返す'],
@@ -14378,8 +14378,8 @@ function bossBreak(e){
   e.broken = e.brkT = duelFinalTier(e) ? DUEL.brkDownFinal : DUEL.brkDown;
   e.cast=null; e.combo=null; e.tele=0; e.vx=0; e.vy=0; e.recover=0; e.roar=0; e.hit=0.4;
   e.brkMax = duelBrkMax(e);
-  if(e.revealed) log(e.name+'——体勢が崩れた');
-  W.pops.push({x:e.x, y:e.y-1.0, txt:'崩し', c:'#ffd06a', life:1.2, max:1.2});
+  if(e.revealed) log(e.name+'——ブレイク！');
+  W.pops.push({x:e.x, y:e.y-1.0, txt:'ブレイク', c:'#ffd06a', life:1.2, max:1.2});
   if(typeof feelKick==='function') feelKick(3.4, 0.28);
   W.fx.push({t:'shock', x:e.x, y:e.y, r:e.r+0.9, life:0.35, max:0.35, col:'#ffd06a'});
 }
@@ -21302,7 +21302,7 @@ function updateHUD(){
   hset('bossbar.disp', boss?'block':'none', v=>bb.style.display=v);
   if(boss){
     hset('bossfill.w', clamp(boss.hp/boss.maxHp*100,0,100)+'%', v=>el('bossfill').style.width=v);
-    hset('bossname.t', boss.name + (boss.rage?'（激昂）':'') + (boss.broken>0?'　崩れ':''), v=>el('bossname').textContent=v);
+    hset('bossname.t', boss.name + (boss.rage?'（激昂）':'') + (boss.broken>0?'　ブレイク':''), v=>el('bossname').textContent=v);
     /* 崩し。崩れている間は「残り時間」が減っていく帯（ゲージは起きてから溜め直し） */
     const bdn = boss.broken>0, bmx = boss.brkMax||1;
     const bw = bdn ? boss.broken/(boss.brkT||1) : (boss.brk||0)/bmx;
@@ -25434,14 +25434,7 @@ function openFallen(a){
   const can = canRevive(a);
   const left = revivesLeft();
   el('fal-body').innerHTML = can
-    ? `<div class="row"><span class="k">見送ると</span><span>この仲間は失われる<br>
-         <span style="color:var(--dim);font-size:12px">装備も恩寵も護符も一緒に消える</span><br>
-         <span style="color:#d6b34a;font-size:12px">${allyLossGold(a)} G が残る（慰霊碑で呼び戻せる）</span>
-         ${boonSum(S.hero,'avenge')>0?'<br><span style="color:#ff8a7a;font-size:12px">弔いの恩寵が発動する</span>':''}</span></div>
-       <div class="row"><span class="k">蘇生すると</span><span>レベルも装備も恩寵もそのまま<br>
-         <span style="color:var(--dim);font-size:12px">SPか広告で蘇生。下の蘇生回数を1つ使う</span></span></div>
-       <div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}
-         <span style="color:var(--dim);font-size:12px">（誰に使ってもよい）</span><br>
+    ? `<div class="row"><span class="k">残りの蘇生</span><span><b>${left}</b> / ${REVIVE_PER_BAND}<br>
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
     : `<div class="row"><span class="k">もう戻せない</span><span>この帯の蘇生を使い切っている。<br>
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層まで進めば、また ${REVIVE_PER_BAND} 回使える</span></span></div>`;

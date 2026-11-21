@@ -180,7 +180,7 @@ R.hud = await run(5, `
   boss.brk=0; boss.broken=1.5; boss.brkT=3; updateHUD();
   const w2=el('bossbrk').style.width, down=el('bossbk').className, nm=el('bossname').textContent;
   return {hidden, w1, hot, w2, down, nm,
-    ok: hidden && parseFloat(w1)===90 && hot.includes('hot') && parseFloat(w2)===50 && down.includes('down') && nm.includes('崩れ')};
+    ok: hidden && parseFloat(w1)===90 && hot.includes('hot') && parseFloat(w2)===50 && down.includes('down') && nm.includes('ブレイク')};
 `);
 
 /* ============ 7. 仲間もボスの予兆を見て避ける ============ */
