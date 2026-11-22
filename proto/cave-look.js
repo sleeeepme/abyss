@@ -4127,10 +4127,21 @@ function bpxDraw(e,t,S){
         u[out+X] = T-a<.05 ? 0xffffffff : T-a<.14 ? B.foamHi : mixU(lit(c>>>0), B.foam, pk); } }
     return [0,-S.anc];
   }
+  const sink=e.mwSink>0 ? Math.min(1,e.mwSink) : 0;
+  if(sink>0){
+    /* マレットのワープ（2026-11-22）：足もとの溜りへ沈む・溜りから浮かぶ。
+       絵を sink ぶん下へずらし、床の線（PT.oy）から下は描かない。床の線のすぐ上は濡れて赤く光る */
+    const d=Math.round(sink*(S.feet+3)), cut=PT.oy;
+    for(let y=0;y<H;y++){ const Y=Y0+y+d; if(Y<0||Y>=N||Y>cut) continue; const r0=(fy+y)*SW+fx, out=Y*N;
+      for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue; const c=src[r0+x]; if(!(c>>>24)) continue;
+        u[out+X] = Y===cut ? MW_RIM0 : Y>=cut-2 ? mixU(lit(c>>>0), MW_RIM1, Y===cut-1?.7:.4) : lit(c>>>0); } }
+    return [0,-S.anc];
+  }
   for(let y=0;y<H;y++){ const Y=Y0+y; if(Y<0||Y>=N) continue; const r0=(fy+y)*SW+fx, out=Y*N;
     for(let x=0;x<W;x++){ const X=X0+x; if(X<0||X>=N) continue; const c=src[r0+x]; if(c>>>24) u[out+X]=lit(c>>>0); } }
   return [0,-S.anc];
 }
+const MW_RIM0=0xff3a48c8, MW_RIM1=0xff18248a;   // 溜りの縁の赤（#c8483a・#8a2418。ABGR）
 CAVE.bpx={key:e=>bpxKey(e), ready:k=>!!(BPX[k]&&BPX[k].u), frame:e=>e&&e._bpF, anims:k=>BPX[k]&&BPX[k].anims};   // テスト用
 /*BPX_END*/
 if(BPX.le) BPX.le.side=true;   // 遺構のヒル（絵は左向き）は標的の側を向く：向きは本編の e.face（口から吐く技のため 2026-11-16）

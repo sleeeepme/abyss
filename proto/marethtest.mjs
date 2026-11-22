@@ -13,7 +13,7 @@ const R = await pg.evaluate(()=>{ try{
   const mx=()=>stats(S.hero).maxHp;
   const reset=()=>{ e=boss(); e.cast=null; e.combo=null; e.recover=0; e.moveCd=99; e.pending=[]; e.hp=e.maxHp; e.rage=false; e.roar=0; e.atkV=3; e.cd=99; e.ms=0;
     W.vials=[]; W.mpools=[]; W.mrings=[]; W.mlights=[]; W.fx=W.fx.filter(f=>f.t!=='bolt'); W.enemies=W.enemies.filter(x=>x.boss); S.hero.party=[];
-    e.x=C.x; e.y=C.y; P.x=e.x+4; P.y=e.y; P.pull=null; P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0; P.mConf=0; P.mConfT=0; P.invuln=0; S.hero.hpNow=mx(); W.haz=null; };
+    e.mw=null; e.mwSink=0; e.x=C.x; e.y=C.y; P.x=e.x+4; P.y=e.y; P.pull=null; P.mDose=null; P.mHeal=0; P.confT=0; P.odT=0; P.mConf=0; P.mConfT=0; P.invuln=0; S.hero.hpNow=mx(); W.haz=null; };
   const finish=()=>{ let n=0; while(e.cast && n++<400) stepSim(1/60); };
   const hp=()=>S.hero.hpNow;
   // --- 施し：薬瓶が置かれる。当たらない。目は閉じたまま
@@ -43,7 +43,11 @@ const R = await pg.evaluate(()=>{ try{
   reset(); bossBeginCast(e,'hands',{x:P.x,y:P.y},false); finish();
   let hands=marethHands();
   R.handsSpawn = hands.length===2 && hands.every(h=>h.summoned && h.hand.st==='rise');
-  R.handsWarp = Math.hypot(e.x-C.x, e.y-C.y)>0.5;
+  /* ワープ（2026-11-22）：沈んでいるあいだは元の場所、沈みきったら行き先へ移り、浮かび上がって終わる */
+  R.warpSinks = !!e.mw && Math.hypot(e.x-C.x, e.y-C.y)<0.01 && FEEL.weaponArts.some(f=>f.id==='mw_out') && FEEL.weaponArts.some(f=>f.id==='mw_in');
+  stepSim(MWARP.out*0.6); R.warpHalfSunk = e.mwSink>0.2 && e.mwSink<1 && Math.hypot(e.x-C.x, e.y-C.y)<0.01;
+  stepSim(MWARP.out*0.4+MWARP.in+0.1);
+  R.handsWarp = Math.hypot(e.x-C.x, e.y-C.y)>0.5 && !e.mw && !(e.mwSink>0);
   for(let i=0;i<4;i++){ e.cast=null; e.moveCd=99; bossBeginCast(e,'hands',{x:P.x,y:P.y},false); finish(); }
   R.handsCap = marethHands().length<=MARETH.handMax;
   // 手は主人公のそばで振りかぶって叩く

@@ -69,7 +69,9 @@
     /* レジェンド武器の衝撃波（2026-11-19 ユーザー提示の動画に合わせる：白い先端・琥珀の筋・ディザの粒） */
     sw0: '#fff6e0', sw1: '#ffe2a0', sw2: '#f6b54a', sw3: '#d9832a', sw4: '#8a4a18',
     /* 無属性の衝撃波（2026-11-19：白。炎の段は薄い灰へ）と、粒の焦げ茶 */
-    nw0: '#f6f8fc', nw1: '#e2e7ef', nw2: '#bcc4d0', nw3: '#8d96a6', nw4: '#5e6676', db0: '#6b4526'
+    nw0: '#f6f8fc', nw1: '#e2e7ef', nw2: '#bcc4d0', nw3: '#8d96a6', nw4: '#5e6676', db0: '#6b4526',
+    /* 施しのマレット（30F）のワープの溜り。衣の赤から（2026-11-22） */
+    mw0: '#f08a6a', mw1: '#c8483a', mw2: '#8a2418', mw3: '#4a0c08', mw4: '#260403'
   };
   const rgba32 = hex => {
     const n = parseInt(hex.slice(1), 16);
@@ -4036,6 +4038,102 @@
     }
   }
 
+
+  /* ---------- 施しのマレット（30F）のワープ ----------
+     2026-11-22 ユーザー指定「マレットがワープする時のエフェクトを作って」。
+     mw_out（元の場所）：足もとに赤い溜りが広がり、衣がそこへ沈む（沈む絵は cave-look）。縁から波紋としぶき、
+                         沈みきった瞬間に真ん中で泡が弾け、瓶の橙が一瞬光って消える。溜りは縮んで乾く。
+     mw_in（行き先）：沈んでいるあいだに溜りが広がって泡立ち（ここに来る予告）、底から橙の光が上がり、
+                      o.at 秒から o.rise 秒かけて衣が浮かび上がる。体から滴が落ちて跳ね、溜りは縮んで消える。
+     半透明は使わず、大きさと形で消す。 */
+  function mwPool(x, y, R, k, lip) {
+    const rx = R * k, ry = rx * 0.42; if (rx < 1) return;
+    const ix = Math.ceil(rx), iy = Math.ceil(ry);
+    for (let dy = -iy; dy <= iy; dy++) for (let dx = -ix; dx <= ix; dx++) {
+      const d = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry); if (d > 1) continue;
+      let c = d > 0.74 ? P.mw2 : P.mw3;
+      if (d < 0.3 && lip) c = P.mw4;                                   // 沈んだ所はいちばん深い
+      if (dy < 0 && dx < 0 && d > 0.42 && d < 0.6 && dx < -rx * 0.25) c = P.mw1;   // 左上のてかり
+      px(x + dx, y + dy, c);
+    }
+    if (rx > 6) { px(x - rx * 0.5, y - ry * 0.45, P.mw0); px(x - rx * 0.5 + 1, y - ry * 0.45, P.mw1); }
+  }
+  function mwRing(x, y, rx, c, clipR) {
+    if (rx < 1) return; const ry = rx * 0.42, n = Math.ceil(rx * 4);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU, X = x + Math.cos(a) * rx, Y = y + Math.sin(a) * ry;
+      if (clipR && ((X - x) * (X - x)) / (clipR * clipR) + ((Y - y) * (Y - y)) / (clipR * clipR * 0.1764) > 1) continue;
+      px(X, Y, c);
+    }
+  }
+  function mwDrop(x, y, q, big) {                                     // 滴：はじめ2×2、あとで1ドット
+    const c = q < 0.5 ? P.mw1 : P.mw2;
+    if (big && q < 0.6) { px(x, y, P.mw0); px(x + 1, y, c); px(x, y + 1, c); px(x + 1, y + 1, P.mw2); } else px(x, y, c);
+  }
+  function mwSplash(x, y, t, seed, n, R, t0, t1, up) {               // 溜りの縁（または真ん中）から跳ねる滴
+    for (let i = 0; i < n; i++) {
+      const b0 = t0 + hash(i, seed) * (t1 - t0), b = t - b0; if (b < 0) continue;
+      const a = hash(i, seed + 1) * TAU, rr = up ? hash(i, seed + 4) * 0.3 : 0.75 + hash(i, seed + 4) * 0.25;
+      const sx = x + Math.cos(a) * R * rr, sy = y + Math.sin(a) * R * rr * 0.42;
+      const vy = (up ? 70 : 42) + hash(i, seed + 2) * 30, vx = Math.cos(a) * (8 + hash(i, seed + 3) * 16), G = 300;
+      const h = vy * b - 0.5 * G * b * b; if (h < 0) continue;            // 落ちたら消える
+      const life = (2 * vy) / G; mwDrop(sx + vx * b, sy - h, b / life, hash(i, seed + 5) < 0.5);
+    }
+  }
+  function mwOutGround(t, o) {
+    const out = o.out || 0.42, R = o.R;
+    const k = t < 0.1 ? 0.85 * easeOut(t / 0.1) : t < out ? 0.85 + 0.15 * ((t - 0.1) / (out - 0.1)) : t < out + 0.15 ? 1 : 1 - clamp((t - out - 0.15) / 0.4);
+    if (k <= 0) return;
+    mwPool(o.x, o.y, R, k, t > out * 0.5 && t < out + 0.3);
+    for (let i = 0; i < 3; i++) {                                    // 衣が沈むと縁へ寄せる波紋
+      const b = t - i * 0.13; if (b < 0 || b > 0.32 || t > out + 0.1) continue;
+      mwRing(o.x, o.y, R * k * (0.35 + 0.6 * (b / 0.32)), b < 0.16 ? P.mw1 : P.mw2, R * k);
+    }
+    const g = t - out;                                               // 沈みきった：真ん中で泡が弾ける
+    if (g >= 0 && g < 0.22) { const r = 2 + 9 * easeOut(g / 0.22); mwRing(o.x, o.y, r, g < 0.1 ? P.mw0 : P.mw1); if (g < 0.12) mwRing(o.x, o.y, r * 0.55, P.mw1); }
+    if (t > out - 0.12 && t < out + 0.1) {                           // 瓶の橙が沈んでいく
+      const q = (t - out + 0.12) / 0.22;
+      if (q < 0.5) { px(o.x, o.y - 1, P.fi1); px(o.x + 1, o.y - 1, P.fi2); px(o.x, o.y, P.fi2); px(o.x + 1, o.y, P.fi3); } else px(o.x, o.y, P.fi2);
+    }
+  }
+  function mwOutAir(t, o) {
+    const out = o.out || 0.42;
+    mwSplash(o.x, o.y, t, 951, 9, o.R, 0.02, out, false);
+    mwSplash(o.x, o.y, t, 961, 6, o.R, out, out + 0.04, true);
+  }
+  function mwInGround(t, o) {
+    const at = o.at || 0.27, rise = o.rise || 0.5, R = o.R;
+    const k = t < at ? easeOut(t / at) : t < at + rise ? 1 : 1 - clamp((t - at - rise) / 0.45);
+    if (k <= 0) return;
+    mwPool(o.x, o.y, R, k, t < at + rise * 0.5);
+    for (let i = 0; i < 7; i++) {                                    // 泡：浮いてきて、ふくらんで弾ける
+      const b0 = hash(i, 971) * (at + rise * 0.4), b = t - b0; if (b < 0 || b > 0.16) continue;
+      const a = hash(i, 972) * TAU, rr = Math.sqrt(hash(i, 973)) * 0.7 * R * k;
+      const bx = o.x + Math.cos(a) * rr, by = o.y + Math.sin(a) * rr * 0.42;
+      if (b < 0.11) { const r = 1 + 2.2 * (b / 0.11); mwRing(bx, by - r * 0.4, r, P.mw1); px(bx - 1, by - r * 0.9, P.mw0); }
+      else { px(bx - 2, by, P.mw1); px(bx + 2, by, P.mw1); px(bx, by - 2, P.mw0); }
+    }
+    if (t > at - 0.18 && t < at + 0.08) {                           // 底から瓶の橙が上がってくる
+      const q = (t - at + 0.18) / 0.26, s = q < 0.35 ? 1 : q < 0.7 ? 2 : 3;
+      for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) px(o.x - (s >> 1) + dx, o.y - (s >> 1) + dy, dx === 0 && dy === 0 && s > 1 ? P.fi0 : s > 2 ? P.fi1 : P.fi2);
+    }
+    for (let i = 0; i < 2; i++) {                                    // 浮かぶときに外へ押し出す波紋
+      const b = t - at - i * 0.16; if (b < 0 || b > 0.3) continue;
+      mwRing(o.x, o.y, R * (0.5 + 0.55 * (b / 0.3)), b < 0.15 ? P.mw1 : P.mw2);
+    }
+  }
+  function mwInAir(t, o) {
+    const at = o.at || 0.27, rise = o.rise || 0.5, R = o.R;
+    mwSplash(o.x, o.y, t, 981, 7, R, at, at + 0.06, true);             // 浮かび始めのしぶき
+    for (let i = 0; i < 9; i++) {                                    // 体から垂れて落ちる滴
+      const b0 = at + 0.06 + hash(i, 991) * (rise + 0.15), b = t - b0; if (b < 0) continue;
+      const sx = o.x + (hash(i, 992) - 0.5) * R * 1.5, top = o.y - 8 - hash(i, 993) * 30 * (1 - (b0 - at) / (rise + 0.3));
+      const y = top + 0.5 * 320 * b * b, land = o.y + (hash(i, 994) - 0.5) * R * 0.3;
+      if (y < land) { px(sx, y, P.mw1); if (b > 0.05) px(sx, y - 1, P.mw2); }
+      else if (b < Math.sqrt(2 * (land - top) / 320) + 0.08) { px(sx - 1, land, P.mw1); px(sx + 1, land, P.mw1); px(sx, land - 1, P.mw0); }
+    }
+  }
+
   const DEFS = {
     /* ---- 大魔導士 ---- */
     collapse: {
@@ -4433,6 +4531,8 @@
     bb_slam: { aux: true, span: 0.7, pad: 18, sky: 40, ground: bbSlamGround, air: bbSlamAir },
     lg_wave: { aux: true, span: 0.78, pad: 22, sky: 4, ground: lgWaveGround, air: lgWaveAir },
     pr_cast: { aux: true, span: 0.7, ext: 24, pad: 12, sky: 64, ground() {}, air: prCastAir },
+    mw_out: { aux: true, span: 1.0, ext: 36, pad: 16, sky: 40, ground: mwOutGround, air: mwOutAir },
+    mw_in: { aux: true, span: 1.35, ext: 36, pad: 16, sky: 56, ground: mwInGround, air: mwInAir },
     pr_mend: { aux: true, span: 1.4, pad: 16, sky: 40, ground() {}, air: prMendAir },
     bb_cleave: { aux: true, span: 0.32, pad: 14, sky: 16, ground() {}, air: bbCleaveAir },
     bb_anvil: { aux: true, span: 0.7, pad: 30, sky: 50, ground: bbAnvilGround, air: bbAnvilAir },

@@ -15306,7 +15306,7 @@ function marethResolve(e, m){
   }else if(id==='hands'){
     (c.spots||[]).forEach(sp=>marethSpawnHand(e, sp.x, sp.y));
     W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:3.2, life:0.5, maxLife:0.5, col:'#c9a98a'});
-    warpBossRandom(e);                              // 招来と同じ：呼んだ瞬間に広間のどこかへ跳ぶ
+    if(!marethWarp(e)) warpBossRandom(e);          // 招来と同じ：呼んだ瞬間に広間のどこかへ跳ぶ（沈んで、行き先から浮かび上がる）
   }else if(id==='reach'){
     (c.spots||[]).forEach(sp=>{
       W.fx.push({t:'shock', x:sp.x, y:sp.y, r:m.rad, life:0.34, max:0.34, col:'#c9a98a'});
@@ -15339,7 +15339,44 @@ function marethResolve(e, m){
   }
 }
 /* 毎フレーム：薬瓶・溜り・服数・毒・混乱・輪・降る光 */
+/* ---------- マレットのワープ（2026-11-22 ユーザー指定「マレットがワープする時のエフェクトを作って」） ----------
+   前は一瞬で消えて、元の場所と行き先に紫の輪が出るだけだった。
+   赤い衣が足もとの溜りへ沈み（out 秒）、行き先にはその間に溜りが広がって泡立ち、
+   沈みきった瞬間に行き先へ移って、溜りから浮かび上がる（in 秒）。
+   沈み・浮かびの絵は cave-look が e.mwSink（0＝全部見える、1＝全部沈んだ）で床の線から下を切って描く。
+   溜り・しぶき・泡は PixelArtFx の mw_out（元の場所）／mw_in（行き先）。
+   ワープのあいだは動かず技も出さない。当たり判定は今いる場所のまま（沈みきった一瞬だけ見えない）。 */
+const MWARP = {out:0.42, in:0.5, warn:0.15, pool:1.9};
+function marethWarp(e){
+  const pt=randomArenaPoint(1.0);
+  if(!pt) return false;
+  e.mw={t:0, fx:e.x, fy:e.y, tx:pt.x, ty:pt.y, moved:false};
+  e.mwSink=0;
+  /* 溜りは衣の裾（絵の下端＝沈む床の線）に置く。e.y は体の真ん中なので、描いた絵の下端（cave-look の e._vis）ぶん下げる */
+  const foot = (e._vis && typeof TS!=='undefined' && e._vis.bot>0) ? e._vis.bot/TS - 0.08 : e.r*0.8;
+  const tot=MWARP.out+MWARP.in;
+  e.moveCd=Math.max(e.moveCd||0, tot+0.2); e.cd=Math.max(e.cd||0, tot+0.2); e.vx=0; e.vy=0;
+  if(typeof feelPixelArt==='function' && typeof PIXEL_ART_FX!=='undefined' && PIXEL_ART_FX && PIXEL_ART_FX.span('mw_out')){
+    feelPixelArt('mw_out', e.x, e.y+foot, {range:MWARP.pool, o:{out:MWARP.out}});
+    feelPixelArt('mw_in', pt.x, pt.y+foot, {range:MWARP.pool, delay:MWARP.warn, o:{at:MWARP.out-MWARP.warn, rise:MWARP.in}});
+  }else{
+    W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:2.2, life:0.4, maxLife:0.4, col:'#a97fe0'});
+    W.fx.push({t:'ultring', x:pt.x, y:pt.y, r:0, max:2.2, life:0.4, maxLife:0.4, col:'#a97fe0'});
+  }
+  return true;
+}
+function marethWarpTick(e, dt){
+  const w=e.mw; if(!w) return;
+  if(e.dead){ e.mw=null; e.mwSink=0; return; }
+  w.t+=dt; e.vx=0; e.vy=0;
+  if(w.t<MWARP.out){ const k=w.t/MWARP.out; e.mwSink=k*k; e.x=w.fx; e.y=w.fy; return; }
+  if(!w.moved){ w.moved=true; e.x=w.tx; e.y=w.ty; }
+  const k=(w.t-MWARP.out)/MWARP.in;
+  if(k>=1){ e.mw=null; e.mwSink=0; return; }
+  e.x=w.tx; e.y=w.ty; e.mwSink=(1-k)*(1-k);
+}
 function tickMareth(dt){
+  if(W.enemies) for(const e of W.enemies) if(e.mw) marethWarpTick(e, dt);
   if(!marethOn() && !(W.vials&&W.vials.length) && !(W.mrings&&W.mrings.length) && !(W.mlights&&W.mlights.length) && !(W.mpools&&W.mpools.length)) return;
   const V=W.vials;
   if(V && V.length){
@@ -18913,7 +18950,7 @@ function draw(){
     const VIS = (e.uniqueBoss===10 && e._vis && window.CAVE && CAVE.on) ? e._vis : null;
     const visTop = VIS ? VIS.top : -R, visBot = VIS ? VIS.bot : R;
     /* ヴェラ第二形態の撃破演出は、弾けた瞬間（e._v2Boom）に影も消す（体が無いのに影だけ残らないように） */
-    const shA = e.dead?(e._v2Boom?0:Math.max(0,(e.fade??0.3)/0.3)):1;
+    const shA = (e.dead?(e._v2Boom?0:Math.max(0,(e.fade??0.3)/0.3)):1) * (e.mwSink>0 ? 1-e.mwSink : 1);   // マレットのワープ：沈むほど影も消える
     if(VIS){ const s=Math.max(shadowSize, VIS.w*0.6/0.52); drawFeelGroundShadow(sx, sy+VIS.bot-TS*0.12-s*0.39, s, 1, shA); }
     else drawFeelGroundShadow(sx,sy,shadowSize,1,shA);
     const disg = finalDisguised(e);   // 幻が出ているあいだ、本体の印を全部伏せる
@@ -26152,13 +26189,13 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
 <!-- 武器技・崩落のドット演出（2026-09-23）。game-feel.js より先に読む -->
-<script src="weapon-art-pixel.js?v=20261120-prayer1"></script>
+<script src="weapon-art-pixel.js?v=20261122-mwarp1"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
 <script src="game-feel.js?v=20261116-brecht3"></script>
 <script src="ui-icons.js"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261117-marethanim4"></script>
+<script src="cave-look.js?v=20261122-mwarp1"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
