@@ -1065,6 +1065,7 @@
   <p class="sub">失った仲間の名前が刻まれている。<br>
     SPを捧げれば、レベルと恩寵を保ったまま呼び戻せる。<b>装備は戻らない。</b></p>
   <div class="grid" id="memlist"></div>
+  <div id="stonebox"></div>
   <div style="height:24px"></div>
 </div>
 
@@ -16453,9 +16454,14 @@ function die(){
      育てた相手が痕跡なく消えるのは、痛みではなく理不尽になる。
 
      刻めば、SPという値段のついた選択肢に変わる。 */
-  const lost=party().slice();
-  lost.forEach(a=>{ if(a) memInter(a); });
+  const lost=party().filter(a=>a && !a.stone);
+  lost.forEach(a=>{ memInter(a); });
   if(lost.length) log('慰霊碑に '+lost.length+' 人の名を刻んだ');
+  /* 結びの石碑に刻んだ仲間は失わない。装備ごと、次の代の隊に戻る（stoneReturn） */
+  const stoneKept=party().filter(a=>a && a.stone);
+  stoneKept.forEach(stoneKeep);
+  if(stoneKept.length){ log('結びの石碑が '+stoneKept.length+' 人を守った');
+    html += '<div style="color:#9fd8c8;margin-top:10px">結びの石碑が <b>'+stoneKept.map(a=>a.name).join('・')+'</b> を守った（次の代の隊に戻る）</div>'; }
   /* 酒場の流れ者も入れ替える。**死んだ直後に棚が空だと詰む**——
      一番人手が要るのがここなので。 */
   rerollTavern();
@@ -16827,6 +16833,7 @@ function finishReturn(overflow){
 
      連れ帰った印だけは付ける。次に雇い直すときに半額になる。 */
   livingParty().forEach(a=>{ a.returned = true; });
+  stoneReturn();                                    // 結びの石碑に還っていた仲間も隊に戻る
   /* 帰還による自動再開（次から+1階／同じ階へ一度だけ）は撤廃。
      恒久の中継地点はボス撃破（中ボスと onGreatBossDown）だけが発生源になる——
      帰還そのものは次の開始階に一切影響しない。 */
@@ -21983,6 +21990,7 @@ function memRevive(uidA){
 }
 function renderMem(){
   el('mem-shards').textContent = '◆ '+(S.shards||0);
+  renderStone();
   const list=(S.fallen||[]);
   const full=party().length>=partyMax();
   el('memlist').innerHTML = !list.length
@@ -22005,6 +22013,69 @@ function renderMem(){
       }).join('');
 }
 function boodName(id){ const d=boonDef(id); return d?d.nm:id; }
+
+/* ---------- 結びの石碑（慰霊碑の中） ----------
+   2026-11-22 ユーザー要望「30階踏破で仲間の状態を保存できる石碑を慰霊碑に追加したい。
+   毎回仲間をロストするストレスを解放して、登録した仲間は死んでもロストしないようにする。登録はレベル×5くらいのSP」。
+   決めたこと（同日の回答）：
+   - 戻るのは**死んだ時点の状態**（レベル・恩寵・装備そのまま）。
+   - 戻り先は**隊**（道中で見送った者は街に戻ったとき、主人公が死んだときは次の代の隊）。入りきらない分は酒場へ。
+   - 刻める人数に上限は無い。一度刻めば、何度倒れても失わない（効き目はずっと）。
+   第30階層を一度でも踏破すると（floorCleared）現れる。刻めるのは街にいる間だけ、隊か酒場の仲間。 */
+const STONE_DEPTH = 30;          // ここを踏破すると石碑が現れる
+const STONE_SP_PER_LV = 5;       // 刻む値段：レベル×5 SP
+function stoneOpen(){ return floorCleared(STONE_DEPTH); }
+function stoneCost(a){ return Math.max(1, a.lv||1)*STONE_SP_PER_LV; }
+function stoneCandidates(){ return S.hero ? [...party(), ...tavernStock()] : []; }
+function stoneBind(uidA){
+  if(!stoneOpen()) return {ok:false, why:'第'+STONE_DEPTH+'階層を踏破すると現れる'};
+  if(S.run) return {ok:false, why:'探索中は刻めない'};
+  const a=stoneCandidates().find(x=>x.uidA===uidA);
+  if(!a) return {ok:false, why:'見つからない'};
+  if(a.stone) return {ok:false, why:'もう刻まれている'};
+  const cost=stoneCost(a);
+  if((S.shards||0) < cost) return {ok:false, why:'SPが足りない'};
+  S.shards -= cost; a.stone=true;
+  return {ok:true, ally:a, cost};
+}
+/* 倒れた（または主人公と一緒に倒れた）石碑の仲間を、死んだ時点の状態のまま預かる */
+function stoneKeep(a){
+  if(!a) return;
+  a.dead=false; a.st={}; a.bu={}; a.fallAnim=null; a.fallBlink=0;
+  a.hpNow=allyStats(a).maxHp;
+  a.x=a.y=undefined;
+  (S.stoneWait=S.stoneWait||[]).push(a);
+}
+/* 預かっていた仲間を隊に戻す。入りきらない（人数・職の上限）分は酒場へ */
+function stoneReturn(){
+  const W0=S.stoneWait; if(!W0 || !W0.length || !S.hero || S.run) return;
+  S.stoneWait=[];
+  for(const a of W0){
+    a.returned=true;
+    if(canJoin(a).ok){ a.slot=party().length; S.hero.party.push(a); }
+    else tavernPut(a);
+  }
+  party().forEach((m,i)=>{ m.slot=i; });
+}
+function renderStone(){
+  const box=el('stonebox'); if(!box) return;
+  if(!stoneOpen()){
+    box.innerHTML='<h2 style="margin:22px 0 6px;color:#9fd8c8;font-size:16px">結びの石碑</h2><div class="empty">第'+STONE_DEPTH+'階層を踏破すると、ここに石碑が現れる</div>';
+    return;
+  }
+  const list=stoneCandidates();
+  box.innerHTML='<h2 style="margin:22px 0 6px;color:#9fd8c8;font-size:16px">結びの石碑</h2>'
+    +'<p class="sub">名を刻んだ仲間は、倒れても失われない。装備もそのまま、隊に戻ってくる。<br>刻むには <b>レベル×'+STONE_SP_PER_LV+' SP</b>。一度刻めばずっと続く。</p>'
+    +'<div class="grid">'+(!list.length ? '<div class="empty">刻める仲間がいない（隊か酒場にいる仲間を刻める）</div>'
+    : list.map(a=>{
+        const j=jobDef(a.job), cost=stoneCost(a), afford=(S.shards||0)>=cost, where=party().includes(a)?'隊':'酒場';
+        return `<div class="item" data-stone="${a.uidA}" style="border-left-color:${j.col};opacity:${a.stone||afford?1:0.55}">
+          <div class="nm" style="color:${j.col}">${allyFullName(a)}
+            <span style="font-size:12px;color:var(--dim)">Lv.${a.lv} ${j.nm}・${where}</span></div>
+          <div class="af" style="color:${a.stone?'#9fd8c8':afford?'#8fd8ff':'#e0705a'}">
+            ${a.stone ? '刻まれている（倒れても失われない）' : '◆ '+cost+' SPで名を刻む'+(afford?'':'（所持 '+(S.shards||0)+'）')}</div>
+        </div>`; }).join(''))+'</div>';
+}
 
 /* ---------- 酒場 ----------
    街開発の「酒場」は今まで**数字だけの施設**だった（仲間の出現率が上がる）。
@@ -22111,8 +22182,9 @@ function tavernPut(a){
   a.returned=true;                 // 半額の印。ここに入るのは連れ帰った者だけ
   st.push(a);
   while(st.length > TAVERN_MAX){
-    let wi=0;
-    for(let i=1;i<st.length;i++) if((st[i].lv||1) < (st[wi].lv||1)) wi=i;
+    let wi=-1;                     // 結びの石碑に刻んだ者は追い出さない
+    for(let i=0;i<st.length;i++) if(!st[i].stone && (wi<0 || (st[i].lv||1) < (st[wi].lv||1))) wi=i;
+    if(wi<0) break;
     const gone=st.splice(wi,1)[0];
     log(gone.name+'は酒場を出て行った（'+TAVERN_MAX+'人まで）');
   }
@@ -22312,6 +22384,12 @@ bindRowTap(el('scr-tavern'), '[data-hire]', t=>{
   renderKeepScroll('scr-tavern', ()=>{ renderTavern(); renderTown(); });
 });
 
+bindRowTap(el('scr-mem'), '[data-stone]', t=>{
+  const r=stoneBind(+t.dataset.stone);
+  if(r.ok){ log(r.ally.name+'の名を結びの石碑に刻んだ'); toast(r.ally.name+'の名を刻んだ（◆ '+r.cost+' SP）'); }
+  else if(r.why!=='もう刻まれている') toast('刻めない — '+(r.why||''), '#e0705a');
+  renderKeepScroll('scr-mem', ()=>{ renderMem(); renderTown(); });
+});
 bindRowTap(el('scr-mem'), '[data-mem]', t=>{
   const r=memRevive(+t.dataset.mem);
   /* 呼び戻せなかったら**理由を言う。**
@@ -22383,6 +22461,7 @@ function renderChar(){
    能力値・装備・恩寵・仲間・呪いは renderChar（ステータス画面）が持つ。
    ここに全部を並べていたときは、潜るまでに5回スクロールが要った。 */
 function renderTown(){
+  if(!S.run) stoneReturn();          // 結びの石碑が預かっている仲間がいれば隊へ（読み込み直後など）
   if(!S.hero) S.hero=newHero();
   refreshGacha();
   if(pruneGrave()) log('遺体は完全に朽ちた');
@@ -25532,6 +25611,8 @@ function openFallen(a){
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層に入ると ${REVIVE_PER_BAND} 回に戻る</span></span></div>`
     : `<div class="row"><span class="k">もう戻せない</span><span>この帯の蘇生を使い切っている。<br>
          <span style="color:var(--dim);font-size:12px">第${reviveBandTop()+1}階層まで進めば、また ${REVIVE_PER_BAND} 回使える</span></span></div>`;
+  { const lb=el('fal-let'); lb.dataset.t0=lb.dataset.t0||lb.textContent;
+    lb.textContent = a.stone ? '見送る（結びの石碑が守る。街で隊に戻る）' : lb.dataset.t0; }
   const btn=el('fal-revive');
   btn.textContent = can ? ('広告を見て蘇生させる（残り '+left+'）') : 'この帯の蘇生は使い切った';
   btn.className   = can ? 'primary' : 'ghost';
@@ -25716,6 +25797,14 @@ function tryPhoenix(h, isPlayer){
 /* ロストを確定させる。パーティから外す。 */
 function letFallenGo(){
   const a=_fallen; if(!a) return;
+  /* 結びの石碑に刻んだ仲間は失わない。装備も護符もそのまま、街に戻ったら隊に戻る */
+  if(a.stone){
+    S.hero.party = party().filter(x=>x!==a);
+    stoneKeep(a);
+    log(a.name+'は結びの石碑に還った（街に戻ると隊に戻る）');
+    closeFallen();
+    return;
+  }
   // 見捨てる＝装備ごと失う。帰還画面の一覧に残すため、外す前に名前を控えておく。
   const equipNames=['weapon','shield','armor','accessory']
     .map(s=>a.equip && a.equip[s] && a.equip[s].nm).filter(Boolean);
@@ -25932,6 +26021,7 @@ bindTap(el('d-ok'), ()=>{
   el('m-death').classList.remove('on');
   S.run=null;
   S.hero=newHero();
+  stoneReturn();                                   // 結びの石碑が守った仲間は、次の代の隊に戻る
   S.startDepth=Math.min(S.startDepth, unlockedDepths()[unlockedDepths().length-1]);
   /* 呼ばれた代は街を通さない。**開始階も動かさない**——
      ここで S.startDepth を 51 にすると、次の代からも51が既定になってしまう。 */
