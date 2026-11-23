@@ -1206,6 +1206,7 @@
 <!-- ============ 仲間候補（道中の NPC） ============ -->
 <div class="modal" id="m-ally"><div class="box" style="text-align:left;max-height:88vh;overflow-y:auto">
   <h1 style="text-align:center" id="ally-name">仲間候補</h1>
+  <div id="ally-art"></div>
   <p class="sub" style="text-align:center" id="ally-sub"></p>
   <div class="card" id="ally-skill"></div>
   <h2>能力</h2>
@@ -1249,6 +1250,7 @@
 <!-- ============ 仲間の装備 ============ -->
 <div class="modal" id="m-allyeq"><div class="box" style="text-align:left;max-height:90vh;overflow-y:auto">
   <h1 id="ae-name" style="text-align:center">仲間</h1>
+  <div id="ae-art"></div>
   <p style="text-align:center;font-size:12px;font-weight:700;margin:0" id="ae-epithet"></p>
   <p class="sub" id="ae-sub" style="text-align:center"></p>
   <div class="card" id="ae-stats"></div>
@@ -22004,6 +22006,7 @@ function renderMem(){
         return `<div class="item" data-mem="${f.uidA}" style="border-left-color:${j.col};opacity:${c.ok?1:0.55}">
           <div class="nm" style="color:${j.col}">${allyFullName(f)}
             <span style="font-size:12px;color:var(--dim)">Lv.${f.lv} ${j.nm}</span></div>
+          ${allyArtHTML(f, j, {dim:'dark'})}
           <div class="af">第${f.depth}階層で失われた</div>
           <div class="af" style="color:#d6b34a">${bl}</div>
           <div class="af" style="color:${c.ok?'#8fd8ff':afford?'#5c6479':'#e0705a'}">
@@ -22059,12 +22062,19 @@ function stoneReturn(){
 }
 /* 石碑の一覧の、名前の下に置くキャラの絵（2026-11-23 ユーザー要望）。
    街の広場と同じく CharacterArt の Image の src をそのまま使う。絵の無いジョブは広場と同じ絵文字 */
-function stoneArtHTML(a, j){
-  const im=CharacterArt.image(CharacterArt.allyKey(a));
+function stoneArtHTML(a, j){ return allyArtHTML(a, j, {dim:!a.stone}); }
+/* 仲間の一覧・詳細の、名前の下に置くキャラの絵（2026-11-23 ユーザー要望：石碑と同じものを
+   ステータスの仲間欄・仲間の詳細・仲間候補・酒場・慰霊碑にも）。
+   size：表示の大きさ（一覧は32、詳細は48）／dim：色をくすませる（刻んでいない・失った等）／center：中央寄せ */
+function allyArtHTML(a, j, o){
+  o=o||{}; j=j||jobDef(a.job);
+  const n=o.size||32, im=CharacterArt.image(CharacterArt.allyKey(a));
+  const filt=o.dim ? (o.dim==='dark' ? 'filter:grayscale(.6) brightness(.7)' : 'filter:saturate(.75) brightness(.9)') : '';
+  const g=Math.round(n*0.875);
   const body=im
-    ? `<img src="${im.src}" alt="" style="width:32px;height:32px;image-rendering:pixelated;display:block;${a.stone?'':'filter:saturate(.75) brightness(.9)'}">`
-    : `<span class="glyph" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;font-size:14px;border:2px solid ${j.col};color:${j.col};border-radius:50%">${hubGlyph(a.job)}</span>`;
-  return `<div class="stone-art" style="margin:4px 0 2px">${body}</div>`;
+    ? `<img src="${im.src}" alt="" style="width:${n}px;height:${n}px;image-rendering:pixelated;display:${o.center?'inline-block':'block'};${filt}">`
+    : `<span class="glyph" style="display:inline-flex;align-items:center;justify-content:center;width:${g}px;height:${g}px;font-size:${Math.round(g/2)}px;border:2px solid ${j.col};color:${j.col};border-radius:50%">${hubGlyph(a.job)}</span>`;
+  return `<div class="ally-art" style="margin:4px 0 2px;${o.center?'text-align:center':''}">${body}</div>`;
 }
 function renderStone(){
   const box=el('stonebox'); if(!box) return;
@@ -22322,6 +22332,7 @@ function tavernPartyRow(a){
   return `<div class="item" data-park="${a.uidA}" style="border-left-color:${j.col}">
     <div class="nm" style="color:${j.col}">${allyFullName(a)}
       <span style="font-size:12px;color:var(--dim)">Lv.${a.lv} ${j.nm}</span></div>
+    ${allyArtHTML(a, j, {dim:a.dead?'dark':false})}
     <div class="af">${a.dead?'倒れている':'装備 '+gear+' 点'}</div>
     <div class="af" style="color:#8fd8ff">タップで酒場に預ける</div>
   </div>`;
@@ -22345,6 +22356,7 @@ function tavernRow(a){
   return `<div class="item" data-hire="${a.uidA}" style="border-left-color:${j.col};opacity:${c.ok?1:0.55}">
     <div class="nm" style="color:${j.col}">${allyFullName(a)}
       <span style="font-size:12px;color:var(--dim)">Lv.${a.lv} ${j.nm}</span></div>
+    ${allyArtHTML(a, j)}
     <div class="af">${why}</div>
     <div class="af" style="color:#d6b34a">${bl}</div>
     <div class="af" style="color:${c.ok?'#7fe0c0':(S.gold>=cost?'#5c6479':'#e0705a')}">
@@ -22460,6 +22472,7 @@ function renderChar(){
     return `<div class="item" data-ally="${a.uidA}" style="border-left-color:${j.col}">
       <div class="nm" style="color:${j.col}">${allyFullName(a)}
         <span style="color:var(--dim);font-size:12px">${j.nm} Lv.${a.lv}</span></div>
+      ${allyArtHTML(a, j)}
       <div class="af">HP ${as.maxHp}　攻撃 ${Math.round(as.atk)}</div>
       <div class="af" style="color:${j.col}">技 ${sk.length}/5${sk.length?'：'+sk.map(x=>x.nm).join('・'):''}
         ${nx?`<span style="color:var(--dim)">　次は Lv.${nx.lv}</span>`:''}</div>
@@ -23148,6 +23161,7 @@ function renderAllyEquip(){
   const j=jobDef(a.job), st=allyStats(a);
   el('ae-name').textContent=a.name;
   el('ae-name').style.color=j.col;
+  el('ae-art').innerHTML=allyArtHTML(a, j, {size:48, center:true});
   el('ae-epithet').textContent = allyEpithet(a);
   el('ae-epithet').style.color = j.col;
   const nx=allyNextSkill(a);
@@ -25001,6 +25015,7 @@ function renderBag(){
     return `<div class="item" data-ally="${a.uidA}" style="border-left-color:${j.col}">
       <div class="nm" style="color:${j.col}">${allyFullName(a)} <span style="color:var(--dim);font-size:12px">${j.nm} Lv.${a.lv}</span>
         <span style="color:#7fe0c0;font-size:12px">　タップで装備・技</span></div>
+      ${allyArtHTML(a, j)}
       <div class="af">HP ${Math.max(0,Math.ceil(a.hpNow))}/${as.maxHp}　攻撃 ${Math.round(as.atk)}　${(DTYPE[as.dmgType]||DTYPE.blunt).nm}</div>
       <div class="af">回避 ${j.evade+allySkillSum(a).evade}%　HP${Math.round(j.bail*100)}%で退く</div>
       <div class="af">${j.sk.nm}：${j.sk.desc}</div>
@@ -25337,6 +25352,7 @@ function openAllyInspect(){
   el('hud').classList.remove('on');
   el('ally-name').textContent = a.name;
   el('ally-name').style.color = j.col;
+  el('ally-art').innerHTML = allyArtHTML(a, j, {size:48, center:true});
   /* 二つ名と持っている恩寵は、加入を決める前に見えていなければならない。
      加入してから分かるのでは「誰を連れて行くか」の判断材料にならない。 */
   const ep=allyEpithet(a);
