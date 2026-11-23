@@ -22021,8 +22021,8 @@ function boodName(id){ const d=boonDef(id); return d?d.nm:id; }
    - 戻るのは**死んだ時点の状態**（レベル・恩寵・装備そのまま）。
    - 戻り先は**隊**（道中で見送った者は街に戻ったとき、主人公が死んだときは次の代の隊）。入りきらない分は酒場へ。
    - 刻める人数に上限は無い。一度刻めば、何度倒れても失わない（効き目はずっと）。
-   第30階層を一度でも踏破すると（floorCleared）現れる。刻めるのは街にいる間だけ、隊か酒場の仲間。 */
-const STONE_DEPTH = 30;          // ここを踏破すると石碑が現れる
+   第20階層を一度でも踏破すると（floorCleared）現れる（はじめは30階、2026-11-23 に20階へ）。刻めるのは街にいる間だけ、隊か酒場の仲間。 */
+const STONE_DEPTH = 20;          // ここを踏破すると石碑が現れる（2026-11-23 ユーザー指定で 30→20）
 const STONE_SP_PER_LV = 5;       // 刻む値段：レベル×5 SP
 function stoneOpen(){ return floorCleared(STONE_DEPTH); }
 function stoneCost(a){ return Math.max(1, a.lv||1)*STONE_SP_PER_LV; }
@@ -22062,8 +22062,8 @@ function stoneReturn(){
 function stoneArtHTML(a, j){
   const im=CharacterArt.image(CharacterArt.allyKey(a));
   const body=im
-    ? `<img src="${im.src}" alt="" style="width:64px;height:64px;image-rendering:pixelated;display:block;${a.stone?'':'filter:saturate(.75) brightness(.9)'}">`
-    : `<span class="glyph" style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:2px solid ${j.col};color:${j.col};border-radius:50%">${hubGlyph(a.job)}</span>`;
+    ? `<img src="${im.src}" alt="" style="width:32px;height:32px;image-rendering:pixelated;display:block;${a.stone?'':'filter:saturate(.75) brightness(.9)'}">`
+    : `<span class="glyph" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;font-size:14px;border:2px solid ${j.col};color:${j.col};border-radius:50%">${hubGlyph(a.job)}</span>`;
   return `<div class="stone-art" style="margin:4px 0 2px">${body}</div>`;
 }
 function renderStone(){

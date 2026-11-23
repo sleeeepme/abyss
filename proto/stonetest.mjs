@@ -1,4 +1,4 @@
-/* 結びの石碑（慰霊碑の中）：第30階層の踏破で現れる。刻んだ仲間（レベル×5 SP）は倒れても失われず、
+/* 結びの石碑（慰霊碑の中）：第20階層の踏破で現れる。刻んだ仲間（レベル×5 SP）は倒れても失われず、
    死んだ時点の状態（レベル・恩寵・装備）で隊に戻る。道中で見送った者は街で、主人公が死んだら次の代の隊に */
 import { boot, install } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
@@ -11,7 +11,7 @@ const R = await pg.evaluate(()=>{ try{
   // まだ石碑は無い
   S.run=null; S.shards=200;
   R.lockedBefore = !stoneOpen() && !stoneBind(A.uidA).ok && S.shards===200;
-  markFloorCleared(30);
+  markFloorCleared(20);
   R.costLv5 = stoneCost(A)===50;
   const r=stoneBind(A.uidA);
   R.bind = r.ok && A.stone===true && S.shards===150;
