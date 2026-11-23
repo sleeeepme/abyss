@@ -22057,6 +22057,15 @@ function stoneReturn(){
   }
   party().forEach((m,i)=>{ m.slot=i; });
 }
+/* 石碑の一覧の、名前の下に置くキャラの絵（2026-11-23 ユーザー要望）。
+   街の広場と同じく CharacterArt の Image の src をそのまま使う。絵の無いジョブは広場と同じ絵文字 */
+function stoneArtHTML(a, j){
+  const im=CharacterArt.image(CharacterArt.allyKey(a));
+  const body=im
+    ? `<img src="${im.src}" alt="" style="width:64px;height:64px;image-rendering:pixelated;display:block;${a.stone?'':'filter:saturate(.75) brightness(.9)'}">`
+    : `<span class="glyph" style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:2px solid ${j.col};color:${j.col};border-radius:50%">${hubGlyph(a.job)}</span>`;
+  return `<div class="stone-art" style="margin:4px 0 2px">${body}</div>`;
+}
 function renderStone(){
   const box=el('stonebox'); if(!box) return;
   if(!stoneOpen()){
@@ -22072,6 +22081,7 @@ function renderStone(){
         return `<div class="item" data-stone="${a.uidA}" style="border-left-color:${j.col};opacity:${a.stone||afford?1:0.55}">
           <div class="nm" style="color:${j.col}">${allyFullName(a)}
             <span style="font-size:12px;color:var(--dim)">Lv.${a.lv} ${j.nm}・${where}</span></div>
+          ${stoneArtHTML(a, j)}
           <div class="af" style="color:${a.stone?'#9fd8c8':afford?'#8fd8ff':'#e0705a'}">
             ${a.stone ? '刻まれている（倒れても失われない）' : '◆ '+cost+' SPで名を刻む'+(afford?'':'（所持 '+(S.shards||0)+'）')}</div>
         </div>`; }).join(''))+'</div>';
