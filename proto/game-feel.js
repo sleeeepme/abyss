@@ -117,7 +117,7 @@ function feelSlow(seconds,scale){FEEL.slow=Math.max(FEEL.slow,seconds);FEEL.slow
 function feelPerfect(txt,col){
   feelSlow(FEEL_TUNING.perfectSlowSeconds,FEEL_TUNING.perfectSlowScale);feelKick(3.1,.15);feelSpray(P.x,P.y,col,26,2.8);
   W.fx.push({t:'feelring',x:P.x,y:P.y,col,life:.38,max:.38,r:1.4});
-  W.pops.push({x:P.x,y:P.y-.7,txt,c:col,life:.85,max:.85});
+  if(txt) W.pops.push({x:P.x,y:P.y-.7,txt,c:col,life:.85,max:.85});
 }
 function feelJustDodge(){
   if(FEEL.just<=0||FEEL.justUsed)return false;
@@ -1668,4 +1668,14 @@ function drawFeelItemIcon(it,x,y){
   const alpha=FEEL_REDUCED.matches||period<=0 ? 1
     : min+(1-min)*(.5+.5*Math.cos(performance.now()/1000/period*Math.PI*2));
   ITEM_ART.draw(ctx,it,x,y,TS,outline,alpha);
+}
+// Provisional A concepts: native 16px, integer-scaled, without gear rarity outlines.
+function drawFeelRelicIcon(id,x,y){
+  /* 2026-11-23 ユーザー指定：落ちている遺物は中身に関わらず全部「目の護符石」（ui-icons の relic）。
+     何の遺物かは拾うまで分からない。16px の絵を整数倍で置く（半端な倍率だとドットの太さがばらつく）。 */
+  if(typeof UI_ICONS!=='undefined' && UI_ICONS.draw(ctx,'relic',x,y,16*Math.max(1,Math.round(TS/16)))) return;
+  if(typeof RELIC_ART!=='undefined' && RELIC_ART.draw(ctx,id,x,y,TS)) return;
+  ctx.save();ctx.fillStyle='#d6b34a';
+  ctx.fillRect(Math.round(x-TS*.15),Math.round(y-TS*.15),Math.round(TS*.3),Math.round(TS*.3));
+  ctx.restore();
 }

@@ -227,6 +227,8 @@
     const keepDebug=S.debug;
     for(const [i,target] of [S,P,W].entries()){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,roots[i]);}
     if(keepDebug)S.debug=keepDebug;
+    S.bld=S.bld||{};
+    S.bld.stash=Math.max(1,S.bld.stash||0); // 旧セーブも倉庫Lv.1から。強化済みは保持
     normalizeDeathPressure(); // 旧セーブの1〜4階の死亡強化も解除
     migrateMidDown();         // 旧セーブ：倒した中ボスの記録（S.midDown）を恩寵の記録から作る
     W.pops=[];RNG=mulberry32(d.rng);genItem._n=d.itemId;

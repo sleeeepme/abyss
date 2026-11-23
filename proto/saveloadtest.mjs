@@ -26,6 +26,55 @@ await check('town survives reload with inventory and growth',async()=>{
   await reload();assert.equal(await page.locator('#t-start').textContent(),'つづきから');await page.click('#t-help');await page.click('#help-ok');assert.equal(await page.locator('#t-start').textContent(),'つづきから');await page.screenshot({path:'/tmp/abyss-save-title.png'});await resume();
   assert.equal(await page.evaluate(()=>JSON.stringify([S.name,S.gold,S.shards,S.stash,S.mastery])),before);
 });
+await check('old saves receive the initial warehouse and keep upgraded levels',async()=>{
+  for(const [oldLevel,expected] of [[undefined,1],[0,1],[4,4]]){
+    await page.evaluate(lv=>{S.bld={forge:2};if(lv!==undefined)S.bld.stash=lv;},oldLevel);
+    await flush();await reload();await resume();
+    assert.deepEqual(await page.evaluate(()=>[bldLv('stash'),hubUnlocked('stash'),bldLv('forge')]),[expected,true,2]);
+  }
+});
+await check('trial relic drop survives reload and becomes permanent only on pickup',async()=>{
+  const before=await page.evaluate(()=>{
+    S.hero=newHero();S.hero.party=[];S.relics=[];S.relicEq=[];S.upg={};
+    startRun(6);setScreen('game');S.hero.hpNow=stats(S.hero).maxHp;P.invuln=999;
+    W.enemies=[];W.drops=[];
+    S.run.trial={t:0.01,max:TRIAL_SEC,bane:'heavy',wave:999,kills:0,x:P.x,y:P.y};
+    tickTrial(0.02);
+    const drop=W.drops.find(d=>d.relic);
+    // Stay away from the reward while reloading so auto-pickup cannot race the assertion.
+    P.x=drop.x+3;
+    setScreen('none');
+    return {id:drop.relic,x:drop.x,y:drop.y};
+  });
+  await flush();await reload();await resume();
+  const restored=await page.evaluate(()=>{
+    setScreen('none');
+    const d=W.drops.find(d=>d.relic);
+    return {id:d?.relic,x:d?.x,y:d?.y,owned:S.relics.length,active:!!S.run.trial};
+  });
+  assert.deepEqual(restored,{...before,owned:0,active:false});
+  await page.evaluate(()=>{const d=W.drops.find(d=>d.relic);d.feelDrop.age=1;P.x=d.x;P.y=d.y;autoPickup();});
+  await flush();await reload();await resume();
+  assert.deepEqual(await page.evaluate(()=>[S.relics.slice(),W.drops.filter(d=>d.relic).length]),[[before.id],0]);
+  await page.evaluate(()=>{S.run=null;setScreen('town');});
+});
+await check('weapon art use growth and an active boosted field survive reload',async()=>{
+  await page.evaluate(()=>{
+    S.hero=newHero();S.hero.party=[];S.artUses={swspin:19,stflame:60};S.cleared2={30:1};
+    startRun(6);W.enemies=[];P.invuln=999;P.atkCd=999;P.artCd=999;
+    const a=makeAlly(6,S.hero,'warrior');a.arts={sword:3};a.artUses={swmulti:120};a.wartCd=999;a.stone=true;S.hero.party=[a];
+    fireArt(artDef('swspin'),S.hero);fireArt(artDef('stflame'),S.hero);setScreen('none');
+  });
+  await flush();await reload();await resume();
+  const got=await page.evaluate(()=>{
+    setScreen('none');const f=W.arts.find(f=>f.def?.id==='stflame');
+    return {open:artGrowthOpen(),hero:S.artUses,ally:party()[0].artUses,
+      level:artGrowthLevel(artDef('swspin')),field:f?.def.mult};
+  });
+  assert.equal(got.open,true);assert.deepEqual(got.hero,{swspin:20,stflame:61});
+  assert.deepEqual(got.ally,{swmulti:120});assert.equal(got.level,2);assert(Math.abs(got.field-.18)<1e-9);
+  await page.evaluate(()=>{S.run=null;S.artUses={};S.cleared2={};S.hero.party=[];setScreen('town');});
+});
 /* タイトルで入れたデバッグの切り替え（S.debug は保存しない）が「つづきから」で消えていた。
    階層全開放を入れて続きから入ると、階層選択が出ずに第1階層へ直行した（報告）。 */
 await check('debug switches set on the title survive resume',async()=>{

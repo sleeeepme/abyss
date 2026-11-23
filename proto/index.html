@@ -3615,7 +3615,8 @@ function relicOn(id){ return relicsOn().some(r=>r.id===id); }
 function relicSum(key){ return relicsOn().reduce((n,r)=>n+(r[key]||0), 0); }
 /* まだ持っていないレリックを1つ。同じ物は落ちない。 */
 function rollNewRelic(){
-  const pool=RELICS.filter(r=>!relicHas(r.id));
+  const pending=new Set((W.drops||[]).map(d=>d.relic).filter(Boolean));
+  const pool=RELICS.filter(r=>!relicHas(r.id) && !pending.has(r.id));
   /* 求道は8種あるが、**抽選では1枠**として扱う。
      そのまま並べると池の半分が求道になり、他の遺物が出なくなる。 */
   const hoards=pool.filter(r=>r.fam==='hoard');
@@ -3637,6 +3638,16 @@ function grantRelic(id){
   if(!upgLv('relic')) S.upg.relic = 1;
   S.relicEq = S.relicEq || [];
   if(S.relicEq.length < relicSlots()) S.relicEq.push(id);   // 空きがあれば即座に着ける
+  return true;
+}
+/* 床の遺物は、拾った時点で永続所持になる。通常の装備や持ち帰り枠には入れない。 */
+function pickupRelic(id,x,y){
+  const prize=relicDef(id);
+  if(!prize || !grantRelic(id)) return false;
+  const equipped=relicOn(id);
+  log(prize.nm+' を拾った'+(equipped?'':'（枠がいっぱいで未装備。スキルの「遺物」で入れ替えられる）'));
+  showBanner(prize.nm,prize.desc+(equipped?'':'　※枠がいっぱいで未装備'),prize.col,3.2);
+  W.fx.push({t:'ultring',x,y,r:0,max:5,life:0.9,maxLife:0.9,col:prize.col});
   return true;
 }
 function relicToggle(id){
@@ -4240,7 +4251,6 @@ function tickFinalBossBane(dt){
   if(fb.t<=0){
     const next=pick(TRIAL_BANES).id;
     S.run.bossBane = {id:next, t:BOSS_BANE_SEC, max:BOSS_BANE_SEC};
-    log('枷が切り替わった — '+trialBaneDef(next).nm);
   }
 }
 /* ---------- 白の層の枷 ----------
@@ -4425,7 +4435,7 @@ function bldLv(id){ return (S.bld&&S.bld[id])||0; }
    **最初の1段を買った実感がいちばん薄い。**
 
    Lv.0 は更地。街のボタンはグレーで残し、押せば何を建てれば開くかを言う。
-   Lv.1 で建つ（＝その施設が使えるようになる）。
+   Lv.1 で建つ（＝その施設が使えるようになる）。倉庫は初期Lv.1で開放済み。
    1段目の値段は「第5階層まで潜って生きて帰れば1つ建つ」あたりに置いてある
    （帰還報酬 101G ＋ 道中の拾得。BUILDINGS.base がそのまま Lv.1 の値段）。
 
@@ -4995,6 +5005,7 @@ const ALLY_RAR_MAX = 1;       // 仲間の装備は Uncommon 止まり（Rare �
    完全な 1/N 分配だと仲間を入れるほど損になり、誰も連れて行かなくなる。
    増えた手数のぶんだけプールを膨らませて、「分配されるが総量は増える」に着地させる。 */
 const XP_PARTY_BONUS = 0.15;
+const NPC_MIN_DEPTH = 3;      // 仲間候補が登場し始める階
 const NPC_CHANCE = 0.42;      // 1階層に NPC が現れる確率
 /* 加入前だけ効く被ダメージ軽減（％）。駆け寄る時間を作るためのもの。 */
 const NPC_GUARD_DR = 55;
@@ -5361,6 +5372,52 @@ const ART_FLASH_MAST   = 0.12;   // 熟練1段ごとに閃きやすさ +12%
 const ART_FLASH_ALLY   = 1.8;
 const ART_ALLY_CD_MUL  = 1.35;   // 仲間は自動発動なので、手で切るより少し遅く回す
 
+/* 30階踏破後の鍛錬。技の習得段（1〜3）とは別に、各技をLv.1〜5へ育てる。 */
+const ART_GROWTH_DEPTH = 30;
+const ART_GROWTH_USES = [0,20,60,120,200]; // 各Lvへの累計発動回数。解放前は数えない
+const ART_GROWTH_POWER = 0.10;            // 1Lvごとに威力・回復量 +10%
+const ART_GROWTH_CDR = 0.03;              // 1Lvごとにリキャスト -3%
+function artGrowthOpen(){ return floorCleared(ART_GROWTH_DEPTH); }
+function artUseCount(def,src){
+  const owner=(!src || src===S.hero) ? S : src;
+  const n=owner.artUses && owner.artUses[def.id];
+  return Number.isSafeInteger(n) && n>0 ? Math.min(n,ART_GROWTH_USES[ART_GROWTH_USES.length-1]) : 0;
+}
+function artGrowthLevel(def,src){
+  if(!artGrowthOpen()) return 1;
+  const n=artUseCount(def,src);
+  return ART_GROWTH_USES.reduce((lv,need,i)=>n>=need ? i+1 : lv,1);
+}
+function artGrowthDef(def,src){
+  const power=1+(artGrowthLevel(def,src)-1)*ART_GROWTH_POWER;
+  if(power===1) return def;
+  const grown=Object.assign({},def);
+  if(def.mult) grown.mult=def.mult*power;
+  if(def.healPct) grown.healPct=def.healPct*power;
+  return grown;
+}
+function recordArtUse(def,src){
+  if(!artGrowthOpen() || !artDef(def.id)) return;
+  const owner=(!src || src===S.hero) ? S : src, before=artGrowthLevel(def,src);
+  owner.artUses=owner.artUses||{};
+  owner.artUses[def.id]=Math.min(ART_GROWTH_USES[ART_GROWTH_USES.length-1],artUseCount(def,src)+1);
+  const after=artGrowthLevel(def,src);
+  if(after>before) log((owner===S?'':src.name+'の')+'武器技「'+artName(def)+'」が Lv.'+after+'になった');
+  if(window.ABYSS_SAVE) ABYSS_SAVE.request();
+}
+function artGrowthText(def,src){
+  const lv=artGrowthLevel(def,src), count=artUseCount(def,src);
+  return 'Lv.'+lv+'/'+ART_GROWTH_USES.length+'　累計使用 '+count
+    +(lv<ART_GROWTH_USES.length ? '/'+ART_GROWTH_USES[lv]+'回' : '回（上限）');
+}
+function artGrowthBonusText(def,src){
+  const steps=artGrowthLevel(def,src)-1, labels=[];
+  if(def.mult) labels.push('威力 +'+Math.round(steps*ART_GROWTH_POWER*100)+'%');
+  if(def.healPct) labels.push('回復量 +'+Math.round(steps*ART_GROWTH_POWER*100)+'%');
+  labels.push('リキャスト -'+Math.round(steps*ART_GROWTH_CDR*100)+'%');
+  return labels.join('　');
+}
+
 /* 技の形（k）と数値。
    **威力は「大技 Lv.1（地脈断＝ATK×3.15）を超えない」を上限に置いてある。**
    段が上がると増えるのは主に届き方と付随効果で、倍率そのものではない——
@@ -5458,14 +5515,15 @@ function artDef(id){
 /* その技が何段目か（1〜3）。リキャストと閃きやすさはここで決まる。 */
 function artTier(def){
   for(const k in WEAPON_ARTS){
-    const i=WEAPON_ARTS[k].indexOf(def);
+    const i=WEAPON_ARTS[k].findIndex(a=>a.id===def.id);
     if(i>=0) return i+1;
   }
   return 1;
 }
-function artCooldown(def, isAlly){
+function artCooldown(def, isAlly, src){
   const cd = ART_CD[artTier(def)-1] || ART_CD[0];
-  return isAlly ? cd*ART_ALLY_CD_MUL : cd;
+  const lv=isAlly && !src ? 1 : artGrowthLevel(def,src);
+  return cd*(isAlly?ART_ALLY_CD_MUL:1)*(1-(lv-1)*ART_GROWTH_CDR);
 }
 /* ---------- 習得（閃き） ----------
    主人公のぶんは**アカウント単位**で持つ（S.arts）。武器熟練と同じ扱いで、
@@ -5770,7 +5828,7 @@ function tickAllyArt(a, st, dt){
 function tickAllyWeaponArt(a, st, dt){
   const def=allyArt(a);
   if(!def){ a.wartCd=0; return; }
-  const cd=artCooldown(def, true);
+  const cd=artCooldown(def, true, a);
   a.wartCd = (a.wartCd===undefined) ? rf(1.0, cd*0.6) : a.wartCd - dt;   // 初回は少しずらす
   if(a.wartCd>0) return;
   // 相手がいないと意味の無い技は、溜めたまま待つ（誰もいない部屋で空撃ちしない）
@@ -6273,8 +6331,13 @@ function stairRevealed(){
    一度でも降り口を抜けた階は覚えておく（口座側）。
    マージンの話は「まだ通っていない階をどこまで見せるか」に残す。 */
 function markFloorCleared(depth){
+  const growthWasOpen=artGrowthOpen();
   S.cleared2 = S.cleared2 || {};
   S.cleared2[depth] = 1;
+  if(!growthWasOpen && artGrowthOpen()){
+    log('武器技の鍛錬が解放された — 使うほどLvが上がる');
+    showBanner('武器技の鍛錬','使用回数で各技がLv.5まで成長する','#8fd8ff',3.2);
+  }
 }
 function floorCleared(depth){ return !!(S.cleared2 && S.cleared2[depth]); }
 /* 気配の濃さ。0 なら何も出さない。 */
@@ -6906,7 +6969,7 @@ const S={
   carry:[], gachaLeft:GACHA_PER_DAY, gachaFree:GACHA_FREE_PER_DAY, gachaDay:'',   // 持ち込み枠（死ぬと失う）
   lastDepth:1,           // 直近の探索の到達最深度。ガチャの排出帯を決める
   cleared:0,             // 第51階層の主（アビスの門番、アズレイア）を倒した回数
-  bld:{},                // 街開発の各施設のレベル
+  bld:{stash:1},         // 倉庫は初期開放。その他の施設は未建設
   tavern:[],             // 酒場で待っている連れ帰った者（口座側。キャラが死んでも残る）
   tavernPool:null,       // 流れ者。帰還のたびに 1〜4 人が入れ替わる（null＝まだ並べていない）
   bossBoon:{},           // 恩寵を受け取ったボス階（二度は出さない）
@@ -6931,6 +6994,7 @@ const S={
      どちらも「その武器種を使い続けた蓄積」なので、片方だけ死で消えると
      同じ物を2つの規則で数えることになる。値は「何段目まで閃いたか」（0〜3）。 */
   arts:{},
+  artUses:{},            // 30階踏破後の武器技ごとの発動回数（主人公・恒久）
   artPick:{},            // 武器種ごとに、ボタンへ乗せている技の id
   skill:null,            // 枠2（#wavebtn）に載せているスキル技の id。null なら覚えた最初の技
   artName:{},            // 閃いた技に自分で付けた名前（技ID→名前）。既定は WEAPON_ARTS の nm
@@ -8196,7 +8260,6 @@ function bossChangeForm(e){
   e.rage=false; e.teleMul=1;
   e.cast=null; e.tele=0; e.moveCd=BOSS_FORM_PAUSE;
   e.hit=0.4;
-  if(e.revealed) log(e.name+'——姿が変わった');
   const U=uniqueBossAt(e.uniqueBoss);
   if(U && U.parts) e.parts=makeBossParts(e, U.parts);
   veraKeepClear(e);                // 第二形態の大きな体が柱や壁に掛かる所で変わったら、掛からない所へずらす
@@ -8243,19 +8306,13 @@ function partHit(e, dmg, sx, sy, p){
   if(bd>0){ e.hp-=bd; pop(e.x, e.y-0.6, bd, '#ffd06a', '', true); }
   e.down=P_.down; e.cast=null; e.tele=0; e.vx=0; e.vy=0; e.hit=0.4; e.combo=null;
   addBreak(e, DUEL.pt.leg);                                     // 脚を砕けば崩しにも大きく入る
-  log(e.name+'——'+p.nm+'が砕けた。崩れ落ちた');
-  W.pops.push({x:e.x+p.ox, y:e.y+p.oy-0.4, txt:'部位破壊', c:'#ffd06a', life:1.1});
   if(typeof feelKick==='function') feelKick(3.0, 0.25);
   W.fx.push({t:'shock', x:e.x+p.ox, y:e.y+p.oy, r:0.9, life:0.3, max:0.3, col:'#b8b0a0'});
   if(e.parts.filter(q=>q.broken).length>=(P_.lameAt||4) && !e.lame){
     e.lame=true;
-    log(e.name+'——脚を2本失い、もう歩けない');
-    W.pops.push({x:e.x, y:e.y-1.6, txt:'移動不能', c:'#ff9a6a', life:1.4});
   }
   if(e.parts.every(q=>q.broken) && !e.partsAll){
     e.partsAll=true; e.def*=P_.allDef;
-    log(e.name+'——脚をすべて失った。守りも大きく崩れた');
-    W.pops.push({x:e.x, y:e.y-1.2, txt:'防御ダウン', c:'#ff9a6a', life:1.4});
   }
   return p;
 }
@@ -9340,6 +9397,7 @@ function spawnEvent(fl, depth){
 
 /* 階層に 1 体だけ現れる仲間候補。パーティが満員なら出さない。 */
 function spawnNpc(fl, depth){
+  if(depth < NPC_MIN_DEPTH) return null;
   if(!S.hero) return null;
   if(hasCurse('solitude')) return null;         // 呪い「孤独」
   if(livingParty().length >= partyMax()) return null;
@@ -11415,6 +11473,8 @@ function fireArt(def, src){
   if(!def || !S.run) return false;
   const c=artCtx(src);
   if(!c.ent || c.ent.dead) return false;
+  const grows=artGrowthOpen();
+  def=artGrowthDef(def,src); // 発動時のLvを固定。多段・持続・保存再開でも途中で威力を変えない
   const ang=Math.atan2(c.diry||0, c.dirx||1);
   sayArt(c.x, c.y, artName(def), def.col);
   if(c.isPlayer) feelUltimate(P, def.col); else feelUltimate(c.ally, def.col);
@@ -11514,6 +11574,7 @@ function fireArt(def, src){
     artStrike(c, def, ang);
   }
   if(c.isPlayer) feelKick(3.6, .2);
+  if(grows) recordArtUse(def,src); // 多段や命中数ではなく、実際の発動1回につき1回
   return true;
 }
 /* ---------- 主人公の武器技 ---------- */
@@ -13802,7 +13863,6 @@ function killEnemy(e, byAlly){
       twinLeft.teleMul = Math.min(twinLeft.teleMul, TWIN_ENRAGE_TELE_MUL);
       twinLeft.ms *= TWIN_ENRAGE_MS_MUL;
       twinLeft.moveCd = Math.min(twinLeft.moveCd, 1.0);
-      log(e.name+'を撃破——相方が速度を上げた');
       W.fx.push({t:'parry',x:e.x,y:e.y,life:0.6,max:0.6});
       return;
     }
@@ -14270,13 +14330,10 @@ function brechtPurge(e){
     feelSpray(e.x, e.y+0.8, '#9a907c', 16, 1.8, 'dust');
   }
   if(brechtArtOn()) feelPixelArt('bb_purge', e.x, e.y, {o:{inner:b.inner}});   // 光のひび → 板が飛んで床に残る
-  W.pops.push({x:e.x, y:e.y-1.2, txt:'鎧を脱いだ', c:'#ffd8a0', life:1.2, max:1.2});
-  if(e.revealed) log(e.name+'——鎧を脱ぎ捨てた。脆いが、速い');
 }
 /* 第3形態：片方が倒れた瞬間、倒れた方が残った方へ合流する。光の線でつなぎ、咆哮（変身と同じ歪み）で始める */
 function brechtMerge(s, d){
   const b=s.brecht; if(!b || b.merged) return;
-  const was=s.name;
   b.merged = true; b.purged = true;
   brechtSetForm(s, BRECHT.merge);
   /* どちらを先に倒したかで合体後が変わる：残った方（s）の技は強い版、倒した方（d）の技は弱い版 */
@@ -14294,8 +14351,6 @@ function brechtMerge(s, d){
   const roarAt=BRECHT_PAIR.mergeRoarAt;
   if(typeof bossFormRoar==='function'){ if(typeof ultLater==='function') ultLater(roarAt, ()=>bossFormRoar(s)); else bossFormRoar(s); }
   s.moveCd=Math.max(s.moveCd||0, roarAt+BOSS_FORM_FX.roarLen+0.3); s.cd=Math.max(s.cd||0, roarAt+BOSS_FORM_FX.roarLen); s.cast=null; s.combo=null;
-  W.pops.push({x:s.x, y:s.y-1.4, txt:'合体', c:'#ffb0d8', life:1.3, max:1.3});
-  if(s.revealed || d.revealed) log(d.name+'が'+was+'と合わさった——'+BRECHT.merge.nm+'、最後の形');
 }
 function bossRage(e){
   if(e.brecht){                                    // ブレヒトは激昂の代わりに鎧を脱ぐ
@@ -14315,14 +14370,11 @@ function bossRage(e){
     rageMoves.forEach(m=>{ if(!e.moves.includes(m)) e.moves.push(m); });
     e.rageMoves = rageMoves.slice();     // 激昂で開いた技は潰せない（第2段階の圧を残す）
     e.moveCd = Math.min(e.moveCd, 1.2);
-    if(e.revealed) log(e.name+'が激昂した');
     W.fx.push({t:'parry',x:e.x,y:e.y,life:0.5,max:0.5});
     /* ---------- 門番：HP半分で全体を巻き込む一撃 ----------
        「激昂＝HP半分」という既存の節目にそのまま乗せる。
        予兆は出さない代わり、単発の大きさに留めて即死にはしない。 */
     if(e.uniqueBoss===FINAL_DEPTH){
-      // 何が起きたかはログの1行で足りる。画面を覆う文章は挟まない。
-      if(e.revealed) log(e.name+'——全体を巻き込む一撃');
       W.fx.push({t:'shock', x:e.x, y:e.y, r:40, life:0.5, max:0.5, col:'#c98adf'});
       aoeTargets().forEach(t=>aoeHit(e, t, 1.8));
     }
@@ -14410,8 +14462,6 @@ function bossBreak(e){
   e.broken = e.brkT = duelFinalTier(e) ? DUEL.brkDownFinal : DUEL.brkDown;
   e.cast=null; e.combo=null; e.tele=0; e.vx=0; e.vy=0; e.recover=0; e.roar=0; e.hit=0.4;
   e.brkMax = duelBrkMax(e);
-  if(e.revealed) log(e.name+'——ブレイク！');
-  W.pops.push({x:e.x, y:e.y-1.0, txt:'ブレイク', c:'#ffd06a', life:1.2, max:1.2});
   if(typeof feelKick==='function') feelKick(3.4, 0.28);
   W.fx.push({t:'shock', x:e.x, y:e.y, r:e.r+0.9, life:0.35, max:0.35, col:'#ffd06a'});
 }
@@ -14444,7 +14494,6 @@ function duelPhase(e){
   e.brkMax = duelBrkMax(e);
   e.moveCd = Math.min(e.moveCd||0, 1.2);
   W.fx.push({t:'ultring', x:e.x, y:e.y, r:0, max:e.r+2.4, life:0.5, maxLife:0.5, col:'#ff8a6a'});
-  if(ph===3 && e.revealed) log(e.name+'——最後の力を振り絞る');
 }
 /* 溜めを潰す。同じ技は次の1回だけ潰せなくなる */
 function bossInterrupt(e){
@@ -14452,8 +14501,6 @@ function bossInterrupt(e){
   e.cast=null; e.combo=null; e.tele=0; e.vx=0; e.vy=0;
   e.recover=DUEL.intrStun; e.noIntr=id;
   e.moveCd=Math.max(e.moveCd||0, m.cd[0]*(e.rage?0.65:1));
-  if(e.revealed) log(e.name+'の技を潰した');
-  W.pops.push({x:e.x, y:e.y-1.0, txt:'妨害', c:'#ffe08a', life:1.0, max:1.0});
   if(id==='gulp') leechChoke(e);       // ヒル：吸い込みを潰すと、むせて呑んだ物を吐き戻す（隙が長い）
   if(typeof feelKick==='function') feelKick(2.6, 0.18);
   W.fx.push({t:'parry', x:e.x, y:e.y, life:0.4, max:0.4});
@@ -14470,8 +14517,7 @@ function duelSkillHit(e, kind, tier){
 function duelMikiri(e, how){
   if(!isDuelBoss(e) || !S.hero) return;
   P.mikiri = DUEL.mikiriCrit;
-  if(how==='walk' && typeof feelPerfect==='function') feelPerfect('見切り','#c4fff1');
-  else W.pops.push({x:P.x, y:P.y-1.3, txt:'見切り', c:'#c4fff1', life:0.9, max:0.9});
+  if(how==='walk' && typeof feelPerfect==='function') feelPerfect(null,'#c4fff1');
   addBreak(e, DUEL.pt.mikiri);
 }
 /* 主人公が被弾した。張り付いて崩す作戦の危険 */
@@ -14579,7 +14625,6 @@ function bossCast(e, dt, slow, tg){
     /* 合体後、HP3割で分かれ打ちが開く */
     if(b.merged && !b.split && e.hp<=e.maxHp*BRECHT_PAIR.splitAt){
       b.split=true; e.moves.push('splitslam');
-      W.pops.push({x:e.x, y:e.y-1.4, txt:'継ぎ目が緩んだ', c:'#ffb0d8', life:1.2, max:1.2});
     }
   }
   // 今の間合いで意味のある技だけを候補にする
@@ -14767,7 +14812,6 @@ function leechChoke(e){
   if(B.venom>0) leechAddPool(mo.x+(e.face||-1)*1.2, mo.y+0.6);
   e.belly={stone:0, venom:0};
   e.recover=LEECH.chokeStun;
-  W.pops.push({x:e.x, y:e.y-1.6, txt:'むせた', c:'#cfe8a0', life:1.0, max:1.0});
   if(typeof feelPixelArt==='function') feelPixelArt('bl_choke', mo.x, mo.y, {angle:e.face>0?0:Math.PI});
 }
 function leechResolve(e, m){
@@ -14792,8 +14836,6 @@ function leechResolve(e, m){
     art('bl_bite', c.ox, c.oy, {angle:dir, range:m.rad});
     if(typeof feelKick==='function') feelKick(2.6, 0.18);
     aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
-    if(e.revealed && (c.ate.stone||c.ate.venom))
-      log(e.name+'が'+(c.ate.stone?'瓦礫':'')+(c.ate.stone&&c.ate.venom?'と':'')+(c.ate.venom?'毒':'')+'を呑んだ');
   }else if(id==='spawn'){
     const lv=Math.max(1, e.lv-2), fams=floorFamilies(S.run?S.run.depth:1);
     (c.spots||[]).forEach(sp=>{
@@ -14990,7 +15032,6 @@ function brechtResolve(e, m){
     aoeTargets().forEach(t=>{ if(bossMoveHits(e, c, t.x, t.y, t.r)) aoeHit(e, t, m.mult); });
     if(id==='throw' && who && who!==e){               // 投げられた宿借りはひっくり返る（大きな隙）
       who.cast=null; who.recover=BRECHT_PAIR.flip; who.moveCd=Math.max(who.moveCd||0, 1.5);
-      W.pops.push({x:who.x, y:who.y-1.0, txt:'ひっくり返った', c:'#ffd8a0', life:1.0, max:1.0});
     }
   }else if(id==='inout'){
     const R=m.rad+e.r, half=m.arc*Math.PI/180;
@@ -15020,10 +15061,8 @@ function brechtFF(e, mt){
   const dmg=Math.max(1, Math.round(e.atkV*BRECHT_PAIR.ffDmg));
   mt.hp=Math.max(1, mt.hp-dmg); mt.hit=Math.max(mt.hit||0, 0.15);
   pop(mt.x, mt.y-0.3, dmg, '#ffd8a0');
-  W.pops.push({x:mt.x, y:mt.y-1.2, txt:'同士討ち', c:'#ffd8a0', life:1.0, max:1.0});
   duelInit(mt); addBreak(mt, BRECHT_PAIR.ffBrk);
   if(typeof feelPixelArt==='function') feelPixelArt('bb_ff', mt.x, mt.y-0.3);
-  if(e.revealed) log(e.name+'の技が'+mt.name+'に当たった');
 }
 function brechtFriendlyFire(e){
   const c=e.cast; if(!e.brecht || !c || c.follow || !BRECHT_FF[c.id]) return;
@@ -15882,10 +15921,6 @@ function finalBossTick(e, dt){
   if(!e.quadPhase && e.hp <= e.maxHp*0.25){
     e.quadPhase = true;
     spawnFinalMirrors(e, 3, null);
-    if(e.revealed){
-      log(e.name+'——常に4人になって攻撃してくる');
-      log(e.name+'——幻が本体から離れなくなった');
-    }
   }
   if(!e.fleePhase && e.hp <= e.maxHp*0.10){
     e.fleePhase = true;
@@ -15893,10 +15928,6 @@ function finalBossTick(e, dt){
     e.moves = e.moves.filter(m=>['beam','burst','pillars','clone'].includes(m));
     if(!e.moves.length) e.moves=['beam'];
     e.fleeing = true;
-    if(e.revealed){
-      log(e.name+'——本体だけが残り、逃げながら遠距離に切り替えた');
-      log(e.name+'——幻を捨てて逃げに転じた');
-    }
   }
 }
 
@@ -17149,6 +17180,7 @@ function autoPickup(){
       /* 床に落ちたSP。いまは誰も置かない（倒した瞬間に口座へ入る）が、
          古いセーブに残っている分を拾えなくすると詰むので、受け口は残す。 */
       if(d.stone){ if(d.first) lanternGetStart(d.x, d.y); else lanternEatStart(d.x, d.y); newStone('蛍石を拾った'); continue; }
+      if(d.relic){ pickupRelic(d.relic,d.x,d.y); continue; }
       if(d.shard){
         const n=gainShards(d.shard);
         if(n>0) W.pops.push({x:d.x, y:d.y-0.85, txt:'+'+n+' SP', c:'#8fd8ff',
@@ -17322,7 +17354,7 @@ function openTrial(){
      <div class="row"><span class="k">枷</span><span style="color:#e0705a">
        <b>${b.nm}</b><br><span style="font-size:12px">${b.desc}</span></span></div>
      <div class="row"><span class="k">報酬</span><span style="color:#d6b34a">
-       <b>遺物がひとつ</b><br><span style="color:var(--dim);font-size:12px">中身は触れるまで分からない</span></span></div>
+       <b>遺物がひとつ</b><br><span style="color:var(--dim);font-size:12px">石碑のそばに落ちる。拾うと入手</span></span></div>
      <div class="row"><span class="k">やめられない</span><span style="color:var(--dim);font-size:12px">
        始めたら、終わるまで湧き続ける<br>穴を降りれば中断できるが、報酬は無い</span></div>`;
   el('m-trial').classList.add('on');
@@ -17350,22 +17382,16 @@ function tickTrial(dt){
   if(tr.t<=0){
     tr.t=0;
     const prize=rollNewRelic();
-    if(prize && grantRelic(prize.id)){
-      /* 遺物の枠が埋まっていると grantRelic は「持ち物には入れるが装備はしない」。
-         **画面上は何も変わらない**——鞘無しの遺物を得たのに刃が増えないように見え、
-         「手に入れたのに追加されなかった」に見える。枠が空いていない場合は、
-         ここで理由をはっきり言う（着ければ効く。倉庫→遺物、で入れ替えられる）。 */
-      const equipped = relicOn(prize.id);
-      log('<i class="pi pi-monument"></i> '+prize.icon+' '+prize.nm+' を得た'
-        + (equipped ? '' : '（遺物の枠が空いていないため未装備。倉庫の「遺物」で入れ替えられる）'));
-      showBanner(prize.icon+' '+prize.nm,
-        prize.desc + (equipped ? '' : '　※枠がいっぱいで未装備。入れ替えが必要'),
-        prize.col, 3.2);
-      W.fx.push({t:'ultring', x:P.x, y:P.y, r:0, max:5, life:0.9, maxLife:0.9, col:prize.col});
+    if(prize){
+      const spot=snapToStandable(W.fl,tr.x+0.8,tr.y+0.4);
+      W.drops.push({x:spot.x,y:spot.y,relic:prize.id,
+        feelDrop:{age:0,x:tr.x,y:tr.y}});
+      log('試練を越えた — 石碑のそばに遺物が落ちた');
     }else{
       log('試練を越えた（もう得られる遺物は無い）');
     }
     S.run.trial=null;
+    if(window.ABYSS_SAVE) ABYSS_SAVE.request();
   }
 }
 /* 湧く場所は主人公から一定の距離を空ける。
@@ -18843,6 +18869,12 @@ function draw(){
       }
       drawFluorite(sx, sy, d);
       if(Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('蛍石', sx, sy-TS*0.55, '#6fe8b8', 0.95);
+      return;
+    }
+    if(d.relic){
+      const relic=relicDef(d.relic);
+      drawFeelRelicIcon(d.relic,sx,sy);
+      if(relic && Math.hypot(d.x-P.x,d.y-P.y)<3.2) label('遺物',sx,sy-TS*0.6,'#8ae4d6',0.95);   // 中身は拾うまで伏せる（2026-11-23 ユーザー指定：手に入る遺物はランダム）
       return;
     }
     if(d.shard){
@@ -21405,15 +21437,15 @@ function updateHUD(){
   hset('bossbar.disp', boss?'block':'none', v=>bb.style.display=v);
   if(boss){
     hset('bossfill.w', clamp(boss.hp/boss.maxHp*100,0,100)+'%', v=>el('bossfill').style.width=v);
-    hset('bossname.t', boss.name + (boss.rage?'（激昂）':'') + (boss.broken>0?'　ブレイク':''), v=>el('bossname').textContent=v);
+    hset('bossname.t', boss.name, v=>el('bossname').textContent=v);
     /* 崩し。崩れている間は「残り時間」が減っていく帯（ゲージは起きてから溜め直し） */
     const bdn = boss.broken>0, bmx = boss.brkMax||1;
     const bw = bdn ? boss.broken/(boss.brkT||1) : (boss.brk||0)/bmx;
     hset('bossbrk.w', (clamp(bw,0,1)*100).toFixed(1)+'%', v=>el('bossbrk').style.width=v);
     hset('bossbk.c', 'bk'+(bdn?' down':(bw>=0.8?' hot':'')), v=>el('bossbk').className=v);
   }
-  /* 部位破壊の脚。壊れていない脚は◆、半分を切ったら◇、壊れたら×。ダウン中は「ダウン」 */
-  const bp = boss && boss.parts ? '脚 '+boss.parts.map(q=>q.broken?'×':(q.hp<q.max*.5?'◇':'◆')).join('')+(boss.down>0?' ダウン':'') : '';
+  /* 部位破壊の脚。壊れていない脚は◆、半分を切ったら◇、壊れたら×。状況の説明文は表示しない */
+  const bp = boss && boss.parts ? '脚 '+boss.parts.map(q=>q.broken?'×':(q.hp<q.max*.5?'◇':'◆')).join('') : '';
   hset('bossparts.t', bp, v=>el('bossparts').textContent=v);
   /* デバフ（枷）の帯。
      ・ラスボスと実際に戦っている間（S.run.bossBane）は、次々切り替わる枷の
@@ -21438,7 +21470,7 @@ function updateHUD(){
      ボス戦中ずっと毎フレーム呼ぶのはやりすぎ——表示の組み合わせが
      「切り替わった瞬間」だけ測り直せば、位置がずれることはない。 */
   const bothShown = !!boss && trialShown;
-  // rage も鍵に含める。名前に「（激昂）」が付き足で折り返して高さが変わりうるため。
+  // 激昂への切り替わりも含め、帯の配置を再確認する。
   hset('trialbar.stackKey', bothShown+':'+(boss?!!boss.rage:false), ()=>{
     if(bothShown){
       const base=el('hud').getBoundingClientRect().top;
@@ -23185,6 +23217,14 @@ function renderAllyEquip(){
         ${got?'':'<span style="font-size:12px;color:var(--dim)">　未習得</span>'}</div>
       <div class="af">${sk.desc}</div></div>`;
   }).join('') || '<div class="empty">なし</div>';
+  if(artGrowthOpen()){
+    const weaponArts=allyLearnedArts(a,allyWeaponBase(a));
+    if(weaponArts.length) el('ae-skills').innerHTML += '<div class="gridhead">武器技の鍛錬</div>'
+      +weaponArts.map(d=>'<div class="item" style="border-left-color:'+d.col+'">'
+        +'<div class="nm">'+artName(d)+'</div><div class="af">'+artGrowthText(d,a)+'</div>'
+        +'<div class="af">'+artGrowthBonusText(d,a)+'</div>'
+        +'<div class="af">リキャスト '+artCooldown(d,true,a).toFixed(1)+'秒</div></div>').join('');
+  }
 
   const worn=Object.values(a.equip).filter(Boolean);
   /* 外したらどう減るか。装備中の側にも同じ形で出す——
@@ -23921,11 +23961,12 @@ function artSlotsHTML(){
     }else learned.forEach((d,i)=>rows.push(artSlotHTML({
       slot:'art', id:d.id, nm:artName(d), icon:d.icon, col:d.col, set:!!cur && cur.id===d.id,
       desc:d.desc, rename:d.id,
-      sub:'lv'+(i+1)+'　リキャスト '+artCooldown(d,false)+'秒'})));
+      sub:'第'+(i+1)+'技　'+(artGrowthOpen()?artGrowthText(d)+'<br>'+artGrowthBonusText(d)+'<br>':'')
+        +'リキャスト '+artCooldown(d,false).toFixed(1)+'秒'})));
     // まだ閃いていないぶんは「あと何段あるか」だけ見せる（中身は伏せる）
     const left=all.length-learned.length;
     if(left>0) rows.push('<div class="empty">'+wbn+'の技はあと'+left+'つ。'
-      +'lv'+(learned.length+1)+'の技を閃くまで、'+wbn+'を振り続けること</div>');
+      +'第'+(learned.length+1)+'技を閃くまで、'+wbn+'を振り続けること</div>');
   }
   const hint =
     '<b>いつでも入れ替えられる</b>（街でも探索中でも）。'
@@ -23933,7 +23974,10 @@ function artSlotsHTML(){
     + (wb ? '<br><span style="color:var(--dim);font-size:12px">武器技は武器種ごと。'
             +wbn+'の熟練 '+masteryOf(wb)+' → 閃きやすさ ×'
             +(1+masteryOf(wb)*ART_FLASH_MAST).toFixed(2)
-            +'　／　閃いた技は ✎ で名前を変えられる</span>' : '');
+            +'　／　閃いた技は ✎ で名前を変えられる</span>' : '')
+    + '<br><span style="color:var(--dim);font-size:12px">'
+    + (artGrowthOpen()?'武器技は発動ごとに成長。最大Lv.5。':'第30階層を踏破すると、武器技の使用回数による成長が解放される。')
+    + '</span>';
   return {html:rows.join(''), hint};
 }
 /* ---------- 技欄は2ヶ所に出す ----------
@@ -25971,13 +26015,13 @@ bindTap(el('dbg-reset'), ()=>{
   // S.legendEverOwned は意図的にここで触らない——リセットを跨いでも
   // 「一度手にしたレジェンドは二度と出ない」を守るための恒久記録。
   S.stash=[];S.legendStash=[];S.gold=0;S.deepest=1;S.bossClear=0;S.deaths=0;S.deathPressure={};S.deathStreak=null;S.starterAllyGiven=false;S.upg={};S.shop=[];S.startDepth=1;S.grave=null;
-  S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
+  S.lastDepth=1; S.deepestBack=0; S.cleared=0; S.bld={stash:1}; S.legacyBoons=[]; S.shards=0; S.shardsRun=0; S.ore={};
   S.fallen=[]; S.deathAdBonus=0; S.beacons=[];
   S.greatKills=0; S.ult=null; S.ultLv={}; S.curses=[]; S.curseWeek=-1;
   S.carry=[];S.gachaDay='';refreshGacha();
   /* 名前も消してタイトルへ戻す。「全消去」と言っておいて名前だけ残るのは、
      消えたのかどうかが分からない一番よくない形。 */
-  S.name=''; S.mastery={}; S.arts={}; S.artPick={}; S.artName={};
+  S.name=''; S.mastery={}; S.arts={}; S.artUses={}; S.artPick={}; S.artName={};
   S.relics=[]; S.relicEq=[]; S.run=null; S.hero=null;
   S.tavern=[]; S.tavernPool=null;                 // 酒場も空にする
   S.moss={}; S.duranGiven=false;                  // 苔玉の記録も消す
@@ -26294,6 +26338,7 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-effect-study.js?v=20260915b"></script>
 <script src="item-icons-imported-data.js?v=20260915a"></script>
 <script src="item-icons.js?v=20261115a"></script>
+<script src="relic-icons.js?v=20261123a"></script>
 <!-- index.html だけが新しく、演出ファイルだけがブラウザの古いキャッシュだと
      描画フックが欠けて「敵ドット」で止まる。演出を更新した時点の版をURLに含め、
      本体と同じ世代を必ず読み込む。 -->
@@ -26301,8 +26346,8 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20261122-mwarp1"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
-<script src="game-feel.js?v=20261116-brecht3"></script>
-<script src="ui-icons.js"></script>
+<script src="game-feel.js?v=20261123-relic-drop2"></script>
+<script src="ui-icons.js?v=20261123-relic"></script>
 <script src="root-kit.js?v=20261008a"></script>
 <script src="cave-look.js?v=20261122-mwarp1"></script>
 <script>
@@ -26370,7 +26415,7 @@ if(typeof beginFeelWorld === 'function'){
 }
 </script>
 <script src="pixel-round.js?v=20261004a"></script>
-<script src="save-load.js?v=20261013pressure-f5"></script>
+<script src="save-load.js?v=20261122-stash1"></script>
 <script src="audio.js?v=20261116-brecht3"></script>
 <script src="audio-game.js?v=20261116-mareth"></script>
 </body>

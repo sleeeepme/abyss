@@ -9,6 +9,14 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
+R.initialStash = await pg.evaluate(()=>{
+  setScreen('town');
+  const level=bldLv('stash'), capacity=stashCap();
+  el('btn-go-stash').click();
+  return {level,capacity,screen:S.screen,
+    ok:level===1 && capacity===26 && S.screen==='stash'};
+});
+
 /* ================= 1. 施設の解放 ================= */
 
 /* 1-a. 建てる前は4つとも閉じている。能力強化・街開発・店・ガチャは閉じない

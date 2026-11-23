@@ -344,7 +344,7 @@ R.baneApplies = await pg.evaluate(()=>{
           ok: heavy<base.ms && dull<base.aspd && fired===false};
 });
 
-// 3-g. 耐え切ると遺物が1つ手に入り、試練は終わる
+// 3-g. 耐え切ると石碑のそばに落ちる。拾うまでは未所持で、着地前は拾えない。
 R.trialRewards = await pg.evaluate(()=>{
   const f=TH.findTrial();
   if(!f) return {skipped:true, ok:false};
@@ -352,11 +352,23 @@ R.trialRewards = await pg.evaluate(()=>{
   openTrial(); startTrial();
   TH.immortal();
   const before=(S.relics||[]).length;
-  stepSim(TRIAL_SEC+2);
+  tickTrial(TRIAL_SEC+0.01);
+  const drop=W.drops.find(d=>d.relic);
+  const notGranted=(S.relics||[]).length===before && relicSlots()===0;
+  const floorSafe=!!drop && standable(drop.x,drop.y);
+  let waitsForLanding=false;
+  if(drop){
+    P.x=drop.x; P.y=drop.y;
+    autoPickup(); waitsForLanding=W.drops.includes(drop) && !relicHas(drop.relic);
+    drop.feelDrop.age=0.42; autoPickup();
+  }
+  const count=(S.relics||[]).length;
+  tickTrial(1); autoPickup();
   return {before, after:(S.relics||[]).length, ended: !trialActive(),
-          slots:relicSlots(),
+          slots:relicSlots(),notGranted,floorSafe,waitsForLanding,
           gotOne:(S.relics||[]).length===before+1,
-          ok: (S.relics||[]).length===before+1 && !trialActive() && relicSlots()>=1};
+          ok: notGranted && floorSafe && waitsForLanding && count===before+1
+            && (S.relics||[]).length===count && !trialActive() && relicSlots()>=1};
 });
 
 /* 3-g2. 遺物の枠が既に埋まっていると、報酬は**持ち物には入るが装備はされない**。
@@ -375,7 +387,9 @@ R.trialRewardSlotsFull = await pg.evaluate(()=>{
   TH.immortal();
   const before = S.relics.length;
   logs.length = 0;
-  stepSim(TRIAL_SEC+2);
+  tickTrial(TRIAL_SEC+0.01);
+  const drop=W.drops.find(d=>d.relic);
+  if(drop){P.x=drop.x;P.y=drop.y;drop.feelDrop.age=0.42;autoPickup();}
   const gained = S.relics.length===before+1;
   const newId = gained ? S.relics[S.relics.length-1] : null;
   const equippedRaw = newId ? relicOn(newId) : null;
@@ -387,6 +401,18 @@ R.trialRewardSlotsFull = await pg.evaluate(()=>{
           notAutoEquipped: equippedRaw===false,
           explainsWhy: said.includes('未装備'),
           ok: gained && equippedRaw===false && said.includes('未装備')};
+});
+
+R.unclaimedRelicExcluded = await pg.evaluate(()=>{
+  const f=TH.findTrial();
+  if(!f)return {ok:false};
+  const id=RELICS[0].id;
+  S.relics=RELICS.slice(1).map(r=>r.id);
+  W.drops=[{x:P.x+2,y:P.y,relic:id}];
+  const reserved=rollNewRelic()===null;
+  W.drops=[];
+  const availableAgain=rollNewRelic()?.id===id;
+  return {reserved,availableAgain,ok:reserved && availableAgain};
 });
 
 /* 3-h. 階を降りると中断される。

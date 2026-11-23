@@ -7,6 +7,16 @@ import { boot, install, done } from './_h.mjs';
 const {b, pg, errs} = await boot(); await install(pg);
 const R={};
 
+R.firstNpcFloor = await pg.evaluate(()=>{
+  TH.run(3,{seed:12}); S.hero.party=[];
+  const counts={1:0,2:0,3:0};
+  for(const depth of [1,2,3]) for(let seed=1;seed<=100;seed++){
+    RNG=mulberry32(seed*7919);
+    if(spawnNpc(W.fl,depth)) counts[depth]++;
+  }
+  return {counts,ok:counts[1]===0 && counts[2]===0 && counts[3]>0};
+});
+
 /* NPC を必ず用意する。spawnNpc は確率と酒場レベルに依存するので、
    ここで待っていると検証にならない。作り方は spawnNpc と同じ形にそろえる。 */
 await pg.evaluate(()=>{
