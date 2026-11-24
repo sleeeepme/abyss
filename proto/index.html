@@ -7424,6 +7424,23 @@ function gearAlerts(){
   return out;
 }
 
+/* 耐久の警告をログへ（updateHUD から毎回呼ぶ。段が変わった装備だけ1行出す）。
+   段：'warn'＝残り DUR_WARN 以下／'broken'＝0。覚えは装備ごと（uid）に持ち、段を外れたら忘れる */
+let _durLogged = {};
+function durAlertLog(){
+  if(!S.hero || !S.run){ _durLogged={}; return; }
+  const now={};
+  for(const x of gearAlerts()){
+    const k=x.it.uid!=null ? x.it.uid : x.slot+':'+x.it.nm, st=x.broken?'broken':'warn';
+    now[k]=st;
+    if(_durLogged[k]===st) continue;
+    log(x.broken
+      ? '<span style="color:#ff6a5a">✕ '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）が壊れている — 性能を失っています。道具屋で修理を</span>'
+      : '<span style="color:#ffb070"><i class="pi pi-warn"></i> '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）耐久 <b>'+x.pct+'%</b></span>');
+  }
+  _durLogged=now;
+}
+
 /* ---------- 属性ダメージと状態異常のエンジン ---------- */
 
 /* 対象の耐性%（-100〜75）。敵は系統から、主人公は装備から。 */
@@ -21478,21 +21495,12 @@ function updateHUD(){
       if(r.height>0) tb.style.top=Math.round(r.bottom-base+8)+'px';
     }else tb.style.top='';
   });
-  /* 耐久の警告。壊れると性能を完全に失うのに、ログは流れて消えてしまう。
-     壊れそう／壊れているあいだは出しっぱなしにして、見落としようがなくする。 */
-  const alerts=gearAlerts(), dtag=el('durtag');
-  hset('durtag.disp', alerts.length?'block':'none', v=>dtag.style.display=v);
-  if(alerts.length){
-    const broken=alerts.some(x=>x.broken);
-    hset('durtag.cls', broken?'crit':'', v=>dtag.className=v);
-    hset('durtag.h', alerts.map(x=> x.broken
-      ? '<span class="brk">✕ '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）が壊れている</span>'
-      : '<i class="pi pi-warn"></i> '+SLOTNM[x.it.slot]+'（'+x.it.nm+'）耐久 <b>'+x.pct+'%</b>'
-    ).join('<br>')
-    + (broken ? '<br><span style="color:#c8a">性能を失っています。道具屋で修理を</span>' : ''),
-    v=>dtag.innerHTML=v);
-  }
-
+  /* 耐久の警告。以前は画面下中央に出しっぱなしの札（#durtag）にしていたが、
+     右下のボタン（一斉攻撃・大技）に重なっていた。2026-11-24 ユーザー指定「耐久の警告はログにまとめて」で、
+     **ログの1行**にした。出しっぱなしにはしないので、その装備が「残りわずか」「壊れた」に
+     入った瞬間に1回ずつ出す（同じ装備・同じ段では繰り返さない。直したり外したりして戻ったら、また出る）。 */
+  hset('durtag.disp', 'none', v=>el('durtag').style.display=v);
+  durAlertLog();
   /* ---------- 左肩のパーティ表示は廃止 ----------
      同じ情報が**既に盤面の上にある**——仲間の足元には常にHPバーが出ているし
      （drawMate の allyBars）、タップすれば装備画面まで開く（tapHitsAlly）。

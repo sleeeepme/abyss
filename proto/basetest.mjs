@@ -176,23 +176,24 @@ R.duel = await pg.evaluate(async ()=>{
 
 /* ============ 3. 耐久の警告 ============ */
 
-// 3-a. 残りわずかで警告が出っぱなしになる
+// 3-a. 残りわずか・壊れた瞬間にログへ1行ずつ（2026-11-24：出しっぱなしの札をやめてログにまとめた）
 R.durWarn = await pg.evaluate(()=>{
   S.hero=newHero(); S.upg={hp:8}; startRun(10); S.hero.party=[];
   const w=genBaseItem('sword',10,1);
   S.hero.equip.weapon=w;
   const tag=document.getElementById('durtag');
-  w.dur=w.durMax; updateHUD();
-  const healthy={shown:tag.style.display==='block'};
-  w.dur=Math.ceil(w.durMax*0.2); updateHUD();
-  const worn={shown:tag.style.display==='block', text:tag.textContent, cls:tag.className};
-  w.dur=0; updateHUD();
-  const broken={shown:tag.style.display==='block', text:tag.textContent, cls:tag.className};
+  const n0=()=>logs.filter(t=>/耐久|壊れている/.test(t)).length;
+  w.dur=w.durMax; updateHUD(); updateHUD();
+  const healthy={logs:n0()};
+  w.dur=Math.ceil(w.durMax*0.2); updateHUD(); updateHUD(); updateHUD();
+  const worn={logs:n0(), text:logs[0]||''};
+  w.dur=0; updateHUD(); updateHUD();
+  const broken={logs:n0(), text:logs[0]||''};
   return {healthy, worn, broken, threshold:DUR_WARN,
-          quietWhenFine: !healthy.shown,
-          warnsWhenWorn: worn.shown && /耐久/.test(worn.text),
-          shoutsWhenBroken: broken.shown && broken.cls==='crit'
-                         && /壊れている/.test(broken.text)};
+          noTag: tag.style.display==='none',
+          quietWhenFine: healthy.logs===0,
+          warnsOnceWhenWorn: worn.logs===1 && /耐久/.test(worn.text),
+          logsWhenBroken: broken.logs===2 && /壊れている/.test(broken.text)};
 });
 
 // 3-b. 壊れた瞬間にバナーとフラッシュが出る
