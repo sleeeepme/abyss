@@ -446,9 +446,11 @@
   #stat,#dsub{font-family:var(--font-fx)}
   /* 層の名前が1行増えるので行間を詰める。行数が増えても高さは元のまま */
   #depth{margin-left:auto;text-align:right;font-size:12px;color:var(--dim);line-height:1.25}
-  #depth b{display:block;font-size:24px;color:var(--txt);line-height:1.05}
+  /* 階の数字は左のゲージ2本（HPと経験値）と同じ高さ（2026-11-25 ユーザー指定）。
+     ベストテンDOT は 1em＝10ドットなので 20px（1ドット＝2px）でくっきり出る */
+  #depth b{display:block;font-size:20px;color:var(--txt);line-height:1;margin-top:-2px}
   /* 「30F」の F。数字より一段落として、読むべきは数字だと分かるようにする */
-  #depth b .fu{font-size:16px}
+  #depth b .fu{font-size:14px}
   #depth .zn{font-size:12px;font-weight:700;letter-spacing:.03em}
   #bossbar{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 58px);width:66%;display:none;text-align:center}
@@ -21396,9 +21398,9 @@ function updateHUD(){
   if(knownFloor(S.run.depth))
     dl.push('<span style="color:#7fe0c0;font-size:12px">踏破済</span>');
   if(z) dl.push('<span class="zn" style="color:'+z.accent+'">'+z.nm+'</span>');
-  dl.push(S.run.loot.length+'点 / '+S.run.gold+'G');
-  dl.push('<span style="color:#8fd8ff;font-size:12px">◆ '+(S.shardsRun||0)+'</span>'
-        + '<span style="color:#c9a06a;font-size:12px">　<i class="pi pi-pick"></i> '+oreRunTotal()+'</span>');
+  /* 2026-11-25 ユーザー指定：アイテムの点数と鉱石の数は消し、点数の代わりに SP。
+     拾った点数は持ち物ボタンの数字、鉱石は持ち物・結果画面で見られる */
+  dl.push('<span style="color:#8fd8ff">◆ '+(S.shardsRun||0)+'</span> / '+S.run.gold+'G');
   if(activeCurses().length)
     dl.push('<span style="font-size:12px">'
       + activeCurses().map(id=>{ const c=curseDef(id);

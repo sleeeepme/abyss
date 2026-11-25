@@ -621,7 +621,7 @@ R.drawAll = await pg.evaluate(()=>{
   }catch(e){ fails.push(e.message); }
   return {failures:fails, ok:fails.length===0,
           hud:el('dsub').textContent.replace(/\s+/g,' '),
-          hudShowsOre: el('dsub').innerHTML.includes('pi-pick')};
+          hudHidesOre: !el('dsub').innerHTML.includes('pi-pick')};   // 2026-11-25：HUDの鉱石の数は消した
 });
 
 await b.close();
