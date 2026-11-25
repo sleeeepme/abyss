@@ -73,7 +73,7 @@ R.mapCenteredAndClear = await pg.evaluate(()=>{
   S.mapOn=true;
   const box=mapBox();
   const cx=box.ox+box.mw/2;
-  const artTop = innerHeight - (228+62);
+  const artTop = innerHeight - mapKeepBottom();   // 2026-11-25：技ボタンは出ている分だけ積む列になったので、列の上端（＋余白）を測った値で見る
   const big = box.mw >= Math.min(innerWidth,innerHeight)*0.3;
   S.mapOn=false;
   return {w:Math.round(box.mw), h:Math.round(box.mh),
