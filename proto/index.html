@@ -176,8 +176,9 @@
 
      盾を持っていないときも**消さずにグレーで出す。**
      消してしまうと「盾を持てば何かできる」こと自体が伝わらない。 */
-  #guardbtn{position:absolute;left:16px;bottom:calc(96px + env(safe-area-inset-bottom));
-    width:66px;height:66px;display:none;
+  /* 2026-11-25：下からの高さを右の技ボタンの列に揃え、左右も同じ余白（--hudm）。大きさも列と同じ62px */
+  #guardbtn{position:absolute;left:var(--hudm);bottom:calc(var(--hudm) + env(safe-area-inset-bottom));
+    width:62px;height:62px;display:none;
     align-items:center;justify-content:center;font-size:24px;
     --pf:rgba(16,20,28,.82);background:none;--pb:#39415a;border:none;color:#8fc7ff;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
@@ -200,8 +201,10 @@
   #m-debug .row b{font-size:12px}
   #m-debug .row s{display:block;text-decoration:none;color:var(--dim);font-size:12px;margin-top:2px}
   #m-debug .sw{flex:0 0 auto;width:auto;padding:6px 14px;font-size:12px;margin:0}
-  #guardbtn.held{--pf:rgba(40,64,96,.9);--pb:#8fc7ff;
-    filter:drop-shadow(0 0 4px #8fc7ff)}
+  #guardbtn.held{--pf:rgba(40,64,96,.9);--pb:#e8e2cf;
+    filter:drop-shadow(0 0 4px #e8e2cf)}
+  /* 盾のアイコンも技ボタンと同じ白に（色付きの絵を白黒にして明るくする） */
+  #guardbtn .pi{width:30px;height:30px;filter:grayscale(1) brightness(3.2) contrast(1.6)}
   /* ---------- リキャストは外周の円ゲージで見せる（2026-10-10） ----------
      秒数の文字はやめて、ボタンの縁そのものが時計回りに満ちていく。
      縁は2ドットの太さ（--pxring）、塗りは conic-gradient、どこまで満ちたかは --gp（角度）。
@@ -852,8 +855,7 @@
   #ultbtn::before,#guardbtn::before,#wavebtn::before,#artbtn::before,#linkbtn::before,#bagbtn::before,#statbtn::before,#mapbtn::before,#stick::before,#knob::before,.hub-ava .glyph::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pf,transparent);-webkit-mask:var(--pxdisk) 0 0/100% 100% no-repeat;mask:var(--pxdisk) 0 0/100% 100% no-repeat}
   #ultbtn::after,#guardbtn::after,#wavebtn::after,#artbtn::after,#linkbtn::after,#bagbtn::after,#statbtn::after,#mapbtn::after,#stick::after,#knob::after,.hub-ava .glyph::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--pb,transparent);-webkit-mask:var(--pxring) 0 0/100% 100% no-repeat;mask:var(--pxring) 0 0/100% 100% no-repeat}
   .hub-ava .glyph{position:relative}
-  #guardbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h13v1h-13zM8 2h17v1h-17zM7 3h19v1h-19zM5 4h23v1h-23zM4 5h25v1h-25zM4 6h25v1h-25zM3 7h27v1h-27zM2 8h29v1h-29zM2 9h29v1h-29zM1 10h31v1h-31zM1 11h31v1h-31zM1 12h31v1h-31zM0 13h33v1h-33zM0 14h33v1h-33zM0 15h33v1h-33zM0 16h33v1h-33zM0 17h33v1h-33zM0 18h33v1h-33zM0 19h33v1h-33zM1 20h31v1h-31zM1 21h31v1h-31zM1 22h31v1h-31zM2 23h29v1h-29zM2 24h29v1h-29zM3 25h27v1h-27zM4 26h25v1h-25zM4 27h25v1h-25zM5 28h23v1h-23zM7 29h19v1h-19zM8 30h17v1h-17zM10 31h13v1h-13zM13 32h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 33 33' shape-rendering='crispEdges'%3E%3Cpath d='M13 0h7v1h-7zM10 1h3v1h-3zM20 1h3v1h-3zM8 2h2v1h-2zM23 2h2v1h-2zM7 3h1v1h-1zM25 3h1v1h-1zM5 4h2v1h-2zM26 4h2v1h-2zM4 5h1v1h-1zM28 5h1v1h-1zM4 6h1v1h-1zM28 6h1v1h-1zM3 7h1v1h-1zM29 7h1v1h-1zM2 8h1v1h-1zM30 8h1v1h-1zM2 9h1v1h-1zM30 9h1v1h-1zM1 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM31 11h1v1h-1zM1 12h1v1h-1zM31 12h1v1h-1zM0 13h1v1h-1zM32 13h1v1h-1zM0 14h1v1h-1zM32 14h1v1h-1zM0 15h1v1h-1zM32 15h1v1h-1zM0 16h1v1h-1zM32 16h1v1h-1zM0 17h1v1h-1zM32 17h1v1h-1zM0 18h1v1h-1zM32 18h1v1h-1zM0 19h1v1h-1zM32 19h1v1h-1zM1 20h1v1h-1zM31 20h1v1h-1zM1 21h1v1h-1zM31 21h1v1h-1zM1 22h1v1h-1zM31 22h1v1h-1zM2 23h1v1h-1zM30 23h1v1h-1zM2 24h1v1h-1zM30 24h1v1h-1zM3 25h1v1h-1zM29 25h1v1h-1zM4 26h1v1h-1zM28 26h1v1h-1zM4 27h1v1h-1zM28 27h1v1h-1zM5 28h2v1h-2zM26 28h2v1h-2zM7 29h1v1h-1zM25 29h1v1h-1zM8 30h2v1h-2zM23 30h2v1h-2zM10 31h3v1h-3zM20 31h3v1h-3zM13 32h7v1h-7z'/%3E%3C/svg%3E")}
-  #ultbtn,#wavebtn,#artbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h17v1h-17zM6 3h19v1h-19zM5 4h21v1h-21zM4 5h23v1h-23zM3 6h25v1h-25zM2 7h27v1h-27zM2 8h27v1h-27zM1 9h29v1h-29zM1 10h29v1h-29zM1 11h29v1h-29zM0 12h31v1h-31zM0 13h31v1h-31zM0 14h31v1h-31zM0 15h31v1h-31zM0 16h31v1h-31zM0 17h31v1h-31zM0 18h31v1h-31zM1 19h29v1h-29zM1 20h29v1h-29zM1 21h29v1h-29zM2 22h27v1h-27zM2 23h27v1h-27zM3 24h25v1h-25zM4 25h23v1h-23zM5 26h21v1h-21zM6 27h19v1h-19zM7 28h17v1h-17zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h5v1h-5zM19 2h5v1h-5zM6 3h3v1h-3zM22 3h3v1h-3zM5 4h2v1h-2zM24 4h2v1h-2zM4 5h2v1h-2zM25 5h2v1h-2zM3 6h2v1h-2zM26 6h2v1h-2zM2 7h2v1h-2zM27 7h2v1h-2zM2 8h2v1h-2zM27 8h2v1h-2zM1 9h2v1h-2zM28 9h2v1h-2zM1 10h2v1h-2zM28 10h2v1h-2zM1 11h2v1h-2zM28 11h2v1h-2zM0 12h2v1h-2zM29 12h2v1h-2zM0 13h2v1h-2zM29 13h2v1h-2zM0 14h2v1h-2zM29 14h2v1h-2zM0 15h2v1h-2zM29 15h2v1h-2zM0 16h2v1h-2zM29 16h2v1h-2zM0 17h2v1h-2zM29 17h2v1h-2zM0 18h2v1h-2zM29 18h2v1h-2zM1 19h2v1h-2zM28 19h2v1h-2zM1 20h2v1h-2zM28 20h2v1h-2zM1 21h2v1h-2zM28 21h2v1h-2zM2 22h2v1h-2zM27 22h2v1h-2zM2 23h2v1h-2zM27 23h2v1h-2zM3 24h2v1h-2zM26 24h2v1h-2zM4 25h2v1h-2zM25 25h2v1h-2zM5 26h2v1h-2zM24 26h2v1h-2zM6 27h3v1h-3zM22 27h3v1h-3zM7 28h5v1h-5zM19 28h5v1h-5zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E")}
+  #ultbtn,#wavebtn,#artbtn,#guardbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h17v1h-17zM6 3h19v1h-19zM5 4h21v1h-21zM4 5h23v1h-23zM3 6h25v1h-25zM2 7h27v1h-27zM2 8h27v1h-27zM1 9h29v1h-29zM1 10h29v1h-29zM1 11h29v1h-29zM0 12h31v1h-31zM0 13h31v1h-31zM0 14h31v1h-31zM0 15h31v1h-31zM0 16h31v1h-31zM0 17h31v1h-31zM0 18h31v1h-31zM1 19h29v1h-29zM1 20h29v1h-29zM1 21h29v1h-29zM2 22h27v1h-27zM2 23h27v1h-27zM3 24h25v1h-25zM4 25h23v1h-23zM5 26h21v1h-21zM6 27h19v1h-19zM7 28h17v1h-17zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 31 31' shape-rendering='crispEdges'%3E%3Cpath d='M12 0h7v1h-7zM9 1h13v1h-13zM7 2h5v1h-5zM19 2h5v1h-5zM6 3h3v1h-3zM22 3h3v1h-3zM5 4h2v1h-2zM24 4h2v1h-2zM4 5h2v1h-2zM25 5h2v1h-2zM3 6h2v1h-2zM26 6h2v1h-2zM2 7h2v1h-2zM27 7h2v1h-2zM2 8h2v1h-2zM27 8h2v1h-2zM1 9h2v1h-2zM28 9h2v1h-2zM1 10h2v1h-2zM28 10h2v1h-2zM1 11h2v1h-2zM28 11h2v1h-2zM0 12h2v1h-2zM29 12h2v1h-2zM0 13h2v1h-2zM29 13h2v1h-2zM0 14h2v1h-2zM29 14h2v1h-2zM0 15h2v1h-2zM29 15h2v1h-2zM0 16h2v1h-2zM29 16h2v1h-2zM0 17h2v1h-2zM29 17h2v1h-2zM0 18h2v1h-2zM29 18h2v1h-2zM1 19h2v1h-2zM28 19h2v1h-2zM1 20h2v1h-2zM28 20h2v1h-2zM1 21h2v1h-2zM28 21h2v1h-2zM2 22h2v1h-2zM27 22h2v1h-2zM2 23h2v1h-2zM27 23h2v1h-2zM3 24h2v1h-2zM26 24h2v1h-2zM4 25h2v1h-2zM25 25h2v1h-2zM5 26h2v1h-2zM24 26h2v1h-2zM6 27h3v1h-3zM22 27h3v1h-3zM7 28h5v1h-5zM19 28h5v1h-5zM9 29h13v1h-13zM12 30h7v1h-7z'/%3E%3C/svg%3E")}
   #bagbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
   #statbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
   #mapbtn{--pxdisk:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h10v1h-10zM4 2h14v1h-14zM3 3h16v1h-16zM2 4h18v1h-18zM2 5h18v1h-18zM1 6h20v1h-20zM1 7h20v1h-20zM0 8h22v1h-22zM0 9h22v1h-22zM0 10h22v1h-22zM0 11h22v1h-22zM0 12h22v1h-22zM0 13h22v1h-22zM1 14h20v1h-20zM1 15h20v1h-20zM2 16h18v1h-18zM2 17h18v1h-18zM3 18h16v1h-16zM4 19h14v1h-14zM6 20h10v1h-10zM8 21h6v1h-6z'/%3E%3C/svg%3E");--pxring:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' shape-rendering='crispEdges'%3E%3Cpath d='M8 0h6v1h-6zM6 1h2v1h-2zM14 1h2v1h-2zM4 2h2v1h-2zM16 2h2v1h-2zM3 3h1v1h-1zM18 3h1v1h-1zM2 4h1v1h-1zM19 4h1v1h-1zM2 5h1v1h-1zM19 5h1v1h-1zM1 6h1v1h-1zM20 6h1v1h-1zM1 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM21 8h1v1h-1zM0 9h1v1h-1zM21 9h1v1h-1zM0 10h1v1h-1zM21 10h1v1h-1zM0 11h1v1h-1zM21 11h1v1h-1zM0 12h1v1h-1zM21 12h1v1h-1zM0 13h1v1h-1zM21 13h1v1h-1zM1 14h1v1h-1zM20 14h1v1h-1zM1 15h1v1h-1zM20 15h1v1h-1zM2 16h1v1h-1zM19 16h1v1h-1zM2 17h1v1h-1zM19 17h1v1h-1zM3 18h1v1h-1zM18 18h1v1h-1zM4 19h2v1h-2zM16 19h2v1h-2zM6 20h2v1h-2zM14 20h2v1h-2zM8 21h6v1h-6z'/%3E%3C/svg%3E")}
@@ -21435,7 +21437,7 @@ function updateHUD(){
     const ready=(P.ultCd||0)<=0;
     ub.classList.add('on');
     ub.classList.toggle('ready', ready);
-    hset('ultbtn.col', ready ? u.col : '', v=>ub.style.color=v);
+    hset('ultbtn.col', ready ? SKILL_READY_COL : '', v=>ub.style.color=v);
     hset('ult-icon.bg', u.id, v=>el('ult-icon').style.backgroundImage=skillIconUrl(v));
     hset('ultbtn.lbl', u.nm+' Lv.'+ultLv(u.id), v=>ub.setAttribute('aria-label', v));   // 名前は読み上げ用にだけ持つ
     skillGauge(ub, 'ultbtn.gp', P.ultCd, P.ultCdMax || ultCooldown(u));
@@ -21449,7 +21451,7 @@ function updateHUD(){
     const wr=(P.waveCd||0)<=0;
     wb.classList.add('on');
     wb.classList.toggle('ready', wr);
-    hset('wavebtn.col', wr ? sk.col : '', v=>wb.style.color=v);
+    hset('wavebtn.col', wr ? SKILL_READY_COL : '', v=>wb.style.color=v);
     hset('wave-icon.bg', sk.id, v=>el('wave-icon').style.backgroundImage=skillIconUrl(v));
     hset('wavebtn.lbl', sk.nm+' Lv.'+skillLv(sk.id), v=>wb.setAttribute('aria-label', v));
     skillGauge(wb, 'wavebtn.gp', P.waveCd, P.waveCdMax || skillCooldown(sk));
@@ -21465,7 +21467,7 @@ function updateHUD(){
     const ar=(P.artCd||0)<=0;
     ab.classList.add('on');
     ab.classList.toggle('ready', ar);
-    hset('artbtn.col', ar ? ad.col : '', v=>ab.style.color=v);
+    hset('artbtn.col', ar ? SKILL_READY_COL : '', v=>ab.style.color=v);
     hset('art-icon.bg', ad.id, v=>el('art-icon').style.backgroundImage=skillIconUrl(v));
     hset('artbtn.lbl', artName(ad), v=>ab.setAttribute('aria-label', v));   // 名付けた名前は読み上げ用にだけ持つ
     skillGauge(ab, 'artbtn.gp', P.artCd, P.artCdMax || artCooldown(ad, false));
@@ -24151,6 +24153,9 @@ function skillIconTint(id, col){
   return (_skillIconTint[k]='url('+cv.toDataURL()+')');
 }
 /* 外周の円ゲージ。満ちた割合（0〜1）を角度にして --gp へ。3度刻みで丸めて、書き込みを減らす */
+/* 右の技ボタン3つ（大技・スキル技・武器技）が使えるときの縁の色。技ごとの色をやめて1色に揃えた
+   （2026-11-25 ユーザー指定「右側のボタンの色とアウトラインの太さを揃えて」） */
+const SKILL_READY_COL = '#e8e2cf';
 function skillGauge(btn, key, cd, max){
   const p = max>0 ? clamp(1 - (cd||0)/max, 0, 1) : 1;
   hset(key, Math.round(p*120)*3, v=>btn.style.setProperty('--gp', v+'deg'));
