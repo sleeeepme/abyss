@@ -405,6 +405,9 @@ foeFoam:{p:[[[0,.06,392,8,1,.5,0,{to:784}],[.14,.05,523,7,1,.5,0,{to:988}],[.27,
   const TRACKS={
     hub:  {src:'assets/bgm/hub_beyond_the_stone_gate.mp3', gain:1},     // 拠点「Beyond the Stone Gate」
     stone:{src:'assets/bgm/stone_the_forgotten_archway.mp3', gain:1},   // 石の層「The Forgotten Archway」
+    sump: {src:'assets/bgm/sump_tides_of_the_sunken_hall.mp3', gain:1},   // 水の層「Tides of the Sunken Hall」（2026-11-25）
+    root: {src:'assets/bgm/root_roots_beneath_the_stone.mp3', gain:1},    // 根の層「Roots Beneath the Stone」（2026-11-25。頭の無音 0.33秒は詰めてある）
+    mallet:{src:'assets/bgm/boss30_sanctum_of_iron_and_stone.mp3', gain:1, restart:true},   // 施しのマレット戦（30F）「Sanctum of Iron and Stone」（2026-11-25。戦いのたびに頭から）
     midboss:{src:'assets/bgm/midboss_the_weight_of_stone.mp3', gain:1, restart:true}, // 5階ごとの中ボス戦「The Weight of Stone」（頭の無音は詰めてある。戦いのたびに頭から）
     /* ヴェラ第二形態「Strike of the Stone Giant」。元の曲は 160BPM で、53.75秒〜119.75秒（176拍＝44小節）が
        後半でもう一度くり返される作り。そこを区間にして回す。継ぎ目は小節の頭（区間の頭の強拍）の直前0.3秒で重ねてある。
