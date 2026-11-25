@@ -441,6 +441,9 @@
   /* 連携値。経験値の下にもう1本、金色で。満ちたら明滅して「押せる」を知らせる */
   .bar.thin{height:5px}
   #stat{font-size:12px;color:var(--dim);margin-top:2px}
+  /* HPの下の「Lv. HP」と、右上の階の数字以外（点・G・SP・黒鉄）は Silkscreen（2026-11-25 ユーザー指定）。
+     --font-fx は英数字が Silkscreen・かな漢字がベストテン。階の数字（#dnum）はベストテンのまま */
+  #stat,#dsub{font-family:var(--font-fx)}
   /* 層の名前が1行増えるので行間を詰める。行数が増えても高さは元のまま */
   #depth{margin-left:auto;text-align:right;font-size:12px;color:var(--dim);line-height:1.25}
   #depth b{display:block;font-size:24px;color:var(--txt);line-height:1.05}
