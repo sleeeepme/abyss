@@ -633,11 +633,13 @@
   #kb{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));font-size:12px;color:#6b7488;line-height:1.6}
   /* 右上は「開く物」の列。上に詰めすぎると、階層・所持金の行に
      🎒 の個数バッジが重なる（実際に重なった）ので、その下から始める。 */
-  #bagbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 106px);
+  /* 右上の3つ（持ち物・ステータス・地図）は、右上の階の表示のすぐ下から積む（2026-11-25 ユーザー指定「もう少し上に」）。
+     --rtop は layoutTopBars が #depth の下端＋8px を入れる。入る前の既定は 80px */
+  #bagbtn{position:absolute;right:14px;top:var(--rtop,calc(max(10px,env(safe-area-inset-top)) + 70px));
     width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
-  #statbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 156px);
+  #statbtn{position:absolute;right:14px;top:calc(var(--rtop,calc(max(10px,env(safe-area-inset-top)) + 70px)) + 50px);
     width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
@@ -645,7 +647,7 @@
      ステータスの下に置く。右上は「開く物」の列なので、
      地図もその列に並べたほうが探さずに済む。
      出ているあいだは縁を光らせる——押したかどうかが一目で分かるように。 */
-  #mapbtn{position:absolute;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 206px);
+  #mapbtn{position:absolute;right:14px;top:calc(var(--rtop,calc(max(10px,env(safe-area-inset-top)) + 70px)) + 100px);
     width:44px;height:44px;--pb:var(--line);border:none;--pf:rgba(22,26,35,.9);background:none;
     color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
     pointer-events:auto}
@@ -21710,6 +21712,8 @@ function layoutLeftColumn(base){
 function layoutTopBars(base){
   const dp=el('depth'); if(!dp) return;
   const d=dp.getBoundingClientRect();
+  /* 右上の3つのボタンは階の表示のすぐ下から（行が増えれば下がる） */
+  { const v=Math.round(d.bottom-base+8)+'px', h=el('hud'); if(h.style.getPropertyValue('--rtop')!==v) h.style.setProperty('--rtop', v); }
   const shown=n=>n && n.style.display!=='none' && getComputedStyle(n).display!=='none';
   const bb=el('bossbar'), tb=el('trialbar');
   let below=null;                                   // ボスのバーの下端（両方出ているときは、帯をその下へ積む）
