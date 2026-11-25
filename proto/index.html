@@ -140,7 +140,16 @@
      列全体を少し詰めて下げ、地図が使える帯を上に空ける。
      地図の側もこの帯を避けて描く（MAP_KEEP_BOTTOM）ので、
      **どちらか片方を直すだけでは必ずまた重なる**——2つで1組の数字。 */
-  #ultbtn{position:absolute;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));
+  /* ---------- 技ボタンは画面の大きさの割合で置く（2026-11-25 ユーザー指定） ----------
+     基準は iPhone の 390×844。そこで今までと同じ位置になるよう、ボタンの**中心**を
+     右から幅の割合（vw）・下から高さの割合（vh）で決める。大きさは変えない。
+       大技   中心 右13.59vw・下14.34vh（74px）
+       スキル技 中心 右13.59vw・下22.63vh（58px）  大技の中心から最低70px上
+       武器技  中心 右13.59vw・下30.69vh（62px）  スキル技の中心から最低64px上
+       一斉攻撃 中心 右33.85vw・下14.69vh（64px）  大技の中心から最低75px左
+     背の低い・幅の狭い画面では割合だけだと重なるので、max() で最低の間隔を守る。
+     地図の側（mapKeepBottom）も同じ式で武器技の上端を計算する——2つで1組。 */
+  #ultbtn{position:absolute;right:calc(13.59vw - 37px);bottom:calc(14.34vh - 37px + env(safe-area-inset-bottom));
     width:74px;height:74px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     --pf:rgba(16,20,28,.82);background:none;border:none;
@@ -294,7 +303,7 @@
      大技の**すぐ上**に置く。左右に並べると親指の可動域から外れるし、
      反対側は盾（押しているあいだ構える）で埋まっている。
      大技より一回り小さくして、切り札と気軽な技の格を見た目で分ける。 */
-  #wavebtn{position:absolute;right:24px;bottom:calc(162px + env(safe-area-inset-bottom));
+  #wavebtn{position:absolute;right:calc(13.59vw - 29px);bottom:calc(max(22.63vh - 29px, 14.34vh + 41px) + env(safe-area-inset-bottom));
     width:58px;height:58px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     --pf:rgba(16,20,28,.82);background:none;border:none;
@@ -309,7 +318,7 @@
 
      武器を持ち替えると中身が変わる（技は武器種に付いている）ので、
      名札を出す——衝撃波と違って「今なにが乗っているか」が変わりうる。 */
-  #artbtn{position:absolute;right:22px;bottom:calc(228px + env(safe-area-inset-bottom));
+  #artbtn{position:absolute;right:calc(13.59vw - 31px);bottom:calc(max(30.69vh - 31px, 22.63vh + 33px, 14.34vh + 103px) + env(safe-area-inset-bottom));
     width:62px;height:62px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     --pf:rgba(16,20,28,.82);background:none;border:none;
@@ -321,7 +330,7 @@
      大技の**左隣**に置く——右手の親指が一番届く所で、出た瞬間に目に入る。
      出ている間はずっと金色で光り、少し脈打つ（押せる状態しか存在しないボタン）。
      縁と面のドットの型は武器技のボタンと同じ物を使う（JS で写す）。 */
-  #linkbtn{position:absolute;right:100px;bottom:calc(92px + env(safe-area-inset-bottom));
+  #linkbtn{position:absolute;right:max(33.85vw - 32px, 13.59vw + 43px);bottom:calc(14.69vh - 32px + env(safe-area-inset-bottom));
     width:64px;height:64px;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     --pf:rgba(40,28,8,.88);background:none;border:none;--pb:currentColor;
@@ -440,10 +449,12 @@
   #xpfill{background:var(--xp);}
   /* 連携値。経験値の下にもう1本、金色で。満ちたら明滅して「押せる」を知らせる */
   .bar.thin{height:5px}
-  #stat{font-size:12px;color:var(--dim);margin-top:2px}
+  #stat{font-size:14px;color:var(--dim);margin-top:2px}   /* 12→14（2026-11-25 ユーザー指定 +2） */
   /* HPの下の「Lv. HP」と、右上の階の数字以外（点・G・SP・黒鉄）は Silkscreen（2026-11-25 ユーザー指定）。
      --font-fx は英数字が Silkscreen・かな漢字がベストテン。階の数字（#dnum）はベストテンのまま */
   #stat,#dsub{font-family:var(--font-fx)}
+  /* バッジの数字・タイトルのロゴも Silkscreen（2026-11-25 ユーザー指定） */
+  #bagcount,.hub-badge,#scr-title .logo{font-family:var(--font-fx)}
   /* 層の名前が1行増えるので行間を詰める。行数が増えても高さは元のまま */
   #depth{margin-left:auto;text-align:right;font-size:12px;color:var(--dim);line-height:1.25}
   /* 階の数字は左のゲージ2本（HPと経験値）と同じ高さ（2026-11-25 ユーザー指定）。
@@ -452,6 +463,7 @@
   /* 「30F」の F。数字より一段落として、読むべきは数字だと分かるようにする */
   #depth b .fu{font-size:14px}
   #depth .zn{font-size:12px;font-weight:700;letter-spacing:.03em}
+  #dsub{font-size:14px}   /* SP / G の行 12→14（2026-11-25 ユーザー指定 +2）。層の名前（.zn）は12のまま */
   #bossbar{position:absolute;left:50%;transform:translateX(-50%);
     top:calc(max(10px,env(safe-area-inset-top)) + 58px);width:66%;display:none;text-align:center}
   #bossbar .bl{height:9px;background:#1b2029;border:1px solid #4a2523;overflow:hidden}
@@ -21219,14 +21231,20 @@ function shade(hex,k){
    MAP_KEEP_BOTTOM は #artbtn の上端（228+62）＋余白で、CSS 側の数字と対。
    片方だけ動かすと必ずまた重なるので、直すときは2つ揃えて動かすこと。 */
 const MM_BOTTOM = 186;            // 旧ミニマップの余白。外部から参照している物があるので残す
-const MAP_KEEP_BOTTOM = 304;      // 下に空けておく帯（技ボタンの列）
+const MAP_KEEP_BOTTOM = 304;      // 下に空けておく帯（技ボタンの列）。390×844 での値。実際は mapKeepBottom()
+/* 技ボタンの列を割合で置くようにしたので（CSS の #artbtn と同じ式）、地図が空ける帯も画面の高さで変わる。
+   武器技の下端（max(30.69vh-31, 22.63vh+33, 14.34vh+103)）＋高さ62＋余白14。844 で 304 */
+function mapKeepBottom(){
+  const H=innerHeight/100;
+  return Math.round(Math.max(30.69*H-31, 22.63*H+33, 14.34*H+103) + 62 + 14);
+}
 const MAP_KEEP_TOP    = 56;       // 上に空けておく帯（階層表示・ログ）
 const MAP_SIDE_KEEP   = 130;      // 左右に空ける合計幅（右上のボタン列を避ける）
 function mapOn(){ return !!S.mapOn; }
 /* 地図の矩形。描画とテストが同じ計算を見るように、ここ1ヶ所で決める。 */
 function mapBox(){
   const f=W.fl; if(!f) return null;
-  const band = Math.max(80, innerHeight - MAP_KEEP_BOTTOM - MAP_KEEP_TOP);
+  const band = Math.max(80, innerHeight - mapKeepBottom() - MAP_KEEP_TOP);
   const lim  = Math.max(110, Math.min(innerWidth - MAP_SIDE_KEEP, band, 520));
   const s    = Math.min(lim/f.W, lim/f.H);
   const mw=f.W*s, mh=f.H*s;
