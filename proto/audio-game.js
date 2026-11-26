@@ -98,6 +98,17 @@
     if(!fought.has(b)&&(b.revealed||Math.hypot(b.x-P.x,b.y-P.y)<=BOSS_NEAR))fought.add(b);
     return fought.has(b)?BOSS_BGM[b.uniqueBoss]:null;
   };
+  /* 打ち直しのブレヒト（20F・2体）（2026-11-26 ユーザー指定）：第一段階（鎧〜脱いだ後）は中ボス戦の曲、
+     合体したらボス戦の曲（ヴェラ第二形態と同じ「Strike of the Stone Giant」）。始め方は中ボスと同じ（正体が割れる／6マス以内）。
+     どちらかの個体で始まったら、2体とも倒れるまで続く */
+  const BRECHT_BGM={first:'midboss', merged:'vera2'};
+  const brechtFight=()=>{
+    if(!W||!W.enemies)return null;
+    const bs=W.enemies.filter(e=>e.boss&&!e.dead&&e.brecht);if(!bs.length)return null;
+    for(const b of bs)if(!fought.has(b)&&(b.revealed||Math.hypot(b.x-P.x,b.y-P.y)<=BOSS_NEAR))fought.add(b);
+    if(!bs.some(b=>fought.has(b))){try{A.musicPrefetch&&A.musicPrefetch(BRECHT_BGM.merged);}catch{}return null;}
+    return bs.some(b=>b.brecht.merged)?BRECHT_BGM.merged:BRECHT_BGM.first;
+  };
   const form2Fight=()=>{
     if(!W||!W.enemies)return null;
     const b=W.enemies.find(e=>e.boss&&!e.dead&&FORM2_BGM[e.uniqueBoss]);if(!b)return null;
@@ -111,6 +122,7 @@
     if(!S.hero||S.screen==='title')return null;
     if(!S.run)return 'hub';
     const f2=form2Fight();if(f2)return f2;
+    const br=brechtFight();if(br)return br;
     if(midBossFight())return 'midboss';
     const ub=bossFight();if(ub)return ub;
     // 潜っている間は層の曲（曲のある層だけ。層は一周するので階の数ではなく層で見る）
@@ -118,7 +130,8 @@
     return z&&ZONE_BGM[z.id]||null;
   }catch{return null;}};
   if(A.music){A.music(bgmWant());setInterval(()=>A.music(bgmWant()),400);
-    wrap('bossChangeForm',()=>A.music(bgmWant()));}   // 第二形態の曲は変わった瞬間に（400ms 待たない）
+    wrap('bossChangeForm',()=>A.music(bgmWant()));
+    wrap('brechtMerge',()=>A.music(bgmWant()));}   // ブレヒトの合体も、合わさった瞬間にボス戦の曲へ   // 第二形態の曲は変わった瞬間に（400ms 待たない）
   // Capture touchend because existing bindTap handlers stop bubbling and prevent click.
   /* ボタンの役割で音を分ける（2026-10-25）。id と文字から決める。data-sfx があればそれを使う。
        開く（バッグ・ステータス・地図・街の各施設）／閉じる（-close・閉じる・×）／戻る（cancel・no・戻る・キャンセル）

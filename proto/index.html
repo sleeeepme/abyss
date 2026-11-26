@@ -7633,8 +7633,12 @@ function resolveDamage(target, parts, srcLevel, opts){
     target.bu[sid]=(target.bu[sid]||0)+build[sid];
     if(target.bu[sid]>=need){ target.bu[sid]=0; addStatus(target,sid,srcLevel); procs.push(sid); }
   }
+  /* ボスが被弾で白く光るのは弱点の属性で当たったときだけ（2026-11-26 ユーザー指定）。光らせる側（cave-look / game-feel）は bossFlashOK を見る */
+  if(target && target.boss && weak) target.weakT=BOSS_WEAK_FLASH;
   return {total, mainType, weak, resisted, procs};
 }
+const BOSS_WEAK_FLASH = 0.25;    // 弱点で当たったあと、白く光ってよい秒数
+function bossFlashOK(e){ return !e || !e.boss || (e.weakT||0)>0; }
 
 /* ---------- 浅い階では出血を配らない ----------
    斬撃は出血を蓄積する。そして第1階層から出る「獣」の攻撃属性が斬撃なので、
@@ -10389,20 +10393,34 @@ function nearEnemies(x, y, r){
    中心の円（1.25）だけだと、奥（画面の上）や肩の横からは体に届かなかった。描いてある冠（角の付け根）と
    左右の肩にも体の円を足す（当たれば体に入る。部位ではない）。弾も絵の肩・冠に当たるようになる。 */
 const VERA2_BODY_HIT = [{ox:0, oy:-1.6, r:0.8}, {ox:-2.3, oy:-0.1, r:0.8}, {ox:2.3, oy:-0.1, r:0.8}];
+/* ブレヒトの当たり（2026-11-26 ユーザー指摘「ブレヒトのコリジョンがおかしい場合がある」）。
+   当たりの円は足元（e.x, e.y）が中心の半径 e.r だったが、絵は足元より上に伸びている（鎧で足元の2マス上〜0.8マス下）。
+   頭を斬っても当たらず、足元の何も無い所で当たっていた。合体後は絵の幅が5.4マスあるのに半径1.35で、触手に当たらなかった。
+   描いた絵の大きさ（e._vis。cave-look が測る）から、見えている体に合わせた円を作る。横に長い形（合体）は左右にもう1つずつ。
+   絵がまだ測れていない間は今まで通りの円。動き・壁・技の当たり（e.r / e.cr）は変えない——被弾の判定だけ */
+function brechtHitCircles(e){
+  const v=e._vis; if(!(v && v.w>0 && typeof TS!=='undefined')) return null;
+  const W=v.w/TS, top=v.top/TS, bot=v.bot/TS, H=bot-top, cy=(top+bot)/2;
+  const r=Math.min(W,H)/2*0.9, out=[{x:e.x, y:e.y+cy, r, part:null}];
+  if(W>H*1.15){ const r2=H/2*0.7, ox=W/2-r2*1.05; out.push({x:e.x-ox, y:e.y+cy+H*0.1, r:r2, part:null}, {x:e.x+ox, y:e.y+cy+H*0.1, r:r2, part:null}); }
+  return out;
+}
 function hitCircles(e){
+  if(e.brecht && !e.dead){ const bc=brechtHitCircles(e); if(bc) return bc; }
   const out=[{x:e.x, y:e.y, r:e.r||0.3, part:null}];
   if(e.boss && e.uniqueBoss===10 && !e.form2) for(const c of VERA2_BODY_HIT) out.push({x:e.x+c.ox, y:e.y+c.oy, r:c.r, part:null});
   if(e.parts) for(const p of e.parts) if(!p.broken) out.push({x:e.x+p.ox, y:e.y+p.oy, r:p.r||0.6, part:p});
   return out;
 }
 function eNear(e, x, y){
-  if(!e.parts){ const d=Math.hypot(e.x-x, e.y-y); return {x:e.x, y:e.y, d:d-(e.r||0.3), part:null}; }
+  if(!e.parts && !e.brecht){ const d=Math.hypot(e.x-x, e.y-y); return {x:e.x, y:e.y, d:d-(e.r||0.3), part:null}; }
   let best=null;
   for(const c of hitCircles(e)){ const d=Math.hypot(c.x-x, c.y-y)-c.r; if(!best||d<best.d) best={x:c.x, y:c.y, d, part:c.part}; }
   return best;
 }
 function eSurf(e, x, y){ return eNear(e, x, y).d; }
 function hitExtent(e){
+  if(e.brecht){ const bc=brechtHitCircles(e); if(bc){ let m=e.r||0.3; for(const c of bc) m=Math.max(m, Math.hypot(c.x-e.x,c.y-e.y)+c.r); return m; } }
   if(!e.parts) return e.r||0.3;
   let m=e.r||0.3; for(const p of e.parts) m=Math.max(m, Math.hypot(p.ox,p.oy)+(p.r||0.6)); return m;
 }
@@ -12841,6 +12859,28 @@ function resolveEnemyOverlap(){
     push(P);
     if(px||py) moveEnt(e, px, py);
   }
+  resolveTwinOverlap();
+}
+/* 2体のボス（20階のブレヒト）は、ボスどうしでも重ならない（2026-11-26 ユーザー指摘「ブレヒトのコリジョンがおかしい場合がある」）。
+   ボスは「押される側」にならない決まりなので、2体が同じ所に寄ると絵がまるごと重なっていた。
+   ボスどうしの組だけ、絵の幅（無ければ e.r）の平均×0.8 まで離す。突進・転がり・技の最中の側は動かさない */
+const TWIN_GAP_K = 0.8;
+function resolveTwinOverlap(){
+  const bs=W.enemies.filter(e=>e.boss && e.twin && !e.dead);
+  if(bs.length<2) return;
+  const free=e=>!e.lunge && !e.roll && !e.hop && !e.fallAnim && !e.pinned && !e.cast;   // 技の最中（投げ・掴み・合体の飛び）は動かさない
+  for(let i=0;i<bs.length;i++) for(let j=i+1;j<bs.length;j++){
+    const a=bs[i], b=bs[j];
+    const wa=bodyWH(a), wb=bodyWH(b);
+    const gap=((wa?wa.w:(a.r||1)*2)+(wb?wb.w:(b.r||1)*2))/2*TWIN_GAP_K;
+    let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+    if(d>=gap) continue;
+    if(d<1e-4){ dx=1; dy=0; d=1; }
+    const fa=free(a), fb=free(b); if(!fa && !fb) continue;
+    const need=gap-d, ka=fa&&fb?0.5:(fa?1:0), kb=fa&&fb?0.5:(fb?1:0);
+    if(ka) moveEnt(a, -dx/d*need*ka, -dy/d*need*ka);
+    if(kb) moveEnt(b,  dx/d*need*kb,  dy/d*need*kb);
+  }
 }
 
 
@@ -14138,6 +14178,7 @@ function enemyUpdate(e,dt){
      「攻撃してこない」に見える（報告：第10階層）。広間のボスは常に見えている扱いにする。 */
   const vis = e.intruder || d < a.aggro || (e.boss && W.fl && W.fl.arena);
   e.hit=Math.max(0,e.hit-dt);
+  if(e.weakT>0) e.weakT=Math.max(0,e.weakT-dt);
   if(!vis && e.state==='idle'){ e.cd-=dt*slow; return; }
   if(vis && e.state==='idle' && e.pack){ e.state='chase'; wakePack(e); }   // 群れは一斉に
   if(vis) e.state='chase';
@@ -19087,7 +19128,7 @@ function draw(){
         ? safeFeelDraw(drawSpriteArt,[sprite(spr),sx,sy,R*2.6,e,e.artDx,e.artDy,1,1,0,true])
         : drawSprite(spr,sx,sy,R*2.6);
       if(!spriteDrawn) spriteDrawn=drawSprite(spr,sx,sy,R*2.6);   // 演出が描けなければ素の絵で
-      if(e.hit>0){
+      if(e.hit>0 && bossFlashOK(e)){
         ctx.save();
         ctx.globalAlpha=Math.min(0.6, e.hit*4);
         ctx.fillStyle='#fff';
@@ -19103,7 +19144,7 @@ function draw(){
       if(!spriteDrawn){
         if(typeof drawFeelEnemyShape==='function'&&drawFeelEnemyShape(e,sx,sy,R))spriteDrawn=true;
         else{
-        ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
+        ctx.fillStyle = e.hit>0 && bossFlashOK(e) ? '#fff' : (e.col || e.arch.col);
         ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
         shape(e.arch.id, sx, sy, R); ctx.fill(); ctx.stroke();
         }
@@ -19111,7 +19152,7 @@ function draw(){
     }else{
       if(typeof drawFeelEnemyShape==='function'&&drawFeelEnemyShape(e,sx,sy,R))spriteDrawn=true;
       else{
-      ctx.fillStyle = e.hit>0 ? '#fff' : (e.col || e.arch.col);
+      ctx.fillStyle = e.hit>0 && bossFlashOK(e) ? '#fff' : (e.col || e.arch.col);
       ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=e.boss?3.5:2;
       shape(e.arch.id, sx, sy, R);
       ctx.fill(); ctx.stroke();
@@ -26409,10 +26450,10 @@ resize(); setScreen('title'); requestAnimationFrame(tick);
 <script src="weapon-art-pixel.js?v=20261122-mwarp1"></script>
 <script src="pixel-art-lighter-core.js?v=20261107a"></script>
 <script src="enemy-surface-light.js?v=20261107b"></script>
-<script src="game-feel.js?v=20261123-relic-drop2"></script>
+<script src="game-feel.js?v=20261126-weakflash"></script>
 <script src="ui-icons.js?v=20261123-relic"></script>
 <script src="root-kit.js?v=20261008a"></script>
-<script src="cave-look.js?v=20261122-mwarp1"></script>
+<script src="cave-look.js?v=20261126-weakflash"></script>
 <script>
 /* ---------- ダッシュの解禁 ----------
    ダッシュ（と、その出際のジャスト回避）そのものは演出側 `game-feel.js` にある。
@@ -26480,6 +26521,6 @@ if(typeof beginFeelWorld === 'function'){
 <script src="pixel-round.js?v=20261004a"></script>
 <script src="save-load.js?v=20261122-stash1"></script>
 <script src="audio.js?v=20261125-bgm"></script>
-<script src="audio-game.js?v=20261125-bgm"></script>
+<script src="audio-game.js?v=20261126-brecht"></script>
 </body>
 </html>

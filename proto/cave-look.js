@@ -3296,6 +3296,8 @@ function tri(ax,ay,bx,by,cx,cy,ramp){ const k=PT.k; const A=[PT.ox+ax*k,PT.oy+ay
   for(let Y=Y0;Y<=Y1;Y++)for(let X=X0;X<=X1;X++){const px=X+.5,py=Y+.5;
     const w0=((B[0]-px)*(Cc[1]-py)-(B[1]-py)*(Cc[0]-px))/ar, w1=((Cc[0]-px)*(A[1]-py)-(Cc[1]-py)*(A[0]-px))/ar, w2=1-w0-w1;
     if(w0<0||w1<0||w2<0) continue; const I=.2+.25*PT.lit+.5*PT.lit*(w0*.3+w1*.6+w2*.2); put(X,Y,ramp[shadeIdx(I,X,Y)]);} }
+/* ボスが白く光るのは弱点の属性で当たったときだけ（2026-11-26 ユーザー指定。index.html の bossFlashOK） */
+function flashOK(e){ return typeof bossFlashOK!=='function' || bossFlashOK(e); }
 function sEnd(p,flash){
   const N=PT.N,u=SPR.u32;
   if(flash){ const wc=0xffffffff; for(let i=0;i<u.length;i++) if(u[i]) u[i]=wc; }
@@ -3706,7 +3708,7 @@ function vera2Draw(e,t){
   // ---- どのコマか ----
   const down=e.down>0, casting=!down&&(!!e.cast||e.tele>0);
   const moving=!e.partsAll && !e.lame && !down && footSpeed(e,t)>.3;
-  const hit=e.hit||0; if(hit>(e._v2Hit||0)+1e-4 && !e.dead){ e._v2Dmg=t; e._v2DmgWho=e._hitWho||'body'; } e._v2Hit=hit;
+  const hit=e.hit||0; if(hit>(e._v2Hit||0)+1e-4 && !e.dead && flashOK(e)){ e._v2Dmg=t; e._v2DmgWho=e._hitWho||'body'; } e._v2Hit=hit;
   if(e._v2Cast && !casting && !down && !e.dead) e._v2Atk=t;   // 溜めが切れた瞬間＝攻撃（振り下ろし）
   e._v2Cast=casting;
   const A=VERA2.anims, hurtLen=A.hurt[2].reduce((a,b)=>a+b,0)/1000;
@@ -3913,7 +3915,7 @@ function veraDraw(e,t){
   const legKey=id=>{ const q=partOf(id); if(!q) return id+':ok'; if(q.broken) return id+':broken';
     const r=q.hp/q.max; return id+(r<.34?':crit':r<.67?':hurt':':ok'); };
   const lift=id=>{ if(!moving||down) return 0; const A=(id==='Nb'||id==='Sm'||id==='Nf'); return ((fr>>1)&1)===(A?0:1)?-2:0; };
-  const leg=id=>{ const q=partOf(id); blit(F.legs[legKey(id)],0,lift(id), !!(q&&!q.broken&&q.hit>0&&((t*30)|0)%2===0)); };
+  const leg=id=>{ const q=partOf(id); blit(F.legs[legKey(id)],0,lift(id), !!(q&&!q.broken&&q.hit>0&&flashOK(e)&&((t*30)|0)%2===0)); };
   ['Nb','Nm','Nf'].forEach(leg);
   blit(F.body[down?'down0':casting?(charge>.55?'draw1':'draw0'):'idle'+fr],0,0,false);
   ['Sb','Sm','Sf'].forEach(leg);
@@ -4436,7 +4438,7 @@ function renderFoe(e,noFlash){
   if(BS){
     PT.ox=N/2; PT.oy=N-(BS.pad||4);
     const an=bpxDraw(e,t,BS);
-    if(!noFlash && e.hit>0 && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
+    if(!noFlash && e.hit>0 && flashOK(e) && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
     SPR.cx.putImageData(SPR.id,0,0);
     return {N,face:BS.side?-(e.face||face):1,mid,k,fam,arch,anchor:[PT.ox+an[0],PT.oy+an[1]],px:BS.px};
   }
@@ -4456,7 +4458,7 @@ function renderFoe(e,noFlash){
       for(let i=0;i<u.length;i++){ const c=u[i]; if(!c) continue;
         const r=c&255, g=(c>>8)&255, b=(c>>16)&255;
         u[i]=(0xff000000|((b+(255-b)*k)<<16)|((g+(255-g)*k)<<8)|(r+(255-r)*k|0))>>>0; } }
-    if(!an2 && !noFlash && e.hit>0 && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
+    if(!an2 && !noFlash && e.hit>0 && flashOK(e) && ((t*20)|0)%2===0){ const u=SPR.u32; for(let i=0;i<u.length;i++) if(u[i]) u[i]=0xffffffff; }
     SPR.cx.putImageData(SPR.id,0,0);
     /* 第一形態の正面・背面の絵は左右反転しない（射撃の形が左右で違う）。横の向きは vera1Draw が狙い・歩く向きで決める */
     const fc = an1 ? (e._v1D==='side' ? (e._v1Face||face) : 1) : face;
@@ -4476,7 +4478,7 @@ function renderFoe(e,noFlash){
     return {N,face,mid,k,fam,arch,anchor:an};
   }
   else BODY[fam][arch](p,e,g,t);
-  sEnd(p, !noFlash && e.hit>0 && ((t*20)|0)%2===0);
+  sEnd(p, !noFlash && e.hit>0 && flashOK(e) && ((t*20)|0)%2===0);
   return {N,face,mid,k,fam,arch};
 }
 /* 倒したときの崩れる粒も、いま描いている絵から出す（元の絵の粒が混ざらないように） */

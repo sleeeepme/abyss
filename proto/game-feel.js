@@ -94,7 +94,9 @@ function feelWeaponKind(base,dt,proj){
   C2._noTags=true;
 })();
 function feelImpact(e,src,crit,dt,elem){
-  const m=feelMotion(e);m.flash=.22;m.crit=crit?.25:0;
+  /* ボスは弱点の属性で当たったときだけ白く光る（2026-11-26。index.html の bossFlashOK） */
+  const fok=typeof bossFlashOK!=='function'||bossFlashOK(e);
+  const m=feelMotion(e);m.flash=fok?.22:0;m.crit=fok&&crit?.25:0;
   // Replace the visual recoil on each hit; never accumulate or change simulation coordinates.
   /* src は座標を持たない物（罠・地形・消えた撃ち手）も来る。
      そのとき dx が NaN になり、Math.hypot(NaN,..)||1 が 1 に化けるので
